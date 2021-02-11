@@ -105,6 +105,9 @@ class Radtrans:
             len(continuum_opacities)) > 0:
             self.absorbers_present = True
 
+        # Line species present? If yes: define wavelength array
+        if len(line_species) > 0:
+            self.line_absorbers_present = True
 
         ##### ADD TO SOURCE AND COMMENT PROPERLY LATER!
         self.test_ck_shuffle_comp = test_ck_shuffle_comp
@@ -189,14 +192,40 @@ class Radtrans:
                 self.test_ck_shuffle_comp = True
 
             # For correlated-k
-
             # Get dimensions of molecular opacity arrays for a given P-T point,
             # they define the resolution.
-            self.freq_len, self.g_len = fi.get_freq_len(self.path)
-            self.freq_len_full = cp.copy(self.freq_len)
-            # Read in the frequency range of the opcity data
-            self.freq, self.border_freqs = fi.get_freq(self.path,self.freq_len)
+            # Use the first entry of self.line_species for this, if given.
+            read_freq = False
+            spec_name = 'H2O'
+            if self.line_absorbers_present:
+                # Check if first species is hdf5
+                path_opa = self.path+'/opacities/lines/corr_k/'+self.line_species[0]
+                hdf5_path = glob.glob(path_opa+'/*.h5')
+                if hdf5_path != []:
+                    read_freq = True
+                    f = h5py.File(hdf5_path[0],'r')
+                    self.freq_len = len(f['bin_centers'][:])
+                    self.g_len = len(f['samples'][:])
+                    self.freq = nc.c*f['bin_centers'][:][::-1]
+                    self.freq_len_full = cp.copy(self.freq_len)
+                    self.border_freqs = nc.c*f['bin_edges'][:][::-1]
+                else:
+                    spec_name = self.line_species[0]
+                    
+            # If no hdf5 line absorbers are given use the classical pRT format.
+            # If no line absorbers are given *at all* use classical water.
+            # In the long run: move to hdf5 fully?
+            # But: people calculate their own k-tables with my code sometimes now.
+            if not read_freq:
+                self.freq_len, self.g_len = fi.get_freq_len(self.path, spec_name)
+                self.freq_len_full = cp.copy(self.freq_len)
+                # Read in the frequency range of the opcity data
+                self.freq, self.border_freqs = fi.get_freq(self.path, \
+                                                           spec_name, \
+                                                           self.freq_len)
+                
             arr_min, arr_max = -1, -1
+
 
         elif self.mode == 'lbl':
             # For high-res line-by-line radiative transfer
@@ -222,7 +251,34 @@ class Radtrans:
                 self.freq_len = len(self.freq)
 
         if self.mode == 'c-k':
-            # To cut opacity data to required range
+
+            # Extend the wavelength range if user requests larger
+            # range than what first line opa species contains
+            wlen = nc.c/self.border_freqs/1e-4
+            if wlen[-1] < wlen_bords_micron[1]:
+                delta_log_lambda = np.diff(np.log10(wlen))[-1]
+                add_high = 1e1**np.arange(np.log10(wlen[-1]), \
+                                          np.log10(wlen_bords_micron[-1])+delta_log_lambda, \
+                                          delta_log_lambda)[1:]
+                wlen = np.concatenate((wlen, add_high))
+            if wlen[0] > wlen_bords_micron[0]:
+                delta_log_lambda = np.diff(np.log10(wlen))[0]
+                add_low = 1e1**(-np.arange(-np.log10(wlen[0]), \
+                                           -np.log10(wlen_bords_micron[0])+delta_log_lambda, \
+                                           delta_log_lambda)[1:][::-1])
+                wlen = np.concatenate((add_low, wlen))
+
+            self.border_freqs = nc.c/(wlen*1e-4)
+            self.freq = (self.border_freqs[1:] + self.border_freqs[:-1])/2.
+            self.freq_len_full = len(self.freq)
+            self.freq_len = self.freq_len_full
+
+            '''
+            import pdb
+            pdb.set_trace()
+            '''
+            # Cut the wavelength range if user requests smaller
+            # range than what first line opa species contains
             index = (nc.c/self.freq > wlen_bords_micron[0]*1e-4) & \
               (nc.c/self.freq < wlen_bords_micron[1]*1e-4)
 
@@ -247,6 +303,7 @@ class Radtrans:
             self.freq_full = self.freq
             self.freq = np.array(self.freq[index],dtype='d',order='F')
             self.freq_len = len(self.freq)
+            
         else:
             index = None
 
@@ -541,6 +598,13 @@ class Radtrans:
                                 self.custom_line_paths[self.line_species[i_spec]][i_TP] \
                                 + ':'
 
+                    #######
+                    ####### TODO PAUL EXO_K Project: do index_fill treatment from below!
+                    ####### Also needs to read "custom" freq_len and freq here again!
+                    ####### FOR ALL TABLES, HERE AND CHUBB: TEST THAT THE GRID IS INDEED THE SAME AS REQUIRED IN THE REGIONS
+                    ####### WITH OPACITY. NEXT STEPS AFTER THIS: (i) MAKE ISOLATED EXO_K rebinning test, (ii) Do external bin down script, save as pRT method
+                    ####### (iii) enable on the fly down-binning, (iv) look into outsourcing methods from class to separate files, this here is getting too long!
+                    #######
                     self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
                       fi.read_in_molecular_opacities( \
                         self.path, \
