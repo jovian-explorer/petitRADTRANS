@@ -97,6 +97,8 @@ class Radtrans:
                      test_ck_shuffle_comp = False, do_scat_emis = False, \
                      lbl_opacity_sampling = None):
 
+        self.wlen_bords_micron = wlen_bords_micron
+        
         # Any opacities there at all?
         self.absorbers_present = False
         if (len(line_species) + \
@@ -216,7 +218,7 @@ class Radtrans:
             # If no line absorbers are given *at all* use classical water.
             # In the long run: move to hdf5 fully?
             # But: people calculate their own k-tables with my code sometimes now.
-            if not read_freq:
+            if (self.line_absorbers_present) and (not read_freq):
                 self.freq_len, self.g_len = fi.get_freq_len(self.path, spec_name)
                 self.freq_len_full = cp.copy(self.freq_len)
                 # Read in the frequency range of the opcity data
@@ -605,12 +607,20 @@ class Radtrans:
                     ####### WITH OPACITY. NEXT STEPS AFTER THIS: (i) MAKE ISOLATED EXO_K rebinning test, (ii) Do external bin down script, save as pRT method
                     ####### (iii) enable on the fly down-binning, (iv) look into outsourcing methods from class to separate files, this here is getting too long!
                     #######
+
+                    local_freq_len, local_g_len = fi.get_freq_len(self.path, self.line_species[i_spec])
+                    local_freq_len_full = cp.copy(local_freq_len)
+                    # Read in the frequency range of the opcity data
+                    local_freq, local_border_freqs = fi.get_freq(self.path, \
+                                                               self.line_species[i_spec], \
+                                                               local_freq_len)
+                    
                     self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
                       fi.read_in_molecular_opacities( \
                         self.path, \
                         self.line_species[i_spec]+':', \
-                        self.freq_len_full, \
-                        self.g_len, \
+                        local_freq_len_full, \
+                        local_g_len, \
                         1, \
                         len_TP, \
                         self.mode, \
@@ -618,6 +628,22 @@ class Radtrans:
                         arr_max, \
                         self.custom_grid[self.line_species[i_spec]], \
                         custom_file_names)
+                 
+                    # Initialize an empty array that has the same spectral entries as
+                    # pRT object has nominally. Only fill those values where the k-tables
+                    # have entries.
+                    retVal = np.zeros(self.g_len* self.freq_len_full*len_TP).reshape( \
+                                          self.g_len, self.freq_len_full, 1, \
+                                          len_TP)
+
+                    index_fill = (self.freq_full <= local_freq[0]*(1.+1e-10)) & \
+                      (self.freq_full >= local_freq[-1]*(1.-1e-10))
+
+                    #import pdb
+                    #pdb.set_trace()
+                    
+                    retVal[:, index_fill, 0, :] = self.line_grid_kappas_custom_PT[self.line_species[i_spec]][:,:,0,:]
+                    self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = retVal
 
                     # Down-sample opacities in lbl mode if requested
                     if (self.mode == 'lbl') and (self.lbl_opacity_sampling != None):
@@ -647,7 +673,7 @@ class Radtrans:
                     k_table2 = k_table2[:,::-1,:]
 
                     # Initialize an empty array that has the same spectral entries as
-                    # pRT nominally. Only fill those values where the Exomol tables
+                    # pRT object has nominally. Only fill those values where the Exomol tables
                     # have entries.
                     retVal = np.zeros(self.g_len* self.freq_len_full* \
                        len(self.custom_line_TP_grid[self.line_species[i_spec]])).reshape( \
@@ -1790,3 +1816,37 @@ class Radtrans:
 
         else:
             self.tau_cloud = None
+
+    def write_out_rebin(self, resolution, species = []):
+
+        import exo_k as xk
+
+        n_spectral_points = int(resolution * np.log(self.wlen_bords_micron[1]/ \
+                                               self.wlen_bords_micron[0]) + 1)
+
+        wavenumber_grid = np.logspace(np.log10(1/self.wlen_bords_micron[1]/1e-4), \
+                                      np.log10(1./self.wlen_bords_micron[0]/1e-4), \
+                                      n_spectral_points)
+
+        for spec in species:
+
+            f = h5py.File('temp', 'w')
+            f.create_dataset('mol_name', data = spec)
+            f.create_dataset('bin_centers', data = self.freq/nc.c)
+
+            import pdb
+            pdb.set_trace()
+
+            
+            f.close()
+            
+
+            # Generate hdf5 table with relevant input
+            # tab =
+
+            # tab.bin_down(wavenumber_grid)
+            # tab.write_hdf5('test.h5')
+            
+
+        print((wavenumber_grid[1:]+wavenumber_grid[:-1])/np.diff(wavenumber_grid)/2.)
+        

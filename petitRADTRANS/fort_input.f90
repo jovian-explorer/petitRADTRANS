@@ -72,6 +72,15 @@ subroutine get_freq(path,spec_name,freq_len,freq,freq_use_ck)
   read(10,*) freq_use_ck(freq_len_use_ck), &
        freq_use_ck(freq_len_use_ck-1)
   close(10)
+
+  !write(*,*) 3e10/freq_use_ck(1)/1d-4
+  ! Correct, smallest wlen is slightly offset (not following log-spacing)
+  freq_use_ck(1) = freq_use_ck(2)*exp(-LOG(freq_use_ck(4)/freq_use_ck(3)))
+  !write(*,*) 3e10/freq_use_ck(1)/1d-4
+  !write(*,*) LOG(freq_use_ck(2)/freq_use_ck(1)), &
+  !     LOG(freq_use_ck(4)/freq_use_ck(3)), &
+  !     LOG(freq_use_ck(5)/freq_use_ck(4))
+  
   freq = (freq_use_ck(1:freq_len_use_ck-1)+freq_use_ck(2:freq_len_use_ck))/2d0
 
 end subroutine get_freq
