@@ -1869,7 +1869,7 @@ class Radtrans:
             f.create_dataset('p', data = self.custom_line_TP_grid[spec][:self.custom_diffPs[spec],1]/1e6)
             f['p'].attrs.create('units', 'bar')
             f.create_dataset('samples', data = self.g_gauss)
-            f.create_dataset('t', data = self.custom_line_TP_grid['H2O'][::self.custom_diffPs['H2O'],0])
+            f.create_dataset('t', data = self.custom_line_TP_grid[spec][::self.custom_diffPs[spec],0])
             f.create_dataset('weights', data = self.w_gauss)
             f.create_dataset('wlrange', data = [np.min(nc.c/self.border_freqs/1e-4), \
                                                 np.max(nc.c/self.border_freqs/1e-4)])
