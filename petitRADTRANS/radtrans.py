@@ -1883,6 +1883,8 @@ class Radtrans:
             ###############################################
             tab = xk.Ktable(filename = 'temp.h5')
             tab.bin_down(wavenumber_grid)
-            tab.write_hdf5('rebin_results/'+spec+'_R_'+str(int(resolution))+'.h5')
+            if path[-1] == '/':
+                path = path[:-1]
+            tab.write_hdf5(path+'/'+spec+'_R_'+str(int(resolution))+'.h5')
             os.system('rm temp.h5')
         
