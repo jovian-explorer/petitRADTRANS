@@ -232,8 +232,8 @@ class ReadOpacities:
                        len(self.custom_line_TP_grid[self.line_species[i_spec]])).reshape( \
                                           self.g_len, self.freq_len_full, 1, \
                                           len(self.custom_line_TP_grid[self.line_species[i_spec]]))
-                    index_fill = (self.freq_full <= freqs_chubb[0]) & \
-                      (self.freq_full >= freqs_chubb[-1])
+                    index_fill = (self.freq_full <= freqs_chubb[0]*(1.+1e-10)) & \
+                      (self.freq_full >= freqs_chubb[-1]*(1.-1e-10))
                     retVal[:, index_fill, 0, :] = k_table2
 
                     # Divide by mass to go from cross-sections to opacities, the latter
