@@ -675,7 +675,9 @@ class Radtrans(_read_opacities.ReadOpacities):
         # Interpolate line opacities, combine with continuum oacities
         self.line_struc_kappas = fi.mix_opas_ck(self.line_abundances, \
                                     self.line_struc_kappas,self.continuum_opa)
-
+        np.save("/Users/nasedkin/Documents/RetrievalNotebooks/line_structs_3_6_ch4h2s",self.line_struc_kappas)
+        np.save("/Users/nasedkin/Documents/RetrievalNotebooks/g_gauss",self.g_gauss)
+        np.save("/Users/nasedkin/Documents/RetrievalNotebooks/w_gauss",self.w_gauss)
         # Similar to the line-by-line case below, if test_ck_shuffle_comp is
         # True, we will put the total opacity into the first species slot and
         # then carry the remaining radiative transfer steps only over that 0
@@ -696,6 +698,9 @@ class Radtrans(_read_opacities.ReadOpacities):
               fs.combine_opas_sample_ck(self.line_struc_kappas, \
                                           self.g_gauss, self.w_gauss, \
                                           1000)
+            np.save("/Users/nasedkin/Documents/RetrievalNotebooks/line_structs_shuffled_3_6_ch4h2s",self.line_struc_kappas)
+            sys.exit(1)
+
             #stamps.append(time.clock())
             #self.combine_opas_shuffle_ck()
             #stamps.append(time.clock())
@@ -1545,7 +1550,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         wavenumber_grid = np.logspace(np.log10(1/self.wlen_bords_micron[1]/1e-4), \
                                       np.log10(1./self.wlen_bords_micron[0]/1e-4), \
                                       n_spectral_points)
-
+        dt = h5py.string_dtype(encoding='utf-8')
         # Do the rebinning, loop through species
         for spec in species:
 
@@ -1556,13 +1561,13 @@ class Radtrans(_read_opacities.ReadOpacities):
             ################################################
             
             f = h5py.File('temp.h5', 'w')
-            f.create_dataset('DOI', data = '--')
+            f.create_dataset('DOI', (1,), data="--", dtype=dt)
             f.create_dataset('bin_centers', data = self.freq[::-1]/nc.c)
             f.create_dataset('bin_edges', data = self.border_freqs[::-1]/nc.c)
 
             ret_opa_table = cp.copy(self.line_grid_kappas_custom_PT[spec])
             ## Mass to go from opacities to cross-sections
-            ret_opa_table = ret_opa_table * nc.amu * masses[spec]
+            ret_opa_table = ret_opa_table * nc.amu * masses[spec.split('_')[0]]
             
             # Do the opposite of what I do when reading in Katy's Exomol tables
             # To get opacities into the right format
@@ -1578,9 +1583,9 @@ class Radtrans(_read_opacities.ReadOpacities):
             f['kcoeff'].attrs.create('units', 'cm^2/molecule')
 
             # Add the rest of the stuff that is needed.
-            f.create_dataset('method', data = 'petit_samples')
-            f.create_dataset('mol_name', data = spec.split('_')[0])
-            f.create_dataset('mol_mass', data = [masses[spec]])
+            f.create_dataset('method', (1,), data = "petit_samples",dtype=dt)
+            f.create_dataset('mol_name', data = spec.split('_')[0], dtype=dt)
+            f.create_dataset('mol_mass', data = [masses[spec.split('_')[0]]])
             f.create_dataset('ngauss', data = len(self.w_gauss))
             f.create_dataset('p', data = self.custom_line_TP_grid[spec][:self.custom_diffPs[spec],1]/1e6)
             f['p'].attrs.create('units', 'bar')
@@ -1601,6 +1606,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             tab.bin_down(wavenumber_grid)
             if path[-1] == '/':
                 path = path[:-1]
-            tab.write_hdf5(path+'/'+spec+'_R_'+str(int(resolution))+'.h5')
+            os.makedirs(path+'/'+spec+'_R_'+str(int(resolution)),exist_ok=True)
+            tab.write_hdf5(path+'/'+spec+'_R_'+str(int(resolution)) +'/' +spec+'_R_'+str(int(resolution))+'.h5')
             os.system('rm temp.h5')
         
