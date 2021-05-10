@@ -98,6 +98,15 @@ class Radtrans(_read_opacities.ReadOpacities):
                      test_ck_shuffle_comp = False, do_scat_emis = False, \
                      lbl_opacity_sampling = None):
 
+        self.path = os.environ.get("pRT_input_data_path")
+        if self.path == None:
+            print('Path to input data not specified!')
+            print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
+            print('    import os')
+            print('    os.environ("pRT_input_data_path") = "path/to/folder/containing/input_data"')
+            print('before creating a Radtrans object or loading the nat_cst module.')
+            sys.exit(1)
+
         self.wlen_bords_micron = wlen_bords_micron
         
         # Any opacities there at all?
@@ -180,14 +189,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     self.N2O2CIA = True
                 elif c == 'H-':
                     self.Hminus = True
-
-
-        # Get path to all input data (opacities, grids, etc.)
-        f = open(os.path.dirname(__file__)+'/path.txt')
-        lines = f.readlines()
-        self.path = os.path.dirname(__file__)+'/'+lines[1].rstrip()
-        f.close()
-
+                
         # Read in frequency grid
         if self.mode == 'c-k':
 
