@@ -35,7 +35,7 @@ fort_rebin = Extension(
     extra_compile_args=extra_compile_args)
 
 
-extensions = [fort_spec, fort_input, fort_rebin, exo-k]
+extensions = [fort_spec, fort_input, fort_rebin]
 
 def setup_function(extensions):
     setup(name='petitRADTRANS',
@@ -50,7 +50,7 @@ def setup_function(extensions):
           license='MIT License',
           packages=find_packages(),
           include_package_data=True,
-          install_requires=['scipy', 'numpy', 'matplotlib', 'h5py'],
+          install_requires=['scipy', 'numpy', 'matplotlib', 'h5py', 'exo-k'],
           zip_safe=False,
           ext_modules=extensions,
           )
