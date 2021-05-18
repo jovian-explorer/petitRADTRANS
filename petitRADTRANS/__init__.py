@@ -6,4 +6,11 @@ __maintainer__ = "Paul Molliere"
 __email__ = "molliere@strw.leidenunivl.nl"
 __status__ = "Development"
 
-from .radtrans import Radtrans
+from petitRADTRANS.radtrans import Radtrans
+
+from petitRADTRANS.retrieval.retrieval import Retrieval
+from petitRADTRANS.retrieval.retrieval_config import RetrievalConfig
+from petitRADTRANS.retrieval.data_class import Data
+from petitRADTRANS.retrieval.parameter_class import Parameter
+
+
