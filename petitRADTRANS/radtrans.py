@@ -8,6 +8,8 @@ from . import pyth_input as pyi
 from . import _read_opacities
 
 import numpy as np
+import tensorflow as tf
+import time
 import copy as cp
 import os,glob
 import sys,pdb
@@ -578,7 +580,207 @@ class Radtrans(_read_opacities.ReadOpacities):
 
 
           return np.multiply(f(xnew,ynew),factor)
+    def calc_opas(self,temp,abunds,gravity,mmw,sigma_lnorm = None, \
+                      fsed = None, Kzz = None, radius = None, \
+                      contribution=False, \
+                      gray_opacity = None, Pcloud = None, \
+                      kappa_zero = None, \
+                      gamma_scat = None, \
+                      add_cloud_scat_as_abs = None,\
+                      Tstar = None, Rstar=None, semimajoraxis = None,\
+                      geometry = 'dayside_ave',theta_star=0, \
+                      hack_cloud_photospheric_tau = None):
+        ''' Method to calculate the atmosphere's emitted flux
+        (emission spectrum).
 
+            Args:
+                temp:
+                    the atmospheric temperature in K, at each atmospheric layer
+                    (1-d numpy array, same length as pressure array).
+                abunds:
+                    dictionary of mass fractions for all atmospheric absorbers.
+                    Dictionary keys are the species names.
+                    Every mass fraction array
+                    has same length as pressure array.
+                gravity (float):
+                    Surface gravity in cgs. Vertically constant for emission
+                    spectra.
+                mmw:
+                    the atmospheric mean molecular weight in amu,
+                    at each atmospheric layer
+                    (1-d numpy array, same length as pressure array).
+                sigma_lnorm (Optional[float]):
+                    width of the log-normal cloud particle size distribution
+                fsed (Optional[float]):
+                    cloud settling parameter
+                Kzz (Optional):
+                    the atmospheric eddy diffusion coeffiecient in cgs untis
+                    (i.e. :math:`\\rm cm^2/s`),
+                    at each atmospheric layer
+                    (1-d numpy array, same length as pressure array).
+                radius (Optional):
+                    dictionary of mean particle radii for all cloud species.
+                    Dictionary keys are the cloud species names.
+                    Every radius array has same length as pressure array.
+                contribution (Optional[bool]):
+                    If ``True`` the emission contribution function will be
+                    calculated. Default is ``False``.
+                gray_opacity (Optional[float]):
+                    Gray opacity value, to be added to the opacity at all
+                    pressures and wavelengths (units :math:`\\rm cm^2/g`)
+                Pcloud (Optional[float]):
+                    Pressure, in bar, where opaque cloud deck is added to the
+                    absorption opacity.
+                kappa_zero (Optional[float]):
+                    Scattering opacity at 0.35 micron, in cgs units (cm^2/g).
+                gamma_scat (Optional[float]):
+                    Has to be given if kappa_zero is definded, this is the
+                    wavelength powerlaw index of the parametrized scattering
+                    opacity.
+                add_cloud_scat_as_abs (Optional[bool]):
+                    If ``True``, 20 % of the cloud scattering opacity will be
+                    added to the absorption opacity, introduced to test for the
+                    effect of neglecting scattering.
+                Tstar (Optional[float]):
+                    The temperature of the host star in K, used only if the
+                    scattering is considered. If not specified, the direct
+                    light contribution is not calculated.
+                Rstar (Optional[float]):
+                    The radius of the star in Solar radii. If specified,
+                    used to scale the to scale the stellar flux,
+                    otherwise it uses PHOENIX radius.
+                semimajoraxis (Optional[float]):
+                    The distance of the planet from the star. Used to scale
+                    the stellar flux when the scattering of the direct light
+                    is considered.
+                geometry (Optional[string]):
+                    if equal to ``'dayside_ave'``: use the dayside average
+                    geometry. if equal to ``'planetary_ave'``: use the
+                    planetary average geometry. if equal to
+                    ``'non-isotropic'``: use the non-isotropic
+                    geometry.
+                theta_star (Optional[float]):
+                    Inclination angle of the direct light with respect to
+                    the normal to the atmosphere. Used only in the
+                    non-isotropic geometry scenario.
+        '''
+
+        self.hack_cloud_photospheric_tau = hack_cloud_photospheric_tau
+        self.Pcloud = Pcloud
+        self.kappa_zero = kappa_zero
+        self.gamma_scat = gamma_scat
+        self.gray_opacity = gray_opacity
+        self.geometry = geometry
+        self.mu_star = np.cos(theta_star*np.pi/180.)
+        self.fsed = fsed
+
+        if self.mu_star<=0.:
+            self.mu_star=1e-8
+        self.get_star_spectrum(Tstar,semimajoraxis,Rstar)
+        self.interpolate_species_opa(temp)
+        lines, s_lines = self.mix_opa_test(abunds,mmw,gravity,sigma_lnorm,fsed,Kzz,radius, \
+                             add_cloud_scat_as_abs = add_cloud_scat_as_abs)
+        return lines, s_lines
+    def mix_opa_test(self, abundances, mmw, gravity, \
+                        sigma_lnorm = None, fsed = None, Kzz = None, \
+                        radius = None, gray_opacity = None, \
+                        add_cloud_scat_as_abs = None):
+        # Combine total line opacities,
+        # according to mass fractions (abundances),
+        # also add continuum opacities, i.e. clouds, CIA...
+
+        self.scat = False
+        self.mmw = mmw
+        for i_spec in range(len(self.line_species)):
+            self.line_abundances[:,i_spec] = abundances[self.line_species[i_spec]]
+        self.continuum_opa = np.zeros_like(self.continuum_opa)
+        self.continuum_opa_scat = np.zeros_like(self.continuum_opa_scat)
+        self.continuum_opa_scat_emis = np.zeros_like(self.continuum_opa_scat_emis)
+
+        # Calc. CIA opacity
+        if self.H2H2CIA:
+            self.continuum_opa = self.continuum_opa + \
+                self.interpolate_cia(self.cia_h2h2_lambda,\
+                    self.cia_h2h2_temp, self.cia_h2h2_alpha_grid,\
+                    abundances['H2'],2.)
+
+        if self.H2HeCIA:
+            self.continuum_opa = self.continuum_opa + \
+                self.interpolate_cia(self.cia_h2he_lambda,\
+                self.cia_h2he_temp, self.cia_h2he_alpha_grid,\
+                np.sqrt(abundances['H2']*abundances['He']),np.sqrt(8.))
+
+        if self.N2N2CIA:
+            self.continuum_opa = self.continuum_opa + \
+                self.interpolate_cia(self.cia_n2n2_lambda,\
+                self.cia_n2n2_temp, self.cia_n2n2_alpha_grid,\
+                abundances['N2'],28.)
+
+        if self.O2O2CIA:
+            self.continuum_opa = self.continuum_opa + \
+                self.interpolate_cia(self.cia_o2o2_lambda,\
+                self.cia_o2o2_temp, self.cia_o2o2_alpha_grid,\
+                abundances['O2'],32.)
+
+        if self.N2O2CIA:
+            self.continuum_opa = self.continuum_opa + \
+                self.interpolate_cia(self.cia_n2o2_lambda,\
+                self.cia_n2o2_temp, self.cia_n2o2_alpha_grid,\
+                np.sqrt(abundances['N2']*abundances['O2']),np.sqrt(896.))
+
+        if self.CO2CO2CIA:
+            self.continuum_opa = self.continuum_opa + \
+                self.interpolate_cia(self.cia_co2co2_lambda,\
+                self.cia_co2co2_temp, self.cia_co2co2_alpha_grid,\
+                abundances['CO2'],44.)
+
+
+        # Calc. H- opacity
+        if self.Hminus:
+            self.continuum_opa = \
+              self.continuum_opa + pyi.hminus_opacity(self.lambda_angstroem, \
+                self.border_lambda_angstroem, \
+                self.temp, self.press, mmw, abundances)
+
+        # Add mock gray cloud opacity here
+        if self.gray_opacity != None:
+            self.continuum_opa = self.continuum_opa + self.gray_opacity
+
+        # Add cloud opacity here, will modify self.continuum_opa
+        if int(len(self.cloud_species)) > 0:
+            self.scat = True
+            self.calc_cloud_opacity(abundances, mmw, gravity, \
+                                        sigma_lnorm, fsed, Kzz, radius, \
+                                        add_cloud_scat_as_abs)
+
+        # Calculate rayleigh scattering opacities
+        if len(self.rayleigh_species) != 0:
+            self.scat = True
+            self.add_rayleigh(abundances)
+        # Add gray cloud deck
+        if (self.Pcloud != None):
+            self.continuum_opa[:,self.press>self.Pcloud*1e6] += 1e99
+        # Add power law opacity
+        if (self.kappa_zero != None):
+            self.scat = True
+            wlen_micron = nc.c/self.freq/1e-4
+            scattering_add = self.kappa_zero * \
+                (wlen_micron/0.35)**self.gamma_scat
+            add_term = np.repeat(scattering_add[None], \
+                int(len(self.press)), axis = 0).transpose()
+            self.continuum_opa_scat += \
+                add_term
+            if self.do_scat_emis:
+                self.continuum_opa_scat_emis += \
+                  add_term
+
+        # Interpolate line opacities, combine with continuum oacities
+        lines = fi.mix_opas_ck(self.line_abundances, \
+                               self.line_struc_kappas,self.continuum_opa)
+        s_lines = fs.combine_opas_sample_ck(lines, \
+                                            self.g_gauss, self.w_gauss, \
+                                            1000)
+        return lines, s_lines
     def mix_opa_tot(self, abundances, mmw, gravity, \
                         sigma_lnorm = None, fsed = None, Kzz = None, \
                         radius = None, gray_opacity = None, \
@@ -675,9 +877,9 @@ class Radtrans(_read_opacities.ReadOpacities):
         # Interpolate line opacities, combine with continuum oacities
         self.line_struc_kappas = fi.mix_opas_ck(self.line_abundances, \
                                     self.line_struc_kappas,self.continuum_opa)
-        np.save("/Users/nasedkin/Documents/RetrievalNotebooks/line_structs_3_6_ch4h2s",self.line_struc_kappas)
-        np.save("/Users/nasedkin/Documents/RetrievalNotebooks/g_gauss",self.g_gauss)
-        np.save("/Users/nasedkin/Documents/RetrievalNotebooks/w_gauss",self.w_gauss)
+        #np.save("/Users/nasedkin/Documents/RetrievalNotebooks/line_structs_3_6_ch4h2s",self.line_struc_kappas)
+        #np.save("/Users/nasedkin/Documents/RetrievalNotebooks/g_gauss",self.g_gauss)
+        #np.save("/Users/nasedkin/Documents/RetrievalNotebooks/w_gauss",self.w_gauss)
         # Similar to the line-by-line case below, if test_ck_shuffle_comp is
         # True, we will put the total opacity into the first species slot and
         # then carry the remaining radiative transfer steps only over that 0
@@ -694,13 +896,49 @@ class Radtrans(_read_opacities.ReadOpacities):
                                           self.g_gauss, self.w_gauss, \
                                           160)
             '''
+            """opa_model = tf.keras.models.load_model('/Users/nasedkin/Documents/RetrievalNotebooks/dnn_model_16pt_v7')
+            wvs = nc.c/self.freq
+            logpres = np.log10(self.press/1e6)
+            print("Input shapes")
+            ls = np.swapaxes(np.swapaxes(self.line_struc_kappas,0,-1),0,1)
+            print(ls.shape)
+            line_struct = np.log10(ls.reshape(self.press.shape[0]*self.freq.shape[0],len(self.line_species),16))
+            print(line_struct.shape)
+
+            start = time.time()
+            input_data_a,input_data_b = np.meshgrid(logpres,wvs)
+            input_data = np.fliplr(np.column_stack((input_data_a.flatten(),input_data_b.flatten())))
+            print(input_data.shape)
+            prev = line_struct[:,0,:]
+            for i in range(1,len(self.line_species)):
+                print(prev[0],prev[-1])
+                in_opa = np.append(input_data,prev,axis=1)
+                in_opa = np.append(in_opa,line_struct[:,i,:],axis=1)
+                prev = opa_model.predict(in_opa)
+            line_out = prev.reshape(self.freq.shape[0],self.press.shape[0],1,16)
+            line_out = np.swapaxes(line_out,1,0)
+            line_out = np.swapaxes(line_out,-1,0)
+            end = time.time()
+            print("DNN Elapsed time")
+            print(end - start)
+            np.save("/Users/nasedkin/Documents/RetrievalNotebooks/DNN_Results/dnn_output_test1",prev)
+            np.save("/Users/nasedkin/Documents/RetrievalNotebooks/DNN_Results/dnn_output_test1_shaped",line_out)
+
+            print("DNN Shapes")
+            print(self.line_struc_kappas.shape,prev.shape,line_out.shape)
+            start = time.time()"""
             self.line_struc_kappas[:, :, 0, :] = \
               fs.combine_opas_sample_ck(self.line_struc_kappas, \
-                                          self.g_gauss, self.w_gauss, \
-                                          1000)
-            np.save("/Users/nasedkin/Documents/RetrievalNotebooks/line_structs_shuffled_3_6_ch4h2s",self.line_struc_kappas)
-            sys.exit(1)
+                                        self.g_gauss, self.w_gauss, \
+                                        1000)
+            """end = time.time()
+            print("Sampled Elapsed time")
+            print(end-start)
+            np.save("/Users/nasedkin/Documents/RetrievalNotebooks/DNN_Results/dnn_output_test1_sampled",self.line_struc_kappas)
+            print("Sampled Shapes")
+            print(self.line_struc_kappas.shape)
 
+            sys.exit(1)"""
             #stamps.append(time.clock())
             #self.combine_opas_shuffle_ck()
             #stamps.append(time.clock())
