@@ -381,16 +381,17 @@ class Retrieval:
                 flux = dd.flux
 
             # TODO:cmap for different datasets
+            scale_factor = dd.scale_factor
             if not dd.photometry:
                 ax.errorbar(wlen, \
-                            flux * self.rd.plot_kwargs["y_axis_scaling"], \
-                            yerr = error * self.rd.plot_kwargs["y_axis_scaling"], \
+                            flux * self.rd.plot_kwargs["y_axis_scaling"]*scale_factor, \
+                            yerr = error * self.rd.plot_kwargs["y_axis_scaling"]*scale_factor, \
                             fmt = '.', \
                             label = name, zorder =10)
             else:
                 ax.errorbar(wlen, \
-                            flux * self.rd.plot_kwargs["y_axis_scaling"], \
-                            yerr = error * self.rd.plot_kwargs["y_axis_scaling"], \
+                            flux * self.rd.plot_kwargs["y_axis_scaling"]*scale_factor, \
+                            yerr = error * self.rd.plot_kwargs["y_axis_scaling"]*scale_factor, \
                             xerr = dd.width_photometry/2., \
                             fmt = '+', zorder = 10, \
                             label = name)
