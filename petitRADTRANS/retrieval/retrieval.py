@@ -10,11 +10,15 @@ import numpy as np
 import copy as cp
 import matplotlib
 matplotlib.use('Agg') # set the backend before importing pyplot
+font = {'family' : 'normal',
+        'size'   : 24}
+matplotlib.rc('font', **font)
 
 import pymultinest
 import json
 import argparse as ap
 import matplotlib.pyplot as plt
+from matplotlib.ticker import AutoMinorLocator, MultipleLocator, AutoMinorLocator, LogLocator, NullFormatter
 
 # Read own packages
 import petitRADTRANS # Just need the filename actually
@@ -161,7 +165,7 @@ class Retrieval:
                 fmts = '\t'.join(['    %-15s' + fmt + " +- " + fmt])
                 print(fmts % (p, med, sigma))
         return
-    def plotAll(self):
+    def plotAll(self, output_dir = None):
         """
         plotAll
         Produces plots for the best fit spectrum, a sample of 100 output spectra,
@@ -171,12 +175,14 @@ class Retrieval:
         # Read in samples
         sample_dict = {}
         parameter_dict = {}
+        if output_dir is None:
+            output_dir = self.output_dir
         for name in self.corner_files:
-            samples = np.genfromtxt(self.output_dir +'out_PMN/'+ \
+            samples = np.genfromtxt(output_dir +'out_PMN/'+ \
                                     name+ \
                                     '_post_equal_weights.dat')
 
-            parameters_read = json.load(open(self.output_dir + 'out_PMN/'+ \
+            parameters_read = json.load(open(output_dir + 'out_PMN/'+ \
                                         name+ \
                                         '_params.json'))
             sample_dict[name] = samples
@@ -202,8 +208,17 @@ class Retrieval:
         # Setup best fit spectrum
         self.LogLikelihood(samples_use[best_fit_index, :-1], 0, 0)
 
+        print("Best fit parameters")
+        i_p = 0
+        for pp in self.parameters:
+            if self.parameters[pp].is_free_parameter:
+                for i_s in range(len(parameters_read)):
+                    if parameters_read[i_s] == self.parameters[pp].name:
+                        print(self.parameters[pp].name, samples_use[best_fit_index][i_p])
+                        i_p += 1
+                        
         # Plotting
-        self.plotSpectra()
+        self.plotSpectra(samples_use[best_fit_index, :-1])
         self.plotSampled(samples_use, parameters_read)
         self.plotPT(sample_dict,parameters_read)
         self.plotCorner(sample_dict,parameter_dict,parameters_read)
@@ -349,8 +364,35 @@ class Retrieval:
             if self.parameters[pp].is_free_parameter:
                 cube[i_p] = self.parameters[pp].get_param_uniform(cube[i_p])
                 i_p += 1
+    def getBestFitModel(self,best_fit_params,model_generating_func = None):
+        wmin = 99999.0
+        wmax = 0.0
+        for name,dd in self.data.items():
+            if dd.wlen_range_pRT[0] < wmin:
+                wmin = dd.wlen_range_pRT[0]
+            if dd.wlen_range_pRT[1] < wmax:
+                wmax = dd.wlen_range_pRT[1]
+        
+        bf_prt = Radtrans(line_species = cp.copy(self.rd.line_species), \
+                            rayleigh_species= cp.copy(self.rd.rayleigh_species), \
+                            continuum_opacities = cp.copy(self.rd.continuum_opacities), \
+                            cloud_species = cp.copy(self.rd.cloud_species), \
+                            mode='c-k', \
+                            wlen_bords_micron = [wmin*0.98,wmax*1.02],
+                            do_scat_emis = self.rd.scattering)
+        if model_generating_func is None:
+            mg_func = self.data.values()[0].model_generating_function
+        else:
+            mg_func = model_generating_func 
 
-    def plotSpectra(self):
+        bf_wlen, bf_spectrum= mg_func(bf_prt, 
+                                        best_fit_params, 
+                                        self.PT_plot_mode,
+                                        AMR = self.rd.AMR,
+                                        resolution = dd.model_resolution)
+        return bf_wlen, bf_spectrum
+
+    def plotSpectra(self,best_fit_params,model_generating_func = None):
         """
         plotSpectra
         Plot the best fit spectrum, the data from each dataset and the residuals between the two.
@@ -361,6 +403,8 @@ class Retrieval:
                                figsize=(24, 12))
         ax = axes[0] # Normal Spectrum axis
         ax_r = axes[1] # residual axis
+        bf_wlen, bf_spectrum = self.getBestFitModel(best_fit_params,model_generating_func)
+
         for name,dd in self.data.items():
             try:
                 resolution_data = np.mean(dd.wlen[1:]/np.diff(dd.wlen))
@@ -380,49 +424,94 @@ class Retrieval:
                 error = dd.flux_error
                 flux = dd.flux
 
-            # TODO:cmap for different datasets
-            scale_factor = dd.scale_factor
-            if not dd.photometry:
-                ax.errorbar(wlen, \
-                            flux * self.rd.plot_kwargs["y_axis_scaling"]*scale_factor, \
-                            yerr = error * self.rd.plot_kwargs["y_axis_scaling"]*scale_factor, \
-                            fmt = '.', \
-                            label = name, zorder =10)
-            else:
-                ax.errorbar(wlen, \
-                            flux * self.rd.plot_kwargs["y_axis_scaling"]*scale_factor, \
-                            yerr = error * self.rd.plot_kwargs["y_axis_scaling"]*scale_factor, \
-                            xerr = dd.width_photometry/2., \
-                            fmt = '+', zorder = 10, \
-                            label = name)
+        scale = dd.scale_factor
+        if not dd.photometry:
+            ax.errorbar(wlen, \
+                         flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
+                         yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
+                         marker='o', markeredgecolor='k', linewidth = 0, elinewidth = 2, \
+                         label = dd.name, zorder =10, alpha = 0.9,)
+        else:
+            ax.errorbar(wlen, \
+                         flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
+                         yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
+                         xerr = dd.width_photometry/2., linewidth = 0, elinewidth = 2, \
+                         marker='o', markeredgecolor='k', zorder = 10, \
+                         label = dd.name, alpha = 0.9)
+        col = ax._get_lines.get_color()
+        if dd.external_pRT_reference == None:
+            print(self.best_fit_specs.keys())
+            ax_r.plot(self.best_fit_specs[name][0], \
+                     (flux - self.best_fit_specs[name][1])/np.std(flux - self.best_fit_specs[name][1]) , \
+                     color = col,
+                     linewidth = 0)
+        else:
+            # TODO might need to add rebinning step here
+            ax_r.plot(self.best_fit_specs[dd.external_pRT_reference][0], \
+                     (flux - self.best_fit_specs[dd.external_pRT_reference][1])/np.std(flux - self.best_fit_specs[name][1]) , \
+                     color = col, 
+                     zorder = -10,
+                     linewidth = 0)
+        ax.plot(bf_wlen, \
+                bf_spectrum * self.rd.plot_kwargs["y_axis_scaling"],
+                linewidth=4,
+                alpha = 0.5,
+                color = 'r')
+        try:
+            ax.set_xscale(self.rd.plot_kwargs["xscale"])
+        except:
+            pass
 
-            if dd.external_pRT_reference == None:
-                ax.plot(self.best_fit_specs[name][0], \
-                        self.best_fit_specs[name][1] * self.rd.plot_kwargs["y_axis_scaling"], \
-                        color = 'black')
-                ax_r.errorbar(wlen, \
-                              (flux * self.rd.plot_kwargs["y_axis_scaling"])-(self.best_fit_specs[name][1] * self.rd.plot_kwargs["y_axis_scaling"]), \
-                              yerr = error * self.rd.plot_kwargs["y_axis_scaling"], \
-                              fmt = '.', \
-                              label = name, zorder =10)
-            else:
-                ax.plot(self.best_fit_specs[dd.external_pRT_reference][0], \
-                        self.best_fit_specs[dd.external_pRT_reference][1] * \
-                        self.rd.plot_kwargs["y_axis_scaling"], \
-                        color = 'black', zorder = -10)
-                ax_r.errorbar(wlen, \
-                        (flux * self.rd.plot_kwargs["y_axis_scaling"])-(self.best_fit_specs[dd.external_pRT_reference][1] * self.rd.plot_kwargs["y_axis_scaling"]), \
-                        yerr = error * self.rd.plot_kwargs["y_axis_scaling"], \
-                        fmt = '.', \
-                        label = name, zorder =10)
-                        
-        ax.set_xscale(self.rd.plot_kwargs["xscale"])
-        ax.set_yscale(self.rd.plot_kwargs["yscale"])
+        try:
+            ax.set_yscale(self.rd.plot_kwargs["yscale"])
+        except:
+            pass
+
+        ax.tick_params(axis="both",direction="in",length=10,bottom=True, top=True, left=True, right=True)
+        #ax.xaxis.set_major_locator(MultipleLocator(1))
+        ax.xaxis.set_major_formatter('{x:.0f}')
+        if self.rd.plot_kwargs["xscale"] == 'log':
+            # For the minor ticks, use no labels; default NullFormatter.
+            x_major = LogLocator(base = 10.0, subs = (1,2,3,4), numticks = 4)
+            ax.xaxis.set_major_locator(x_major)
+
+            x_minor = LogLocator(base = 10.0, subs = np.arange(0.1,10.1,0.1)*0.1, numticks = 100)
+            ax.xaxis.set_minor_locator(x_minor)
+            ax.xaxis.set_minor_formatter(NullFormatter())
+        else:
+            ax.xaxis.set_minor_locator(AutoMinorLocator())
+            ax.tick_params(axis='both', which='minor', bottom=True, top=True, left=True, right=True, direction='in',length=5)
+
+        ax.yaxis.set_minor_locator(AutoMinorLocator())
+        ax.tick_params(axis='both', which='minor', bottom=True, top=True, left=True, right=True, direction='in',length=5)
+
         ax.set_xlabel(self.rd.plot_kwargs["spec_xlabel"])
         ax.set_ylabel(self.rd.plot_kwargs["spec_ylabel"])
+
+        ax_r.tick_params(axis="both",direction="in",length=10,bottom=True, top=True, left=True, right=True)
+        #ax.xaxis.set_major_locator(MultipleLocator(1))
+        ax_r.xaxis.set_major_formatter('{x:.0f}')
+        if self.rd.plot_kwargs["xscale"] == 'log':
+            # For the minor ticks, use no labels; default NullFormatter.
+            x_major = LogLocator(base = 10.0, subs = (1,2,3,4), numticks = 4)
+            ax_r.xaxis.set_major_locator(x_major)
+
+            x_minor = LogLocator(base = 10.0, subs = np.arange(0.1,10.1,0.1)*0.1, numticks = 100)
+            ax_r.xaxis.set_minor_locator(x_minor)
+            ax_r.xaxis.set_minor_formatter(NullFormatter())
+        else:
+            ax_r.xaxis.set_minor_locator(AutoMinorLocator())
+            ax._rtick_params(axis='both', which='minor', bottom=True, top=True, left=True, right=True, direction='in',length=5)
+
+        ax_r.yaxis.set_minor_locator(AutoMinorLocator())
+        ax_r.tick_params(axis='both', which='minor', bottom=True, top=True, left=True, right=True, direction='in',length=5)
+
+        ax_r.set_xlabel("Residuals")
+        ax_r.set_ylabel(self.rd.plot_kwargs["spec_ylabel"])
         #([model_min*0.98, model_max*1.02])
+        plt.tight_layout()
         plt.legend(loc='best')
-        plt.savefig(self.output_dir + 'evaluate_'+self.retrieval_name +'/best_fit_spec.pdf')
+        plt.savefig('evaluate_'+self.rd.retrieval_name +'/best_fit_spec.pdf')
 
     def plotSampled(self,samples_use):
         """

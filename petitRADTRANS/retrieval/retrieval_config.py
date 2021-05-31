@@ -57,7 +57,27 @@ class RetrievalConfig:
         self.rayleigh_species = ["H2", "He"]
         self.continuum_opacities = ["H2-H2", "H2-He"]
         self.plot_kwargs = {}
+        self.plot_defaults()
         self.write_out_spec_sample = write_out_spec_sample
+
+    def plot_defaults(self):
+        ##################################################################
+        # Define axis properties of spectral plot if run_mode == 'evaluate'
+        ##################################################################
+        self.plot_kwargs["spec_xlabel"] = 'Wavelength [micron]'
+        self.plot_kwargs["spec_ylabel"] =  "Flux [W/m2/micron]"
+        self.plot_kwargs["y_axis_scaling"] = 1.0
+        self.plot_kwargs["xscale"] = 'log'
+        self.plot_kwargs["yscale"] = 'linear'
+        self.plot_kwargs["resolution"] = 1500.
+
+        ##################################################################
+        # Define from which observation object to take P-T
+        # in evaluation mode (if run_mode == 'evaluate'),
+        # add PT-envelope plotting options
+        ##################################################################
+        self.plot_kwargs["temp_limits"] = [150, 3000]
+        self.plot_kwargs["press_limits"] = [1e2, 1e-5]
 
     def setup_pres(self, scaling = 10, width = 3):
         # Maybe should read the params from somewhere?
