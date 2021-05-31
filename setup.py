@@ -33,9 +33,15 @@ fort_rebin = Extension(
     name='petitRADTRANS.fort_rebin',
     sources=['petitRADTRANS/fort_rebin.f90'], \
     extra_compile_args=extra_compile_args)
+    
+rebin_give_width = Extension(
+    name='petitRADTRANS.rebin_give_width',
+    sources=['petitRADTRANS/retrieval/rebin_give_width.f90'], \
+    extra_compile_args=extra_compile_args)
+
+extensions = [fort_spec, fort_input, fort_rebin, rebin_give_width]
 
 
-extensions = [fort_spec, fort_input, fort_rebin]
 
 def setup_function(extensions):
     setup(name='petitRADTRANS',
