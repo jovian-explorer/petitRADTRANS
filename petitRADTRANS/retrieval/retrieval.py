@@ -107,6 +107,17 @@ class Retrieval:
         # TODO
         self.retrieval_list = plot_multiple_retrieval_names
 
+        # Path to input opacities
+        self.path = os.environ.get("pRT_input_data_path")
+        if self.path == None:
+            print('Path to input data not specified!')
+            print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
+            print('    import os')
+            print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
+            print('before creating a Radtrans object or loading the nat_cst module.')
+            sys.exit(1)
+        if not self.path.endswith("/"):
+            self.path += "/"
         # Setup Directories
         if not os.path.isdir(self.output_dir + 'out_PMN/'):
             os.makedirs(self.output_dir + 'out_PMN', exist_ok=True)  
@@ -240,14 +251,14 @@ class Retrieval:
                     species = []
                     # Check if low res opacities already exist
                     for line in self.rd.line_species:
-                        if not os.path.isdir(petitRADTRANS.__file__.split('_')[0] + "input_data/opacities/lines/corr_k/" +line + "_R_" + str(dd.model_resolution)):
+                        if not os.path.isdir(self.path + "opacities/lines/corr_k/" +line + "_R_" + str(dd.model_resolution)):
                             species.append(line)
                     # If not, setup low-res c-k tables
                     if len(species)>0:
                         from util import MMWs as masses
                         atmosphere = Radtrans(line_species = species, wlen_bords_micron = [0.1, 251.])
-                        prt_path = os.path.dirname(petitRADTRANS.__file__)
-                        ck_path = prt_path + '/input_data/opacities/lines/corr_k/'
+                        prt_path = self.path
+                        ck_path = prt_path + 'opacities/lines/corr_k/'
                         print("Saving to " + ck_path)
                         print("Resolution: ", dd.model_resolution)
                         atmosphere.write_out_rebin(int(dd.model_resolution), 

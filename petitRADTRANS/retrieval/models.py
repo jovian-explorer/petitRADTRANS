@@ -12,8 +12,6 @@ from .util import surf_to_meas, calc_MMW
 from petitRADTRANS import Radtrans
 from petitRADTRANS import nat_cst as nc
 from petitRADTRANS.retrieval import cloud_cond as fc
-from poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm
-
 import pdb
 # Global constants to reduce calculations and initializations.
 p_global = np.logspace(-6,3,100*10)
@@ -67,6 +65,12 @@ def emission_model_diseq(pRT_object,
     spectrum_model : np.array
         Computed emission spectrum [W/m2/micron]
     """
+    try: 
+        from poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm
+    except ImportError:
+        print("Could not import poor_mans_nonequ_chemistry. Exiting.")
+        sys.exit(2)     
+
     #for key, val in parameters.items():
     #    print(key,val.value)
     # Priors for these parameters are implemented here, as they depend on each other
