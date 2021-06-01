@@ -10,9 +10,11 @@ import numpy as np
 import copy as cp
 import matplotlib
 #matplotlib.use('Agg') # set the backend before importing pyplot
+'''
 font = {'family' : 'normal',
         'size'   : 24}
 matplotlib.rc('font', **font)
+'''
 
 import pymultinest
 import json

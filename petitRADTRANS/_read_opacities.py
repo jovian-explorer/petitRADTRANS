@@ -189,13 +189,21 @@ class ReadOpacities:
                                               self.g_len, self.freq_len_full, 1, \
                                               len_TP)
 
+                        # Indices in retVal to be filled with read-in opacities
                         index_fill = (self.freq_full <= local_freq[0]*(1.+1e-10)) & \
                           (self.freq_full >= local_freq[-1]*(1.-1e-10))
+                        # Indices of read-in opacities to be filled into retVal
+                        index_use = (local_freq <= self.freq_full[0]*(1.+1e-10)) & \
+                                    (local_freq >= self.freq_full[-1]*(1.-1e-10))
 
+                        #print(np.shape(retVal[:, index_fill, 0, :]))
+                        #print(np.shape(self.line_grid_kappas_custom_PT[self.line_species[i_spec]][:,:,0,:]))
+                        #print(np.shape(self.line_grid_kappas_custom_PT[self.line_species[i_spec]][:, index_use, 0, :]))
                         #import pdb
                         #pdb.set_trace()
 
-                        retVal[:, index_fill, 0, :] = self.line_grid_kappas_custom_PT[self.line_species[i_spec]][:,:,0,:]
+                        retVal[:, index_fill, 0, :] = \
+                            self.line_grid_kappas_custom_PT[self.line_species[i_spec]][:,index_use,0,:]
                         self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = retVal
 
                     # Down-sample opacities in lbl mode if requested
@@ -234,7 +242,9 @@ class ReadOpacities:
                                           len(self.custom_line_TP_grid[self.line_species[i_spec]]))
                     index_fill = (self.freq_full <= freqs_chubb[0]*(1.+1e-10)) & \
                       (self.freq_full >= freqs_chubb[-1]*(1.-1e-10))
-                    retVal[:, index_fill, 0, :] = k_table2
+                    index_use = (freqs_chubb <= self.freq_full[0] * (1. + 1e-10)) & \
+                                (freqs_chubb >= self.freq_full[-1] * (1. - 1e-10))
+                    retVal[:, index_fill, 0, :] = k_table2[:, index_use, :]
 
                     # Divide by mass to go from cross-sections to opacities, the latter
                     # is what pRT requires.
