@@ -24,19 +24,20 @@ end module constants_block
 
 !!$ Subroutine to get length of frequency grid in correlated-k mode
 
-subroutine get_freq_len(path,freq_len,g_len)
+subroutine get_freq_len(path,spec_name,freq_len,g_len)
 
   implicit none
   ! I/O
   character*2500, intent(in) :: path
+  character*100, intent(in)  :: spec_name
   integer, intent(out) :: freq_len, g_len
 
   g_len = 1
-  open(unit=10,file=trim(adjustl(path))//'/opacities/lines/corr_k/H2O/kappa_g_info.dat')
+  open(unit=10,file=trim(adjustl(path))//'/opacities/lines/corr_k/'// &
+       trim(adjustl(spec_name))//'/kappa_g_info.dat')
   read(10,*) freq_len, g_len
   close(10)
   freq_len = freq_len-1
-  ! g_len = g_len-2 ! for OLD 32 grid
 
 end subroutine get_freq_len
 
@@ -47,11 +48,12 @@ end subroutine get_freq_len
 
 !!$ Subroutine to read in frequency grid
 
-subroutine get_freq(path,freq_len,freq,freq_use_ck)
+subroutine get_freq(path,spec_name,freq_len,freq,freq_use_ck)
 
   implicit none
   ! I/O
   character*1500, intent(in) :: path
+  character*100, intent(in)  :: spec_name
   integer, intent(in) :: freq_len
   double precision, intent(out) :: freq(freq_len), &
        freq_use_ck(freq_len+1)
@@ -61,7 +63,8 @@ subroutine get_freq(path,freq_len,freq,freq_use_ck)
 
   ! Because freqs fot c-k are stored as borders!
   freq_len_use_ck = freq_len + 1
-  open(unit=10,file=trim(adjustl(path))//'/opacities/lines/corr_k/H2O/kappa_g_info.dat')
+  open(unit=10,file=trim(adjustl(path))//'/opacities/lines/corr_k/'// &
+       trim(adjustl(spec_name))//'/kappa_g_info.dat')
   read(10,*)
   do i_freq = 1, freq_len_use_ck-2
      read(10,*) buffer, freq_use_ck(i_freq)
@@ -69,6 +72,15 @@ subroutine get_freq(path,freq_len,freq,freq_use_ck)
   read(10,*) freq_use_ck(freq_len_use_ck), &
        freq_use_ck(freq_len_use_ck-1)
   close(10)
+
+  !write(*,*) 3e10/freq_use_ck(1)/1d-4
+  ! Correct, smallest wlen is slightly offset (not following log-spacing)
+  freq_use_ck(1) = freq_use_ck(2)*exp(-LOG(freq_use_ck(4)/freq_use_ck(3)))
+  !write(*,*) 3e10/freq_use_ck(1)/1d-4
+  !write(*,*) LOG(freq_use_ck(2)/freq_use_ck(1)), &
+  !     LOG(freq_use_ck(4)/freq_use_ck(3)), &
+  !     LOG(freq_use_ck(5)/freq_use_ck(4))
+  
   freq = (freq_use_ck(1:freq_len_use_ck-1)+freq_use_ck(2:freq_len_use_ck))/2d0
 
 end subroutine get_freq

@@ -5,6 +5,7 @@ from . import fort_spec as fs
 from . import fort_rebin as fr
 from . import nat_cst as nc
 from . import pyth_input as pyi
+from . import _read_opacities
 
 import numpy as np
 import copy as cp
@@ -13,7 +14,7 @@ import sys,pdb
 from scipy import interpolate
 import h5py
 
-class Radtrans:
+class Radtrans(_read_opacities.ReadOpacities):
     """ Class defining objects for carrying out spectral calculations for a
     given set of opacities
 
@@ -104,7 +105,7 @@ class Radtrans:
             print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
             print('before creating a Radtrans object or loading the nat_cst module.')
             sys.exit(1)
-        
+
         # Any opacities there at all?
         self.absorbers_present = False
         if (len(line_species) + \
@@ -113,6 +114,9 @@ class Radtrans:
             len(continuum_opacities)) > 0:
             self.absorbers_present = True
 
+        # Line species present? If yes: define wavelength array
+        if len(line_species) > 0:
+            self.line_absorbers_present = True
 
         ##### ADD TO SOURCE AND COMMENT PROPERLY LATER!
         self.test_ck_shuffle_comp = test_ck_shuffle_comp
@@ -190,14 +194,40 @@ class Radtrans:
                 self.test_ck_shuffle_comp = True
 
             # For correlated-k
-
             # Get dimensions of molecular opacity arrays for a given P-T point,
             # they define the resolution.
-            self.freq_len, self.g_len = fi.get_freq_len(self.path)
-            self.freq_len_full = cp.copy(self.freq_len)
-            # Read in the frequency range of the opcity data
-            self.freq, self.border_freqs = fi.get_freq(self.path,self.freq_len)
+            # Use the first entry of self.line_species for this, if given.
+            read_freq = False
+            spec_name = 'H2O'
+            if self.line_absorbers_present:
+                # Check if first species is hdf5
+                path_opa = self.path+'/opacities/lines/corr_k/'+self.line_species[0]
+                hdf5_path = glob.glob(path_opa+'/*.h5')
+                if hdf5_path != []:
+                    read_freq = True
+                    f = h5py.File(hdf5_path[0],'r')
+                    self.freq_len = len(f['bin_centers'][:])
+                    self.g_len = len(f['samples'][:])
+                    self.freq = nc.c*f['bin_centers'][:][::-1]
+                    self.freq_len_full = cp.copy(self.freq_len)
+                    self.border_freqs = nc.c*f['bin_edges'][:][::-1]
+                else:
+                    spec_name = self.line_species[0]
+
+            # If no hdf5 line absorbers are given use the classical pRT format.
+            # If no line absorbers are given *at all* use classical water.
+            # In the long run: move to hdf5 fully?
+            # But: people calculate their own k-tables with my code sometimes now.
+            if (self.line_absorbers_present) and (not read_freq):
+                self.freq_len, self.g_len = fi.get_freq_len(self.path, spec_name)
+                self.freq_len_full = cp.copy(self.freq_len)
+                # Read in the frequency range of the opcity data
+                self.freq, self.border_freqs = fi.get_freq(self.path, \
+                                                           spec_name, \
+                                                           self.freq_len)
+
             arr_min, arr_max = -1, -1
+
 
         elif self.mode == 'lbl':
             # For high-res line-by-line radiative transfer
@@ -223,7 +253,34 @@ class Radtrans:
                 self.freq_len = len(self.freq)
 
         if self.mode == 'c-k':
-            # To cut opacity data to required range
+
+            # Extend the wavelength range if user requests larger
+            # range than what first line opa species contains
+            wlen = nc.c/self.border_freqs/1e-4
+            if wlen[-1] < wlen_bords_micron[1]:
+                delta_log_lambda = np.diff(np.log10(wlen))[-1]
+                add_high = 1e1**np.arange(np.log10(wlen[-1]), \
+                                          np.log10(wlen_bords_micron[-1])+delta_log_lambda, \
+                                          delta_log_lambda)[1:]
+                wlen = np.concatenate((wlen, add_high))
+            if wlen[0] > wlen_bords_micron[0]:
+                delta_log_lambda = np.diff(np.log10(wlen))[0]
+                add_low = 1e1**(-np.arange(-np.log10(wlen[0]), \
+                                           -np.log10(wlen_bords_micron[0])+delta_log_lambda, \
+                                           delta_log_lambda)[1:][::-1])
+                wlen = np.concatenate((add_low, wlen))
+
+            self.border_freqs = nc.c/(wlen*1e-4)
+            self.freq = (self.border_freqs[1:] + self.border_freqs[:-1])/2.
+            self.freq_len_full = len(self.freq)
+            self.freq_len = self.freq_len_full
+
+            '''
+            import pdb
+            pdb.set_trace()
+            '''
+            # Cut the wavelength range if user requests smaller
+            # range than what first line opa species contains
             index = (nc.c/self.freq > wlen_bords_micron[0]*1e-4) & \
               (nc.c/self.freq < wlen_bords_micron[1]*1e-4)
 
@@ -248,6 +305,7 @@ class Radtrans:
             self.freq_full = self.freq
             self.freq = np.array(self.freq[index],dtype='d',order='F')
             self.freq_len = len(self.freq)
+
         else:
             index = None
 
@@ -298,16 +356,17 @@ class Radtrans:
         # Read in line opacities
         ###########################
 
+        # Inherited from ReadOpacities in _read_opacities.py
         self.read_line_opacities(index, arr_min, arr_max)
 
         ###########################
         # Read in continuum opacities
         ###########################
 
-
         # Clouds
         if len(self.cloud_species) > 0:
-              self.read_cloud_opas()
+            # Inherited from ReadOpacities in _read_opacities.py
+            self.read_cloud_opas()
 
         # CIA
         if self.H2H2CIA:
@@ -402,272 +461,6 @@ class Radtrans:
             xn.append(x[i]+(x[i+1]-x[i])/2.)
         xn.append(x[int(len(x))-1]+(x[int(len(x))-1]-x[int(len(x))-2])/2.)
         return np.array(xn)
-
-    def read_line_opacities(self, index, arr_min, arr_max):
-        # Reads in the line opacities for spectral calculation
-
-        # First get the P-Ts position where the grid is defined.
-        # This here is for the nominal, log-uniform 10 x 13 point
-        # P-T grid.
-        buffer = np.genfromtxt(self.path+'/opa_input_files/opa_PT_grid.dat')
-        self.line_TP_grid = np.zeros_like(buffer)
-        self.line_TP_grid[:,0] = buffer[:,1]
-        self.line_TP_grid[:,1] = buffer[:,0]
-        # Convert from bars to cgs
-        self.line_TP_grid[:,1] = 1e6*self.line_TP_grid[:,1]
-        self.line_TP_grid = np.array(self.line_TP_grid.reshape( \
-                    len(self.line_TP_grid[:,1]),2),dtype='d',order='F')
-
-        # Check if species has custom P-T grid and reads in this grid.
-        # Grid must be sorted appropriately, but the pyi.get_custom_grid()
-        # will do that for the user in case a randomly ordered PTpaths.ls
-        # is specified by the user in the opacity folder of the relevant species.
-        # Only condition: it needs to be rectangular.
-        # Because it is easier, a custom grid is saved for every species,
-        # also the ones that use the nominal P-T grid of petitRADTRANS
-
-        self.custom_grid = {}
-
-        if len(self.line_species) > 0:
-            self.custom_line_TP_grid = {}
-            self.custom_line_paths = {}
-            self.custom_diffTs, self.custom_diffPs = {}, {}
-
-            for i_spec in range(len(self.line_species)):
-                # Check if it is an Exomol hdf5 file that needs to be read:
-                Chubb = False
-                if self.mode == 'c-k':
-                     path_opa = self.path+'/opacities/lines/corr_k/'+self.line_species[i_spec]
-                     if glob.glob(path_opa+'/*.h5') != []:
-                         Chubb = True
-
-                 # If not Exomol k-table made by Katy Chubb
-                if not Chubb:
-
-
-                    # Check and sort custom grid for species, if defined.
-                    custom_grid_data = \
-                      pyi.get_custom_PT_grid(self.path, \
-                                             self.mode, \
-                                             self.line_species[i_spec])
-
-                    # If no custom grid was specified (no PTpaths.ls found):
-                    # take nominal grid. This assumes that the files indeed
-                    # are following the nominal grid and naming convention.
-                    # Otherwise it will take the info provided in PTpaths.ls
-                    # which was filled into custom_grid_data.
-                    if custom_grid_data == None:
-                        self.custom_line_TP_grid[self.line_species[i_spec]] = \
-                          self.line_TP_grid
-                        self.custom_line_paths[self.line_species[i_spec]] = None
-                        self.custom_diffTs[self.line_species[i_spec]], \
-                          self.custom_diffPs[self.line_species[i_spec]] = 13, 10
-                        self.custom_grid[self.line_species[i_spec]] = False
-                    else:
-                        self.custom_line_TP_grid[self.line_species[i_spec]] = \
-                          custom_grid_data[0]
-                        self.custom_line_paths[self.line_species[i_spec]] = \
-                          custom_grid_data[1]
-                        self.custom_diffTs[self.line_species[i_spec]], \
-                          self.custom_diffPs[self.line_species[i_spec]] = \
-                          custom_grid_data[2], \
-                          custom_grid_data[3]
-                        self.custom_grid[self.line_species[i_spec]] = True
-                else:
-                    # If the user wants to make use of an Exomol k-table.
-                    # In this case the custom grid is defined by reading
-                    # the grid coordinates from the Exomol hdf5 file.
-                    path_opa = self.path+'/opacities/lines/corr_k/'+self.line_species[i_spec]
-                    file_path_hdf5 = glob.glob(path_opa+'/*.h5')[0]
-                    f = h5py.File(file_path_hdf5,'r')
-
-                    lent = len(f['t'][:])
-                    lenp = len(f['p'][:])
-                    retVal = np.zeros(lent*lenp*2).reshape(lent*lenp,2)
-                    for i_t in range(lent):
-                        for i_p in range(lenp):
-                                                     # convert from bar to cgs
-                            retVal[i_t*lenp+i_p, 1] = f['p'][i_p]*1e6
-                            retVal[i_t*lenp+i_p, 0] = f['t'][i_t]
-                    self.custom_line_TP_grid[self.line_species[i_spec]] = retVal
-                    self.custom_diffTs[self.line_species[i_spec]], \
-                      self.custom_diffPs[self.line_species[i_spec]] = \
-                          lent, \
-                          lenp
-                    self.custom_grid[self.line_species[i_spec]] = True
-                    f.close()
-
-        # Read actual opacities....
-        # The nominal petitRADTRANS opacity grid "line_grid_kappas"
-        # has the shape g_len,freq_len,len(line_species),len(line_TP_grid[:,0])
-        # line_grid_kappas_custom_PT's entries have the shape
-        # g_len,freq_len,len(self.custom_line_TP_grid[self.line_species[i_spec]])
-        # From now on also the nominal grid opacities are read into
-        # line_grid_kappas_custom_PT, because this makes things easier.
-        self.line_grid_kappas_custom_PT = {}
-
-        if len(self.line_species) > 0:
-
-            tot_str = ''
-            for sstring in self.line_species:
-                tot_str = tot_str + sstring + ':'
-
-            custom_file_names = ''
-
-            for i_spec in range(len(self.line_species)):
-
-                # Read in opacities in the petitRADTRANS format, either
-                # in pRT P-T grid spacing or custom P-T grid spacing.
-
-                # Check if it is an Exomol hdf5 file that needs to be read:
-                Chubb = False
-                if self.mode == 'c-k':
-                    path_opa = self.path+'/opacities/lines/corr_k/'+self.line_species[i_spec]
-                    if glob.glob(path_opa+'/*.h5') != []:
-                        Chubb = True
-
-                if not Chubb:
-
-
-                    if not self.custom_grid[self.line_species[i_spec]]:
-                        len_TP = len(self.line_TP_grid[:,0])
-                    else:
-                        len_TP = len(self.custom_line_TP_grid[ \
-                                self.line_species[i_spec]][:,0])
-
-                    custom_file_names = ''
-                    if self.custom_grid[self.line_species[i_spec]]:
-                        for i_TP in range(len_TP):
-                            custom_file_names = custom_file_names + \
-                                self.custom_line_paths[self.line_species[i_spec]][i_TP] \
-                                + ':'
-
-                    self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
-                      fi.read_in_molecular_opacities( \
-                        self.path, \
-                        self.line_species[i_spec]+':', \
-                        self.freq_len_full, \
-                        self.g_len, \
-                        1, \
-                        len_TP, \
-                        self.mode, \
-                        arr_min, \
-                        arr_max, \
-                        self.custom_grid[self.line_species[i_spec]], \
-                        custom_file_names)
-
-                    # Down-sample opacities in lbl mode if requested
-                    if (self.mode == 'lbl') and (self.lbl_opacity_sampling != None):
-                        self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
-                            self.line_grid_kappas_custom_PT[self.line_species[i_spec]][:,::self.lbl_opacity_sampling,:]
-
-                # Read in the Exomol k-table by Katy Chubb if requested by the user
-                else:
-                    print('  Read line opacities of '+self.line_species[i_spec]+'...')
-
-                    path_opa = self.path+'/opacities/lines/corr_k/'+self.line_species[i_spec]
-                    file_path_hdf5 = glob.glob(path_opa+'/*.h5')[0]
-                    f = h5py.File(file_path_hdf5,'r')
-
-
-                    lenf = len(f['bin_centers'][:])
-                    freqs_chubb = nc.c*f['bin_centers'][:][::-1]
-                    lent = len(f['t'][:])
-                    lenp = len(f['p'][:])
-
-                    # Some swapaxes magic is required because the tables are sorted
-                    # differently when coming from the Exomol website.
-                    k_table = np.array(f['kcoeff'])
-                    k_table = np.swapaxes(k_table, 0, 1)
-                    k_table2 = k_table.reshape(lenp*lent, lenf, 16)
-                    k_table2 = np.swapaxes(k_table2, 0, 2)
-                    k_table2 = k_table2[:,::-1,:]
-
-                    # Initialize an empty array that has the same spectral entries as
-                    # pRT nominally. Only fill those values where the Exomol tables
-                    # have entries.
-                    retVal = np.zeros(self.g_len* self.freq_len_full* \
-                       len(self.custom_line_TP_grid[self.line_species[i_spec]])).reshape( \
-                                          self.g_len, self.freq_len_full, 1, \
-                                          len(self.custom_line_TP_grid[self.line_species[i_spec]]))
-                    index_fill = (self.freq_full <= freqs_chubb[0]) & \
-                      (self.freq_full >= freqs_chubb[-1])
-                    retVal[:, index_fill, 0, :] = k_table2
-
-                    # Divide by mass to go from cross-sections to opacities, the latter
-                    # is what pRT requires.
-                    exomol_mass = float(f['mol_mass'][0])
-                    self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = retVal/exomol_mass/nc.amu
-                    print(' Done.')
-
-                    f.close()
-
-                # Cut the wavelength range of the just-read species to the wavelength range
-                # requested by the user
-                if self.mode == 'c-k':
-                    self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
-                      np.array(self.line_grid_kappas_custom_PT[ \
-                        self.line_species[i_spec]][:,index,0,:], \
-                                 dtype='d',order='F')
-                else:
-                    self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
-                    np.array(self.line_grid_kappas_custom_PT[ \
-                        self.line_species[i_spec]][:,:,0,:], \
-                                 dtype='d',order='F')
-
-            print()
-
-        # Read in g grid for correlated-k
-        if self.mode == 'c-k':
-            buffer = np.genfromtxt(self.path+'/opa_input_files/g_comb_grid.dat')
-            self.g_gauss, self.w_gauss = buffer[:,0], buffer[:,1]
-            self.g_gauss,self.w_gauss = np.array(self.g_gauss,dtype='d', \
-                order='F'),np.array(self.w_gauss, \
-                dtype='d',order='F')
-        elif self.mode == 'lbl':
-            self.g_gauss, self.w_gauss = np.ones(1), np.ones(1)
-            self.g_gauss,self.w_gauss = np.array(self.g_gauss,dtype='d', \
-                order='F'),np.array(self.w_gauss, \
-                dtype='d',order='F')
-
-    def read_cloud_opas(self):
-        # Function to read cloud opacities
-        self.cloud_species_mode = []
-        for i in range(int(len(self.cloud_species))):
-            splitstr = self.cloud_species[i].split('_')
-            self.cloud_species_mode.append(splitstr[1])
-            self.cloud_species[i] = splitstr[0]
-
-        # Prepare single strings delimited by ':' which are then
-        # put into F routines
-        tot_str_names = ''
-        for sstring in self.cloud_species:
-            tot_str_names = tot_str_names + sstring + ':'
-
-        tot_str_modes = ''
-        for sstring in self.cloud_species_mode:
-            tot_str_modes = tot_str_modes + sstring + ':'
-
-        self.N_cloud_lambda_bins = int(len(np.genfromtxt(self.path + \
-            '/opacities/continuum/clouds/MgSiO3_c/amorphous/mie/opa_0001.dat' \
-                                                             )[:,0]))
-
-        # Actual reading of opacities
-        rho_cloud_particles, cloud_specs_abs_opa, cloud_specs_scat_opa, \
-          cloud_aniso, cloud_lambdas, cloud_rad_bins, cloud_radii \
-          = fi.read_in_cloud_opacities(self.path,tot_str_names,tot_str_modes, \
-                            len(self.cloud_species),self.N_cloud_lambda_bins)
-
-        self.rho_cloud_particles = \
-          np.array(rho_cloud_particles,dtype='d',order='F')
-        self.cloud_specs_abs_opa = \
-          np.array(cloud_specs_abs_opa,dtype='d',order='F')
-        self.cloud_specs_scat_opa = \
-          np.array(cloud_specs_scat_opa,dtype='d',order='F')
-        self.cloud_aniso = np.array(cloud_aniso,dtype='d',order='F')
-        self.cloud_lambdas = np.array(cloud_lambdas,dtype='d',order='F')
-        self.cloud_rad_bins = np.array(cloud_rad_bins,dtype='d',order='F')
-        self.cloud_radii = np.array(cloud_radii,dtype='d',order='F')
 
     # Preparing structures
     def setup_opa_structure(self,P):
@@ -1738,3 +1531,75 @@ class Radtrans:
 
         else:
             self.tau_cloud = None
+
+    def write_out_rebin(self, resolution, path = '', species = [], masses = None):
+
+        import exo_k as xk
+        import copy as cp
+
+        # Define own wavenumber grid, make sure that log spacing is constant everywhere
+        n_spectral_points = int(resolution * np.log(self.wlen_bords_micron[1]/ \
+                                               self.wlen_bords_micron[0]) + 1)
+
+        wavenumber_grid = np.logspace(np.log10(1/self.wlen_bords_micron[1]/1e-4), \
+                                      np.log10(1./self.wlen_bords_micron[0]/1e-4), \
+                                      n_spectral_points)
+
+        # Do the rebinning, loop through species
+        for spec in species:
+
+            print('Rebinning species '+spec+'...')
+
+            ################################################
+            # Create hdf5 file that Exo-k can read...
+            ################################################
+
+            f = h5py.File('temp.h5', 'w')
+            f.create_dataset('DOI', data = '--')
+            f.create_dataset('bin_centers', data = self.freq[::-1]/nc.c)
+            f.create_dataset('bin_edges', data = self.border_freqs[::-1]/nc.c)
+
+            ret_opa_table = cp.copy(self.line_grid_kappas_custom_PT[spec])
+            ## Mass to go from opacities to cross-sections
+            ret_opa_table = ret_opa_table * nc.amu * masses[spec]
+
+            # Do the opposite of what I do when reading in Katy's Exomol tables
+            # To get opacities into the right format
+            ret_opa_table = ret_opa_table[:,::-1,:]
+            ret_opa_table = np.swapaxes(ret_opa_table, 2, 0)
+            ret_opa_table = ret_opa_table.reshape(self.custom_diffTs[spec], \
+                                                  self.custom_diffPs[spec], \
+                                                  self.freq_len, \
+                                                  len(self.w_gauss))
+            ret_opa_table = np.swapaxes(ret_opa_table, 1, 0)
+            ret_opa_table[ret_opa_table < 1e-60] = 1e-60
+            f.create_dataset('kcoeff', data = ret_opa_table)
+            f['kcoeff'].attrs.create('units', 'cm^2/molecule')
+
+            # Add the rest of the stuff that is needed.
+            f.create_dataset('method', data = 'petit_samples')
+            f.create_dataset('mol_name', data = spec.split('_')[0])
+            f.create_dataset('mol_mass', data = [masses[spec]])
+            f.create_dataset('ngauss', data = len(self.w_gauss))
+            f.create_dataset('p', data = self.custom_line_TP_grid[spec][:self.custom_diffPs[spec],1]/1e6)
+            f['p'].attrs.create('units', 'bar')
+            f.create_dataset('samples', data = self.g_gauss)
+            f.create_dataset('t', data = self.custom_line_TP_grid[spec][::self.custom_diffPs[spec],0])
+            f.create_dataset('weights', data = self.w_gauss)
+            f.create_dataset('wlrange', data = [np.min(nc.c/self.border_freqs/1e-4), \
+                                                np.max(nc.c/self.border_freqs/1e-4)])
+            f.create_dataset('wnrange', data = [np.min(self.border_freqs/nc.c), \
+                                                np.max(self.border_freqs/nc.c)])
+
+            f.close()
+
+            ###############################################
+            # Use Exo-k to rebin to low-res, save to desired folder
+            ###############################################
+            tab = xk.Ktable(filename = 'temp.h5')
+            tab.bin_down(wavenumber_grid)
+            if path[-1] == '/':
+                path = path[:-1]
+            tab.write_hdf5(path+'/'+spec+'_R_'+str(int(resolution))+'.h5')
+            os.system('rm temp.h5')
+

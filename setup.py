@@ -56,7 +56,7 @@ def setup_function(extensions):
           license='MIT License',
           packages=find_packages(),
           include_package_data=True,
-          install_requires=['scipy', 'numpy', 'matplotlib', 'h5py'],
+          install_requires=['scipy', 'numpy', 'matplotlib', 'h5py', 'exo-k'],
           zip_safe=False,
           ext_modules=extensions,
           )
