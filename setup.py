@@ -35,7 +35,7 @@ fort_rebin = Extension(
     extra_compile_args=extra_compile_args)
     
 rebin_give_width = Extension(
-    name='petitRADTRANS.rebin_give_width',
+    name='petitRADTRANS.retrieval.rebin_give_width',
     sources=['petitRADTRANS/retrieval/rebin_give_width.f90'], \
     extra_compile_args=extra_compile_args)
 

@@ -9,7 +9,7 @@ os.environ["OMP_NUM_THREADS"] = "1"
 import numpy as np
 import copy as cp
 import matplotlib
-matplotlib.use('Agg') # set the backend before importing pyplot
+#matplotlib.use('Agg') # set the backend before importing pyplot
 
 import pymultinest
 import json
