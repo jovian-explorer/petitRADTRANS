@@ -113,15 +113,15 @@ class Data:
         """
         obs = np.genfromtxt(path,delimiter = ',')
         if np.isnan(obs).any():
-            print("Nans in " + path + ", trying different delimiter")
+            #print("Nans in " + path + ", trying different delimiter")
             obs = np.genfromtxt(path, delimiter = ' ')
         if len(obs.shape) < 2:
-            print("Incorrect shape in " + path + ", trying different delimiter")
+            #print("Incorrect shape in " + path + ", trying different delimiter")
             obs = np.genfromtxt(path)
         if obs.shape[1] != 3:
-            print("Incorrect shape in " + path + ", trying different delimiter")
+            #print("Incorrect shape in " + path + ", trying different delimiter")
             obs= np.genfromtxt(path)
-        print(obs.shape,len(obs.shape))
+        #print(obs.shape,len(obs.shape))
         self.wlen = obs[:,0]
         self.flux = obs[:,1]
         self.flux_error = obs[:,-1]

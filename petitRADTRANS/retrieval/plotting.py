@@ -11,7 +11,6 @@ from petitRADTRANS import nat_cst as nc
 from .data_class import Data
 
 def plot_specs(fig,ax,path, name, color1, color2, zorder, rebin_val = None):
-
     specs = [f for f in glob.glob(path+'/*.dat')]
     nspectra = int(len(specs))
     wlen = np.genfromtxt(specs[0])[:,0]

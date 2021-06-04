@@ -13,13 +13,41 @@ from petitRADTRANS import Radtrans
 from petitRADTRANS import nat_cst as nc
 from petitRADTRANS.retrieval import cloud_cond as fc
 import pdb
+
+try: 
+    from poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm
+except ImportError:
+    print("Could not import poor_mans_nonequ_chemistry. Exiting.")
+    sys.exit(2)     
+
 # Global constants to reduce calculations and initializations.
 p_global = np.logspace(-6,3,100*10)
 
 #######################################################
 # Define retrieval models
 #######################################################
-# All models must take a pRT_object, a parameter dictionary, a plotting argument and and AMR argument.
+# All models must take the same set of inputs
+#   pRT_object : petitRADTRANS.RadTrans
+#       This is the pRT object that is used to compute the spectrum
+#       It must be fully initialized prior to be used in the model function
+#   parameters : dict
+#       A dictionary of Parameter objects. The naming of the parameters
+#       must be consistent between the Priors and the model function you
+#       are using.
+#   PT_plot_mode : bool
+#       If this argument is True, the model function should return the pressure 
+#       and temperature arrays before computing the flux.
+#       TODO: Split this off into a separate function???
+#   AMR : bool
+#       If this parameter is True, your model should allow for reshaping of the 
+#       pressure and temperature arrays based on the position of the clouds or
+#       the location of the photosphere, increasing the resolution where required.
+#       For example, using the fixed_length_amr function defined below.
+#   resolution : int
+#       If using exo-k to compute low resolution c-k opacity tables, or using
+#       the model_resolution parameter when defining your Data object, this 
+#       parameter should take in the defined model_resolution. This is necessary
+#       for selecting the correct line lists.
 
 def emission_model_diseq(pRT_object, 
                          parameters,
@@ -65,12 +93,7 @@ def emission_model_diseq(pRT_object,
     spectrum_model : np.array
         Computed emission spectrum [W/m2/micron]
     """
-    try: 
-        from poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm
-    except ImportError:
-        print("Could not import poor_mans_nonequ_chemistry. Exiting.")
-        sys.exit(2)     
-
+    
     #for key, val in parameters.items():
     #    print(key,val.value)
     # Priors for these parameters are implemented here, as they depend on each other
@@ -122,6 +145,7 @@ def emission_model_diseq(pRT_object,
                         fsed = parameters['fsed'].value,
                         Kzz = Kzz_use,
                         sigma_lnorm = parameters['sigma_lnorm'].value)
+    # Getting the model into correct units (W/m2/micron)
     wlen_model = nc.c/pRT_object.freq/1e-4
     wlen = nc.c/pRT_object.freq
     f_lambda = pRT_object.flux*nc.c/wlen**2.
@@ -198,7 +222,6 @@ def guillot_free_emission(pRT_object, \
         #print("AMR")
         p_clouds = np.array(list(Pbases.values()))
         pressures,small_index = fixed_length_amr(p_clouds,p_global)
-        #print(pressures)
         pRT_object.press = pressures * 1e6
         temperatures = temperatures[small_index]
     else:
@@ -220,7 +243,6 @@ def guillot_free_emission(pRT_object, \
     abundances['He'] = 0.234 * (1.0-msum) * np.ones_like(pressures)
 
     MMW = calc_MMW(abundances)
-    
     for cloud in pRT_object.cloud_species:
         cname = cloud.split('_')[0]
         pbase = Pbases[cname]
@@ -235,8 +257,9 @@ def guillot_free_emission(pRT_object, \
                             ((pressures[pressures <= pbase]/pbase)**parameters['fsed'].value)
         except:
             return None,None
-    if msum > 1.0:
-        return None, None
+    #print(msum)
+    #if msum > 1.0:
+    #    return None, None
     #abundances = set_resolution(pRT_object.line_species,abundances,resolution)
     pRT_object.calc_flux(temperatures, \
                      abundances, \
@@ -772,13 +795,18 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
             start = c_list[j][-1]
             sl = len(total_inds)
             ind = 0
+            done = 0
             while len(total_inds) < sl+int(scaling*width):
+                if start-ind < 0:
+                    start = start + len(c_list[j]) 
+                    ind = done
                 if np.in1d(start-ind,np.array(total_inds)).any():
                     ind += 1
                     continue
                 else:
                     total_inds.append(int(start-ind))
                     ind+=1
+                    done += 1
         # Check if the smallest new index is larger than the current max
         # if so, we can just add the indexes
         # I can probably replace all this with total_inds.extend(c_list[j])
@@ -786,9 +814,11 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
             start = c_list[j][0]
             sl = len(total_inds)
             ind = 0
+            done = 0
             while len(total_inds) < sl+int(scaling*width):
                 if (start+ind) >= (len(press_plus_index)-1):
                     start = start - len(c_list[j]) - 1
+                    ind = done
                     continue
                 if np.in1d(start+ind,np.array(total_inds)).any():
                     ind += 1
@@ -796,6 +826,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
                 else:
                     total_inds.append(int(start+ind))
                     ind+=1
+                    done += 1
         else:
             # This loop takes care of cases where we're between existing entries
             # it adds indices until duplicates are found, then keeps incrementing 
@@ -803,9 +834,11 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
             start = np.array(total_inds)[np.where(np.array(total_inds)==c_list[j][0])[0]]
             sl = len(total_inds)
             ind = 0
+            done = 0
             while len(total_inds) < sl+int(scaling*width):
                 if (start+ind) >= (len(press_plus_index)-1):
                     start = start - len(c_list[j]) - 1
+                    ind = done
                     continue
                 if np.in1d(start+ind,np.array(total_inds)).any():
                     ind += 1
@@ -813,6 +846,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
                 else:
                     total_inds.append(int(start+ind))
                     ind+=1
+                    done += 1
     total_inds = np.array(sorted(total_inds,reverse=False))
     # Stack the low res and high res grids, sort it, and take the unique values
     try:

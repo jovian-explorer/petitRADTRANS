@@ -6,6 +6,8 @@ __maintainer__ = "Paul Molliere"
 __email__ = "molliere@strw.leidenunivl.nl"
 __status__ = "Development"
 
+import petitRADTRANS.retrieval.plot_style
+
 from petitRADTRANS.radtrans import Radtrans
 
 from petitRADTRANS.retrieval.retrieval import Retrieval
