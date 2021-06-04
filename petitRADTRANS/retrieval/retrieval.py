@@ -624,8 +624,8 @@ class Retrieval:
         # Plot the shading in the residual plot        
         yabs_max = abs(max(ax_r.get_ylim(), key=abs))
         lims = ax.get_xlim()
-        lim_y = ax.get_xlim()
-        lim_y = [lim_y[0],lim_y[1]*1.05]
+        lim_y = ax.get_ylim()
+        lim_y = [lim_y[0],lim_y[1]*1.12]
         ax.set_ylim(lim_y)
         # weird scaling to get axis to look ok on log plots
         if self.rd.plot_kwargs["xscale"] == 'log':
@@ -698,18 +698,18 @@ class Retrieval:
         """
         print("Plotting Best-fit spectrum with 100 samples")
         len_samples = samples_use.shape[0]
+        path = self.output_dir + 'evaluate_'+self.retrieval_name + "/"
+
         for i_sample in range(int(self.rd.plot_kwargs["nsample"])):
             random_index = int(np.random.uniform()*len_samples)
             self.LogLikelihood(samples_use[random_index, :-1], 0, 0)
             for name,dd in self.data.items():
                 if dd.external_pRT_reference == None:
-                    np.savetxt('evaluate_'+self.retrieval_name + '/' +\
-                            name.replace(' ','_')+'_sampled_'+ \
-                                str(int(i_sample+1)).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))+'.dat', \
-                            np.column_stack((self.posterior_sample_specs[name][0], \
-                                            self.posterior_sample_specs[name][1])))
+                    np.savetxt(path +name.replace(' ','_')+'_sampled_'+ 
+                                str(int(i_sample+1)).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))+'.dat',
+                                np.column_stack((self.posterior_sample_specs[name][0],
+                                                 self.posterior_sample_specs[name][1])))
             
-        path = self.output_dir + 'evaluate_'+self.retrieval_name + "/"
         fig,ax = plt.subplots(figsize = (16,10))
         try : 
             plot_specs(fig,ax,path, 'Retrieved', '#ff9f9f', '#ff3d3d', -10, rebin_val = 5)
