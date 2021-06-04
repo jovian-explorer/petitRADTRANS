@@ -14,14 +14,10 @@ from petitRADTRANS import nat_cst as nc
 from petitRADTRANS.retrieval import cloud_cond as fc
 import pdb
 
-try: 
-    from poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm
-except ImportError:
-    print("Could not import poor_mans_nonequ_chemistry. Exiting.")
-    sys.exit(2)     
+    
 
 # Global constants to reduce calculations and initializations.
-p_global = np.logspace(-6,3,100*10)
+p_global = np.logspace(-6,3,1000)
 
 #######################################################
 # Define retrieval models
@@ -94,6 +90,10 @@ def emission_model_diseq(pRT_object,
         Computed emission spectrum [W/m2/micron]
     """
     
+
+    pglobal_check(pRT_object.press,
+                    parameters['pressure_simple'].value,
+                    parameters['pressure_scaling'].value)
     #for key, val in parameters.items():
     #    print(key,val.value)
     # Priors for these parameters are implemented here, as they depend on each other
@@ -201,10 +201,13 @@ def guillot_free_emission(pRT_object, \
     spectrum_model : np.array
         Computed emission spectrum [W/m2/micron]
     """
-    # Make the P-T profile
-    #pressures = pRT_object.press/1e6
     #for key, val in parameters.items():
     #    print(key,val.value)
+
+    pglobal_check(pRT_object.press,
+                  parameters['pressure_simple'].value,
+                  parameters['pressure_scaling'].value)
+
     temperatures = nc.guillot_global(p_global, \
                                 10**parameters['log_kappa_IR'].value, 
                                 parameters['gamma'].value, \
@@ -322,6 +325,11 @@ def guillot_eqchem_transmission(pRT_object, \
     spectrum_model : np.array
         Computed transmission spectrum R_pl**2/Rstar**2
     """
+    try: 
+        from poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm
+    except ImportError:
+        print("Could not import poor_mans_nonequ_chemistry. Exiting.")
+        sys.exit(2) 
     # Make the P-T profile
     pressures = pRT_object.press/1e6
     temperatures = nc.guillot_global(pressures, \
@@ -418,6 +426,11 @@ def isothermal_eqchem_transmission(pRT_object, \
     spectrum_model : np.array
         Computed transmission spectrum R_pl**2/Rstar**2
     """
+    try: 
+        from poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm
+    except ImportError:
+        print("Could not import poor_mans_nonequ_chemistry. Exiting.")
+        sys.exit(2)
     # Make the P-T profile
     pressures = pRT_object.press/1e6
     temperatures = parameters['Temp'].value * np.ones_like(pressures)
@@ -591,7 +604,11 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv = True):
     CO: C/O for the nabla_ad interpolation
     FeH: metallicity for the nabla_ad interpolation
     '''
-
+    try: 
+        from poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm
+    except ImportError:
+        print("Could not import poor_mans_nonequ_chemistry. Exiting.")
+        sys.exit(2)
     # Go grom bar to cgs
     press_cgs = press*1e6
 
@@ -734,6 +751,7 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv = True):
     return tret#, press_tau(1.)/1e6, tfintp(p_bot_spline)
 
 def make_half_pressure_better(P_clouds, press):
+    # Obsolete, replaced with fixed_length_amr
     press_plus_index = np.zeros((press.shape[0],2))
     press_plus_index[:,0] = press
     press_plus_index[:,1] = range(len(press))
@@ -763,11 +781,24 @@ def make_half_pressure_better(P_clouds, press):
     return press_out[:,0],  press_out[:, 1].astype('int')
 
 def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
+    """
+    fixed_length_amr
+    This function takes in the cloud base pressures for each cloud,
+    and returns an array of pressures with a high resolution mesh 
+    in the region where the cloud is located.
+
+    parameters
+    ----------
+    P_clouds : numpy.ndarray
+        The cloud base pressures in bar
+    press : np.ndarray
+    """
     # P_clouds is array of pressures
     # press should be ~len scaling*100
     # guarantees total length will be press.shape[0] + P_clouds.shape[0]*width*(scaling - 1)
     # scaling is how many hi-res points per normal point. Must be int
     # width is the number of low res points to replace. Must be int.
+
     press_plus_index = np.zeros((press.shape[0],2))
     press_plus_index[:,0] = np.logspace(np.log10(np.min(press)),np.log10(np.max(press)),press.shape[0])
     press_plus_index[:,1] = range(len(press_plus_index[:,0]))
@@ -860,6 +891,40 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
 
 
 def get_abundances(pRT_object,pressures,temperatures,parameters,AMR = False):
+    """
+    get_abundances
+    This function takes in the C/O ratio, metallicity, and quench pressures and uses them
+    to compute the gas phase and equilibrium condensate abundances.
+    Clouds are currently hard coded into the function.
+
+    parameters:
+    -----------
+    pRT_object : petitRADTRANS.RadTrans
+        The pRT object used to compute the spectrum.
+    pressures : numpy.ndarray
+        A log spaced pressure array. If AMR is on it should be the full high resolution grid.
+    temperatures : numpy.ndarray
+        A temperature array with the same shape as pressures
+    parameters : dict
+        A dictionary of model parameters, in particular it must contain the names C/O, Fe/H and
+        log_pquench. Additionally the cloud parameters log_X_cb_Fe(c) and MgSiO3(c) must be present.
+    AMR : bool
+        Turn the adaptive mesh grid on or off. See fixed_length_amr for implementation.
+
+    returns:
+    --------
+    abundances : dict
+        Mass fraction abundances of all atmospheric species
+    MMW : numpy.ndarray
+        Array of the mean molecular weights in each pressure bin
+    small_index : numpy.ndarray
+        The indices of the high resolution grid to use to define the adaptive grid.
+    """
+    try: 
+        from poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm
+    except ImportError:
+        print("Could not import poor_mans_nonequ_chemistry. Exiting.")
+        sys.exit(2)
     # Make the abundance profile
     COs = parameters['C/O'].value * np.ones_like(pressures)
     FeHs = parameters['Fe/H'].value * np.ones_like(pressures)
@@ -895,7 +960,13 @@ def get_abundances(pRT_object,pressures,temperatures,parameters,AMR = False):
     for key, val in Pbases.items():
         p_clouds.append(val)
     p_clouds = np.array(p_clouds)
-    press_use, small_index = fixed_length_amr(p_clouds, pressures)
+
+    if AMR:
+        press_use, small_index = fixed_length_amr(p_clouds, pressures)
+    else : 
+        #TODO: Test
+        press_use = pressures
+        small_index = np.indices(press_use)
 
     for cloud in cp.copy(pRT_object.cloud_species):
         cname = cloud.split('_')[0]
@@ -924,6 +995,28 @@ def get_abundances(pRT_object,pressures,temperatures,parameters,AMR = False):
     if 'FeH' in abundances.keys():
         abundances['FeH'] = abundances['FeH']/2.
     return abundances,MMW,small_index
+
+def pglobal_check(press,shape,scaling):
+    """
+    pglobal_check
+    Check to ensure that the global pressure array has the correct length.
+    Updates p_global.
+
+    parameters
+    ----------
+    press : numpy.ndarray
+        Pressure array from a pRT_object. Used to set the min and max values of p_global
+    shape : int
+        the shape of the pressure array if no AMR is used
+    scaling : 
+        The factor by which the pressure array resolution should be scaled.
+    """
+    global p_global
+    if p_global.shape[0] != int(scaling*shape):  
+        p_global = np.logspace(np.log10(press[0]),
+                                np.log10(press[1]),
+                                int(scaling*shape))
+    return
 
 def set_resolution(lines,abundances,resolution):
     # Set correct key names in abundances for pRT, with set resolution

@@ -38,7 +38,7 @@ figure = {'titlesize' : 32,
           'dpi': 300,
           'autolayout' : True}
 legend = {'fancybox' : True,
-          'fontsize' : 26}
+          'fontsize' : 20}
 scatter = {'marker' : 'o',
            'edgecolors' : 'k'}
 

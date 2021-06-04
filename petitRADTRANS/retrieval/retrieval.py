@@ -1,6 +1,4 @@
-###########################################
 # Input / output, general run definitions
-###########################################
 import sys, os
 # To not have numpy start parallelizing on its own
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -8,16 +6,16 @@ os.environ["OMP_NUM_THREADS"] = "1"
 # Read external packages
 import numpy as np
 import copy as cp
-
 import pymultinest
 import json
 import argparse as ap
 from scipy.stats import binned_statistic
+
+# Plotting
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator, AutoMinorLocator, LogLocator, NullFormatter
 
 # Read own packages
-import petitRADTRANS # Just need the filename actually
 from petitRADTRANS import Radtrans
 from petitRADTRANS import nat_cst as nc
 from .parameter_class import Parameter
@@ -40,7 +38,7 @@ class Retrieval:
                  pRT_plot_style = True,
                  plot_multiple_retrieval_names = None):
         """
-        Retrieve Class
+        Retrieval Class
         This class implements the retrieval method using petitRADTRANS and pymultinest.
         A RetrievalConfig object is passed to this class to describe the retrieval data, parameters
         and priors. The run() method then uses pymultinest to sample the parameter space, producing
@@ -181,82 +179,39 @@ class Retrieval:
                 print(fmts % (p, med, sigma))
         return
 
-    def getSamples(self, output_dir = None):
+    def run_ultranest(self):
         """
-        getSamples
-        This function looks in the given output directory and finds the post_equal_weights
-        file associated with the current retrieval name.
-
-        parameters
-        ----------
-        output_dir : str
-            Parent directory of the out_PMN/*post_equal_weights.dat file
-        
-        returns
-        -------
-        sample_dict : dict
-            A dictionary with keys being the name of the retrieval, and values are a numpy
-            ndarray containing the samples in the post_equal_weights file
-        parameter_dict : dict
-            A dictionary with keys being the name of the retrieval, and values are a list of names
-            of the parameters used in the retrieval. The first name corresponds to the first column
-            of the samples, and so on.
+        run
+        Run mode for the class. Uses ultranest to sample parameter space
+        and produce standard outputs.
         """
-        sample_dict = {}
-        parameter_dict = {}
-        if output_dir is None:
-            output_dir = self.output_dir
-        for name in self.corner_files:
-            samples = np.genfromtxt(output_dir +'out_PMN/'+ \
-                                    name+ \
-                                    '_post_equal_weights.dat')
+        print("Warning, ultranest mode is still in development. Proceed with caution")
+        try:
+             import ultranest as un
+        except ImportError:
+            print("Could not import ultranest. Exiting.")
+            sys.exit(1)
+        # Todo: autodetect PMN vs UN outputs
+        prefix = self.output_dir + 'out_PMN/'+self.retrieval_name+'_'
+        if self.run_mode == 'retrieval':
+            print("Starting retrieval: " + self.retrieval_name+'\n')
+            # How many free parameters?
+            n_params = 0
+            free_parameter_names = []
+            for pp in self.parameters:
+                if self.parameters[pp].is_free_parameter:
+                    free_parameter_names.append(self.parameters[pp].name)
+                    n_params += 1
+            json.dump(free_parameter_names, \
+                    open(self.output_dir + 'out_PMN/'+self.retrieval_name+'_params.json', 'w'))
+            sampler = un.ReactiveNestedSampler(free_parameter_names, 
+                                               self.LogLikelihood,
+                                               self.Prior,
+                                               log_dir=self.output_dir + "out_" + self.retrieval_name, 
+                                               resume=True)
 
-            parameters_read = json.load(open(output_dir + 'out_PMN/'+ \
-                                        name+ \
-                                        '_params.json'))
-            sample_dict[name] = samples
-            parameter_dict[name] = parameters_read
-        return sample_dict, parameter_dict
-
-    def plotAll(self, output_dir = None):
-        """
-        plotAll
-        Produces plots for the best fit spectrum, a sample of 100 output spectra,
-        the best fit PT profile and a corner plot for parameters specified in the
-        run definition.
-        """
-        if output_dir is None:
-            output_dir = self.output_dir
-        sample_dict, parameter_dict = self.getSamples(output_dir)
-
-        ###########################################
-        # Plot best-fit spectrum
-        ###########################################
-        samples_use = cp.copy(sample_dict[self.retrieval_name])
-        parameters_read = cp.copy(parameter_dict[self.retrieval_name])
-        i_p = 0
-        for pp in self.parameters:
-            if self.parameters[pp].is_free_parameter:
-                for i_s in range(len(parameters_read)):
-                    if parameters_read[i_s] == self.parameters[pp].name:
-                        samples_use[:,i_p] = sample_dict[self.retrieval_name][:, i_s]
-                i_p += 1
-                
-        print("Best fit parameters")
-        i_p = 0
-        for pp in self.parameters:
-            if self.parameters[pp].is_free_parameter:
-                for i_s in range(len(parameters_read)):
-                    if parameters_read[i_s] == self.parameters[pp].name:
-                        print(self.parameters[pp].name, samples_use[best_fit_index][i_p])
-                        i_p += 1
-                        
-        # Plotting
-        self.plotSpectra(samples_use,parameters_read)
-        self.plotSampled(samples_use, parameters_read)
-        self.plotPT(sample_dict,parameters_read)
-        self.plotCorner(sample_dict,parameter_dict,parameters_read)
-        print("Done!")
+            result = sampler.run()
+            sampler.print_results()
         return
 
     def setupData(self):
@@ -317,6 +272,17 @@ class Retrieval:
                 dd.pRT_object = rt_object
         return
 
+    def Prior(self, cube, ndim, nparams):
+        """
+        Prior
+        pymultinest prior function. Transforms unit hypercube into physical space.
+        """
+        i_p = 0
+        for pp in self.parameters:
+            if self.parameters[pp].is_free_parameter:
+                cube[i_p] = self.parameters[pp].get_param_uniform(cube[i_p])
+                i_p += 1
+
     def LogLikelihood(self,cube,ndim,nparam):
         """
         LogLikelihood
@@ -365,7 +331,7 @@ class Retrieval:
                                             self.plotting)
                 # Save sampled outputs if necessary.
                 if self.run_mode == 'evaluate':
-                    np.savetxt(self.output_dir + 'evaluate_data/model_spec_best_fit'+ 
+                    np.savetxt(self.output_dir + 'evaluate_' + self.retrieval_name + '/model_spec_best_fit_'+ 
                             name+'.dat', 
                             np.column_stack((wlen_model, 
                                                 spectrum_model)))
@@ -388,16 +354,42 @@ class Retrieval:
         #print(log_likelihood)
         return log_likelihood + log_prior  
     
-    def Prior(self, cube, ndim, nparams):
+    def getSamples(self, output_dir = None):
         """
-        Prior
-        pymultinest prior function. Transforms unit hypercube into physical space.
+        getSamples
+        This function looks in the given output directory and finds the post_equal_weights
+        file associated with the current retrieval name.
+
+        parameters
+        ----------
+        output_dir : str
+            Parent directory of the out_PMN/*post_equal_weights.dat file
+        
+        returns
+        -------
+        sample_dict : dict
+            A dictionary with keys being the name of the retrieval, and values are a numpy
+            ndarray containing the samples in the post_equal_weights file
+        parameter_dict : dict
+            A dictionary with keys being the name of the retrieval, and values are a list of names
+            of the parameters used in the retrieval. The first name corresponds to the first column
+            of the samples, and so on.
         """
-        i_p = 0
-        for pp in self.parameters:
-            if self.parameters[pp].is_free_parameter:
-                cube[i_p] = self.parameters[pp].get_param_uniform(cube[i_p])
-                i_p += 1
+        sample_dict = {}
+        parameter_dict = {}
+        if output_dir is None:
+            output_dir = self.output_dir
+        for name in self.corner_files:
+            samples = np.genfromtxt(output_dir +'out_PMN/'+ \
+                                    name+ \
+                                    '_post_equal_weights.dat')
+
+            parameters_read = json.load(open(output_dir + 'out_PMN/'+ \
+                                        name+ \
+                                        '_params.json'))
+            sample_dict[name] = samples
+            parameter_dict[name] = parameters_read
+        return sample_dict, parameter_dict
 
     def getBestFitParams(self,best_fit_params,parameters_read):
         """
@@ -496,6 +488,50 @@ class Retrieval:
         self.best_fit_specs[ret_name]= [bf_wlen,bf_spectrum]
         return bf_wlen, bf_spectrum
 
+
+#############################################################
+# Plotting functions
+#############################################################
+    def plotAll(self, output_dir = None):
+        """
+        plotAll
+        Produces plots for the best fit spectrum, a sample of 100 output spectra,
+        the best fit PT profile and a corner plot for parameters specified in the
+        run definition.
+        """
+        if output_dir is None:
+            output_dir = self.output_dir
+        sample_dict, parameter_dict = self.getSamples(output_dir)
+
+        ###########################################
+        # Plot best-fit spectrum
+        ###########################################
+        samples_use = cp.copy(sample_dict[self.retrieval_name])
+        parameters_read = cp.copy(parameter_dict[self.retrieval_name])
+        i_p = 0
+        for pp in self.parameters:
+            if self.parameters[pp].is_free_parameter:
+                for i_s in range(len(parameters_read)):
+                    if parameters_read[i_s] == self.parameters[pp].name:
+                        samples_use[:,i_p] = sample_dict[self.retrieval_name][:, i_s]
+                i_p += 1
+                
+        print("Best fit parameters")
+        i_p = 0
+        for pp in self.parameters:
+            if self.parameters[pp].is_free_parameter:
+                for i_s in range(len(parameters_read)):
+                    if parameters_read[i_s] == self.parameters[pp].name:
+                        print(self.parameters[pp].name, samples_use[best_fit_index][i_p])
+                        i_p += 1
+                        
+        # Plotting
+        self.plotSpectra(samples_use,parameters_read)
+        self.plotSampled(samples_use, parameters_read)
+        self.plotPT(sample_dict,parameters_read)
+        self.plotCorner(sample_dict,parameter_dict,parameters_read)
+        print("Done!")
+        return
     def plotSpectra(self,samples_use,parameters_read,model_generating_func = None):
         """
         plotSpectra
@@ -630,6 +666,9 @@ class Retrieval:
         # weird scaling to get axis to look ok on log plots
         if self.rd.plot_kwargs["xscale"] == 'log':
             lims = [lims[0]*1.09,lims[1]*1.02]
+        else:
+            lims = [bf_wlen[0]*0.98,bf_wlen[-1]*1.02]
+        ax.set_xlim(lims)
         ax_r.set_xlim(lims)
         ax_r.set_ylim(ymin=-yabs_max, ymax=yabs_max)
         ax_r.fill_between(lims,-1,1,color='dimgrey',alpha=0.4,zorder = -10)
@@ -676,12 +715,12 @@ class Retrieval:
             ax_r.xaxis.set_minor_formatter(NullFormatter())
         else:
             ax_r.xaxis.set_minor_locator(AutoMinorLocator())
-            ax._rtick_params(axis='both', which='minor', bottom=True, top=True, left=True, right=True, direction='in',length=5)
+            ax_r.tick_params(axis='both', which='minor', bottom=True, top=True, left=True, right=True, direction='in',length=5)
         ax_r.yaxis.set_minor_locator(AutoMinorLocator())
         ax_r.tick_params(axis='both', which='minor', bottom=True, top=True, left=True, right=True, direction='in',length=5)
         ax_r.set_ylabel("Residuals [$\sigma$]")
         ax_r.set_xlabel(self.rd.plot_kwargs["spec_xlabel"])
-        ax.legend(loc='best').set_zorder(1002) 
+        ax.legend(loc='upper center',ncol = len(self.data.keys())+1).set_zorder(1002) 
         plt.tight_layout()
         plt.savefig(self.output_dir + 'evaluate_'+self.rd.retrieval_name +'/best_fit_spec.pdf')
         return fig, ax, ax_r
@@ -696,14 +735,21 @@ class Retrieval:
         samples_use : np.ndarray
             posterior samples from pynmultinest outputs (post_equal_weights)
         """
-        print("Plotting Best-fit spectrum with 100 samples")
+        print("Plotting Best-fit spectrum with "+ str(self.rd.plot_kwargs["nsample"]) + " samples.")
+        print("This could take some time...")
         len_samples = samples_use.shape[0]
         path = self.output_dir + 'evaluate_'+self.retrieval_name + "/"
+
+        data_use= {}
+        for name, dd in self.data.items():
+            if not os.path.exists(path + name.replace(' ','_')+'_sampled_'+ 
+                        str(int(self.rd.plot_kwargs["nsample"])).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))+'.dat'):
+                data_use[name] = dd
 
         for i_sample in range(int(self.rd.plot_kwargs["nsample"])):
             random_index = int(np.random.uniform()*len_samples)
             self.LogLikelihood(samples_use[random_index, :-1], 0, 0)
-            for name,dd in self.data.items():
+            for name,dd in data_use.items():
                 if dd.external_pRT_reference == None:
                     np.savetxt(path +name.replace(' ','_')+'_sampled_'+ 
                                 str(int(i_sample+1)).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))+'.dat',
@@ -711,11 +757,9 @@ class Retrieval:
                                                  self.posterior_sample_specs[name][1])))
             
         fig,ax = plt.subplots(figsize = (16,10))
-        try : 
-            plot_specs(fig,ax,path, 'Retrieved', '#ff9f9f', '#ff3d3d', -10, rebin_val = 5)
-        except : 
-            print("Plotting sample spectrum failed, are you sure you allowed sampling?")
-            return None
+        plot_specs(fig,ax,path, 'Retrieved', '#ff9f9f', '#ff3d3d', -10, rebin_val = 5)
+        #print("Plotting sample spectrum failed, are you sure you allowed sampling?")
+        #return None
         
         for name,dd in self.data.items():
             plot_data(fig,ax,dd, name, 'white', 0, rebin_val = 5)
@@ -774,7 +818,7 @@ class Retrieval:
                         x1 = temps_sort[int(len_samp*(0.5-0.997/2.)), :], \
                         x2 = temps_sort[int(len_samp*(0.5+0.997/2.)), :], \
                         color = 'brown', label = '3 sig')
-        ax.axhline.fill_betweenx(pressures, \
+        ax.fill_betweenx(pressures, \
                         x1 = temps_sort[int(len_samp*(0.5-0.95/2.)), :], \
                         x2 = temps_sort[int(len_samp*(0.5+0.95/2.)), :], \
                         color = 'orange', label = '2 sig')

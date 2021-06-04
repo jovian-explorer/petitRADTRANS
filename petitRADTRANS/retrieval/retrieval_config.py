@@ -60,6 +60,11 @@ class RetrievalConfig:
         self.plot_defaults()
         self.write_out_spec_sample = write_out_spec_sample
 
+        self.add_parameter("pressure_scaling",False,value = 1)
+        self.add_parameter("pressure_width",False,value = 1)
+        self.add_parameter("pressure_simple",False,value = self.p_global.shape[0])
+
+
     def plot_defaults(self):
         ##################################################################
         # Define axis properties of spectral plot if run_mode == 'evaluate'
@@ -81,11 +86,18 @@ class RetrievalConfig:
 
     def setup_pres(self, scaling = 10, width = 3):
         # Maybe should read the params from somewhere?
+        print("Setting up AMR pressure grid.")
+        self.scaling = scaling
+        self.width = width
         nclouds = len(self.cloud_species)
         if nclouds == 0:
             print("WARNING: there are no clouds in the retrieval, please add cloud species before setting up AMR")
         new_len = self.p_global.shape[0]  + nclouds*width*(scaling-1)
         self.amr_pressure = np.logspace(np.log10(self.p_global[0]),np.log10(self.p_global[-1]),new_len)
+        self.add_parameter("pressure_scaling",False,value = scaling)
+        self.add_parameter("pressure_width",False,value = width)
+        self.add_parameter("pressure_simple",False,value = self.p_global.shape[0])
+
         return self.amr_pressure
     def add_parameter(self,name,free, value = None, transform_prior_cube_coordinate  = None):
         self.parameters[name] = Parameter(name, free, value, 
