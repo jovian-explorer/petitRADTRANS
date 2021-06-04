@@ -37,6 +37,7 @@ class Retrieval:
                  bayes_factor_species = None,
                  corner_plot_names = None,
                  short_names = None,
+                 pRT_plot_style = True,
                  plot_multiple_retrieval_names = None):
         """
         Retrieve Class
@@ -107,6 +108,9 @@ class Retrieval:
         # TODO
         self.retrieval_list = plot_multiple_retrieval_names
 
+        # Set up pretty plotting
+        if pRT_plot_style:
+            import petitRADTRANS.retrieval.plot_style
         # Path to input opacities
         self.path = os.environ.get("pRT_input_data_path")
         if self.path == None:
@@ -459,7 +463,8 @@ class Retrieval:
             if dd.wlen_range_pRT[1] > wmax:
                 wmax = dd.wlen_range_pRT[1]
         # Set up parameter dictionary
-        self.getBestFitParams(best_fit_params,parameters_read)
+        if not self.retrieval_name in self.best_fit_specs.keys():
+            self.getBestFitParams(best_fit_params,parameters_read)
 
         # Setup the pRT object
         bf_prt = Radtrans(line_species = cp.copy(self.rd.line_species), \
@@ -619,6 +624,9 @@ class Retrieval:
         # Plot the shading in the residual plot        
         yabs_max = abs(max(ax_r.get_ylim(), key=abs))
         lims = ax.get_xlim()
+        lim_y = ax.get_xlim()
+        lim_y = [lim_y[0],lim_y[1]*1.05]
+        ax.set_ylim(lim_y)
         # weird scaling to get axis to look ok on log plots
         if self.rd.plot_kwargs["xscale"] == 'log':
             lims = [lims[0]*1.09,lims[1]*1.02]
@@ -673,7 +681,7 @@ class Retrieval:
         ax_r.tick_params(axis='both', which='minor', bottom=True, top=True, left=True, right=True, direction='in',length=5)
         ax_r.set_ylabel("Residuals [$\sigma$]")
         ax_r.set_xlabel(self.rd.plot_kwargs["spec_xlabel"])
-        ax.legend(loc='upper right').set_zorder(1002) 
+        ax.legend(loc='best').set_zorder(1002) 
         plt.tight_layout()
         plt.savefig(self.output_dir + 'evaluate_'+self.rd.retrieval_name +'/best_fit_spec.pdf')
         return fig, ax, ax_r
@@ -689,8 +697,8 @@ class Retrieval:
             posterior samples from pynmultinest outputs (post_equal_weights)
         """
         print("Plotting Best-fit spectrum with 100 samples")
-        len_samples = np.shape(samples_use)[0]
-        for i_sample in range(self.rd.plot_kwargs["nsample"]):
+        len_samples = samples_use.shape[0]
+        for i_sample in range(int(self.rd.plot_kwargs["nsample"])):
             random_index = int(np.random.uniform()*len_samples)
             self.LogLikelihood(samples_use[random_index, :-1], 0, 0)
             for name,dd in self.data.items():
