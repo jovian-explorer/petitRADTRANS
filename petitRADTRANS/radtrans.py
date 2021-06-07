@@ -1203,8 +1203,20 @@ class Radtrans(_read_opacities.ReadOpacities):
             if not Rstar == None:
                  print('Using Rstar value input by user.')
                  rad = Rstar
-            self.stellar_intensity = fr.rebin_spectrum(spec[:,0], \
-            spec[:,1], nc.c/self.freq)
+
+
+            add_stellar_flux = np.zeros(100)
+            add_wavelengths = np.logspace(np.log10(1.0000002e-02), 2, 100)
+
+            #import pdb
+            #pdb.set_trace()
+
+            interpwavelengths = np.append(spec[:,0], add_wavelengths)
+            interpfluxes      = np.append(spec[:, 1], add_stellar_flux)
+
+            self.stellar_intensity = fr.rebin_spectrum(interpwavelengths,
+                                                       interpfluxes,
+                                                       nc.c / self.freq)
 
             try:
                 ###### SCALED INTENSITY (Flux/pi)
