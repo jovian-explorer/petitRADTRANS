@@ -106,6 +106,8 @@ class Radtrans(_read_opacities.ReadOpacities):
             print('before creating a Radtrans object or loading the nat_cst module.')
             sys.exit(1)
 
+        self.wlen_bords_micron = wlen_bords_micron
+
         # Any opacities there at all?
         self.absorbers_present = False
         if (len(line_species) + \
@@ -1544,74 +1546,65 @@ class Radtrans(_read_opacities.ReadOpacities):
         else:
             self.tau_cloud = None
 
-    def write_out_rebin(self, resolution, path = '', species = [], masses = None):
-
-        import exo_k as xk
-        import copy as cp
-
-        # Define own wavenumber grid, make sure that log spacing is constant everywhere
-        n_spectral_points = int(resolution * np.log(self.wlen_bords_micron[1]/ \
-                                               self.wlen_bords_micron[0]) + 1)
-
-        wavenumber_grid = np.logspace(np.log10(1/self.wlen_bords_micron[1]/1e-4), \
-                                      np.log10(1./self.wlen_bords_micron[0]/1e-4), \
-                                      n_spectral_points)
-
-        # Do the rebinning, loop through species
-        for spec in species:
-
-            print('Rebinning species '+spec+'...')
-
-            ################################################
-            # Create hdf5 file that Exo-k can read...
-            ################################################
-
-            f = h5py.File('temp.h5', 'w')
-            f.create_dataset('DOI', data = '--')
-            f.create_dataset('bin_centers', data = self.freq[::-1]/nc.c)
-            f.create_dataset('bin_edges', data = self.border_freqs[::-1]/nc.c)
-
-            ret_opa_table = cp.copy(self.line_grid_kappas_custom_PT[spec])
-            ## Mass to go from opacities to cross-sections
-            ret_opa_table = ret_opa_table * nc.amu * masses[spec]
-
-            # Do the opposite of what I do when reading in Katy's Exomol tables
-            # To get opacities into the right format
-            ret_opa_table = ret_opa_table[:,::-1,:]
-            ret_opa_table = np.swapaxes(ret_opa_table, 2, 0)
-            ret_opa_table = ret_opa_table.reshape(self.custom_diffTs[spec], \
-                                                  self.custom_diffPs[spec], \
-                                                  self.freq_len, \
-                                                  len(self.w_gauss))
-            ret_opa_table = np.swapaxes(ret_opa_table, 1, 0)
-            ret_opa_table[ret_opa_table < 1e-60] = 1e-60
-            f.create_dataset('kcoeff', data = ret_opa_table)
-            f['kcoeff'].attrs.create('units', 'cm^2/molecule')
-
-            # Add the rest of the stuff that is needed.
-            f.create_dataset('method', data = 'petit_samples')
-            f.create_dataset('mol_name', data = spec.split('_')[0])
-            f.create_dataset('mol_mass', data = [masses[spec]])
-            f.create_dataset('ngauss', data = len(self.w_gauss))
-            f.create_dataset('p', data = self.custom_line_TP_grid[spec][:self.custom_diffPs[spec],1]/1e6)
-            f['p'].attrs.create('units', 'bar')
-            f.create_dataset('samples', data = self.g_gauss)
-            f.create_dataset('t', data = self.custom_line_TP_grid[spec][::self.custom_diffPs[spec],0])
-            f.create_dataset('weights', data = self.w_gauss)
-            f.create_dataset('wlrange', data = [np.min(nc.c/self.border_freqs/1e-4), \
-                                                np.max(nc.c/self.border_freqs/1e-4)])
-            f.create_dataset('wnrange', data = [np.min(self.border_freqs/nc.c), \
-                                                np.max(self.border_freqs/nc.c)])
-
-            f.close()
-
-            ###############################################
-            # Use Exo-k to rebin to low-res, save to desired folder
-            ###############################################
-            tab = xk.Ktable(filename = 'temp.h5')
-            tab.bin_down(wavenumber_grid)
-            if path[-1] == '/':
-                path = path[:-1]
-            tab.write_hdf5(path+'/'+spec+'_R_'+str(int(resolution))+'.h5')
-            os.system('rm temp.h5')
+    def write_out_rebin(self, resolution, path='', species=[], masses=None):
+            import exo_k as xk
+            import copy as cp
+            # Define own wavenumber grid, make sure that log spacing is constant everywhere
+            n_spectral_points = int(resolution * np.log(self.wlen_bords_micron[1] / \
+                                                        self.wlen_bords_micron[0]) + 1)
+            wavenumber_grid = np.logspace(np.log10(1 / self.wlen_bords_micron[1] / 1e-4), \
+                                          np.log10(1. / self.wlen_bords_micron[0] / 1e-4), \
+                                          n_spectral_points)
+            dt = h5py.string_dtype(encoding='utf-8')
+            # Do the rebinning, loop through species
+            for spec in species:
+                print('Rebinning species ' + spec + '...')
+                ################################################
+                # Create hdf5 file that Exo-k can read...
+                ################################################
+                f = h5py.File('temp.h5', 'w')
+                f.create_dataset('DOI', (1,), data="--", dtype=dt)
+                f.create_dataset('bin_centers', data=self.freq[::-1] / nc.c)
+                f.create_dataset('bin_edges', data=self.border_freqs[::-1] / nc.c)
+                ret_opa_table = cp.copy(self.line_grid_kappas_custom_PT[spec])
+                ## Mass to go from opacities to cross-sections
+                ret_opa_table = ret_opa_table * nc.amu * masses[spec.split('_')[0]]
+                # Do the opposite of what I do when reading in Katy's Exomol tables
+                # To get opacities into the right format
+                ret_opa_table = ret_opa_table[:, ::-1, :]
+                ret_opa_table = np.swapaxes(ret_opa_table, 2, 0)
+                ret_opa_table = ret_opa_table.reshape(self.custom_diffTs[spec], \
+                                                      self.custom_diffPs[spec], \
+                                                      self.freq_len, \
+                                                      len(self.w_gauss))
+                ret_opa_table = np.swapaxes(ret_opa_table, 1, 0)
+                ret_opa_table[ret_opa_table < 1e-60] = 1e-60
+                f.create_dataset('kcoeff', data=ret_opa_table)
+                f['kcoeff'].attrs.create('units', 'cm^2/molecule')
+                # Add the rest of the stuff that is needed.
+                f.create_dataset('method', (1,), data="petit_samples", dtype=dt)
+                f.create_dataset('mol_name', data=spec.split('_')[0], dtype=dt)
+                f.create_dataset('mol_mass', data=[masses[spec.split('_')[0]]])
+                f.create_dataset('ngauss', data=len(self.w_gauss))
+                f.create_dataset('p', data=self.custom_line_TP_grid[spec][:self.custom_diffPs[spec], 1] / 1e6)
+                f['p'].attrs.create('units', 'bar')
+                f.create_dataset('samples', data=self.g_gauss)
+                f.create_dataset('t', data=self.custom_line_TP_grid[spec][::self.custom_diffPs[spec], 0])
+                f.create_dataset('weights', data=self.w_gauss)
+                f.create_dataset('wlrange', data=[np.min(nc.c / self.border_freqs / 1e-4), \
+                                                  np.max(nc.c / self.border_freqs / 1e-4)])
+                f.create_dataset('wnrange', data=[np.min(self.border_freqs / nc.c), \
+                                                  np.max(self.border_freqs / nc.c)])
+                f.close()
+                ###############################################
+                # Use Exo-k to rebin to low-res, save to desired folder
+                ###############################################
+                tab = xk.Ktable(filename='temp.h5')
+                tab.bin_down(wavenumber_grid)
+                if path[-1] == '/':
+                    path = path[:-1]
+                os.makedirs(path + '/' + spec + '_R_' + str(int(resolution)), exist_ok=True)
+                tab.write_hdf5(path + '/' + spec + '_R_' + str(int(resolution)) + '/' + spec + '_R_' + str(
+                    int(resolution)) + '.h5')
+                os.system('rm temp.h5')
 

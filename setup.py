@@ -39,9 +39,12 @@ rebin_give_width = Extension(
     sources=['petitRADTRANS/retrieval/rebin_give_width.f90'], \
     extra_compile_args=extra_compile_args)
 
-extensions = [fort_spec, fort_input, fort_rebin, rebin_give_width]
+poor_mans = Extension(
+    name='petitRADTRANS.poor_mans_nonequ_chem.chem_fortran_util.chem_fortran_util',
+    sources=['petitRADTRANS/poor_mans_nonequ_chem/chem_fortran_util/chem_fortran_util.f90'], \
+    extra_compile_args=extra_compile_args)
 
-
+extensions = [fort_spec, fort_input, fort_rebin, rebin_give_width, poor_mans]
 
 def setup_function(extensions):
     setup(name='petitRADTRANS',
