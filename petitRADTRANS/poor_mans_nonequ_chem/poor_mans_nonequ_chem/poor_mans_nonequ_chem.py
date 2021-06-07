@@ -5,28 +5,33 @@ Created on Mon May 29 14:44:35 2017
 
 @author: Paul Mollière
 """
-#import chem_fortran_util as chem
 import numpy as np
 import os
 from ..chem_fortran_util import read_data, interpolate
 import copy as cp
 
-current_directory = os.path.dirname(os.path.abspath(__file__))
-package_directory = os.path.abspath(os.path.join(current_directory, os.pardir)) + '/'
+path = os.environ.get("pRT_input_data_path")
+if path == None:
+    print('Path to input data not specified!')
+    print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
+    print('    import os')
+    print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
+    print('before creating a Radtrans object or loading the nat_cst module.')
+    sys.exit(1)
 
 # Read in parameters of chemistry grid
-FEHs = np.genfromtxt(os.path.join(package_directory, "abundance_files/FEHs.dat"))
-COs = np.genfromtxt(os.path.join(package_directory, "abundance_files/COs.dat"))
-temps = np.genfromtxt(os.path.join(package_directory, "abundance_files/temps.dat"))
-pressures = np.genfromtxt(os.path.join(package_directory, "abundance_files/pressures.dat"))
-f = open(os.path.join(package_directory, "abundance_files/species.dat"))
+FEHs = np.genfromtxt(os.path.join(path, "abundance_files/FEHs.dat"))
+COs = np.genfromtxt(os.path.join(path, "abundance_files/COs.dat"))
+temps = np.genfromtxt(os.path.join(path, "abundance_files/temps.dat"))
+pressures = np.genfromtxt(os.path.join(path, "abundance_files/pressures.dat"))
+f = open(os.path.join(path, "abundance_files/species.dat"))
 names = f.readlines()
 f.close()
 for id in range(len(names)):
     names[id] = names[id][:-1]
 
 chem_table = read_data(int(len(FEHs)), int(len(COs)), int(len(temps)),
-                            int(len(pressures)), int(len(names)), package_directory)
+                            int(len(pressures)), int(len(names)), path+'/')
 
 chem_table = np.array(chem_table, dtype='d', order='F')
 

@@ -3,7 +3,7 @@ subroutine read_data(NFEH, NCO, Npress, Ntemp, Nspec, module_path, chem_table)
   implicit none
   ! I/O
   integer, intent(in) :: NFEH, NCO, Npress, Ntemp, Nspec
-  character*200, intent(in) :: module_path
+  character*500, intent(in) :: module_path
   double precision, intent(out) :: chem_table(Nspec, Ntemp, Npress, NCO, NFEH)
   ! Internal
   integer :: i_feh, i_co, i_p, i_t
