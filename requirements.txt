@@ -1,8 +1,8 @@
-astropy~=4.2
-exo-k~=1.0.1
-h5py~=2.10.0
-matplotlib~=3.3.4
-mpi4py~=3.0.3
-numpy~=1.19.5
-pymultinest~=2.9
-scipy~=1.5.4
+astropy>=4.1
+exo-k>=1.0.1
+h5py>=2.10
+matplotlib>=3.3
+mpi4py>=3.0
+numpy>=1.19
+pymultinest>=2.9
+scipy>=1.5
