@@ -39,17 +39,12 @@ p_global = np.logspace(-6,3,1000)
 #       pressure and temperature arrays based on the position of the clouds or
 #       the location of the photosphere, increasing the resolution where required.
 #       For example, using the fixed_length_amr function defined below.
-#   resolution : int
-#       If using exo-k to compute low resolution c-k opacity tables, or using
-#       the model_resolution parameter when defining your Data object, this 
-#       parameter should take in the defined model_resolution. This is necessary
-#       for selecting the correct line lists.
+
 
 def emission_model_diseq(pRT_object, 
                          parameters,
                          PT_plot_mode = False,
-                         AMR = True,
-                         resolution=None):
+                         AMR = True):
     """
     emission_model_diseq
     This model computes an emission spectrum based on disequilibrium carbon chemistry,
@@ -114,14 +109,13 @@ def emission_model_diseq(pRT_object,
                             conv=True)
     if PT_plot_mode:
         return p_global, temperatures
+
     # If in evaluation mode, and PTs are supposed to be plotted
     abundances, MMW, small_index = get_abundances(pRT_object,p_global,temperatures,parameters,AMR =AMR)
     Kzz_use = (10**parameters['log_kzz'].value ) * np.ones_like(p_global)
 
     # Only include the high resolution pressure array near the cloud base.
     pressures = p_global
-    #print("global")
-    #print(pressures.shape)
     if AMR:
         temperatures = temperatures[small_index]
         pressures = p_global[small_index]
@@ -129,17 +123,18 @@ def emission_model_diseq(pRT_object,
         Kzz_use = Kzz_use[small_index]
         #pRT_object.setup_opa_structure(pressures)
     # Calculate the spectrum
-    #pdb.set_trace()
-    #abundances = set_resolution(pRT_object.line_species,abundances,resolution)
     if pressures.shape[0] != pRT_object.press.shape[0]:
         return None,None
     pRT_object.press = pressures*1e6
-    #print(pRT_object.press.shape,temperatures.shape)
-    #print(pRT_object.press,temperatures)
 
+    log_g = 2.0
+    if 'log_g' in parameters.keys():
+        10**parameters['log_g'].value
+    elif 'mass' in parameters.keys():
+        log_g = np.log10(nc.G * parameters['mass'].value/parameters['R_pl'].value**2)
     pRT_object.calc_flux(temperatures, 
                         abundances, 
-                        10**parameters['log_g'].value, 
+                        log_g, 
                         MMW, 
                         contribution = False,
                         fsed = parameters['fsed'].value,
@@ -221,7 +216,6 @@ def guillot_free_emission(pRT_object, \
                                 10**parameters['log_X_cb_MgSiO3(c)'].value)
     
     if AMR:
-        #print("AMR")
         p_clouds = np.array(list(Pbases.values()))
         pressures,small_index = fixed_length_amr(p_clouds,p_global,parameters['pressure_scaling'].value,parameters['pressure_width'].value)
         pRT_object.press = pressures * 1e6
@@ -252,10 +246,10 @@ def guillot_free_emission(pRT_object, \
                             ((pressures[pressures <= pbase]/pbase)**parameters['fsed'].value)
         except:
             return None,None
+
     # This is bad for some reason...
     #if msum > 1.0:
     #    return None, None
-    #abundances = set_resolution(pRT_object.line_species,abundances,resolution)
     pRT_object.calc_flux(temperatures, \
                      abundances, \
                      10**parameters['log_g'].value, \
@@ -351,7 +345,6 @@ def guillot_eqchem_transmission(pRT_object, \
     abundances['He'] = abundances_interp['He']
     
     MMW = abundances_interp['MMW']
-    #abundances = set_resolution(pRT_object.line_species,abundances,resolution)
 
     # Calculate the spectrum
     if 'Pcloud' in parameters.keys():
@@ -360,7 +353,7 @@ def guillot_eqchem_transmission(pRT_object, \
                                10**parameters['log_g'].value, \
                                MMW, \
                                R_pl=parameters['R_pl'].value, \
-                               P0_bar=100.,
+                               P0_bar=0.01,
                                Pcloud = parameters['Pcloud'].value)
     else:
         pRT_object.calc_transm(temperatures, \
@@ -368,11 +361,7 @@ def guillot_eqchem_transmission(pRT_object, \
                                10**parameters['log_g'].value, \
                                MMW, \
                                R_pl=parameters['R_pl'].value, \
-                               P0_bar=100.)
-                               # Keep P0_bar at 100. for now!
-                               # Otherwise change maximum pressure
-                               # value for pressures = np.logspace(-6, 2, 100)
-                               # in retrieve.py!
+                               P0_bar=0.01)
 
     wlen_model = nc.c/pRT_object.freq/1e-4
     spectrum_model = (pRT_object.transm_rad/parameters['Rstar'].value)**2.
@@ -451,7 +440,6 @@ def isothermal_eqchem_transmission(pRT_object, \
         pcloud = 10**parameters['log_Pcloud'].value
     elif 'Pcloud' in parameters.keys():
         pcloud = parameters['log_Pcloud'].value
-    #abundances = set_resolution(pRT_object.line_species,abundances,resolution)
     if pcloud is not None:
         # P0_bar is important for low gravity transmission
         # spectrum. 100 is standard, 0.01 is good for small,
@@ -470,14 +458,8 @@ def isothermal_eqchem_transmission(pRT_object, \
                                MMW, \
                                R_pl=parameters['R_pl'].value, \
                                P0_bar=0.01)
-                               # Keep P0_bar at 100. for now!
-                               # Otherwise change maximum pressure
-                               # value for pressures = np.logspace(-6, 2, 100)
-                               # in retrieve.py!
-
     wlen_model = nc.c/pRT_object.freq/1e-4
     spectrum_model = (pRT_object.transm_rad/parameters['Rstar'].value)**2.
-    
     return wlen_model, spectrum_model
 
 
@@ -553,7 +535,7 @@ def isothermal_free_transmission(pRT_object, \
                                10**parameters['log_g'].value, \
                                MMW, \
                                R_pl=parameters['R_pl'].value, \
-                               P0_bar=100.0,
+                               P0_bar=0.01,
                                Pcloud = pcloud)
     else:
         pRT_object.calc_transm(temperatures, \
@@ -561,11 +543,7 @@ def isothermal_free_transmission(pRT_object, \
                                10**parameters['log_g'].value, \
                                MMW, \
                                R_pl=parameters['R_pl'].value, \
-                               P0_bar=100.0)
-                               # Keep P0_bar at 100. for now!
-                               # Otherwise change maximum pressure
-                               # value for pressures = np.logspace(-6, 2, 100)
-                               # in retrieve.py!
+                               P0_bar=0.01)
 
     wlen_model = nc.c/pRT_object.freq/1e-4
     spectrum_model = (pRT_object.transm_rad/parameters['Rstar'].value)**2.
@@ -927,11 +905,14 @@ def get_abundances(pRT_object,pressures,temperatures,parameters,AMR = False):
     clouds['Fe(c)'] = 10**parameters['log_X_cb_Fe(c)'].value*XFe
     clouds['MgSiO3(c)'] = 10**parameters['log_X_cb_MgSiO3(c)'].value*XMgSiO3
 
+    pquench_C = None
+    if 'log_pquench' in parameters.keys():
+        pquench_C = 10**parameters['log_pquench'].value
     abundances_interp = pm.interpol_abundances(COs, \
                                                FeHs, \
                                                temperatures, \
                                                pressures,
-                                               Pquench_carbon = 10**parameters['log_pquench'].value)
+                                               Pquench_carbon = pquench_C)
     MMW = abundances_interp['MMW']
 
     Pbases = {}

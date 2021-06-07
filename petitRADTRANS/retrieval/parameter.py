@@ -48,18 +48,3 @@ class Parameter:
             sys.exit(1)
 
         
-class Made_up_parameter():
-
-    def __init__(self, \
-                 name, \
-                 corner_ranges = None, \
-                 transform_function = None, \
-                 transform_parameters = None, \
-                 corner_label = None):
-
-        self.name = name
-        self.corner_ranges  = corner_ranges
-        self.transform_function = transform_function
-        self.transform_parameters = transform_parameters
-        self.corner_label = corner_label
-        

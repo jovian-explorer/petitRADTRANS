@@ -326,8 +326,7 @@ class Retrieval:
                         dd.model_generating_function(dd.pRT_object, 
                                                     self.parameters, 
                                                     self.PT_plot_mode,
-                                                    AMR = self.rd.AMR,
-                                                    resolution = dd.model_resolution)
+                                                    AMR = self.rd.AMR)
                     # Sanity checks on outputs
                     #print(spectrum_model)
                     if spectrum_model is None:
@@ -552,6 +551,7 @@ class Retrieval:
         self.plotCorner(sample_dict,parameter_dict,parameters_read)
         print("Done!")
         return
+
     def plotSpectra(self,samples_use,parameters_read,model_generating_func = None):
         """
         plotSpectra
