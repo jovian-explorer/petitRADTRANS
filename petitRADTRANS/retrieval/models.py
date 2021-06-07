@@ -163,8 +163,7 @@ def emission_model_diseq(pRT_object,
 def guillot_free_emission(pRT_object, \
                             parameters, \
                             PT_plot_mode = False,
-                            AMR = False,
-                            resolution = None):
+                            AMR = False):
     """
     guillot_free_model_spec
     This model computes an emission spectrum based on free retrieval chemistry,
@@ -229,10 +228,6 @@ def guillot_free_emission(pRT_object, \
         temperatures = temperatures[small_index]
     else:
         pressures = pRT_object.press/1e6
-    #P,delta,gamma,T_int,T_equ,ptrans,alpha
-    #print(temperatures)  
-    #or pp in parameters:
-    #    print(parameters[pp].name,parameters[pp].value)
 
     # If in evaluation mode, and PTs are supposed to be plotted
     if PT_plot_mode:    
@@ -240,8 +235,8 @@ def guillot_free_emission(pRT_object, \
     abundances = {}
     msum = 0.0
     for species in pRT_object.line_species:
-        abundances[species] = 10**parameters[species.split("_R_"+str(resolution))[0]].value * np.ones_like(pressures)
-        msum += 10**parameters[species.split("_R_"+str(resolution))[0]].value
+        abundances[species] = 10**parameters[species.split("_R_")[0]].value * np.ones_like(pressures)
+        msum += 10**parameters[species.split("_R_")[0]].value
     abundances['H2'] = 0.766 * (1.0-msum) * np.ones_like(pressures)
     abundances['He'] = 0.234 * (1.0-msum) * np.ones_like(pressures)
 
@@ -249,9 +244,6 @@ def guillot_free_emission(pRT_object, \
     for cloud in pRT_object.cloud_species:
         cname = cloud.split('_')[0]
         pbase = Pbases[cname]
-        #print(cname)
-        #print(parameters['Pbase_'+cname].value,parameters['fsed'].value,parameters['log_X_cb_'+cname].value )
-        #print(pbase,(pressures[pressures <= pbase]/pbase)**parameters['fsed'].value)
         abundances[cname] = np.zeros_like(temperatures)
         msum += 10**parameters['log_X_cb_'+cname].value
         try:
@@ -260,7 +252,7 @@ def guillot_free_emission(pRT_object, \
                             ((pressures[pressures <= pbase]/pbase)**parameters['fsed'].value)
         except:
             return None,None
-    #print(msum)
+    # This is bad for some reason...
     #if msum > 1.0:
     #    return None, None
     #abundances = set_resolution(pRT_object.line_species,abundances,resolution)
@@ -290,8 +282,7 @@ def guillot_free_emission(pRT_object, \
 def guillot_eqchem_transmission(pRT_object, \
                                     parameters, \
                                     PT_plot_mode = False,
-                                    AMR = False,
-                                    resolution = None):
+                                    AMR = False):
     """
     retrieval_model_eq_transmission
     This model computes a transmission spectrum based on equilibrium chemistry
@@ -355,12 +346,12 @@ def guillot_eqchem_transmission(pRT_object, \
     abundances = {}
     for species in pRT_object.line_species:
         abundances[species] = abundances_interp[ \
-                    species.replace('_all_iso', '').replace('C2H2','C2H2,acetylene')]
+                    species.split('_R_')[0].replace('_all_iso', '').replace('C2H2','C2H2,acetylene')]
     abundances['H2'] = abundances_interp['H2']
     abundances['He'] = abundances_interp['He']
     
     MMW = abundances_interp['MMW']
-    abundances = set_resolution(pRT_object.line_species,abundances,resolution)
+    #abundances = set_resolution(pRT_object.line_species,abundances,resolution)
 
     # Calculate the spectrum
     if 'Pcloud' in parameters.keys():
@@ -391,8 +382,7 @@ def guillot_eqchem_transmission(pRT_object, \
 def isothermal_eqchem_transmission(pRT_object, \
                                     parameters, \
                                     PT_plot_mode = False,
-                                    AMR = False,
-                                    resolution = None):
+                                    AMR = False):
     """
     retrieval_model_eq_transmission
     This model computes a transmission spectrum based on equilibrium chemistry
@@ -451,7 +441,7 @@ def isothermal_eqchem_transmission(pRT_object, \
     abundances = {}
     for species in pRT_object.line_species:
         abundances[species] = abundances_interp[ \
-                    species.replace('_all_iso', '').replace('C2H2','C2H2,acetylene')]
+                    species.split('_R_')[0].replace('_all_iso', '').replace('C2H2','C2H2,acetylene')]
     abundances['H2'] = abundances_interp['H2']
     abundances['He'] = abundances_interp['He']
     
@@ -461,7 +451,7 @@ def isothermal_eqchem_transmission(pRT_object, \
         pcloud = 10**parameters['log_Pcloud'].value
     elif 'Pcloud' in parameters.keys():
         pcloud = parameters['log_Pcloud'].value
-    abundances = set_resolution(pRT_object.line_species,abundances,resolution)
+    #abundances = set_resolution(pRT_object.line_species,abundances,resolution)
     if pcloud is not None:
         # P0_bar is important for low gravity transmission
         # spectrum. 100 is standard, 0.01 is good for small,
@@ -494,8 +484,7 @@ def isothermal_eqchem_transmission(pRT_object, \
 def isothermal_free_transmission(pRT_object, \
                                 parameters, \
                                 PT_plot_mode = False,
-                                AMR = False,
-                                resolution=None):
+                                AMR = False):
     """
     retrieval_model_eq_transmission
     This model computes a transmission spectrum based on free retrieval chemistry
@@ -536,8 +525,9 @@ def isothermal_free_transmission(pRT_object, \
     abundances = {}
     msum = 0.0
     for species in pRT_object.line_species:
-        abundances[species] = 10**parameters[species].value * np.ones_like(pressures)
-        msum += 10**parameters[species].value
+        spec = species.split('_R_')[0]
+        abundances[species] = 10**parameters[spec].value * np.ones_like(pressures)
+        msum += 10**parameters[spec].value
     if msum > 1.0:
         return None, None
     abundances['H2'] = 0.766 * (1.0-msum) * np.ones_like(pressures)
@@ -1021,6 +1011,7 @@ def pglobal_check(press,shape,scaling):
 def set_resolution(lines,abundances,resolution):
     # Set correct key names in abundances for pRT, with set resolution
     # Only needed for free chemistry retrieval
+    # Obsolete 
     #print(lines)
     #print(abundances)
     if resolution is None:
