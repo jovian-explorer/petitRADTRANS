@@ -535,6 +535,9 @@ class Retrieval:
                 
         print("Best fit parameters")
         i_p = 0
+        # Get best-fit index
+        logL = samples_use[:,-1]
+        best_fit_index = np.argmax(logL)
         for pp in self.parameters:
             if self.parameters[pp].is_free_parameter:
                 for i_s in range(len(parameters_read)):
