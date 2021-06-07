@@ -139,7 +139,12 @@ class Retrieval:
         Run mode for the class. Uses pynultinest to sample parameter space
         and produce standard PMN outputs.
         """
+
         prefix = self.output_dir + 'out_PMN/'+self.retrieval_name+'_'
+
+        if len(self.output_dir + 'out_PMN/') > 100:
+            print("PyMultinest requires output directory names to be <100 characters. Please use a short path name.")
+            sys.exit(3)
         if self.run_mode == 'retrieval':
             print("Starting retrieval: " + self.retrieval_name+'\n')
             # How many free parameters?

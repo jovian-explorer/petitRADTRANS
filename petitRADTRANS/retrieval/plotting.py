@@ -154,12 +154,10 @@ def contour_corner(sampledict, \
                 truths_list.append(true_values[key][i])
         except:
             pass
-        fig = plt.figure(figsize = (30,30))
-        label_kwargs = {'fontsize':18}
-        title_kwargs = {'fontsize':16}#{'fontsize':int(48/len(parameter_plot_indices[key]))}
-        hist2d_kwargs = {'fontsize':12}
-        
-        #TODO reset default figsize
+        fig = plt.figure(figsize = (60,60),dpi=80)
+        label_kwargs = {'fontsize':46}
+        title_kwargs = {'fontsize':38}#{'fontsize':int(48/len(parameter_plot_indices[key]))}
+        hist2d_kwargs = {'fontsize':38}
         if count == 0:
             fig = corner.corner(np.array(data_list).T,
                                 fig = fig,
@@ -194,7 +192,7 @@ def contour_corner(sampledict, \
                           )
             count += 1
         for ax in fig.get_axes():
-            ax.tick_params(axis='both', labelsize=18, direction="in")
+            ax.tick_params(axis='both', labelsize=32, direction="in")
         if dimensions == 1:
             plt.tight_layout(h_pad=0, w_pad=0)
         if short_name is None:
