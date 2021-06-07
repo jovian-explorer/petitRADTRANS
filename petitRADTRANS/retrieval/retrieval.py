@@ -246,7 +246,7 @@ class Retrieval:
                             species.append(line)
                     # If not, setup low-res c-k tables
                     if len(species)>0:
-                        from util import MMWs as masses
+                        from .util import MMWs as masses
                         atmosphere = Radtrans(line_species = species, wlen_bords_micron = [0.1, 251.])
                         prt_path = self.path
                         ck_path = prt_path + 'opacities/lines/corr_k/'
