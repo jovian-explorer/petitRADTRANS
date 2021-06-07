@@ -32,6 +32,7 @@ class Retrieval:
                  sampling_efficiency = 0.05,\
                  const_efficiency_mode = True, \
                  n_live_points = 4000,
+                 resume = True,
                  bayes_factor_species = None,
                  corner_plot_names = None,
                  short_names = None,
@@ -63,6 +64,8 @@ class Retrieval:
             pymultinest constant efficiency mode
         n_live_points : Int
             Number of live points to use in pymultinest.
+        resume : bool
+            Continue existing retrieval. If FALSE THIS WILL OVERWRITE YOUR EXISTING RETRIEVAL.
         bayes_factor_species : Str
             A pRT species that should be removed to test for the bayesian evidence for it's presence.
         corner_plot_names : List(Str)
@@ -102,7 +105,7 @@ class Retrieval:
         self.sampling_efficiency = sampling_efficiency
         self.const_efficiency_mode = const_efficiency_mode
         self.n_live_points = n_live_points
-
+        self.resume = resume
         # TODO
         self.retrieval_list = plot_multiple_retrieval_names
 
@@ -153,7 +156,7 @@ class Retrieval:
                             self.Prior, 
                             n_params, 
                             outputfiles_basename=prefix, 
-                            resume = True, 
+                            resume = self.resume, 
                             verbose = True, 
                             sampling_efficiency = self.sampling_efficiency,
                             const_efficiency_mode = self.const_efficiency_mode, 
@@ -208,11 +211,11 @@ class Retrieval:
                                                self.LogLikelihood,
                                                self.Prior,
                                                log_dir=self.output_dir + "out_" + self.retrieval_name, 
-                                               resume=True)
+                                               resume=self.resume)
 
             result = sampler.run()
             sampler.print_results()
-        return
+        return result
 
     def setupData(self,scaling=10,width = 3):
         """
