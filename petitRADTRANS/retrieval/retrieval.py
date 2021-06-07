@@ -18,8 +18,8 @@ from matplotlib.ticker import AutoMinorLocator, MultipleLocator, AutoMinorLocato
 # Read own packages
 from petitRADTRANS import Radtrans
 from petitRADTRANS import nat_cst as nc
-from .parameter_class import Parameter
-from .data_class import Data
+from .parameter import Parameter
+from .data import Data
 from .plotting import plot_specs,plot_data,contour_corner
 from .rebin_give_width import rebin_give_width as rgw
 
@@ -214,11 +214,21 @@ class Retrieval:
             sampler.print_results()
         return
 
-    def setupData(self):
+    def setupData(self,scaling=10,width = 3):
         """
         setupData
         Creates a pRT object for each data set that asks for a unique object.
         Checks if there are low resolution c-k models from exo-k, and creates them if necessary.
+        The scaling and width parameters adjust the AMR grid as described in RetrievalConfig.setup_pres
+        and models.fixed_length_amr. It is recommended to keep the defaults.
+
+        arameters
+        ----------
+        scaling : int
+            A multiplicative factor that determines the size of the full high resolution pressure grid,
+            which will have length self.p_global.shape[0] * scaling.
+        width : int
+            The number of cells in the low pressure grid to replace with the high resolution grid.
         """
         for name,dd in self.data.items():
             # Only create if there's no other data
@@ -265,7 +275,7 @@ class Retrieval:
 
                 # Create random P-T profile to create RT arrays of the Radtrans object.
                 if self.rd.AMR:
-                    p = self.rd.setup_pres()
+                    p = self.rd.setup_pres(scaling,width)
                 else:
                     p = self.rd.p_global
                 rt_object.setup_opa_structure(p)

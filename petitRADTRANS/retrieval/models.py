@@ -6,8 +6,8 @@ os.environ["OMP_NUM_THREADS"] = "1"
 import numpy as np
 from scipy.interpolate import interp1d,splev,splrep,CubicSpline
 
-from .data_class import Data
-from .parameter_class import Parameter
+from .data import Data
+from .parameter import Parameter
 from .util import surf_to_meas, calc_MMW
 from petitRADTRANS import Radtrans
 from petitRADTRANS import nat_cst as nc
@@ -224,7 +224,7 @@ def guillot_free_emission(pRT_object, \
     if AMR:
         #print("AMR")
         p_clouds = np.array(list(Pbases.values()))
-        pressures,small_index = fixed_length_amr(p_clouds,p_global)
+        pressures,small_index = fixed_length_amr(p_clouds,p_global,parameters['pressure_scaling'].value,parameters['pressure_width'].value)
         pRT_object.press = pressures * 1e6
         temperatures = temperatures[small_index]
     else:
@@ -326,7 +326,7 @@ def guillot_eqchem_transmission(pRT_object, \
         Computed transmission spectrum R_pl**2/Rstar**2
     """
     try: 
-        from poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm
+        from petitRADTRANS import poor_mans_nonequ_chem as pm
     except ImportError:
         print("Could not import poor_mans_nonequ_chemistry. Exiting.")
         sys.exit(2) 
@@ -427,7 +427,7 @@ def isothermal_eqchem_transmission(pRT_object, \
         Computed transmission spectrum R_pl**2/Rstar**2
     """
     try: 
-        from poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm
+        from petitRADTRANS import poor_mans_nonequ_chem as pm
     except ImportError:
         print("Could not import poor_mans_nonequ_chemistry. Exiting.")
         sys.exit(2)
@@ -605,7 +605,7 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv = True):
     FeH: metallicity for the nabla_ad interpolation
     '''
     try: 
-        from poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm
+        from petitRADTRANS import poor_mans_nonequ_chem as pm
     except ImportError:
         print("Could not import poor_mans_nonequ_chemistry. Exiting.")
         sys.exit(2)
@@ -921,7 +921,7 @@ def get_abundances(pRT_object,pressures,temperatures,parameters,AMR = False):
         The indices of the high resolution grid to use to define the adaptive grid.
     """
     try: 
-        from poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm
+        from petitRADTRANS import poor_mans_nonequ_chem as pm
     except ImportError:
         print("Could not import poor_mans_nonequ_chemistry. Exiting.")
         sys.exit(2)
@@ -962,7 +962,7 @@ def get_abundances(pRT_object,pressures,temperatures,parameters,AMR = False):
     p_clouds = np.array(p_clouds)
 
     if AMR:
-        press_use, small_index = fixed_length_amr(p_clouds, pressures)
+        press_use, small_index = fixed_length_amr(p_clouds, pressures,parameters['pressure_scaling'].value,parameters['pressure_width'].value)
     else : 
         #TODO: Test
         press_use = pressures
