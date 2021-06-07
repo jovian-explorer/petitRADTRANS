@@ -706,7 +706,7 @@ class Retrieval:
         except:
             print("Please update to matplotlib 3.3.4 or greater")
             pass
-        
+
         if self.rd.plot_kwargs["xscale"] == 'log':
             # For the minor ticks, use no labels; default NullFormatter.
             x_major = LogLocator(base = 10.0, subs = (1,2,3,4), numticks = 4)
@@ -723,7 +723,13 @@ class Retrieval:
 
         # Fancy ticks for lower pane
         ax_r.tick_params(axis="both",direction="in",length=10,bottom=True, top=True, left=True, right=True)
-        ax_r.xaxis.set_major_formatter('{x:.1f}')
+
+        try:
+            ax_r.xaxis.set_major_formatter('{x:.1f}')
+        except:
+            print("Please update to matplotlib 3.3.4 or greater")
+            pass
+        
         if self.rd.plot_kwargs["xscale"] == 'log':
             # For the minor ticks, use no labels; default NullFormatter.
             x_major = LogLocator(base = 10.0, subs = (1,2,3,4), numticks = 4)
