@@ -1,5 +1,5 @@
 import numpy as np
-from .rebin_give_width import rebin_give_width as rgw
+from .rebin_give_width import rebin_give_width
 from scipy.ndimage.filters import gaussian_filter
 from astropy.io import fits
 
@@ -180,10 +180,10 @@ class Data:
                             self.data_resolution)
 
             # Rebin to model observation
-            flux_rebinned = rgw.rebin_give_width(wlen_model, \
-                                                 spectrum_model, \
-                                                 self.wlen, \
-                                                 self.wlen_bins)
+            flux_rebinned = rebin_give_width(wlen_model, \
+                                            spectrum_model, \
+                                            self.wlen, \
+                                            self.wlen_bins)
         else:
             flux_rebinned = \
                 self.photometric_transfomation_function(wlen_model, \
