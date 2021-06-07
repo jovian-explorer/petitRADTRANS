@@ -1,5 +1,5 @@
 import numpy as np
-from .rebin_give_width import rebin_give_width
+from .rebin_give_width import rebin_give_width as rgw
 from scipy.ndimage.filters import gaussian_filter
 from astropy.io import fits
 
@@ -11,7 +11,7 @@ class Data:
                  model_resolution = None,
                  external_pRT_reference = None,
                  model_generating_function = None,
-                 generate_spectrum_wlen_range_micron = None,
+                 wlen_range_micron = None,
                  scale = False,
                  wlen_bins = None,
                  photometry = False,
@@ -35,15 +35,29 @@ class Data:
             flux, transit depth and error, or a fits file containing the wavelength, spectrum and covariance matrix.
         data_resolution : float
             Spectral resolution of the instrument. Optional, allows convolution of model to instrumental line width.
+        model_resolution : float
+            The resolution of the c-k opacity tables in pRT. This will generate a new c-k table using exo-k. The default 
+            (and maximum) correlated k resolution in pRT is λ/∆λ = 1000 (R=500). Lowering the resolution will speed up the computation.
         external_pRT_instance : object
             An existing RadTrans object. Leave as none unless you're sure of what you're doing.
-        model_generating_function : fnc
+        model_generating_function : method
             A function, typically defined in run_definition.py that returns the model wavelength and spectrum (emission or transmission).
             This is the function that contains the physics of the model, and calls pRT in order to compute the spectrum.
-        generate_spectrum_wlen_range_micron : tuple,list
-            Deprecated.
+        wlen_range_micron : tuple,list
+            Set the wavelength range of the pRT object. Defaults to a range ±5% greater than that of the data. Must at least be 
+            equal to the range of the data. 
         scale : bool
-            Turn on or off scaling the data by a constant factor.
+            Turn on or off scaling the data by a constant factor. Set to True if scaling the data during the retrieval.
+        wlen_bins : numpy.ndarray
+            Set the wavelength bins to bin the pRT model to the data. Defaults to the data bins.
+        photometry : bool
+            Set to True if using photometric data.
+        photometric_transfomation_function : method
+            Transform the photometry (account for filter transmission etc.)
+        photometry_range : Tuple, numpy.ndarray
+            The wavelength range of the pRT object, must be greater than the width of the photometric band. [low,high]
+        width_photometry : Tuple, numpy.ndarray
+            The width of the photometric bin. [low,high]
         """
         self.name = name
         self.path_to_observations = path_to_observations
@@ -52,8 +66,7 @@ class Data:
 
         self.external_pRT_reference = external_pRT_reference
         self.model_generating_function = model_generating_function
-        self.generate_spectrum_wlen_range_micron = \
-            generate_spectrum_wlen_range_micron
+        self.generate_spectrum_wlen_range_micron = wlen_range_micron
         self.covariance = None
         self.inv_cov = None
         self.flux_error = None
@@ -127,6 +140,10 @@ class Data:
         self.flux_error = obs[:,-1]
 
     def loadfits(self,path):
+        """
+        loadfits
+        Load in a particular style of fits file.
+        """
         self.wlen = fits.getdata(path, 'SPECTRUM').field("WAVELENGTH")
         self.flux = fits.getdata(path, 'SPECTRUM').field("FLUX")
         self.covariance = fits.getdata(path,'SPECTRUM').field("COVARIANCE")
@@ -137,18 +154,40 @@ class Data:
     def get_chisq(self, wlen_model, \
                   spectrum_model, \
                   plotting):
+        """
+        get_chisq
+        Calculate the chi square between the model and the data.
+
+        parameters
+        ----------
+        wlen_model : numpy.ndarray
+            The wavlengths of the model
+        spectrum_model : numpy.ndarray
+            The model flux in the same units as the data.
+        plotting : bool
+            Show test plots. 
+        """
         if plotting:
             import pylab as plt
         # Convolve to data resolution
-        if self.data_resolution != None:
-            spectrum_model = self.convolve(wlen_model, \
-                        spectrum_model, \
-                        self.data_resolution)
-        # Rebin to model observation
-        flux_rebinned = rebin_give_width(wlen_model, \
-                                        spectrum_model, \
-                                        self.wlen, \
-                                        self.wlen_bins)
+        if not self.photometry:
+            # Convolve to data resolution
+            if self.data_resolution != None:
+                spectrum_model = self.convolve(wlen_model, \
+                            spectrum_model, \
+                            self.data_resolution)
+
+            # Rebin to model observation
+            flux_rebinned = rgw.rebin_give_width(wlen_model, \
+                                                 spectrum_model, \
+                                                 self.wlen, \
+                                                 self.wlen_bins)
+        else:
+            flux_rebinned = \
+                self.photometric_transfomation_function(wlen_model, \
+                                                  spectrum_model)
+
+
         diff = (flux_rebinned - self.flux*self.scale_factor)
         f_err = self.flux_error*self.scale_factor
         logL=0.0
