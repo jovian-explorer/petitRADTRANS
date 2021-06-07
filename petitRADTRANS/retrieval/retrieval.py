@@ -8,7 +8,6 @@ import numpy as np
 import copy as cp
 import pymultinest
 import json
-import argparse as ap
 from scipy.stats import binned_statistic
 
 # Plotting
@@ -729,7 +728,7 @@ class Retrieval:
         except:
             print("Please update to matplotlib 3.3.4 or greater")
             pass
-        
+
         if self.rd.plot_kwargs["xscale"] == 'log':
             # For the minor ticks, use no labels; default NullFormatter.
             x_major = LogLocator(base = 10.0, subs = (1,2,3,4), numticks = 4)
