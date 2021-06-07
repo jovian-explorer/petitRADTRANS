@@ -8,10 +8,9 @@ from matplotlib import rcParams
 from matplotlib import rc
 import corner
 from petitRADTRANS import nat_cst as nc
-from .data_class import Data
+from .data import Data
 
 def plot_specs(fig,ax,path, name, color1, color2, zorder, rebin_val = None):
-
     specs = [f for f in glob.glob(path+'/*.dat')]
     nspectra = int(len(specs))
     wlen = np.genfromtxt(specs[0])[:,0]
@@ -61,8 +60,7 @@ def contour_corner(sampledict, \
                 true_values = None, \
                 max_val_ratio = None,
                 short_name = None,
-                legend = False,
-                color_list = None):
+                legend = False):
     """
     contour_corner
     Use the corner package to plot the posterior distributions produced by pymultinest.
@@ -103,14 +101,8 @@ def contour_corner(sampledict, \
     color_list : list
         List of colors for each retrieval. If none uses a default color scheme (Up to 4 runs)
     """
-    #font = {'family':'serif','serif':['Computer Modern'],
-    #        'weight' :'bold',
-    #        'size'   : 16}
-
-    #plt.rc('font', **font)
-    #plt.rc('text', usetex=True)
-    if color_list is None:
-        color_list = ["#ff0066",'#2a9df4','#008D7C','#F9D030']
+    from .plot_style import prt_colours
+    color_list = prt_colours
 
     N_samples = []
     range_list = []
@@ -162,16 +154,21 @@ def contour_corner(sampledict, \
                 truths_list.append(true_values[key][i])
         except:
             pass
-        label_kwargs = {'fontsize':24}
+        fig = plt.figure(figsize = (30,30))
+        label_kwargs = {'fontsize':18}
         title_kwargs = {'fontsize':16}#{'fontsize':int(48/len(parameter_plot_indices[key]))}
-        hist2d_kwargs = {'fontsize':24}
+        hist2d_kwargs = {'fontsize':12}
+        
+        #TODO reset default figsize
         if count == 0:
             fig = corner.corner(np.array(data_list).T,
+                                fig = fig,
                                 smooth=True,
                                 title_fmt = ".2f",
                                 show_titles = True,
                                 title_kwargs = title_kwargs,
                                 labels = labels_list,
+                                label_kwargs = label_kwargs,
                                 range = range_list,
                                 color = color_list[count],
                                 quantiles=[0.16, 0.5, 0.84],

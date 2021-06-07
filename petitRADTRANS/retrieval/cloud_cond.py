@@ -6,6 +6,13 @@ plotting = False
 if plotting:
     import pylab as plt
     from petitRADTRANS import nat_cst as nc
+#############################################################
+# Cloud Cond
+#############################################################
+# This file allows the calculation of equilibrium cloud abundances
+# and base pressures
+#
+# TODO: Make a better cloud module.
 
 #############################################################
 # To calculate X_Fe from [Fe/H], C/O

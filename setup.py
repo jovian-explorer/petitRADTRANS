@@ -35,16 +35,11 @@ fort_rebin = Extension(
     extra_compile_args=extra_compile_args)
     
 rebin_give_width = Extension(
-    name='petitRADTRANS.retrieval.rebin_give_width',
+    name='petitRADTRANS.rebin_give_width',
     sources=['petitRADTRANS/retrieval/rebin_give_width.f90'], \
     extra_compile_args=extra_compile_args)
 
-poor_mans = Extension(
-    name='petitRADTRANS.poor_mans_nonequ_chem.chem_fortran_util.chem_fortran_util',
-    sources=['petitRADTRANS/poor_mans_nonequ_chem/chem_fortran_util/chem_fortran_util.f90'], \
-    extra_compile_args=extra_compile_args)
-
-extensions = [fort_spec, fort_input, fort_rebin, rebin_give_width, poor_mans]
+extensions = [fort_spec, fort_input, fort_rebin, rebin_give_width]
 
 
 
@@ -61,7 +56,13 @@ def setup_function(extensions):
           license='MIT License',
           packages=find_packages(),
           include_package_data=True,
-          install_requires=['scipy', 'numpy', 'matplotlib', 'h5py', 'exo-k'],
+          install_requires=['scipy',
+                            'numpy',
+                            'matplotlib',
+                            'h5py',
+                            'corner',
+                            'astropy',
+                            'exo_k'],
           zip_safe=False,
           ext_modules=extensions,
           )

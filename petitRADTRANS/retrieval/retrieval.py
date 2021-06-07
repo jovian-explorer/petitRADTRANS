@@ -1,6 +1,4 @@
-###########################################
 # Input / output, general run definitions
-###########################################
 import sys, os
 # To not have numpy start parallelizing on its own
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -8,27 +6,21 @@ os.environ["OMP_NUM_THREADS"] = "1"
 # Read external packages
 import numpy as np
 import copy as cp
-import matplotlib
-#matplotlib.use('Agg') # set the backend before importing pyplot
-'''
-font = {'family' : 'normal',
-        'size'   : 24}
-matplotlib.rc('font', **font)
-'''
-
 import pymultinest
 import json
-import argparse as ap
+from scipy.stats import binned_statistic
+
+# Plotting
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator, AutoMinorLocator, LogLocator, NullFormatter
 
 # Read own packages
-import petitRADTRANS # Just need the filename actually
 from petitRADTRANS import Radtrans
 from petitRADTRANS import nat_cst as nc
-from .parameter_class import Parameter
-from .data_class import Data
+from .parameter import Parameter
+from .data import Data
 from .plotting import plot_specs,plot_data,contour_corner
+from .rebin_give_width import rebin_give_width as rgw
 
 class Retrieval:
     def __init__(self,
@@ -39,12 +31,14 @@ class Retrieval:
                  sampling_efficiency = 0.05,\
                  const_efficiency_mode = True, \
                  n_live_points = 4000,
+                 resume = True,
                  bayes_factor_species = None,
                  corner_plot_names = None,
                  short_names = None,
+                 pRT_plot_style = True,
                  plot_multiple_retrieval_names = None):
         """
-        Retrieve Class
+        Retrieval Class
         This class implements the retrieval method using petitRADTRANS and pymultinest.
         A RetrievalConfig object is passed to this class to describe the retrieval data, parameters
         and priors. The run() method then uses pymultinest to sample the parameter space, producing
@@ -69,6 +63,8 @@ class Retrieval:
             pymultinest constant efficiency mode
         n_live_points : Int
             Number of live points to use in pymultinest.
+        resume : bool
+            Continue existing retrieval. If FALSE THIS WILL OVERWRITE YOUR EXISTING RETRIEVAL.
         bayes_factor_species : Str
             A pRT species that should be removed to test for the bayesian evidence for it's presence.
         corner_plot_names : List(Str)
@@ -92,10 +88,13 @@ class Retrieval:
 
         self.remove_species = bayes_factor_species
         self.corner_files = corner_plot_names
+        if self.corner_files is None:
+            self.corner_files = [self.retrieval_name]
         self.short_names = short_names
 
         # Plotting variables
         self.best_fit_specs = {}
+        self.best_fit_params = {}
         self.posterior_sample_specs = {}
         self.plotting = test_plotting
         self.PT_plot_mode = test_plotting
@@ -105,10 +104,13 @@ class Retrieval:
         self.sampling_efficiency = sampling_efficiency
         self.const_efficiency_mode = const_efficiency_mode
         self.n_live_points = n_live_points
-
+        self.resume = resume
         # TODO
         self.retrieval_list = plot_multiple_retrieval_names
 
+        # Set up pretty plotting
+        if pRT_plot_style:
+            import petitRADTRANS.retrieval.plot_style
         # Path to input opacities
         self.path = os.environ.get("pRT_input_data_path")
         if self.path == None:
@@ -153,7 +155,7 @@ class Retrieval:
                             self.Prior, 
                             n_params, 
                             outputfiles_basename=prefix, 
-                            resume = True, 
+                            resume = self.resume, 
                             verbose = True, 
                             sampling_efficiency = self.sampling_efficiency,
                             const_efficiency_mode = self.const_efficiency_mode, 
@@ -178,71 +180,57 @@ class Retrieval:
                 fmts = '\t'.join(['    %-15s' + fmt + " +- " + fmt])
                 print(fmts % (p, med, sigma))
         return
-    def plotAll(self, output_dir = None):
+
+    def run_ultranest(self):
         """
-        plotAll
-        Produces plots for the best fit spectrum, a sample of 100 output spectra,
-        the best fit PT profile and a corner plot for parameters specified in the
-        run definition.
+        run
+        Run mode for the class. Uses ultranest to sample parameter space
+        and produce standard outputs.
         """
-        # Read in samples
-        sample_dict = {}
-        parameter_dict = {}
-        if output_dir is None:
-            output_dir = self.output_dir
-        for name in self.corner_files:
-            samples = np.genfromtxt(output_dir +'out_PMN/'+ \
-                                    name+ \
-                                    '_post_equal_weights.dat')
+        print("Warning, ultranest mode is still in development. Proceed with caution")
+        try:
+             import ultranest as un
+        except ImportError:
+            print("Could not import ultranest. Exiting.")
+            sys.exit(1)
+        # Todo: autodetect PMN vs UN outputs
+        prefix = self.output_dir + 'out_PMN/'+self.retrieval_name+'_'
+        if self.run_mode == 'retrieval':
+            print("Starting retrieval: " + self.retrieval_name+'\n')
+            # How many free parameters?
+            n_params = 0
+            free_parameter_names = []
+            for pp in self.parameters:
+                if self.parameters[pp].is_free_parameter:
+                    free_parameter_names.append(self.parameters[pp].name)
+                    n_params += 1
+            json.dump(free_parameter_names, \
+                    open(self.output_dir + 'out_PMN/'+self.retrieval_name+'_params.json', 'w'))
+            sampler = un.ReactiveNestedSampler(free_parameter_names, 
+                                               self.LogLikelihood,
+                                               self.Prior,
+                                               log_dir=self.output_dir + "out_" + self.retrieval_name, 
+                                               resume=self.resume)
 
-            parameters_read = json.load(open(output_dir + 'out_PMN/'+ \
-                                        name+ \
-                                        '_params.json'))
-            sample_dict[name] = samples
-            parameter_dict[name] = parameters_read
+            result = sampler.run()
+            sampler.print_results()
+        return result
 
-        ###########################################
-        # Plot best-fit spectrum
-        ###########################################
-        samples_use = cp.copy(sample_dict[self.retrieval_name])
-        parameters_read = cp.copy(parameter_dict[self.retrieval_name])
-        i_p = 0
-        for pp in self.parameters:
-            if self.parameters[pp].is_free_parameter:
-                for i_s in range(len(parameters_read)):
-                    if parameters_read[i_s] == self.parameters[pp].name:
-                        samples_use[:,i_p] = sample_dict[self.retrieval_name][:, i_s]
-                i_p += 1
-                
-        # Get best-fit index
-        logL = samples_use[:,-1]
-        best_fit_index = np.argmax(logL)
-
-        # Setup best fit spectrum
-        self.LogLikelihood(samples_use[best_fit_index, :-1], 0, 0)
-
-        print("Best fit parameters")
-        i_p = 0
-        for pp in self.parameters:
-            if self.parameters[pp].is_free_parameter:
-                for i_s in range(len(parameters_read)):
-                    if parameters_read[i_s] == self.parameters[pp].name:
-                        print(self.parameters[pp].name, samples_use[best_fit_index][i_p])
-                        i_p += 1
-                        
-        # Plotting
-        self.plotSpectra(samples_use[best_fit_index, :-1])
-        self.plotSampled(samples_use, parameters_read)
-        self.plotPT(sample_dict,parameters_read)
-        self.plotCorner(sample_dict,parameter_dict,parameters_read)
-        print("Done!")
-        return
-
-    def setupData(self):
+    def setupData(self,scaling=10,width = 3):
         """
         setupData
         Creates a pRT object for each data set that asks for a unique object.
         Checks if there are low resolution c-k models from exo-k, and creates them if necessary.
+        The scaling and width parameters adjust the AMR grid as described in RetrievalConfig.setup_pres
+        and models.fixed_length_amr. It is recommended to keep the defaults.
+
+        arameters
+        ----------
+        scaling : int
+            A multiplicative factor that determines the size of the full high resolution pressure grid,
+            which will have length self.p_global.shape[0] * scaling.
+        width : int
+            The number of cells in the low pressure grid to replace with the high resolution grid.
         """
         for name,dd in self.data.items():
             # Only create if there's no other data
@@ -257,7 +245,7 @@ class Retrieval:
                             species.append(line)
                     # If not, setup low-res c-k tables
                     if len(species)>0:
-                        from util import MMWs as masses
+                        from .util import MMWs as masses
                         atmosphere = Radtrans(line_species = species, wlen_bords_micron = [0.1, 251.])
                         prt_path = self.path
                         ck_path = prt_path + 'opacities/lines/corr_k/'
@@ -289,12 +277,23 @@ class Retrieval:
 
                 # Create random P-T profile to create RT arrays of the Radtrans object.
                 if self.rd.AMR:
-                    p = self.rd.setup_pres()
+                    p = self.rd.setup_pres(scaling,width)
                 else:
                     p = self.rd.p_global
                 rt_object.setup_opa_structure(p)
                 dd.pRT_object = rt_object
         return
+
+    def Prior(self, cube, ndim, nparams):
+        """
+        Prior
+        pymultinest prior function. Transforms unit hypercube into physical space.
+        """
+        i_p = 0
+        for pp in self.parameters:
+            if self.parameters[pp].is_free_parameter:
+                cube[i_p] = self.parameters[pp].get_param_uniform(cube[i_p])
+                i_p += 1
 
     def LogLikelihood(self,cube,ndim,nparam):
         """
@@ -344,14 +343,14 @@ class Retrieval:
                                             self.plotting)
                 # Save sampled outputs if necessary.
                 if self.run_mode == 'evaluate':
-                    if not self.evaluate_sample_spectra:
-                        np.savetxt(self.output_dir + 'evaluate_data/model_spec_best_fit'+ 
-                                name+'.dat', 
-                                np.column_stack((wlen_model, 
-                                                    spectrum_model)))
-                        self.best_fit_specs[name] = [wlen_model, \
-                                                spectrum_model]
-                    else:
+                    np.savetxt(self.output_dir + 'evaluate_' + self.retrieval_name + '/model_spec_best_fit_'+ 
+                            name+'.dat', 
+                            np.column_stack((wlen_model, 
+                                                spectrum_model)))
+
+                    self.best_fit_specs[name] = [wlen_model, \
+                                            spectrum_model]
+                    if self.evaluate_sample_spectra:
                         self.posterior_sample_specs[name] = [wlen_model, \
                                                 spectrum_model]
                 # Check for data using the same pRT object,
@@ -367,25 +366,111 @@ class Retrieval:
         #print(log_likelihood)
         return log_likelihood + log_prior  
     
-    def Prior(self, cube, ndim, nparams):
+    def getSamples(self, output_dir = None):
         """
-        Prior
-        pymultinest prior function. Transforms unit hypercube into physical space.
+        getSamples
+        This function looks in the given output directory and finds the post_equal_weights
+        file associated with the current retrieval name.
+
+        parameters
+        ----------
+        output_dir : str
+            Parent directory of the out_PMN/*post_equal_weights.dat file
+        
+        returns
+        -------
+        sample_dict : dict
+            A dictionary with keys being the name of the retrieval, and values are a numpy
+            ndarray containing the samples in the post_equal_weights file
+        parameter_dict : dict
+            A dictionary with keys being the name of the retrieval, and values are a list of names
+            of the parameters used in the retrieval. The first name corresponds to the first column
+            of the samples, and so on.
+        """
+        sample_dict = {}
+        parameter_dict = {}
+        if output_dir is None:
+            output_dir = self.output_dir
+        for name in self.corner_files:
+            samples = np.genfromtxt(output_dir +'out_PMN/'+ \
+                                    name+ \
+                                    '_post_equal_weights.dat')
+
+            parameters_read = json.load(open(output_dir + 'out_PMN/'+ \
+                                        name+ \
+                                        '_params.json'))
+            sample_dict[name] = samples
+            parameter_dict[name] = parameters_read
+        return sample_dict, parameter_dict
+
+    def getBestFitParams(self,best_fit_params,parameters_read):
+        """
+        getBestFitParams
+        This function converts the sample from the post_equal_weights file with the maximum
+        log likelihood, and converts it into a dictionary of Parameters that can be used in
+        a model function.
+
+        parameters
+        ----------
+        best_fit_params : numpy.ndarray
+            An array of the best fit parameter values (or any other sample)
+        parameters_read : list
+            A list of the free parameters as read from the output files.
         """
         i_p = 0
         for pp in self.parameters:
             if self.parameters[pp].is_free_parameter:
-                cube[i_p] = self.parameters[pp].get_param_uniform(cube[i_p])
-                i_p += 1
-    def getBestFitModel(self,best_fit_params,model_generating_func = None):
+                for i_s in range(len(parameters_read)):
+                    if parameters_read[i_s] == self.parameters[pp].name:
+                        self.best_fit_params[self.parameters[pp].name] = Parameter(pp,False,value=best_fit_params[i_p])
+                        i_p += 1
+            else:
+                self.best_fit_params[pp] = Parameter(pp,False,value=self.parameters[pp].value)
+        return self.best_fit_params
+
+    def getBestFitModel(self,best_fit_params,parameters_read,model_generating_func = None,ret_name = None):
+        """
+        getBestFitModel
+        This function uses the best fit parameters to generate a pRT model that spans the entire wavelength
+        range of the retrieval, to be used in plots.
+
+        parameters
+        ----------
+        best_fit_params : numpy.ndarray
+            A numpy array containing the best fit parameters, to be passed to getBestFitParams
+        parameters_read : list
+            A list of the free parameters as read from the output files.
+        model_generating_fun : method
+            A function that will take in the standard 'model' arguments (pRT_object, params, pt_plot_mode, AMR, resolution)
+            and will return the wavlength and flux arrays as calculated by petitRadTrans.
+            If no argument is given, it uses the method of the first dataset included in the retrieval.
+        ret_name : str
+            If plotting a fit from a different retrieval, input the retrieval name to be included.
+        
+        returns
+        -------
+        bf_wlen : numpy.ndarray
+            The wavelength array of the best fit model
+        bf_spectrum : numpy.ndarray
+            The emission or transmission spectrum array, with the same shape as bf_wlen
+        """
+        print("Computing Best Fit Model, this may take a minute...")
+        if ret_name == None:
+            ret_name = self.retrieval_name
+
+        # Find the boundaries of the wavelength range to calculate
         wmin = 99999.0
         wmax = 0.0
         for name,dd in self.data.items():
             if dd.wlen_range_pRT[0] < wmin:
                 wmin = dd.wlen_range_pRT[0]
-            if dd.wlen_range_pRT[1] < wmax:
+            if dd.wlen_range_pRT[1] > wmax:
                 wmax = dd.wlen_range_pRT[1]
-        
+        # Set up parameter dictionary
+        if not self.retrieval_name in self.best_fit_specs.keys():
+            self.getBestFitParams(best_fit_params,parameters_read)
+
+        # Setup the pRT object
         bf_prt = Radtrans(line_species = cp.copy(self.rd.line_species), \
                             rayleigh_species= cp.copy(self.rd.rayleigh_species), \
                             continuum_opacities = cp.copy(self.rd.continuum_opacities), \
@@ -393,41 +478,131 @@ class Retrieval:
                             mode='c-k', \
                             wlen_bords_micron = [wmin*0.98,wmax*1.02],
                             do_scat_emis = self.rd.scattering)
+        if self.rd.AMR:
+            p = self.rd.setup_pres()
+        else:
+            p = self.rd.p_global
+        bf_prt.setup_opa_structure(p)
+
+        # Check what model function we're using
         if model_generating_func is None:
-            mg_func = self.data.values()[0].model_generating_function
+            mg_func = list(self.data.values())[0].model_generating_function
         else:
             mg_func = model_generating_func 
 
+        # get the spectrum
         bf_wlen, bf_spectrum= mg_func(bf_prt, 
-                                        best_fit_params, 
-                                        self.PT_plot_mode,
-                                        AMR = self.rd.AMR,
-                                        resolution = dd.model_resolution)
+                                      self.best_fit_params, 
+                                      PT_plot_mode= False,
+                                      AMR = True,
+                                      resolution = None)
+        # Add to the dictionary.
+        self.best_fit_specs[ret_name]= [bf_wlen,bf_spectrum]
         return bf_wlen, bf_spectrum
 
-    def plotSpectra(self,best_fit_params,model_generating_func = None):
+
+#############################################################
+# Plotting functions
+#############################################################
+    def plotAll(self, output_dir = None):
+        """
+        plotAll
+        Produces plots for the best fit spectrum, a sample of 100 output spectra,
+        the best fit PT profile and a corner plot for parameters specified in the
+        run definition.
+        """
+        if output_dir is None:
+            output_dir = self.output_dir
+        sample_dict, parameter_dict = self.getSamples(output_dir)
+
+        ###########################################
+        # Plot best-fit spectrum
+        ###########################################
+        samples_use = cp.copy(sample_dict[self.retrieval_name])
+        parameters_read = cp.copy(parameter_dict[self.retrieval_name])
+        i_p = 0
+        for pp in self.parameters:
+            if self.parameters[pp].is_free_parameter:
+                for i_s in range(len(parameters_read)):
+                    if parameters_read[i_s] == self.parameters[pp].name:
+                        samples_use[:,i_p] = sample_dict[self.retrieval_name][:, i_s]
+                i_p += 1
+                
+        print("Best fit parameters")
+        i_p = 0
+        for pp in self.parameters:
+            if self.parameters[pp].is_free_parameter:
+                for i_s in range(len(parameters_read)):
+                    if parameters_read[i_s] == self.parameters[pp].name:
+                        print(self.parameters[pp].name, samples_use[best_fit_index][i_p])
+                        i_p += 1
+                        
+        # Plotting
+        self.plotSpectra(samples_use,parameters_read)
+        self.plotSampled(samples_use, parameters_read)
+        self.plotPT(sample_dict,parameters_read)
+        self.plotCorner(sample_dict,parameter_dict,parameters_read)
+        print("Done!")
+        return
+    def plotSpectra(self,samples_use,parameters_read,model_generating_func = None):
         """
         plotSpectra
         Plot the best fit spectrum, the data from each dataset and the residuals between the two.
+        Saves a file to $OUTPUT_DIR/evaluate_$RETRIEVAL_NAME/best_fit_spec.pdf
+        TODO: include plotting of multiple retrievals
+
+        parameters:
+        samples_use : numpy.ndarray
+            An array of the samples from the post_equal_weights file, used to find the best fit sample
+        parameters_read : list
+            A list of the free parameters as read from the output files.
+        model_generating_fun : method
+            A function that will take in the standard 'model' arguments (pRT_object, params, pt_plot_mode, AMR, resolution)
+            and will return the wavlength and flux arrays as calculated by petitRadTrans.
+            If no argument is given, it uses the method of the first dataset included in the retrieval.
+        
+        returns
+        -------
+        fig : matplotlib.figure
+        ax : matplotlib.axes
+            The upper pane of the plot, containing the best fit spectrum and data
+        ax_r : matplotlib.axes
+            The lower pane of the plot, containing the residuals between the fit and the data
         """
         print("Plotting Best-fit spectrum")
         fig, axes = fig, axes = plt.subplots(nrows=2, ncols=1, sharex='col', sharey=False,
                                gridspec_kw={'height_ratios': [2.5, 1],'hspace':0.1},
-                               figsize=(24, 12))
+                               figsize=(20, 10))
         ax = axes[0] # Normal Spectrum axis
         ax_r = axes[1] # residual axis
-        bf_wlen, bf_spectrum = self.getBestFitModel(best_fit_params,model_generating_func)
+                
+        # Get best-fit index
+        logL = samples_use[:,-1]
+        best_fit_index = np.argmax(logL)
 
+        # Setup best fit spectrum
+        # First get the fit for each dataset for the residual plots
+        self.LogLikelihood(samples_use[best_fit_index, :-1], 0, 0)
+        # Then get the full wavelength range
+        bf_wlen, bf_spectrum = self.getBestFitModel(samples_use[best_fit_index, :-1],parameters_read,model_generating_func)
+
+        # Iterate through each dataset, plotting the data and the residuals.
         for name,dd in self.data.items():
+            # If the user has specified a resolution, rebin to that
             try:
+                # Sometimes this fails, I'm not super sure why.
                 resolution_data = np.mean(dd.wlen[1:]/np.diff(dd.wlen))
                 ratio = resolution_data / self.rd.plot_kwargs["resolution"]
                 if int(ratio) > 1:
-                    wlen = nc.running_mean(dd.wlen, int(ratio))[::int(ratio)]
-                    error = nc.running_mean(dd.flux_error / int(np.sqrt(ratio)), \
-                                            int(ratio))[::int(ratio)]
-                    flux = nc.running_mean(dd.flux, \
-                                            int(ratio))[::int(ratio)]
+                    flux,edges,_ = binned_statistic(dd.wlen,dd.flux,'mean',dd.wlen.shape[0]/ratio)
+                    error,_,_ = binned_statistic(dd.wlen,dd.flux_error,'mean',dd.wlen.shape[0]/ratio)/np.sqrt(ratio)
+                    wlen = np.array([(edges[i]+edges[i+1])/2.0 for i in range(edges.shape[0]-1)])
+                    # Old method
+                    #wlen = nc.running_mean(dd.wlen, int(ratio))[::int(ratio)]
+                    #error = nc.running_mean(dd.flux_error / int(np.sqrt(ratio)), \
+                    #                        int(ratio))[::int(ratio)]
+                    #flux = nc.running_mean(dd.flux, \
+                    #                        int(ratio))[::int(ratio)]
                 else:
                     wlen = dd.wlen
                     error = dd.flux_error
@@ -437,96 +612,143 @@ class Retrieval:
                 error = dd.flux_error
                 flux = dd.flux
 
-        scale = dd.scale_factor
-        if not dd.photometry:
-            ax.errorbar(wlen, \
-                         flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
-                         yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
-                         marker='o', markeredgecolor='k', linewidth = 0, elinewidth = 2, \
-                         label = dd.name, zorder =10, alpha = 0.9,)
-        else:
-            ax.errorbar(wlen, \
-                         flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
-                         yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
-                         xerr = dd.width_photometry/2., linewidth = 0, elinewidth = 2, \
-                         marker='o', markeredgecolor='k', zorder = 10, \
-                         label = dd.name, alpha = 0.9)
-        col = ax._get_lines.get_color()
-        if dd.external_pRT_reference == None:
-            print(self.best_fit_specs.keys())
-            ax_r.plot(self.best_fit_specs[name][0], \
-                     (flux - self.best_fit_specs[name][1])/np.std(flux - self.best_fit_specs[name][1]) , \
-                     color = col,
-                     linewidth = 0)
-        else:
-            # TODO might need to add rebinning step here
-            ax_r.plot(self.best_fit_specs[dd.external_pRT_reference][0], \
-                     (flux - self.best_fit_specs[dd.external_pRT_reference][1])/np.std(flux - self.best_fit_specs[name][1]) , \
-                     color = col, 
-                     zorder = -10,
-                     linewidth = 0)
+            # If the data has an arbitrary retrieved scaling factor
+            scale = dd.scale_factor
+
+            # Setup bins to rebin the best fit model to find the residuals
+            wlen_bins = np.zeros_like(wlen)
+            wlen_bins[:-1] = np.diff(wlen)
+            wlen_bins[-1] = wlen_bins[-2]
+            if dd.external_pRT_reference == None:
+                best_fit_binned = rgw(self.best_fit_specs[name][0], \
+                                        self.best_fit_specs[name][1], \
+                                        wlen, \
+                                        wlen_bins)
+            else:
+                best_fit_binned = rgw(self.best_fit_specs[dd.external_pRT_reference][0], \
+                            self.best_fit_specs[dd.external_pRT_reference][1], \
+                            wlen, \
+                            wlen_bins)
+            
+            # Plot the data
+            if not dd.photometry:
+                ax.errorbar(wlen, \
+                            flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
+                            yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
+                            marker='o', markeredgecolor='k', linewidth = 0, elinewidth = 2, \
+                            label = dd.name, zorder =10, alpha = 0.9,)
+            else:
+                ax.errorbar(wlen, \
+                            flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
+                            yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
+                            xerr = dd.width_photometry/2., linewidth = 0, elinewidth = 2, \
+                            marker='o', markeredgecolor='k', zorder = 10, \
+                            label = dd.name, alpha = 0.9)
+            # Plot the residuals
+            col = ax.get_lines()[-1].get_color()
+            if dd.external_pRT_reference == None:
+                ax_r.errorbar(wlen, \
+                            ((flux*scale) - best_fit_binned )/error , 
+                            yerr = error/error,
+                            color = col,
+                            linewidth = 0, elinewidth = 2, \
+                            marker='o', markeredgecolor='k', zorder = 10,
+                            alpha = 0.9)
+            else:
+                ax_r.errorbar(wlen, \
+                        ((flux*scale) - best_fit_binned )/error,
+                        yerr = error/error,
+                        color = col,
+                        linewidth = 0, elinewidth = 2, \
+                        marker='o', markeredgecolor='k', zorder = 10,
+                        alpha = 0.9)
+        # Plot the best fit model
         ax.plot(bf_wlen, \
                 bf_spectrum * self.rd.plot_kwargs["y_axis_scaling"],
+                label = 'Best Fit Model',
                 linewidth=4,
                 alpha = 0.5,
                 color = 'r')
+        # Plot the shading in the residual plot        
+        yabs_max = abs(max(ax_r.get_ylim(), key=abs))
+        lims = ax.get_xlim()
+        lim_y = ax.get_ylim()
+        lim_y = [lim_y[0],lim_y[1]*1.12]
+        ax.set_ylim(lim_y)
+        # weird scaling to get axis to look ok on log plots
+        if self.rd.plot_kwargs["xscale"] == 'log':
+            lims = [lims[0]*1.09,lims[1]*1.02]
+        else:
+            lims = [bf_wlen[0]*0.98,bf_wlen[-1]*1.02]
+        ax.set_xlim(lims)
+        ax_r.set_xlim(lims)
+        ax_r.set_ylim(ymin=-yabs_max, ymax=yabs_max)
+        ax_r.fill_between(lims,-1,1,color='dimgrey',alpha=0.4,zorder = -10)
+        ax_r.fill_between(lims,-3,3,color='darkgrey',alpha=0.3,zorder = -9)
+        ax_r.fill_between(lims,-5,5,color='lightgrey',alpha=0.3,zorder = -8)
+        ax_r.axhline(linestyle = '--', color = 'k',alpha=0.8, linewidth=2)
+
+        # Making the plots pretty
         try:
             ax.set_xscale(self.rd.plot_kwargs["xscale"])
         except:
             pass
-
         try:
             ax.set_yscale(self.rd.plot_kwargs["yscale"])
         except:
             pass
 
+        # Fancy ticks for upper pane
         ax.tick_params(axis="both",direction="in",length=10,bottom=True, top=True, left=True, right=True)
-        #ax.xaxis.set_major_locator(MultipleLocator(1))
-        ax.xaxis.set_major_formatter('{x:.0f}')
+        try:
+            ax.xaxis.set_major_formatter('{x:.1f}')
+        except:
+            print("Please update to matplotlib 3.3.4 or greater")
+            pass
+
         if self.rd.plot_kwargs["xscale"] == 'log':
             # For the minor ticks, use no labels; default NullFormatter.
             x_major = LogLocator(base = 10.0, subs = (1,2,3,4), numticks = 4)
             ax.xaxis.set_major_locator(x_major)
-
             x_minor = LogLocator(base = 10.0, subs = np.arange(0.1,10.1,0.1)*0.1, numticks = 100)
             ax.xaxis.set_minor_locator(x_minor)
             ax.xaxis.set_minor_formatter(NullFormatter())
         else:
             ax.xaxis.set_minor_locator(AutoMinorLocator())
             ax.tick_params(axis='both', which='minor', bottom=True, top=True, left=True, right=True, direction='in',length=5)
-
         ax.yaxis.set_minor_locator(AutoMinorLocator())
         ax.tick_params(axis='both', which='minor', bottom=True, top=True, left=True, right=True, direction='in',length=5)
-
-        ax.set_xlabel(self.rd.plot_kwargs["spec_xlabel"])
         ax.set_ylabel(self.rd.plot_kwargs["spec_ylabel"])
 
+        # Fancy ticks for lower pane
         ax_r.tick_params(axis="both",direction="in",length=10,bottom=True, top=True, left=True, right=True)
-        #ax.xaxis.set_major_locator(MultipleLocator(1))
-        ax_r.xaxis.set_major_formatter('{x:.0f}')
+
+        try:
+            ax_r.xaxis.set_major_formatter('{x:.1f}')
+        except:
+            print("Please update to matplotlib 3.3.4 or greater")
+            pass
+
         if self.rd.plot_kwargs["xscale"] == 'log':
             # For the minor ticks, use no labels; default NullFormatter.
             x_major = LogLocator(base = 10.0, subs = (1,2,3,4), numticks = 4)
             ax_r.xaxis.set_major_locator(x_major)
-
             x_minor = LogLocator(base = 10.0, subs = np.arange(0.1,10.1,0.1)*0.1, numticks = 100)
             ax_r.xaxis.set_minor_locator(x_minor)
             ax_r.xaxis.set_minor_formatter(NullFormatter())
         else:
             ax_r.xaxis.set_minor_locator(AutoMinorLocator())
-            ax._rtick_params(axis='both', which='minor', bottom=True, top=True, left=True, right=True, direction='in',length=5)
-
+            ax_r.tick_params(axis='both', which='minor', bottom=True, top=True, left=True, right=True, direction='in',length=5)
         ax_r.yaxis.set_minor_locator(AutoMinorLocator())
         ax_r.tick_params(axis='both', which='minor', bottom=True, top=True, left=True, right=True, direction='in',length=5)
-
-        ax_r.set_xlabel("Residuals")
-        ax_r.set_ylabel(self.rd.plot_kwargs["spec_ylabel"])
-        #([model_min*0.98, model_max*1.02])
+        ax_r.set_ylabel("Residuals [$\sigma$]")
+        ax_r.set_xlabel(self.rd.plot_kwargs["spec_xlabel"])
+        ax.legend(loc='upper center',ncol = len(self.data.keys())+1).set_zorder(1002) 
         plt.tight_layout()
-        plt.legend(loc='best')
-        plt.savefig('evaluate_'+self.rd.retrieval_name +'/best_fit_spec.pdf')
+        plt.savefig(self.output_dir + 'evaluate_'+self.rd.retrieval_name +'/best_fit_spec.pdf')
+        return fig, ax, ax_r
 
-    def plotSampled(self,samples_use):
+    def plotSampled(self,samples_use,parameters_read):
         """
         plotSampled
         Plot a set of randomly sampled output spectra
@@ -536,35 +758,43 @@ class Retrieval:
         samples_use : np.ndarray
             posterior samples from pynmultinest outputs (post_equal_weights)
         """
-        print("Plotting Best-fit spectrum with 100 samples")
-        len_samples = np.shape(samples_use)[0]
-        evaluate_sample_spectra = True
-        if self.rd.write_out_spec_sample:
-            for i_sample in range(self.rd.plot_kwargs["nsample"]):
-                random_index = int(np.random.uniform()*len_samples)
-                self.LogLikelihood(samples_use[random_index, :-1], 0, 0)
-                for name,dd in self.data.items():
-                    if dd.external_pRT_reference == None:
-                        np.savetxt('evaluate_'+self.retrieval_name + '/' +\
-                                name.replace(' ','_')+'_sampled_'+ \
-                                    str(int(i_sample+1)).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))+'.dat', \
-                                np.column_stack((self.posterior_sample_specs[name][0], \
-                                                self.posterior_sample_specs[name][1])))
+        print("Plotting Best-fit spectrum with "+ str(self.rd.plot_kwargs["nsample"]) + " samples.")
+        print("This could take some time...")
+        len_samples = samples_use.shape[0]
+        path = self.output_dir + 'evaluate_'+self.retrieval_name + "/"
+
+        data_use= {}
+        for name, dd in self.data.items():
+            if not os.path.exists(path + name.replace(' ','_')+'_sampled_'+ 
+                        str(int(self.rd.plot_kwargs["nsample"])).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))+'.dat'):
+                data_use[name] = dd
+
+        for i_sample in range(int(self.rd.plot_kwargs["nsample"])):
+            random_index = int(np.random.uniform()*len_samples)
+            self.LogLikelihood(samples_use[random_index, :-1], 0, 0)
+            for name,dd in data_use.items():
+                if dd.external_pRT_reference == None:
+                    np.savetxt(path +name.replace(' ','_')+'_sampled_'+ 
+                                str(int(i_sample+1)).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))+'.dat',
+                                np.column_stack((self.posterior_sample_specs[name][0],
+                                                 self.posterior_sample_specs[name][1])))
             
-        path = self.output_dir + 'evaluate_'+self.retrieval_name
         fig,ax = plt.subplots(figsize = (16,10))
         plot_specs(fig,ax,path, 'Retrieved', '#ff9f9f', '#ff3d3d', -10, rebin_val = 5)
+        #print("Plotting sample spectrum failed, are you sure you allowed sampling?")
+        #return None
+        
         for name,dd in self.data.items():
             plot_data(fig,ax,dd, name, 'white', 0, rebin_val = 5)
             #plt.ylim([0.006, 0.0085])
-        #TODO: autoset xlim
-        #ax.set_xlim([1.4,2.6])
+
         ax.set_xlabel('Wavelength [micron]')
-        ax.set_ylabel(r'$F_{\rm P}/F_*$ (\%)')
-        plt.legend()
+        ax.set_ylabel(self.rd.plot_kwargs["spec_ylabel"])
+        ax.legend(loc='best')
         plt.tight_layout()
-        plt.savefig(path +'/sampled_data.pdf',bbox_inches = 0.)
-    
+        plt.savefig(path +'sampled_data.pdf',bbox_inches = 0.)
+        return fig, ax
+
     def plotPT(self,sample_dict,parameters_read):
         """
         plotPT
@@ -577,6 +807,11 @@ class Retrieval:
         parameters_read : List
             Used to plot correct parameters, as some in self.parameters are not free, and
             aren't included in the PMN outputs
+
+        returns
+        -------
+        fig : matplotlib.figure
+        ax : matplotlib.axes
         """
         print("Plotting PT profiles")
         self.PT_plot_mode = True
@@ -596,39 +831,39 @@ class Retrieval:
 
         temps = np.array(temps)
         temps_sort = np.sort(temps, axis=0)
-
+        fig,ax = plt.subplots(figsize=(16, 10))
         len_samp = len(samples_use)
-        plt.fill_betweenx(pressures, \
+        ax.fill_betweenx(pressures, \
                         x1 = temps_sort[0, :], \
                         x2 = temps_sort[-1, :], \
                         color = 'cyan', label = 'all')
-        plt.fill_betweenx(pressures, \
+        ax.fill_betweenx(pressures, \
                         x1 = temps_sort[int(len_samp*(0.5-0.997/2.)), :], \
                         x2 = temps_sort[int(len_samp*(0.5+0.997/2.)), :], \
                         color = 'brown', label = '3 sig')
-        plt.fill_betweenx(pressures, \
+        ax.fill_betweenx(pressures, \
                         x1 = temps_sort[int(len_samp*(0.5-0.95/2.)), :], \
                         x2 = temps_sort[int(len_samp*(0.5+0.95/2.)), :], \
                         color = 'orange', label = '2 sig')
-        plt.fill_betweenx(pressures, \
+        ax.fill_betweenx(pressures, \
                         x1 = temps_sort[int(len_samp*(0.5-0.68/2.)), :], \
                         x2 = temps_sort[int(len_samp*(0.5+0.68/2.)), :], \
                         color = 'red', label = '1 sig')
 
-        plt.yscale('log')
+        ax.set_yscale('log')
         try:
-            plt.ylim(self.rd.plot_kwargs["press_limits"])
+            ax.set_ylim(self.rd.plot_kwargs["press_limits"])
         except:
-            plt.ylim([pressures[-1], pressures[0]])
+            ax.set_ylim([pressures[-1], pressures[0]])
         try:
-            plt.xlim(self.rd.plot_kwargs["temp_limits"])
+            ax.set_xlim(self.rd.plot_kwargs["temp_limits"])
         except:
             pass
-        plt.xlabel('T (K)')
-        plt.ylabel('P (bar)')
-        plt.legend(loc='best')
+        ax.set_xlabel('Temperature [K]')
+        ax.set_ylabel('Pressure [bar]')
+        ax.legend(loc='best')
         plt.savefig(self.output_dir + 'evaluate_'+self.retrieval_name +'/PT_envelopes.pdf')
-        return 
+        return fig, ax
 
     def plotCorner(self,sample_dict,parameter_dict,parameters_read):
         """

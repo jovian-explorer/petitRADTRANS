@@ -9,7 +9,7 @@ __status__ = "Development"
 from petitRADTRANS.radtrans import Radtrans
 from petitRADTRANS.retrieval.retrieval import Retrieval
 from petitRADTRANS.retrieval.retrieval_config import RetrievalConfig
-from petitRADTRANS.retrieval.data_class import Data
-from petitRADTRANS.retrieval.parameter_class import Parameter
+from petitRADTRANS.retrieval.data import Data
+from petitRADTRANS.retrieval.parameter import Parameter
 
 
