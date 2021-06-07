@@ -275,6 +275,7 @@ class RetrievalConfig:
                  data_resolution = None,
                  model_resolution = None,
                  scale = False,
+                 wlen_range_micron = None,
                  external_pRT_reference = None):
         """
         add_data
@@ -284,16 +285,20 @@ class RetrievalConfig:
         -----------
         name : str
             Identifier for this data set.
-        path_to_observations : str
+        path : str
             Path to observations file, including filename. This can be a txt or dat file containing the wavelength,
             flux, transit depth and error, or a fits file containing the wavelength, spectrum and covariance matrix.
-        data_resolution : float
-            Spectral resolution of the instrument. Optional, allows convolution of model to instrumental line width.
         model_generating_function : fnc
             A function, typically defined in run_definition.py that returns the model wavelength and spectrum (emission or transmission).
             This is the function that contains the physics of the model, and calls pRT in order to compute the spectrum.
+        data_resolution : float
+            Spectral resolution of the instrument. Optional, allows convolution of model to instrumental line width.
+        model_resolution : float
+            Spectral resolution of the model, allowing for low resolution correlated k tables from exo-k.
         scale : bool
             Turn on or off scaling the data by a constant factor.
+        wlen_range_micron : Tuple
+            A pair of wavelenths in units of micron that determine the lower and upper boundaries of the model computation.
         external_pRT_reference : str
             The name of an existing Data object. This object's pRT_object will be used to calculate the chi squared
             of the new Data object. This is useful when two datasets overlap, as only one model computation is required
@@ -304,4 +309,78 @@ class RetrievalConfig:
                                 data_resolution = data_resolution,
                                 model_resolution = model_resolution,
                                 scale = scale,
+                                wlen_range_micron = wlen_range_micron,
                                 external_pRT_reference=external_pRT_reference)
+        return
+    def add_photometry(self, path, 
+                       model_resolution = 10, 
+                       scale = False, 
+                       wlen_range_micron = None,
+                       transform_func = None,
+                       external_pRT_reference = None):
+        """
+        add_photometry
+        Create a Data class object for each photometric point in a photometry file.
+        The photometry file must be a csv file and have the following structure:
+        name, lower wavelength bound [um], upper wavelength boundary[um], flux [W/m2/micron], flux error [W/m2/micron]
+
+        Photometric data requires a transformation function to conver a spectrum into synthetic photometry.
+        You must provide this function yourself, or have the species package installed.
+        If using species, the name in the data file must be of the format instrument/filter.
+
+        parameters
+        -----------
+        name : str
+            Identifier for this data set.
+        path : str
+            Path to observations file, including filename.
+        model_resolution : float
+            Spectral resolution of the model, allowing for low resolution correlated k tables from exo-k.
+        scale : bool
+            Turn on or off scaling the data by a constant factor. Currently only set up to scale all photometric data
+            in a given file.
+        wlen_range_micron : Tuple
+            A pair of wavelenths in units of micron that determine the lower and upper boundaries of the model computation.
+        external_pRT_reference : str
+            The name of an existing Data object. This object's pRT_object will be used to calculate the chi squared
+            of the new Data object. This is useful when two datasets overlap, as only one model computation is required
+            to compute the log likelihood of both datasets.
+        photometric_transfomation_function : method
+            A function that will transform a spectrum into an average synthetic photometric point, typicall accounting for 
+            filter transmission.
+        """
+        photometry = open(path)
+        if transform_func is None:
+            try:
+                import species
+            except:
+                print("Please provide a function to transform a spectrum into photometry, or pip install species")
+        for line in photometry:
+            vals = line.split(',')
+            name = vals[0]
+            wlow = float(vals[1])
+            whigh = float(vals[2])
+            flux = float(vals[3])
+            err = float(vals[4])
+            if transform_func is None:
+                transform = species.synphot(name).spectrum_to_flux()
+            else:
+                transform = transform_func
+            
+            if wlen_range_micron is None:
+                wbins = [0.95*wlow,1.05*whigh]
+            else:
+                wbins = wlen_range_micron
+            self.add_data(name, 
+                    path,    
+                    photometry = True,
+                    photometry_range = wbins,
+                    width_photometry = [wlow,whigh],
+                    data_resolution = np.mean([wlow,whigh])/(whigh-wlow),
+                    model_resolution = model_resolution,
+                    scale = scale,
+                    photometric_transfomation_function = transform,
+                    external_pRT_reference=external_pRT_reference)
+            self.data[name].flux = flux
+            self.data[name].flux_error = err
+        return

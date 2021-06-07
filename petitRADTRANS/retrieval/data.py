@@ -124,6 +124,8 @@ class Data:
         path : str
             Directory and filename of the data.
         """
+        if self.photometry:
+            return
         obs = np.genfromtxt(path,delimiter = ',')
         if np.isnan(obs).any():
             #print("Nans in " + path + ", trying different delimiter")
@@ -146,6 +148,8 @@ class Data:
         Must include extension SPECTRUM with fields WAVLENGTH, FLUX
         and COVARIANCE.
         """
+        if self.photometry:
+            return
         self.wlen = fits.getdata(path, 'SPECTRUM').field("WAVELENGTH")
         self.flux = fits.getdata(path, 'SPECTRUM').field("FLUX")
         self.covariance = fits.getdata(path,'SPECTRUM').field("COVARIANCE")
@@ -185,9 +189,19 @@ class Data:
                                             self.wlen, \
                                             self.wlen_bins)
         else:
-            flux_rebinned = \
-                self.photometric_transfomation_function(wlen_model, \
-                                                  spectrum_model)
+            if self.photometric_transfomation_function is None:
+                spectrum_model = self.convolve(wlen_model, \
+                            spectrum_model, \
+                            self.data_resolution)
+                # Rebin to model observation
+                flux_rebinned = rebin_give_width(wlen_model, \
+                                            spectrum_model, \
+                                            self.wlen, \
+                                            self.wlen_bins)
+            else:
+                flux_rebinned = \
+                    self.photometric_transfomation_function(wlen_model, \
+                                                    spectrum_model)
 
 
         diff = (flux_rebinned - self.flux*self.scale_factor)

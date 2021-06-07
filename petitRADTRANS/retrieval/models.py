@@ -91,6 +91,7 @@ def emission_model_diseq(pRT_object,
                     parameters['pressure_scaling'].value)
     #for key, val in parameters.items():
     #    print(key,val.value)
+    
     # Priors for these parameters are implemented here, as they depend on each other
     T3 = ((3./4.*parameters['T_int'].value**4.*(0.1+2./3.))**0.25)*(1-parameters['T3'].value)
     T2 = T3*(1.0-parameters['T2'].value)
@@ -127,14 +128,23 @@ def emission_model_diseq(pRT_object,
         return None,None
     pRT_object.press = pressures*1e6
 
-    log_g = 2.0
-    if 'log_g' in parameters.keys():
-        10**parameters['log_g'].value
+    gravity = 2.0
+    R_pl = 1.0
+    if 'log_g' in parameters.keys() and 'mass' in parameters.keys():
+        gravity = 10**parameters['log_g'].value
+        R_pl = np.sqrt(nc.G*parameters['mass'].value/gravity)
+    elif 'log_g' in parameters.keys():
+        gravity= 10**parameters['log_g'].value
     elif 'mass' in parameters.keys():
-        log_g = np.log10(nc.G * parameters['mass'].value/parameters['R_pl'].value**2)
+        R_pl = parameters['R_pl'].value
+        gravity = nc.G * parameters['mass'].value/R_pl**2
+    else:
+        print("Pick two of log_g, R_pl and mass priors!")
+        sys.exit(5)
+
     pRT_object.calc_flux(temperatures, 
                         abundances, 
-                        log_g, 
+                        gravity, 
                         MMW, 
                         contribution = False,
                         fsed = parameters['fsed'].value,
@@ -151,7 +161,7 @@ def emission_model_diseq(pRT_object,
     # convert from ergs to Joule
     f_lambda = f_lambda * 1e-7
     spectrum_model = surf_to_meas(f_lambda, 
-                                  parameters['R_pl'].value,
+                                  R_pl,
                                   parameters['D_pl'].value)    #print(wlen_model,spectrum_model)
     return wlen_model, spectrum_model
 
@@ -250,9 +260,23 @@ def guillot_free_emission(pRT_object, \
     # This is bad for some reason...
     #if msum > 1.0:
     #    return None, None
+    gravity = 2.0
+    R_pl = 1.0
+    if 'log_g' in parameters.keys() and 'mass' in parameters.keys():
+        gravity = 10**parameters['log_g'].value
+        R_pl = np.sqrt(nc.G*parameters['mass'].value/gravity)
+    elif 'log_g' in parameters.keys():
+        gravity= 10**parameters['log_g'].value
+    elif 'mass' in parameters.keys():
+        R_pl = parameters['R_pl'].value
+        gravity = nc.G * parameters['mass'].value/R_pl**2
+    else:
+        print("Pick two of log_g, R_pl and mass priors!")
+        sys.exit(5)
+
     pRT_object.calc_flux(temperatures, \
                      abundances, \
-                     10**parameters['log_g'].value, \
+                     gravity, \
                      MMW, \
                      contribution = False,
                      fsed = parameters['fsed'].value,
@@ -269,7 +293,7 @@ def guillot_free_emission(pRT_object, \
     # convert from ergs to Joule
     f_lambda = f_lambda * 1e-7
     spectrum_model = surf_to_meas(f_lambda, 
-                                  parameters['R_pl'].value,
+                                  R_pl,
                                   parameters['D_pl'].value)  
     return wlen_model, spectrum_model
 
