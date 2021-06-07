@@ -143,6 +143,8 @@ class Data:
         """
         loadfits
         Load in a particular style of fits file.
+        Must include extension SPECTRUM with fields WAVLENGTH, FLUX
+        and COVARIANCE.
         """
         self.wlen = fits.getdata(path, 'SPECTRUM').field("WAVELENGTH")
         self.flux = fits.getdata(path, 'SPECTRUM').field("FLUX")
