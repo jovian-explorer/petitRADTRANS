@@ -713,28 +713,37 @@ class Retrieval:
                     wlen = dd.wlen
                     error = dd.flux_error
                     flux = dd.flux
+                # Setup bins to rebin the best fit model to find the residuals
+                wlen_bins = np.zeros_like(wlen)
+                wlen_bins[:-1] = np.diff(wlen)
+                wlen_bins[-1] = wlen_bins[-2]
             else:
                 wlen = np.mean(dd.width_photometry)
                 flux = dd.flux
-                error = dd.error
+                error = dd.flux_error
+                wlen_bins = dd.wlen_bins
 
             # If the data has an arbitrary retrieved scaling factor
             scale = dd.scale_factor
 
-            # Setup bins to rebin the best fit model to find the residuals
-            wlen_bins = np.zeros_like(wlen)
-            wlen_bins[:-1] = np.diff(wlen)
-            wlen_bins[-1] = wlen_bins[-2]
-            if dd.external_pRT_reference == None:
-                best_fit_binned = rgw(self.best_fit_specs[name][0], \
-                                        self.best_fit_specs[name][1], \
-                                        wlen, \
-                                        wlen_bins)
+            if not dd.photometry:
+                if dd.external_pRT_reference == None:
+                    best_fit_binned = rgw(self.best_fit_specs[name][0], \
+                                            self.best_fit_specs[name][1], \
+                                            wlen, \
+                                            wlen_bins)
+                else:
+                    best_fit_binned = rgw(self.best_fit_specs[dd.external_pRT_reference][0], \
+                                self.best_fit_specs[dd.external_pRT_reference][1], \
+                                wlen, \
+                                wlen_bins)
             else:
-                best_fit_binned = rgw(self.best_fit_specs[dd.external_pRT_reference][0], \
-                            self.best_fit_specs[dd.external_pRT_reference][1], \
-                            wlen, \
-                            wlen_bins)
+                if dd.external_pRT_reference == None:
+                    best_fit_binned = dd.photometric_transformation_function(self.best_fit_specs[name][0],
+                                                                         self.best_fit_specs[name][1])
+                else:
+                    best_fit_binned = dd.photometric_transformation_function(self.best_fit_specs[dd.external_pRT_reference][0],
+                                                                            self.best_fit_specs[dd.external_pRT_reference][1])
             
             # Plot the data
             if not dd.photometry:
