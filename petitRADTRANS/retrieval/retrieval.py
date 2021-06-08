@@ -237,7 +237,7 @@ class Retrieval:
             A Pymultinest stats dictionary, from Analyzer.get_stats(). 
             This contains the evidence and best fit parameters.
         """
-        with open(self.output_dir + self.retrieval_name + "_ret_summary.txt", "w+") as summary:
+        with open(self.output_dir + "evaluate_" + self.retrieval_name + "/" + self.retrieval_name + "_ret_summary.txt", "w+") as summary:
             from datetime import datetime
             summary.write(self.retrieval_name + '\n')
             summary.write(datetime.now().strftime("%Y-%m-%d, %H:%M:%S") + '\n')
@@ -585,7 +585,16 @@ class Retrieval:
         self.best_fit_specs[ret_name]= [bf_wlen,bf_spectrum]
         return bf_wlen, bf_spectrum
 
-
+    def get_abundances(self,sample):
+        from petitRADTRANS.retrieval.models import get_abundances
+        name = self.rd.plot_kwargs["take_PTs_from"]
+        abundances, MMW, _ = get_abundances(self.p_global, 
+                                            self.data[name].pRT_object.temperature,
+                                            self.data[name].pRT_object.line_species,
+                                            self.data[name].pRT_object.cloud_species,
+                                            self.parameters,
+                                            AMR=False)
+        return abundances, MMW
 #############################################################
 # Plotting functions
 #############################################################

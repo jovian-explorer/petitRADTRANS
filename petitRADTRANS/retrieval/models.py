@@ -91,7 +91,7 @@ def emission_model_diseq(pRT_object,
                     parameters['pressure_scaling'].value)
     #for key, val in parameters.items():
     #    print(key,val.value)
-    
+
     # Priors for these parameters are implemented here, as they depend on each other
     T3 = ((3./4.*parameters['T_int'].value**4.*(0.1+2./3.))**0.25)*(1-parameters['T3'].value)
     T2 = T3*(1.0-parameters['T2'].value)
@@ -112,7 +112,7 @@ def emission_model_diseq(pRT_object,
         return p_global, temperatures
 
     # If in evaluation mode, and PTs are supposed to be plotted
-    abundances, MMW, small_index = get_abundances(pRT_object,p_global,temperatures,parameters,AMR =AMR)
+    abundances, MMW, small_index = get_abundances(p_global,temperatures,pRT_object.line_species,pRT_object.cloud_species,parameters,AMR =AMR)
     Kzz_use = (10**parameters['log_kzz'].value ) * np.ones_like(p_global)
 
     # Only include the high resolution pressure array near the cloud base.
@@ -882,7 +882,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
     return p_out,  press_out[ind, 1].astype('int')
 
 
-def get_abundances(pRT_object,pressures,temperatures,parameters,AMR = False):
+def get_abundances(pressures, temperatures, line_species, cloud_species, parameters, AMR = False):
     """
     get_abundances
     This function takes in the C/O ratio, metallicity, and quench pressures and uses them
@@ -891,12 +891,14 @@ def get_abundances(pRT_object,pressures,temperatures,parameters,AMR = False):
 
     parameters:
     -----------
-    pRT_object : petitRADTRANS.RadTrans
-        The pRT object used to compute the spectrum.
     pressures : numpy.ndarray
         A log spaced pressure array. If AMR is on it should be the full high resolution grid.
     temperatures : numpy.ndarray
         A temperature array with the same shape as pressures
+    line_species : List(str)
+        A list of gas species that will contribute to the line-by-line opacity of the pRT atmosphere.
+    cloud_species : List(str)
+        A list of condensate species that will contribute to the cloud opacity of the pRT atmosphere.
     parameters : dict
         A dictionary of model parameters, in particular it must contain the names C/O, Fe/H and
         log_pquench. Additionally the cloud parameters log_X_cb_Fe(c) and MgSiO3(c) must be present.
@@ -963,7 +965,7 @@ def get_abundances(pRT_object,pressures,temperatures,parameters,AMR = False):
         press_use = pressures
         small_index = np.indices(press_use)
 
-    for cloud in cp.copy(pRT_object.cloud_species):
+    for cloud in cp.copy(cloud_species):
         cname = cloud.split('_')[0]
         if 'log_X_cb_'+cname not in parameters.keys():
             continue
@@ -977,13 +979,13 @@ def get_abundances(pRT_object,pressures,temperatures,parameters,AMR = False):
     if AMR:
         abundances['Fe(c)'] = abundances['Fe(c)'][small_index]
         abundances['MgSiO3(c)'] = abundances['MgSiO3(c)'][small_index]
-        for species in pRT_object.line_species:
+        for species in line_species:
             abundances[species] = abundances_interp[species.split('_')[0]][small_index]
         abundances['H2'] = abundances_interp['H2'][small_index]
         abundances['He'] = abundances_interp['He'][small_index]
 
     else:
-        for species in pRT_object.line_species:
+        for species in line_species:
             abundances[species] = abundances_interp[species.split('_')[0]]
         abundances['H2'] = abundances_interp['H2']
         abundances['He'] = abundances_interp['He']

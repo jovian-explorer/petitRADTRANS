@@ -158,6 +158,7 @@ def contour_corner(sampledict, \
         label_kwargs = {'fontsize':46}
         title_kwargs = {'fontsize':38}#{'fontsize':int(48/len(parameter_plot_indices[key]))}
         hist2d_kwargs = {'fontsize':38}
+        contour_kwargs = {"linewidths":6}
         if count == 0:
             fig = corner.corner(np.array(data_list).T,
                                 fig = fig,
@@ -172,6 +173,7 @@ def contour_corner(sampledict, \
                                 quantiles=[0.16, 0.5, 0.84],
                                 hist2d_kwargs = hist2d_kwargs,
                                 plot_contours = True,
+                                contour_kwargs = contour_kwargs,
                                 levels=[1-np.exp(-0.5),1-np.exp(-2),1-np.exp(-4.5)]
                                 )
             count +=1
@@ -188,11 +190,14 @@ def contour_corner(sampledict, \
                           label_kwargs = label_kwargs,
                           hist2d_kwargs = hist2d_kwargs,
                           plot_contours = True,
+                          contour_kwargs = contour_kwargs,
                           levels=[1-np.exp(-0.5),1-np.exp(-2),1-np.exp(-4.5)]
                           )
             count += 1
         for ax in fig.get_axes():
             ax.tick_params(axis='both', labelsize=32, direction="in")
+            ax.tick_params(axis='both',which = 'major', length = 20, width = 4)
+            ax.tick_params(axis='both',which = 'minor', length = 10, width = 2)
         if dimensions == 1:
             plt.tight_layout(h_pad=0, w_pad=0)
         if short_name is None:
