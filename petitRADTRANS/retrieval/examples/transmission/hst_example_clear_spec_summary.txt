@@ -1,0 +1,34 @@
+hst_example_clear_spec
+2021-06-08, 13:33:41
+/Users/nasedkin/python-packages/petitRADTRANS/petitRADTRANS/retrieval_examples/transmission/
+
+Fixed Parameters
+pressure_scaling = 1
+pressure_width = 1
+pressure_simple = 100
+Rstar = 45277050000.0
+
+Free Parameters
+log_g = 2.0, 5.5
+R_pl = 0.2, 0.4
+Temperature = 300.02, 2299.98
+log_Pcloud = -6.0, 2.0
+CH4 = -6.0, -0.0
+H2O = -6.0, -0.0
+CO2 = -6.0, -0.0
+CO_all_iso = -6.0, -0.0
+
+Data
+Best Fit Parameters
+pressure_scaling = 1
+pressure_width = 1
+pressure_simple = 100
+Rstar = 45277050000.0
+log_g = 2.93
+R_pl = 1270901957.179
+Temperature = 682.297
+log_Pcloud = -0.906
+CH4 = 0.813
+H2O = 1.865
+CO2 = 0.006
+CO_all_iso = 0.021

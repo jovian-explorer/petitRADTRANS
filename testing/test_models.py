@@ -24,9 +24,9 @@ class TestModels(unittest.TestCase):
                                wlen_bords_micron = self.emtest.wlen_range_pRT,
                                do_scat_emis = True)
         self.em_obj.setup_opa_structure(self.pressures)
-
         self.trans_obj = Radtrans()
         return 
+        
     def setup_parameters(self):
         self.parameters = {}
 

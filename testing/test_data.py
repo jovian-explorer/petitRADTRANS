@@ -5,10 +5,10 @@ from petitRADTRANS.retrieval.models import emission_model_diseq, isothermal_free
 
 class TestData(unittest.TestCase):
     def test_init(self):
-        self.test_fits_file = "../petitRADTRANS/retrieval_examples/emission/HR8799e_spectra.fits"        
-        self.test_txt_file = "../petitRADTRANS/retrieval_examples/transmission/hst_example_clear_spec.fits"
+        self.test_fits_file = "../petitRADTRANS/retrieval/examples/emission/HR8799e_spectra.fits"        
+        self.test_txt_file = "../petitRADTRANS/retrieval/examples/transmission/hst_example_clear_spec.fits"
         self.test_fits()
-        self.test_txt
+        self.test_txt()
         return 
 
     def test_fits(self):

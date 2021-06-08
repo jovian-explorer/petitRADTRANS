@@ -16,7 +16,7 @@ class RetrievalConfig:
                  plotting = False,
                  scattering = False,
                  pressures = None,
-                 write_out_spec_sample = True):
+                 write_out_spec_sample = False):
         """
         parameters
         ----------
@@ -54,8 +54,8 @@ class RetrievalConfig:
         self.instruments = []
         self.line_species = []
         self.cloud_species = []
-        self.rayleigh_species = ["H2", "He"]
-        self.continuum_opacities = ["H2-H2", "H2-He"]
+        self.rayleigh_species = []
+        self.continuum_opacities = []
         self.plot_kwargs = {}
 
         self._plot_defaults()
@@ -86,7 +86,7 @@ class RetrievalConfig:
         self.plot_kwargs["temp_limits"] = [150, 3000]
         self.plot_kwargs["press_limits"] = [1e2, 1e-5]
 
-    def setup_pres(self, scaling = 10, width = 3):
+    def _setup_pres(self, scaling = 10, width = 3):
         """
         setup_pres
         This converts the standard pressure grid into the correct length
@@ -254,7 +254,8 @@ class RetrievalConfig:
             range would be (-3,0). If eq is false, this sets the the range on the actual cloud abundance,
             with a typical range being (-5,7). Note that the upper limit is set from abund_lim[0] + abund_lim[1].
         PBase_lim : tuple(float,float)
-            Only used if not using an equilibrium model. Sets the limits on teh log of the cloud base pressure
+            Only used if not using an equilibrium model. Sets the limits on teh log of the cloud base pressure.
+            Obsolete.
         """
         if species.endswith("(c)"):
             print("Ensure you set the cloud particle shape, typically with the _cd tag!")
@@ -361,11 +362,13 @@ class RetrievalConfig:
         if transform_func is None:
             try:
                 import species
-                species.SpeciesInit(os.path.dirname(path))
+                species.SpeciesInit()
             except:
                 print("Please provide a function to transform a spectrum into photometry, or pip install species")
-                return
         for line in photometry:
+            # # must be the comment character
+            if line[0] == '#':
+                continue
             vals = line.split(',')
             name = vals[0]
             wlow = float(vals[1])
@@ -373,7 +376,7 @@ class RetrievalConfig:
             flux = float(vals[3])
             err = float(vals[4])
             if transform_func is None:
-                transform = species.synphot(name).spectrum_to_flux()
+                transform = species.SyntheticPhotometry(name).spectrum_to_flux
             else:
                 transform = transform_func
             
@@ -381,17 +384,18 @@ class RetrievalConfig:
                 wbins = [0.95*wlow,1.05*whigh]
             else:
                 wbins = wlen_range_micron
-            self.add_data(name, 
-                    path,    
-                    distance = distance,
-                    photometry = True,
-                    photometry_range = wbins,
-                    width_photometry = [wlow,whigh],
-                    data_resolution = np.mean([wlow,whigh])/(whigh-wlow),
-                    model_resolution = model_resolution,
-                    scale = scale,
-                    photometric_transfomation_function = transform,
-                    external_pRT_reference=external_pRT_reference)
+            print("Adding " +name)
+            self.data[name] = Data(name, 
+                                    path,    
+                                    distance = distance,
+                                    photometry = True,
+                                    wlen_range_micron = wbins,
+                                    photometric_bin_edges = [wlow,whigh],
+                                    data_resolution = np.mean([wlow,whigh])/(whigh-wlow),
+                                    model_resolution = model_resolution,
+                                    scale = scale,
+                                    photometric_transfomation_function = transform,
+                                    external_pRT_reference=external_pRT_reference)
             self.data[name].flux = flux
             self.data[name].flux_error = err
         return

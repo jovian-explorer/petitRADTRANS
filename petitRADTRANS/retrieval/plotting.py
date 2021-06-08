@@ -103,7 +103,7 @@ def contour_corner(sampledict, \
     """
     from .plot_style import prt_colours
     color_list = prt_colours
-
+    #color_list = ['#009FB8','#FF695C', '#70FF92',  '#FFBB33', '#6171FF', "#FF1F69", "#52AC25", '#E574FF', "#FF261D", "#B429FF" ]
     N_samples = []
     range_list = []
     handles = []
@@ -155,10 +155,16 @@ def contour_corner(sampledict, \
         except:
             pass
         fig = plt.figure(figsize = (60,60),dpi=80)
-        label_kwargs = {'fontsize':46}
-        title_kwargs = {'fontsize':38}#{'fontsize':int(48/len(parameter_plot_indices[key]))}
-        hist2d_kwargs = {'fontsize':38}
+        label_kwargs = {'fontsize':54}
+        title_kwargs = {'fontsize':42}#{'fontsize':int(48/len(parameter_plot_indices[key]))}
+        hist2d_kwargs = {'fontsize':42}
+        hist_kwargs = {"linewidth":6}
         contour_kwargs = {"linewidths":6}
+        import matplotlib as mpl
+        mpl.rcParams['axes.linewidth'] = 1
+        #mpl.rcParams['figure.figsize']=(40,40)
+        #mpl.rcParams['figure.dpi']=100
+
         if count == 0:
             fig = corner.corner(np.array(data_list).T,
                                 fig = fig,
@@ -174,6 +180,7 @@ def contour_corner(sampledict, \
                                 hist2d_kwargs = hist2d_kwargs,
                                 plot_contours = True,
                                 contour_kwargs = contour_kwargs,
+                                hist_kwargs = hist_kwargs,
                                 levels=[1-np.exp(-0.5),1-np.exp(-2),1-np.exp(-4.5)]
                                 )
             count +=1
@@ -191,24 +198,26 @@ def contour_corner(sampledict, \
                           hist2d_kwargs = hist2d_kwargs,
                           plot_contours = True,
                           contour_kwargs = contour_kwargs,
+                          hist_kwargs = hist_kwargs,
                           levels=[1-np.exp(-0.5),1-np.exp(-2),1-np.exp(-4.5)]
                           )
             count += 1
         for ax in fig.get_axes():
-            ax.tick_params(axis='both', labelsize=32, direction="in")
-            ax.tick_params(axis='both',which = 'major', length = 20, width = 4)
-            ax.tick_params(axis='both',which = 'minor', length = 10, width = 2)
-        if dimensions == 1:
-            plt.tight_layout(h_pad=0, w_pad=0)
+            ax.tick_params(axis='both', labelsize=36, direction="in")
+            ax.tick_params(axis='both',which = 'major', length = 24)
+            ax.tick_params(axis='both',which = 'minor', length = 12)
+        #if dimensions == 1:
+        #    plt.tight_layout(h_pad=0, w_pad=0)
         if short_name is None:
             label = key
         else:
             label = short_name[key]
         handles.append(Line2D([0], [0], marker = 'o',color=color_list[count], label = label,markersize = 15))
+    fig.subplots_adjust( wspace=0.005, hspace=0.005)
     if legend:
         fig.get_axes()[2].legend(handles = handles,
                                  loc = 'upper right' )
-    plt.savefig(output_file)
+    plt.savefig(output_file,dpi=300, bbox_inches='tight')
 
 
 

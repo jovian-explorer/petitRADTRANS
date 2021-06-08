@@ -247,7 +247,7 @@ class Retrieval:
                 if not value.is_free_parameter:
                     summary.write(key + " = " + str(round(value.value,3)) + '\n')
             summary.write('\n')
-            summary.write("Free Parameters\n")
+            summary.write("Free Parameters, Prior^-1(0), Prior^-1(1)\n")
             for key,value in self.parameters.items():
                 if value.is_free_parameter:
                     low = value.transform_prior_cube_coordinate(0.0000001)
@@ -261,7 +261,8 @@ class Retrieval:
             for name,dd in self.data.items():
                 summary.write(name+'\n')
                 summary.write("     " + dd.path_to_observations + '\n')
-                summary.write("     " + dd.model_generating_function.__name__+ '\n')
+                if dd.model_generating_function is not None:
+                    summary.write("     " + dd.model_generating_function.__name__+ '\n')
                 if dd.scale:
                     summary.write("     scale factor = " + str(dd.scale_factor)+ '\n')
                 if dd.data_resolution is not None:
@@ -270,11 +271,12 @@ class Retrieval:
                     summary.write("     model resolution = " + str(dd.model_resolution)+ '\n')
                 if dd.photometry:
                     summary.write("     photometric width = " + str(dd.photometry_range[0]) + "--" + str(dd.photometry_range[1]) + " um"+ '\n')
+                    summary.write("     " + dd.photometric_transfomation_function.__name__+ '\n')
             if stats is not None:
                 summary.write("Multinest Outputs")
                 summary.write('  marginal likelihood:')
-                summary.write('    log Z = %.1f +- %.1f' % (stats['global evidence']/np.log(10), stats['global evidence error']/np.log(10)))
-                summary.write('    ln Z = %.1f +- %.1f' % (stats['global evidence'], stats['global evidence error']))
+                summary.write('    log Z = %.1f +- %.1f\n' % (stats['global evidence']/np.log(10), stats['global evidence error']/np.log(10)))
+                summary.write('    ln Z = %.1f +- %.1f\n' % (stats['global evidence'], stats['global evidence error']))
                 summary.write("  Statistical Fit Parameters\n")
                 for p, m in zip(self.parameters.keys(), stats['marginals']):
                     lo, hi = m['1sigma']
@@ -286,7 +288,7 @@ class Retrieval:
                         i = max(0, int(-np.floor(np.log10(sigma))) + 1)
                     fmt = '%%.%df' % i
                     fmts = '\t'.join(['    %-15s' + fmt + " +- " + fmt])
-                    summary.write(fmts % (p, med, sigma))
+                    summary.write(fmts % (p, med, sigma) + '\n')
                 summary.write('\n')
             if self.run_mode == 'evaluate':
                 summary.write("Best Fit Parameters\n")
@@ -364,7 +366,7 @@ class Retrieval:
 
                 # Create random P-T profile to create RT arrays of the Radtrans object.
                 if self.rd.AMR:
-                    p = self.rd.setup_pres(scaling,width)
+                    p = self.rd._setup_pres(scaling,width)
                 else:
                     p = self.rd.p_global
                 rt_object.setup_opa_structure(p)
@@ -565,7 +567,7 @@ class Retrieval:
                             wlen_bords_micron = [wmin*0.98,wmax*1.02],
                             do_scat_emis = self.rd.scattering)
         if self.rd.AMR:
-            p = self.rd.setup_pres()
+            p = self.rd._setup_pres()
         else:
             p = self.rd.p_global
         bf_prt.setup_opa_structure(p)

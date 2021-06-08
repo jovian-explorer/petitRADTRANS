@@ -18,8 +18,8 @@ class Data:
                  wlen_bins = None,
                  photometry = False,
                  photometric_transfomation_function = None, 
-                 photometry_range = None,
-                 width_photometry = None):
+                 model_photometry_range = None,
+                 photometric_bin_edges = None):
         """
         Data class initializer
         This class stores the spectral data to be retrieved from a single instrument or observation.
@@ -58,77 +58,92 @@ class Data:
             Set to True if using photometric data.
         photometric_transfomation_function : method
             Transform the photometry (account for filter transmission etc.)
-        photometry_range : Tuple, numpy.ndarray
-            The wavelength range of the pRT object, must be greater than the width of the photometric band. [low,high]
-        width_photometry : Tuple, numpy.ndarray
+        photometric_bin_edges : Tuple, numpy.ndarray
             The width of the photometric bin. [low,high]
         """
         self.name = name
         self.path_to_observations = path_to_observations
 
+        # To be filled later
+        self.pRT_object = None
+        self.wlen = None
+        self.flux = None
+        self.flux_error = None
+
+        # Data file
         if not os.path.exists(path_to_observations):
             print(path_to_observations = "Does not exist!")
             sys.exit(7)
+
+        # Sanity check distance
         self.distance = distance
         if not distance:
             self.distance = 10.* nc.pc
         if self.distance < 1.0*nc.pc:
             print("Your distance is less than 1pc, are you sure you're using cgs units?")  
 
+
         self.data_resolution = data_resolution
         self.model_resolution = model_resolution
-
         self.external_pRT_reference = external_pRT_reference
         self.model_generating_function = model_generating_function
 
-        if not model_generating_function and not external_pRT_reference:
+        # Sanity check model function
+        if not model_generating_function and not external_pRT_reference and not photometry:
             print("Please provide a model generating function or external reference for " + name + "!")
             sys.exit(8)
-        self.generate_spectrum_wlen_range_micron = wlen_range_micron
+
+        # Optional, covariance and scaling
         self.covariance = None
         self.inv_cov = None
         self.flux_error = None
         self.scale = scale
         self.scale_factor = 1.0
         
+        # Bins and photometry
         self.wlen_bins = wlen_bins
         self.photometry = photometry
         self.photometric_transfomation_function = \
             photometric_transfomation_function
-        self.photometry_range = photometry_range
-        self.width_photometry = width_photometry
+        if photometry:
+            if photometric_transfomation_function is None:
+                print("Please provide a photometry transformation function for " + name + "!")
+                sys.exit(9)
+            if photometric_bin_edges is None:
+                print("You must include the photometric bin size if photometry is True!")
+                sys.exit(9)
+        self.photometry_range = wlen_range_micron
+        self.width_photometry = photometric_bin_edges
 
         # Read in data
         if path_to_observations != None:
-            if path_to_observations.endswith('.fits'):
-                self.loadfits(path_to_observations)
-            else:
-                self.loadtxt(path_to_observations)
-            
-            self.wlen_range_pRT = [0.95 * self.wlen[0], \
-                                   1.05 * self.wlen[-1]]
-            # For binning later
-            if not self.photometry:
+            if not photometry:
+                if path_to_observations.endswith('.fits'):
+                    self.loadfits(path_to_observations)
+                else:
+                    self.loadtxt(path_to_observations)
+                
+                self.wlen_range_pRT = [0.95 * self.wlen[0], \
+                                    1.05 * self.wlen[-1]]
                 if wlen_bins != None:
                     self.wlen_bins = wlen_bins
                 else:
                     self.wlen_bins = np.zeros_like(self.wlen)
                     self.wlen_bins[:-1] = np.diff(self.wlen)
                     self.wlen_bins[-1] = self.wlen_bins[-2]
+            else:
+                if wlen_range_micron is not None:
+                    self.wlen_range_pRT = wlen_range_micron
+                else: 
+                    self.wlen_range_pRT = [0.95*self.width_photometry[0],
+                                            1.05*self.width_photometry[1]]
+                # For binning later
+                self.wlen_bins = self.width_photometry[1]-self.width_photometry[0]
+                if self.data_resolution is None:
+                    self.data_resolution = np.mean(self.width_photometry)/self.wlen_bins
+           
+       
 
-            # For binning later
-            self.wlen_bins = np.zeros_like(self.wlen)
-            self.wlen_bins[:-1] = np.diff(self.wlen)
-            self.wlen_bins[-1] = self.wlen_bins[-2]
-        else:
-            self.wlen_range_pRT = \
-                self.generate_spectrum_wlen_range_micron
-        if self.photometry:
-            self.wlen_range_pRT = [0.95*self.photometry_range[0], \
-                                    1.05*self.photometry_range[1]]
-
-        # To be filled later
-        self.pRT_object = None
 
     def loadtxt(self, path, delimiter = ',', comments = '#'):
         """
@@ -247,32 +262,24 @@ class Data:
         if plotting:
             import pylab as plt
         # Convolve to data resolution
-        if not self.photometry:
-            # Convolve to data resolution
-            if self.data_resolution != None:
+        if self.data_resolution != None:
                 spectrum_model = self.convolve(wlen_model, \
                             spectrum_model, \
                             self.data_resolution)
 
+        if not self.photometry:
             # Rebin to model observation
             flux_rebinned = rebin_give_width(wlen_model, \
                                             spectrum_model, \
                                             self.wlen, \
                                             self.wlen_bins)
         else:
-            if self.photometric_transfomation_function is None:
-                spectrum_model = self.convolve(wlen_model, \
-                            spectrum_model, \
-                            self.data_resolution)
-                # Rebin to model observation
-                flux_rebinned = rebin_give_width(wlen_model, \
-                                            spectrum_model, \
-                                            self.wlen, \
-                                            self.wlen_bins)
-            else:
-                flux_rebinned = \
-                    self.photometric_transfomation_function(wlen_model, \
-                                                    spectrum_model)
+            flux_rebinned = \
+                self.photometric_transfomation_function(wlen_model, \
+                                                spectrum_model)
+            # species spectrum_to_flux functions return (flux,error)
+            if isinstance(flux_rebinned,[tuple,list]):
+                flux_rebinned = flux_rebinned[0]
 
 
         diff = (flux_rebinned - self.flux*self.scale_factor)
@@ -283,13 +290,13 @@ class Data:
         else:
             logL += -1*np.sum( (diff / f_err)**2. ) / 2.
         if plotting:
-            plt.plot(self.wlen, flux_rebinned)
-            plt.errorbar(self.wlen, \
-                         self.flux*self.scale_factor, \
-                         yerr = f_err, \
-                         fmt = '+')
-            plt.show()
-        #print("LogL, " + self.name + " = "  + str(logL))
+            if not self.photometry:
+                plt.plot(self.wlen, flux_rebinned)
+                plt.errorbar(self.wlen, \
+                                self.flux*self.scale_factor, \
+                                yerr = f_err, \
+                                fmt = '+')
+                plt.show()
         return logL
 
     def convolve(self, \
