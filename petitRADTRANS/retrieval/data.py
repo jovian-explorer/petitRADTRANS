@@ -1,11 +1,13 @@
+import sys,os
 import numpy as np
 from .rebin_give_width import rebin_give_width
 from scipy.ndimage.filters import gaussian_filter
-from astropy.io import fits
+import petitRADTRANS.nat_cst as nc
 
 class Data:
     def __init__(self,
                  name,
+                 distance = 10.0*nc.pc,
                  path_to_observations = None,
                  data_resolution = None,
                  model_resolution = None,
@@ -33,6 +35,8 @@ class Data:
         path_to_observations : str
             Path to observations file, including filename. This can be a txt or dat file containing the wavelength,
             flux, transit depth and error, or a fits file containing the wavelength, spectrum and covariance matrix.
+        distance : float
+            The distance to the object in cgs units. Defaults to a 10pc normalized distance.
         data_resolution : float
             Spectral resolution of the instrument. Optional, allows convolution of model to instrumental line width.
         model_resolution : float
@@ -61,6 +65,7 @@ class Data:
         """
         self.name = name
         self.path_to_observations = path_to_observations
+        self.distance = distance
         self.data_resolution = data_resolution
         self.model_resolution = model_resolution
 
@@ -106,37 +111,49 @@ class Data:
             self.wlen_range_pRT = \
                 self.generate_spectrum_wlen_range_micron
         if self.photometry:
-            self.wlen_range_pRT = [self.photometry_range[0], \
-                                       self.photometry_range[1]]
+            self.wlen_range_pRT = [0.95*self.photometry_range[0], \
+                                    1.05*self.photometry_range[1]]
 
         # To be filled later
         self.pRT_object = None
 
-    def loadtxt(self, path):
+    def loadtxt(self, path, delimiter = ',', comments = '#'):
         """
         loadtxt
         This function reads in a .txt or .dat file containing the spectrum. Headers should be commented out with #,
         the first column must be the wavelength in micron, the second column the flux or transit depth, 
         and the final column must be the error on each data point.
+        Checks will be performed to determine the correct delimiter, but the recommended format is to use a 
+        csv file with columns for wavlength, flux and error.
 
         parameters
         ----------
         path : str
             Directory and filename of the data.
+        delimiter : string, int
+            The string used to separate values. By default, commas act as delimiter. 
+            An integer or sequence of integers can also be provided as width(s) of each field.
+        comments : string
+            The character used to indicate the start of a comment. 
+            All the characters occurring on a line after a comment are discarded
         """
         if self.photometry:
             return
-        obs = np.genfromtxt(path,delimiter = ',')
+        obs = np.genfromtxt(path,delimiter = delimiter, comments = comments)
+        # Input sanity checks
         if np.isnan(obs).any():
-            #print("Nans in " + path + ", trying different delimiter")
-            obs = np.genfromtxt(path, delimiter = ' ')
+            obs = np.genfromtxt(path, delimiter = ' ', comments = comments)
         if len(obs.shape) < 2:
-            #print("Incorrect shape in " + path + ", trying different delimiter")
-            obs = np.genfromtxt(path)
+            obs = np.genfromtxt(path, comments = comments)
         if obs.shape[1] != 3:
-            #print("Incorrect shape in " + path + ", trying different delimiter")
             obs= np.genfromtxt(path)
-        #print(obs.shape,len(obs.shape))
+
+        # Warnings and errors
+        if obs.shape[1] != 3:
+            print("Failed to properly load data in " + path + "!!!")
+            sys.exit(6)
+        if np.isnan(obs).any():
+            print("WARNING: nans present in " + path + ", please verify your data before running the retrieval!")
         self.wlen = obs[:,0]
         self.flux = obs[:,1]
         self.flux_error = obs[:,-1]
@@ -147,7 +164,13 @@ class Data:
         Load in a particular style of fits file.
         Must include extension SPECTRUM with fields WAVLENGTH, FLUX
         and COVARIANCE.
+
+        parameters
+        ----------
+        path : str
+            Directory and filename of the data.
         """
+        from astropy.io import fits
         if self.photometry:
             return
         self.wlen = fits.getdata(path, 'SPECTRUM').field("WAVELENGTH")
@@ -156,6 +179,41 @@ class Data:
         self.inv_cov = np.linalg.inv(self.covariance)
         self.flux_error = np.sqrt(self.covariance.diagonal())
         return
+
+    def set_distance(self,distance):
+        """
+        set_distance
+        Sets the distance variable in the data class.
+        This does NOT rescale the flux to the new distance.
+        In order to rescale the flux and error, use the scale_to_distance method.
+        parameters:
+        -----------
+        distance : float
+            The distance to the object in cgs units.
+        """
+        self.distance = distance
+        return self.distance
+
+    def scale_to_distance(self, new_dist):
+        """
+        set_distance
+        Updates the distance variable in the data class.
+        This will rescale the flux to the new distance.
+        parameters:
+        -----------
+        distance : float
+            The distance to the object in cgs units.
+        """
+        scale = (new_dist/self.distance)**2
+        self.flux *= scale
+        if self.covariance: 
+            self.covariance *= scale**2
+            self.inv_cov = np.linalg.inv(self.covariance)
+            self.flux_error = np.sqrt(self.covariance.diagonal())
+        else:
+            self.flux_error *= scale
+        self.distance = new_dist
+        return scale
 
     def get_chisq(self, wlen_model, \
                   spectrum_model, \
@@ -225,7 +283,24 @@ class Data:
                  input_wavelength, \
                  input_flux, \
                  instrument_res):
-    
+        """
+        convolve
+        This function convolves a model spectrum to the instrumental wavelength
+        using the provided data_resolution
+        parameters:
+        -----------
+        input_wavelength : numpy.ndarray
+            The wavelength grid of the model spectrum
+        input_flux : numpy.ndarray
+            The flux as computed by the model
+        instrument_res : float
+            λ/∆λ, the width of the gaussian kernel to convolve with the model spectrum.
+
+        returns:
+        --------
+        flux_LSF
+            The convolved spectrum.
+        """
         # From talking to Ignas: delta lambda of resolution element
         # is FWHM of the LSF's standard deviation, hence:
         sigma_LSF = 1./instrument_res/(2.*np.sqrt(2.*np.log(2.)))

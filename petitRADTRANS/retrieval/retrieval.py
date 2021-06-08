@@ -131,6 +131,7 @@ class Retrieval:
         # Setup pRT Objects for each data structure.
         print("Setting up PRT Objects")
         self.setupData()
+        self.generateRetrievalSummary()
         return
 
     def run(self):
@@ -168,7 +169,8 @@ class Retrieval:
             self.analyzer = pymultinest.Analyzer(n_params = n_params, 
                                                  outputfiles_basename = prefix)
             s = self.analyzer.get_stats()
-
+            self.run_mode = 'evaluate'
+            self.generateRetrievalSummary(s)
             json.dump(s, open(prefix + 'stats.json', 'w'), indent=4)
             print('  marginal likelihood:')
             print('    ln Z = %.1f +- %.1f' % (s['global evidence'], s['global evidence error']))
@@ -220,6 +222,86 @@ class Retrieval:
             result = sampler.run()
             sampler.print_results()
         return result
+
+    def generateRetrievalSummary(self,stats = None):
+        """
+        generateRetrievalSummary
+        This function produces a human-readable text file describing the retrieval.
+        It includes all of the fixed and free parameters, the limits of the priors (if uniform),
+        a description of the data used, and if the retrieval is complete, a summary of the
+        best fit parameters and model evidence.
+
+        parameters
+        ----------
+        stats : dict
+            A Pymultinest stats dictionary, from Analyzer.get_stats(). 
+            This contains the evidence and best fit parameters.
+        """
+        with open(self.output_dir + self.retrieval_name + "_summary.txt", "w+") as summary:
+            import datetime as dt
+            summary.write(self.retrieval_name + '\n')
+            summary.write(dt.now() + '\n')
+            summary.write(self.output_dir + '\n\n')
+            summary.write("Fixed Parameters\n")
+            for key,value in self.parameters.items():
+                if not value.is_free_parameter:
+                    summary.write(key + " = " + str(round(value.value,3)) + '\n')
+            summary.write('\n')
+            summary.write("Free Parameters\n")
+            for key,value in self.parameters.items():
+                if value.is_free_parameter:
+                    low = value.transform_prior_cube_coordinate(0.00001)
+                    high = value.transform_prior_cube_coordinate(0.99999)
+                    if value.corner_transform is not None:
+                        low = value.corner_transform(low)
+                        high = value.corner_transform(high)
+                    summary.write(key + " = " + str(round(low,3)) + ", " + str(round(high,3)) + '\n')
+            summary.write('\n')
+            summary.write("Data\n")
+            for name,dd in self.data:
+                summary.write(name)
+                summary.write("     " + dd.path_to_observations + '\n')
+                summary.write("     " + dd.model_generating_function.__name__+ '\n')
+                if dd.scale:
+                    summary.write("     scale factor = " + dd.scale_factor+ '\n')
+                if dd.data_resolution is not None:
+                    summary.write("     data resolution = " + dd.data_resolution+ '\n')
+                if dd.model_resolution is not None:
+                    summary.write("     model resolution = " + dd.model_resolution+ '\n')
+                if dd.photometry:
+                    summary.write("     photometric width = " + str(dd.photometry_range[0]) + "--" + str(dd.photometry_range[1]) + " um"+ '\n')
+            if stats is not None:
+                summary.write("Multinest Outputs")
+                summary.write('  marginal likelihood:')
+                summary.write('    log Z = %.1f +- %.1f' % (stats['global evidence']/np.log(10), stats['global evidence error']/np.log(10)))
+                summary.write('    ln Z = %.1f +- %.1f' % (stats['global evidence'], stats['global evidence error']))
+                summary.write("  Statistical Fit Parameters\n")
+                for p, m in zip(self.parameters.keys(), stats['marginals']):
+                    lo, hi = m['1sigma']
+                    med = m['median']
+                    sigma = (hi - lo) / 2
+                    if sigma == 0:
+                        i = 3
+                    else:
+                        i = max(0, int(-np.floor(np.log10(sigma))) + 1)
+                    fmt = '%%.%df' % i
+                    fmts = '\t'.join(['    %-15s' + fmt + " +- " + fmt])
+                    summary.write(fmts % (p, med, sigma))
+                summary.write('\n')
+            if self.run_mode == 'evaluate':
+                summary.write("Best Fit Parameters\n")
+                if not self.best_fit_params:
+                    sample_dict, parameter_dict = self.getSamples(self.output_dir)
+                    samples_use = sample_dict[self.retrieval_name]
+                    parameters_read = parameter_dict[self.retrieval_name]
+                    i_p = 0
+                    # Get best-fit index
+                    logL = samples_use[:,-1]
+                    best_fit_index = np.argmax(logL)
+                    self.getBestFitParams(samples_use[best_fit_index,:-1],parameters_read)
+                for key,value in self.best_fit_params.items():
+                    summary.write(key + " = " + str(round(value.value,3)) + '\n')
+        return
 
     def setupData(self,scaling=10,width = 3):
         """
@@ -328,7 +410,7 @@ class Retrieval:
                                                     self.PT_plot_mode,
                                                     AMR = self.rd.AMR)
                     # Sanity checks on outputs
-                    #print(spectrum_model)
+                    print(spectrum_model)
                     if spectrum_model is None:
                         return -np.inf
                     if np.isnan(spectrum_model).any():
@@ -498,8 +580,7 @@ class Retrieval:
         bf_wlen, bf_spectrum= mg_func(bf_prt, 
                                       self.best_fit_params, 
                                       PT_plot_mode= False,
-                                      AMR = True,
-                                      resolution = None)
+                                      AMR = True)
         # Add to the dictionary.
         self.best_fit_specs[ret_name]= [bf_wlen,bf_spectrum]
         return bf_wlen, bf_spectrum
