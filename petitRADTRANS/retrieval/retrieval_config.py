@@ -274,6 +274,7 @@ class RetrievalConfig:
                  model_generating_function,
                  data_resolution = None,
                  model_resolution = None,
+                 distance = 10*nc.pc,
                  scale = False,
                  wlen_range_micron = None,
                  external_pRT_reference = None):
@@ -295,6 +296,9 @@ class RetrievalConfig:
             Spectral resolution of the instrument. Optional, allows convolution of model to instrumental line width.
         model_resolution : float
             Spectral resolution of the model, allowing for low resolution correlated k tables from exo-k.
+        distance : float
+            The distance to the object in cgs units. Defaults to a 10pc normalized distance. All data must be scaled to the 
+            same distance before running the retrieval, which can be done using the scale_to_distance method in the Data class.
         scale : bool
             Turn on or off scaling the data by a constant factor.
         wlen_range_micron : Tuple
@@ -308,12 +312,14 @@ class RetrievalConfig:
                                 model_generating_function = model_generating_function,
                                 data_resolution = data_resolution,
                                 model_resolution = model_resolution,
+                                distance = distance,
                                 scale = scale,
                                 wlen_range_micron = wlen_range_micron,
                                 external_pRT_reference=external_pRT_reference)
         return
     def add_photometry(self, path, 
                        model_resolution = 10, 
+                       distance = 10*nc.pc,
                        scale = False, 
                        wlen_range_micron = None,
                        transform_func = None,
@@ -339,6 +345,9 @@ class RetrievalConfig:
         scale : bool
             Turn on or off scaling the data by a constant factor. Currently only set up to scale all photometric data
             in a given file.
+        distance : float
+            The distance to the object in cgs units. Defaults to a 10pc normalized distance. All data must be scaled to the 
+            same distance before running the retrieval, which can be done using the scale_to_distance method in the Data class.
         wlen_range_micron : Tuple
             A pair of wavelenths in units of micron that determine the lower and upper boundaries of the model computation.
         external_pRT_reference : str
@@ -373,6 +382,7 @@ class RetrievalConfig:
                 wbins = wlen_range_micron
             self.add_data(name, 
                     path,    
+                    distance = distance,
                     photometry = True,
                     photometry_range = wbins,
                     width_photometry = [wlow,whigh],
