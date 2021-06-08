@@ -65,12 +65,22 @@ class Data:
         """
         self.name = name
         self.path_to_observations = path_to_observations
+
+        if not os.path.exists(path_to_observations):
+            print(path_to_observations = "Does not exist!")
+            sys.exit(7)
+        if distance < 1*nc.pc:
+            print("Your distance is less than 1pc, are you sure you're using cgs units?")  
         self.distance = distance
         self.data_resolution = data_resolution
         self.model_resolution = model_resolution
 
         self.external_pRT_reference = external_pRT_reference
         self.model_generating_function = model_generating_function
+
+        if not model_generating_function and not external_pRT_reference:
+            print("Please provide a model generating function or external reference for " + name + "!")
+            sys.exit(8)
         self.generate_spectrum_wlen_range_micron = wlen_range_micron
         self.covariance = None
         self.inv_cov = None

@@ -130,8 +130,8 @@ class Retrieval:
         
         # Setup pRT Objects for each data structure.
         print("Setting up PRT Objects")
-        self.setupData()
-        self.generateRetrievalSummary()
+        self.setup_data()
+        self.generate_retrieval_summary()
         return
 
     def run(self):
@@ -157,8 +157,8 @@ class Retrieval:
                     n_params += 1
             json.dump(free_parameter_names, \
                     open(self.output_dir + 'out_PMN/'+self.retrieval_name+'_params.json', 'w'))
-            pymultinest.run(self.LogLikelihood, 
-                            self.Prior, 
+            pymultinest.run(self.log_likelihood, 
+                            self.prior, 
                             n_params, 
                             outputfiles_basename=prefix, 
                             resume = self.resume, 
@@ -170,7 +170,7 @@ class Retrieval:
                                                  outputfiles_basename = prefix)
             s = self.analyzer.get_stats()
             self.run_mode = 'evaluate'
-            self.generateRetrievalSummary(s)
+            self.generate_retrieval_summary(s)
             json.dump(s, open(prefix + 'stats.json', 'w'), indent=4)
             print('  marginal likelihood:')
             print('    ln Z = %.1f +- %.1f' % (s['global evidence'], s['global evidence error']))
@@ -214,8 +214,8 @@ class Retrieval:
             json.dump(free_parameter_names, \
                     open(self.output_dir + 'out_PMN/'+self.retrieval_name+'_params.json', 'w'))
             sampler = un.ReactiveNestedSampler(free_parameter_names, 
-                                               self.LogLikelihood,
-                                               self.Prior,
+                                               self.log_likelihood,
+                                               self.prior,
                                                log_dir=self.output_dir + "out_" + self.retrieval_name, 
                                                resume=self.resume)
 
@@ -223,7 +223,7 @@ class Retrieval:
             sampler.print_results()
         return result
 
-    def generateRetrievalSummary(self,stats = None):
+    def generate_retrieval_summary(self,stats = None):
         """
         generateRetrievalSummary
         This function produces a human-readable text file describing the retrieval.
@@ -298,12 +298,12 @@ class Retrieval:
                     # Get best-fit index
                     logL = samples_use[:,-1]
                     best_fit_index = np.argmax(logL)
-                    self.getBestFitParams(samples_use[best_fit_index,:-1],parameters_read)
+                    self.get_best_fit_params(samples_use[best_fit_index,:-1],parameters_read)
                 for key,value in self.best_fit_params.items():
                     summary.write(key + " = " + str(round(value.value,3)) + '\n')
         return
 
-    def setupData(self,scaling=10,width = 3):
+    def setup_data(self,scaling=10,width = 3):
         """
         setupData
         Creates a pRT object for each data set that asks for a unique object.
@@ -371,7 +371,7 @@ class Retrieval:
                 dd.pRT_object = rt_object
         return
 
-    def Prior(self, cube, ndim, nparams):
+    def prior(self, cube, ndim, nparams):
         """
         Prior
         pymultinest prior function. Transforms unit hypercube into physical space.
@@ -382,9 +382,9 @@ class Retrieval:
                 cube[i_p] = self.parameters[pp].get_param_uniform(cube[i_p])
                 i_p += 1
 
-    def LogLikelihood(self,cube,ndim,nparam):
+    def log_likelihood(self,cube,ndim,nparam):
         """
-        LogLikelihood
+        log_likelihood
         pymultinest required likelihood function.
         """
         log_likelihood = 0.
@@ -452,7 +452,7 @@ class Retrieval:
         #print(log_likelihood)
         return log_likelihood + log_prior  
     
-    def getSamples(self, output_dir = None):
+    def get_samples(self, output_dir = None):
         """
         getSamples
         This function looks in the given output directory and finds the post_equal_weights
@@ -489,7 +489,7 @@ class Retrieval:
             parameter_dict[name] = parameters_read
         return sample_dict, parameter_dict
 
-    def getBestFitParams(self,best_fit_params,parameters_read):
+    def get_best_fit_params(self,best_fit_params,parameters_read):
         """
         getBestFitParams
         This function converts the sample from the post_equal_weights file with the maximum
@@ -514,7 +514,7 @@ class Retrieval:
                 self.best_fit_params[pp] = Parameter(pp,False,value=self.parameters[pp].value)
         return self.best_fit_params
 
-    def getBestFitModel(self,best_fit_params,parameters_read,model_generating_func = None,ret_name = None):
+    def get_best_fit_model(self,best_fit_params,parameters_read,model_generating_func = None,ret_name = None):
         """
         getBestFitModel
         This function uses the best fit parameters to generate a pRT model that spans the entire wavelength
@@ -554,7 +554,7 @@ class Retrieval:
                 wmax = dd.wlen_range_pRT[1]
         # Set up parameter dictionary
         if not self.retrieval_name in self.best_fit_specs.keys():
-            self.getBestFitParams(best_fit_params,parameters_read)
+            self.get_best_fit_params(best_fit_params,parameters_read)
 
         # Setup the pRT object
         bf_prt = Radtrans(line_species = cp.copy(self.rd.line_species), \
@@ -589,7 +589,7 @@ class Retrieval:
 #############################################################
 # Plotting functions
 #############################################################
-    def plotAll(self, output_dir = None):
+    def plot_all(self, output_dir = None):
         """
         plotAll
         Produces plots for the best fit spectrum, a sample of 100 output spectra,
@@ -626,14 +626,14 @@ class Retrieval:
                         i_p += 1
                         
         # Plotting
-        self.plotSpectra(samples_use,parameters_read)
-        self.plotSampled(samples_use, parameters_read)
-        self.plotPT(sample_dict,parameters_read)
-        self.plotCorner(sample_dict,parameter_dict,parameters_read)
+        self.plot_spectra(samples_use,parameters_read)
+        self.plot_sampled(samples_use, parameters_read)
+        self.plot_PT(sample_dict,parameters_read)
+        self.plot_corner(sample_dict,parameter_dict,parameters_read)
         print("Done!")
         return
 
-    def plotSpectra(self,samples_use,parameters_read,model_generating_func = None):
+    def plot_spectra(self,samples_use,parameters_read,model_generating_func = None):
         """
         plotSpectra
         Plot the best fit spectrum, the data from each dataset and the residuals between the two.
@@ -671,9 +671,9 @@ class Retrieval:
 
         # Setup best fit spectrum
         # First get the fit for each dataset for the residual plots
-        self.LogLikelihood(samples_use[best_fit_index, :-1], 0, 0)
+        self.log_likelihood(samples_use[best_fit_index, :-1], 0, 0)
         # Then get the full wavelength range
-        bf_wlen, bf_spectrum = self.getBestFitModel(samples_use[best_fit_index, :-1],parameters_read,model_generating_func)
+        bf_wlen, bf_spectrum = self.get_best_fit_model(samples_use[best_fit_index, :-1],parameters_read,model_generating_func)
 
         # Iterate through each dataset, plotting the data and the residuals.
         for name,dd in self.data.items():
@@ -837,7 +837,7 @@ class Retrieval:
         plt.savefig(self.output_dir + 'evaluate_'+self.rd.retrieval_name +'/best_fit_spec.pdf')
         return fig, ax, ax_r
 
-    def plotSampled(self,samples_use,parameters_read):
+    def plot_sampled(self,samples_use,parameters_read):
         """
         plotSampled
         Plot a set of randomly sampled output spectra
@@ -860,7 +860,7 @@ class Retrieval:
 
         for i_sample in range(int(self.rd.plot_kwargs["nsample"])):
             random_index = int(np.random.uniform()*len_samples)
-            self.LogLikelihood(samples_use[random_index, :-1], 0, 0)
+            self.log_likelihood(samples_use[random_index, :-1], 0, 0)
             for name,dd in data_use.items():
                 if dd.external_pRT_reference == None:
                     np.savetxt(path +name.replace(' ','_')+'_sampled_'+ 
@@ -884,7 +884,7 @@ class Retrieval:
         plt.savefig(path +'sampled_data.pdf',bbox_inches = 0.)
         return fig, ax
 
-    def plotPT(self,sample_dict,parameters_read):
+    def plot_PT(self,sample_dict,parameters_read):
         """
         plotPT
         Plot the PT profile with error contours
@@ -915,7 +915,7 @@ class Retrieval:
 
         temps = []
         for i_s in range(len(samples_use)):
-            pressures, t = self.LogLikelihood(samples_use[i_s, :-1], 0, 0)
+            pressures, t = self.log_likelihood(samples_use[i_s, :-1], 0, 0)
             temps.append(t)
 
         temps = np.array(temps)
@@ -954,7 +954,7 @@ class Retrieval:
         plt.savefig(self.output_dir + 'evaluate_'+self.retrieval_name +'/PT_envelopes.pdf')
         return fig, ax
 
-    def plotCorner(self,sample_dict,parameter_dict,parameters_read):
+    def plot_corner(self,sample_dict,parameter_dict,parameters_read):
         """
         plotCorner
         Make the corner plots
