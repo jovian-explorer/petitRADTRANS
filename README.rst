@@ -5,7 +5,7 @@ petitRADTRANS
 
 Welcome to the repository of petitRADTRANS, an easy-to-use code for the calculation of exoplanet spectra.
 petitRADTRANS allows the calculation of emission or transmission spectra, at low or high resolution, clear or cloudy,
-and includes a retrieval package to fit a petitRADTRANS model to your spectral data.
+and includes a retrieval module to fit a petitRADTRANS model to your spectral data.
 
 
 Documentation
