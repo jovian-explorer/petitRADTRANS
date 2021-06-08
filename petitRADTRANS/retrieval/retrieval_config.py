@@ -318,11 +318,12 @@ class RetrievalConfig:
                                 external_pRT_reference=external_pRT_reference)
         return
     def add_photometry(self, path, 
+                       model_generating_function,
                        model_resolution = 10, 
                        distance = None,
                        scale = False, 
                        wlen_range_micron = None,
-                       transform_func = None,
+                       photometric_transformation_function = None,
                        external_pRT_reference = None):
         """
         add_photometry
@@ -354,12 +355,12 @@ class RetrievalConfig:
             The name of an existing Data object. This object's pRT_object will be used to calculate the chi squared
             of the new Data object. This is useful when two datasets overlap, as only one model computation is required
             to compute the log likelihood of both datasets.
-        photometric_transfomation_function : method
+        photometric_transformation_function : method
             A function that will transform a spectrum into an average synthetic photometric point, typicall accounting for 
             filter transmission.
         """
         photometry = open(path)
-        if transform_func is None:
+        if photometric_transformation_function is None:
             try:
                 import species
                 species.SpeciesInit()
@@ -375,10 +376,10 @@ class RetrievalConfig:
             whigh = float(vals[2])
             flux = float(vals[3])
             err = float(vals[4])
-            if transform_func is None:
+            if photometric_transformation_function is None:
                 transform = species.SyntheticPhotometry(name).spectrum_to_flux
             else:
-                transform = transform_func
+                transform = photometric_transformation_function
             
             if wlen_range_micron is None:
                 wbins = [0.95*wlow,1.05*whigh]
@@ -386,7 +387,8 @@ class RetrievalConfig:
                 wbins = wlen_range_micron
             print("Adding " +name)
             self.data[name] = Data(name, 
-                                    path,    
+                                    path, 
+                                    model_generating_function = model_generating_function,   
                                     distance = distance,
                                     photometry = True,
                                     wlen_range_micron = wbins,
@@ -394,7 +396,7 @@ class RetrievalConfig:
                                     data_resolution = np.mean([wlow,whigh])/(whigh-wlow),
                                     model_resolution = model_resolution,
                                     scale = scale,
-                                    photometric_transfomation_function = transform,
+                                    photometric_transformation_function = transform,
                                     external_pRT_reference=external_pRT_reference)
             self.data[name].flux = flux
             self.data[name].flux_error = err

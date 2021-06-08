@@ -17,8 +17,7 @@ class Data:
                  scale = False,
                  wlen_bins = None,
                  photometry = False,
-                 photometric_transfomation_function = None, 
-                 model_photometry_range = None,
+                 photometric_transformation_function = None,
                  photometric_bin_edges = None):
         """
         Data class initializer
@@ -56,7 +55,7 @@ class Data:
             Set the wavelength bins to bin the pRT model to the data. Defaults to the data bins.
         photometry : bool
             Set to True if using photometric data.
-        photometric_transfomation_function : method
+        photometric_transformation_function : method
             Transform the photometry (account for filter transmission etc.)
         photometric_bin_edges : Tuple, numpy.ndarray
             The width of the photometric bin. [low,high]
@@ -89,7 +88,7 @@ class Data:
         self.model_generating_function = model_generating_function
 
         # Sanity check model function
-        if not model_generating_function and not external_pRT_reference and not photometry:
+        if not model_generating_function and not external_pRT_reference:
             print("Please provide a model generating function or external reference for " + name + "!")
             sys.exit(8)
 
@@ -103,10 +102,10 @@ class Data:
         # Bins and photometry
         self.wlen_bins = wlen_bins
         self.photometry = photometry
-        self.photometric_transfomation_function = \
-            photometric_transfomation_function
+        self.photometric_transformation_function = \
+            photometric_transformation_function
         if photometry:
-            if photometric_transfomation_function is None:
+            if photometric_transformation_function is None:
                 print("Please provide a photometry transformation function for " + name + "!")
                 sys.exit(9)
             if photometric_bin_edges is None:
@@ -262,7 +261,7 @@ class Data:
         if plotting:
             import pylab as plt
         # Convolve to data resolution
-        if self.data_resolution != None:
+        if self.data_resolution is not None:
                 spectrum_model = self.convolve(wlen_model, \
                             spectrum_model, \
                             self.data_resolution)
@@ -275,10 +274,10 @@ class Data:
                                             self.wlen_bins)
         else:
             flux_rebinned = \
-                self.photometric_transfomation_function(wlen_model, \
+                self.photometric_transformation_function(wlen_model, \
                                                 spectrum_model)
             # species spectrum_to_flux functions return (flux,error)
-            if isinstance(flux_rebinned,[tuple,list]):
+            if isinstance(flux_rebinned,(tuple,list)):
                 flux_rebinned = flux_rebinned[0]
 
 

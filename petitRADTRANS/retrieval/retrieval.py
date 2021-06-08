@@ -271,10 +271,11 @@ class Retrieval:
                     summary.write("     model resolution = " + str(dd.model_resolution)+ '\n')
                 if dd.photometry:
                     summary.write("     photometric width = " + str(dd.photometry_range[0]) + "--" + str(dd.photometry_range[1]) + " um"+ '\n')
-                    summary.write("     " + dd.photometric_transfomation_function.__name__+ '\n')
+                    summary.write("     " + dd.photometric_transformation_function.__name__+ '\n')
+            summary.write('\n')
             if stats is not None:
-                summary.write("Multinest Outputs")
-                summary.write('  marginal likelihood:')
+                summary.write("Multinest Outputs\n")
+                summary.write('  marginal likelihood:\n')
                 summary.write('    log Z = %.1f +- %.1f\n' % (stats['global evidence']/np.log(10), stats['global evidence error']/np.log(10)))
                 summary.write('    ln Z = %.1f +- %.1f\n' % (stats['global evidence'], stats['global evidence error']))
                 summary.write("  Statistical Fit Parameters\n")
@@ -689,28 +690,33 @@ class Retrieval:
         # Iterate through each dataset, plotting the data and the residuals.
         for name,dd in self.data.items():
             # If the user has specified a resolution, rebin to that
-            try:
-                # Sometimes this fails, I'm not super sure why.
-                resolution_data = np.mean(dd.wlen[1:]/np.diff(dd.wlen))
-                ratio = resolution_data / self.rd.plot_kwargs["resolution"]
-                if int(ratio) > 1:
-                    flux,edges,_ = binned_statistic(dd.wlen,dd.flux,'mean',dd.wlen.shape[0]/ratio)
-                    error,_,_ = binned_statistic(dd.wlen,dd.flux_error,'mean',dd.wlen.shape[0]/ratio)/np.sqrt(ratio)
-                    wlen = np.array([(edges[i]+edges[i+1])/2.0 for i in range(edges.shape[0]-1)])
-                    # Old method
-                    #wlen = nc.running_mean(dd.wlen, int(ratio))[::int(ratio)]
-                    #error = nc.running_mean(dd.flux_error / int(np.sqrt(ratio)), \
-                    #                        int(ratio))[::int(ratio)]
-                    #flux = nc.running_mean(dd.flux, \
-                    #                        int(ratio))[::int(ratio)]
-                else:
+            if not dd.photometry:
+                try:
+                    # Sometimes this fails, I'm not super sure why.
+                    resolution_data = np.mean(dd.wlen[1:]/np.diff(dd.wlen))
+                    ratio = resolution_data / self.rd.plot_kwargs["resolution"]
+                    if int(ratio) > 1:
+                        flux,edges,_ = binned_statistic(dd.wlen,dd.flux,'mean',dd.wlen.shape[0]/ratio)
+                        error,_,_ = binned_statistic(dd.wlen,dd.flux_error,'mean',dd.wlen.shape[0]/ratio)/np.sqrt(ratio)
+                        wlen = np.array([(edges[i]+edges[i+1])/2.0 for i in range(edges.shape[0]-1)])
+                        # Old method
+                        #wlen = nc.running_mean(dd.wlen, int(ratio))[::int(ratio)]
+                        #error = nc.running_mean(dd.flux_error / int(np.sqrt(ratio)), \
+                        #                        int(ratio))[::int(ratio)]
+                        #flux = nc.running_mean(dd.flux, \
+                        #                        int(ratio))[::int(ratio)]
+                    else:
+                        wlen = dd.wlen
+                        error = dd.flux_error
+                        flux = dd.flux
+                except:
                     wlen = dd.wlen
                     error = dd.flux_error
                     flux = dd.flux
-            except:
-                wlen = dd.wlen
-                error = dd.flux_error
+            else:
+                wlen = np.mean(dd.width_photometry)
                 flux = dd.flux
+                error = dd.error
 
             # If the data has an arbitrary retrieved scaling factor
             scale = dd.scale_factor
@@ -741,7 +747,7 @@ class Retrieval:
                 ax.errorbar(wlen, \
                             flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
                             yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
-                            xerr = dd.width_photometry/2., linewidth = 0, elinewidth = 2, \
+                            xerr = dd.wlen_bins/2., linewidth = 0, elinewidth = 2, \
                             marker='o', markeredgecolor='k', zorder = 10, \
                             label = dd.name, alpha = 0.9)
             # Plot the residuals
