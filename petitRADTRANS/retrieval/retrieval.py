@@ -225,7 +225,7 @@ class Retrieval:
 
     def generate_retrieval_summary(self,stats = None):
         """
-        generateRetrievalSummary
+        generate_retrieval_summary
         This function produces a human-readable text file describing the retrieval.
         It includes all of the fixed and free parameters, the limits of the priors (if uniform),
         a description of the data used, and if the retrieval is complete, a summary of the
@@ -237,10 +237,10 @@ class Retrieval:
             A Pymultinest stats dictionary, from Analyzer.get_stats(). 
             This contains the evidence and best fit parameters.
         """
-        with open(self.output_dir + self.retrieval_name + "_summary.txt", "w+") as summary:
-            import datetime as dt
+        with open(self.output_dir + self.retrieval_name + "_ret_summary.txt", "w+") as summary:
+            from datetime import datetime
             summary.write(self.retrieval_name + '\n')
-            summary.write(dt.now() + '\n')
+            summary.write(datetime.now().strftime("%Y-%m-%d, %H:%M:%S") + '\n')
             summary.write(self.output_dir + '\n\n')
             summary.write("Fixed Parameters\n")
             for key,value in self.parameters.items():
@@ -250,24 +250,24 @@ class Retrieval:
             summary.write("Free Parameters\n")
             for key,value in self.parameters.items():
                 if value.is_free_parameter:
-                    low = value.transform_prior_cube_coordinate(0.00001)
-                    high = value.transform_prior_cube_coordinate(0.99999)
+                    low = value.transform_prior_cube_coordinate(0.0000001)
+                    high = value.transform_prior_cube_coordinate(0.9999999)
                     if value.corner_transform is not None:
                         low = value.corner_transform(low)
                         high = value.corner_transform(high)
                     summary.write(key + " = " + str(round(low,3)) + ", " + str(round(high,3)) + '\n')
             summary.write('\n')
             summary.write("Data\n")
-            for name,dd in self.data:
-                summary.write(name)
+            for name,dd in self.data.items():
+                summary.write(name+'\n')
                 summary.write("     " + dd.path_to_observations + '\n')
                 summary.write("     " + dd.model_generating_function.__name__+ '\n')
                 if dd.scale:
-                    summary.write("     scale factor = " + dd.scale_factor+ '\n')
+                    summary.write("     scale factor = " + str(dd.scale_factor)+ '\n')
                 if dd.data_resolution is not None:
-                    summary.write("     data resolution = " + dd.data_resolution+ '\n')
+                    summary.write("     data resolution = " + str(dd.data_resolution)+ '\n')
                 if dd.model_resolution is not None:
-                    summary.write("     model resolution = " + dd.model_resolution+ '\n')
+                    summary.write("     model resolution = " + str(dd.model_resolution)+ '\n')
                 if dd.photometry:
                     summary.write("     photometric width = " + str(dd.photometry_range[0]) + "--" + str(dd.photometry_range[1]) + " um"+ '\n')
             if stats is not None:
@@ -291,7 +291,7 @@ class Retrieval:
             if self.run_mode == 'evaluate':
                 summary.write("Best Fit Parameters\n")
                 if not self.best_fit_params:
-                    sample_dict, parameter_dict = self.getSamples(self.output_dir)
+                    sample_dict, parameter_dict = self.get_samples(self.output_dir)
                     samples_use = sample_dict[self.retrieval_name]
                     parameters_read = parameter_dict[self.retrieval_name]
                     i_p = 0
@@ -305,7 +305,7 @@ class Retrieval:
 
     def setup_data(self,scaling=10,width = 3):
         """
-        setupData
+        setup_data
         Creates a pRT object for each data set that asks for a unique object.
         Checks if there are low resolution c-k models from exo-k, and creates them if necessary.
         The scaling and width parameters adjust the AMR grid as described in RetrievalConfig.setup_pres
@@ -410,7 +410,7 @@ class Retrieval:
                                                     self.PT_plot_mode,
                                                     AMR = self.rd.AMR)
                     # Sanity checks on outputs
-                    print(spectrum_model)
+                    #print(spectrum_model)
                     if spectrum_model is None:
                         return -np.inf
                     if np.isnan(spectrum_model).any():
@@ -491,7 +491,7 @@ class Retrieval:
 
     def get_best_fit_params(self,best_fit_params,parameters_read):
         """
-        getBestFitParams
+        get_best_fit_params
         This function converts the sample from the post_equal_weights file with the maximum
         log likelihood, and converts it into a dictionary of Parameters that can be used in
         a model function.
@@ -516,14 +516,14 @@ class Retrieval:
 
     def get_best_fit_model(self,best_fit_params,parameters_read,model_generating_func = None,ret_name = None):
         """
-        getBestFitModel
+        get_best_fit_model
         This function uses the best fit parameters to generate a pRT model that spans the entire wavelength
         range of the retrieval, to be used in plots.
 
         parameters
         ----------
         best_fit_params : numpy.ndarray
-            A numpy array containing the best fit parameters, to be passed to getBestFitParams
+            A numpy array containing the best fit parameters, to be passed to get_best_fit_params
         parameters_read : list
             A list of the free parameters as read from the output files.
         model_generating_fun : method
@@ -591,14 +591,14 @@ class Retrieval:
 #############################################################
     def plot_all(self, output_dir = None):
         """
-        plotAll
+        plot_all
         Produces plots for the best fit spectrum, a sample of 100 output spectra,
         the best fit PT profile and a corner plot for parameters specified in the
         run definition.
         """
         if output_dir is None:
             output_dir = self.output_dir
-        sample_dict, parameter_dict = self.getSamples(output_dir)
+        sample_dict, parameter_dict = self.get_samples(output_dir)
 
         ###########################################
         # Plot best-fit spectrum
@@ -635,7 +635,7 @@ class Retrieval:
 
     def plot_spectra(self,samples_use,parameters_read,model_generating_func = None):
         """
-        plotSpectra
+        plot_spectra
         Plot the best fit spectrum, the data from each dataset and the residuals between the two.
         Saves a file to $OUTPUT_DIR/evaluate_$RETRIEVAL_NAME/best_fit_spec.pdf
         TODO: include plotting of multiple retrievals
@@ -839,7 +839,7 @@ class Retrieval:
 
     def plot_sampled(self,samples_use,parameters_read):
         """
-        plotSampled
+        plot_sampled
         Plot a set of randomly sampled output spectra
 
         Parameters:
@@ -886,7 +886,7 @@ class Retrieval:
 
     def plot_PT(self,sample_dict,parameters_read):
         """
-        plotPT
+        plot_PT
         Plot the PT profile with error contours
 
         Parameters:
@@ -956,7 +956,7 @@ class Retrieval:
 
     def plot_corner(self,sample_dict,parameter_dict,parameters_read):
         """
-        plotCorner
+        plot_corner
         Make the corner plots
 
         Parameters:

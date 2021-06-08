@@ -7,10 +7,10 @@ import petitRADTRANS.nat_cst as nc
 class Data:
     def __init__(self,
                  name,
-                 distance = 10.0*nc.pc,
                  path_to_observations = None,
                  data_resolution = None,
                  model_resolution = None,
+                 distance = None,
                  external_pRT_reference = None,
                  model_generating_function = None,
                  wlen_range_micron = None,
@@ -69,9 +69,12 @@ class Data:
         if not os.path.exists(path_to_observations):
             print(path_to_observations = "Does not exist!")
             sys.exit(7)
-        if distance < 1*nc.pc:
-            print("Your distance is less than 1pc, are you sure you're using cgs units?")  
         self.distance = distance
+        if not distance:
+            self.distance = 10.* nc.pc
+        if self.distance < 1.0*nc.pc:
+            print("Your distance is less than 1pc, are you sure you're using cgs units?")  
+
         self.data_resolution = data_resolution
         self.model_resolution = model_resolution
 

@@ -273,7 +273,7 @@ class RetrievalConfig:
                  model_generating_function,
                  data_resolution = None,
                  model_resolution = None,
-                 distance = 10*nc.pc,
+                 distance = None,
                  scale = False,
                  wlen_range_micron = None,
                  external_pRT_reference = None):
@@ -318,7 +318,7 @@ class RetrievalConfig:
         return
     def add_photometry(self, path, 
                        model_resolution = 10, 
-                       distance = 10*nc.pc,
+                       distance = None,
                        scale = False, 
                        wlen_range_micron = None,
                        transform_func = None,
