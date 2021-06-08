@@ -6,6 +6,7 @@ plotting = False
 if plotting:
     import pylab as plt
     from petitRADTRANS import nat_cst as nc
+    
 #############################################################
 # Cloud Cond
 #############################################################
@@ -502,8 +503,6 @@ def simple_cdf_KCL(press, temp, FeH, CO, MMW = 2.33):
         plt.show()
 
     return P_cloud
-
-
 
 if plotting:
     kappa_IR = 0.01

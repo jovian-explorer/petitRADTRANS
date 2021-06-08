@@ -4,7 +4,6 @@ os.environ["OMP_NUM_THREADS"] = "1"
 
 from .data import Data
 from .parameter import Parameter
-from petitRADTRANS import Radtrans
 from petitRADTRANS import nat_cst as nc
 
 import numpy as np
