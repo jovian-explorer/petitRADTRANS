@@ -361,8 +361,10 @@ class RetrievalConfig:
         if transform_func is None:
             try:
                 import species
+                species.SpeciesInit(os.path.dirname(path))
             except:
                 print("Please provide a function to transform a spectrum into photometry, or pip install species")
+                return
         for line in photometry:
             vals = line.split(',')
             name = vals[0]
