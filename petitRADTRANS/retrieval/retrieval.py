@@ -146,15 +146,16 @@ class Retrieval:
         if len(self.output_dir + 'out_PMN/') > 100:
             print("PyMultinest requires output directory names to be <100 characters. Please use a short path name.")
             sys.exit(3)
+            
+        # How many free parameters?
+        n_params = 0
+        free_parameter_names = []
+        for pp in self.parameters:
+            if self.parameters[pp].is_free_parameter:
+                free_parameter_names.append(self.parameters[pp].name)
+                n_params += 1
         if self.run_mode == 'retrieval':
             print("Starting retrieval: " + self.retrieval_name+'\n')
-            # How many free parameters?
-            n_params = 0
-            free_parameter_names = []
-            for pp in self.parameters:
-                if self.parameters[pp].is_free_parameter:
-                    free_parameter_names.append(self.parameters[pp].name)
-                    n_params += 1
             json.dump(free_parameter_names, \
                     open(self.output_dir + 'out_PMN/'+self.retrieval_name+'_params.json', 'w'))
             pymultinest.run(self.log_likelihood, 
@@ -166,26 +167,26 @@ class Retrieval:
                             sampling_efficiency = self.sampling_efficiency,
                             const_efficiency_mode = self.const_efficiency_mode, 
                             n_live_points = self.n_live_points)
-            self.analyzer = pymultinest.Analyzer(n_params = n_params, 
-                                                 outputfiles_basename = prefix)
-            s = self.analyzer.get_stats()
-            self.run_mode = 'evaluate'
-            self.generate_retrieval_summary(s)
-            json.dump(s, open(prefix + 'stats.json', 'w'), indent=4)
-            print('  marginal likelihood:')
-            print('    ln Z = %.1f +- %.1f' % (s['global evidence'], s['global evidence error']))
-            print('  parameters:')
-            for p, m in zip(self.parameters.keys(), s['marginals']):
-                lo, hi = m['1sigma']
-                med = m['median']
-                sigma = (hi - lo) / 2
-                if sigma == 0:
-                    i = 3
-                else:
-                    i = max(0, int(-np.floor(np.log10(sigma))) + 1)
-                fmt = '%%.%df' % i
-                fmts = '\t'.join(['    %-15s' + fmt + " +- " + fmt])
-                print(fmts % (p, med, sigma))
+        self.analyzer = pymultinest.Analyzer(n_params = n_params, 
+                                                outputfiles_basename = prefix)
+        s = self.analyzer.get_stats()
+        self.run_mode = 'evaluate'
+        self.generate_retrieval_summary(s)
+        json.dump(s, open(prefix + 'stats.json', 'w'), indent=4)
+        print('  marginal likelihood:')
+        print('    ln Z = %.1f +- %.1f' % (s['global evidence'], s['global evidence error']))
+        print('  parameters:')
+        for p, m in zip(self.parameters.keys(), s['marginals']):
+            lo, hi = m['1sigma']
+            med = m['median']
+            sigma = (hi - lo) / 2
+            if sigma == 0:
+                i = 3
+            else:
+                i = max(0, int(-np.floor(np.log10(sigma))) + 1)
+            fmt = '%%.%df' % i
+            fmts = '\t'.join(['    %-15s' + fmt + " +- " + fmt])
+            print(fmts % (p, med, sigma))
         return
 
     def run_ultranest(self):
@@ -778,7 +779,7 @@ class Retrieval:
                             yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
                             xerr = dd.wlen_bins/2., linewidth = 0, elinewidth = 2, \
                             marker=marker, markeredgecolor='k', color = 'grey', zorder = 10, \
-                            label = None, alpha = 0.4)
+                            label = None, alpha = 0.6)
             # Plot the residuals
             col = ax.get_lines()[-1].get_color()
             if dd.external_pRT_reference == None:

@@ -60,6 +60,7 @@ class Data:
         photometric_bin_edges : Tuple, numpy.ndarray
             The width of the photometric bin. [low,high]
         """
+        #print("Adding " +name)
         self.name = name
         self.path_to_observations = path_to_observations
 

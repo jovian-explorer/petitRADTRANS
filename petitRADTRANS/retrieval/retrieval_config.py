@@ -41,7 +41,7 @@ class RetrievalConfig:
         """
 
         self.retrieval_name =  retrieval_name
-        
+
         if run_mode == 'retrieve':
             run_mode = 'retrieval'
         self.run_mode = run_mode
@@ -392,7 +392,6 @@ class RetrievalConfig:
                 wbins = [0.95*wlow,1.05*whigh]
             else:
                 wbins = wlen_range_micron
-            print("Adding " +name)
             self.data[name] = Data(name, 
                                     path, 
                                     model_generating_function = model_generating_function,   
