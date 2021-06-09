@@ -365,17 +365,19 @@ class Retrieval:
                                         rayleigh_species= cp.copy(self.rd.rayleigh_species), \
                                         continuum_opacities = cp.copy(self.rd.continuum_opacities), \
                                         cloud_species = cp.copy(self.rd.cloud_species), \
-                                        mode='c-k', \
+                                        mode=self.rd.op_mode, \
                                         wlen_bords_micron = dd.wlen_range_pRT,
-                                        do_scat_emis = self.rd.scattering)
+                                        do_scat_emis = self.rd.scattering,
+                                        lbl_opacity_sampling = self.rd.lbl_sampling)
                 else:
                     rt_object = Radtrans(line_species = cp.copy(self.rd.line_species), \
                                         rayleigh_species= cp.copy(self.rd.rayleigh_species), \
                                         continuum_opacities = cp.copy(self.rd.continuum_opacities), \
                                         cloud_species = cp.copy(self.rd.cloud_species), \
-                                        mode='c-k', \
+                                        mode=self.rd.op_mode, \
                                         wlen_bords_micron = dd.wlen_range_pRT,
-                                        do_scat_emis = self.rd.scattering)
+                                        do_scat_emis = self.rd.scattering,
+                                        lbl_opacity_sampling = self.rd.lbl_sampling)
 
                 # Create random P-T profile to create RT arrays of the Radtrans object.
                 if self.rd.AMR:

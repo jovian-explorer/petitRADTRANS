@@ -16,6 +16,8 @@ class RetrievalConfig:
                  plotting = False,
                  scattering = False,
                  pressures = None,
+                 opacities = 'c-k',
+                 lbl_opacity_sampling = None,
                  write_out_spec_sample = False):
         """
         parameters
@@ -33,6 +35,21 @@ class RetrievalConfig:
         plotting : bool
             Produce plots for each sample to check that the retrieval is running properly. Only
             set to true on a local machine.
+        opacities : str
+            Should the retrieval be run using correlated-k opacities (default, 'c-k'), or line by line ('lbl')opacities?
+            If 'lbl' is selected, it is HIGHLY recommended to set the lbl_opacity_sampling parameter.
+        lbl_opacity_sampling : (Optional[int]):
+            Will be ``None`` by default. If integer positive value, and if
+            ``mode == 'lbl'`` is ``True``, then this will only consider every
+            lbl_opacity_sampling-nth point of the high-resolution opacities.
+            This may be desired in the case where medium-resolution spectra are
+            required with a :math:`\lambda/\Delta \lambda > 1000`, but much smaller than
+            :math:`10^6`, which is the resolution of the ``lbl`` mode. In this case it
+            may make sense to carry out the calculations with lbl_opacity_sampling = 10,
+            for example, and then rebinning to the final desired resolution:
+            this may save time! The user should verify whether this leads to
+            solutions which are identical to the rebinned results of the fiducial
+            :math:`10^6` resolution. If not, this parameter must not be used.
         scattering : bool
             If using emission spectra, turn scattering on or off.
         pressures : numpy.array
@@ -55,7 +72,8 @@ class RetrievalConfig:
             self.p_global = np.logspace(-6,3,100)
         self.plotting = plotting
         self.scattering = scattering 
-
+        self.op_mode = opacities
+        self.lbl_sampling = lbl_opacity_sampling
         self.parameters = {}
         self.data = {}
         self.instruments = []
@@ -146,7 +164,65 @@ class RetrievalConfig:
         """
         self.parameters[name] = Parameter(name, free, value, 
                                           transform_prior_cube_coordinate = transform_prior_cube_coordinate)
+    def list_available_line_species(self):
+        """
+        list_available_line_species
+        List the currently installed opacity tables that are available for species that contribute to the line opacity.
+        """
+        prt_path = os.environ.get("pRT_input_data_path")
+        if prt_path == None:
+            print('Path to input data not specified!')
+            print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
+            print('    import os')
+            print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
+            print('before creating a Radtrans object or loading the nat_cst module.')
+            sys.exit(1)
 
+        if self.op_mode == 'c-k':
+            files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/corr_k/")]
+            files = set([f.split('_R_')[0] for f in files])
+        if self.op_mode == 'lbl':
+            files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/lbl/")]
+            files = set(files)
+        [print(f) for f in files]
+        return files
+    def list_available_cloud_species(self):
+        """
+        list_available_cloud_species
+        List the currently installed opacity tables that are available for cloud species.
+        """
+        prt_path = os.environ.get("pRT_input_data_path")
+        if prt_path == None:
+            print('Path to input data not specified!')
+            print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
+            print('    import os')
+            print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
+            print('before creating a Radtrans object or loading the nat_cst module.')
+            sys.exit(1)
+
+        files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/continuum/clouds/")]
+        files = set(files)
+        [print(f) for f in files]
+
+        return files
+    def list_available_cia_species(self):
+        """
+        list_available_cloud_species
+        List the currently installed opacity tables that are available for CIA species.
+        """
+        prt_path = os.environ.get("pRT_input_data_path")
+        if prt_path == None:
+            print('Path to input data not specified!')
+            print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
+            print('    import os')
+            print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
+            print('before creating a Radtrans object or loading the nat_cst module.')
+            sys.exit(1)
+
+        files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/continuum/cia/")]
+        files = set(files)
+        [print(f) for f in files]
+        return files
     def set_line_species(self,linelist,free=False,abund_lim=(-6.0,6.0)):
         """
         set_line_species
