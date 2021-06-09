@@ -39,13 +39,15 @@ class RetrievalConfig:
             A log-spaced array of pressures over which to retrieve. 100 points is standard, between 
             10^-6 and 10^3.
         """
-        if retrieval_name == 'retrieve':
-            retrieval_name = 'retrieval'
+
         self.retrieval_name =  retrieval_name
-        if self.retrieval_name != 'retrieval' or self.retrieval_name != 'evaluate':
-            print("retrieval_name must be either 'retrieval' or 'evaluate'!")
-            sys.exit(1)
+        
+        if run_mode == 'retrieve':
+            run_mode = 'retrieval'
         self.run_mode = run_mode
+        if self.run_mode != 'retrieval' and self.run_mode != 'evaluate':
+            print("run_mode must be either 'retrieval' or 'evaluate'!")
+            sys.exit(1)
         self.AMR = AMR
         if pressures is not None:
             self.p_global = pressures

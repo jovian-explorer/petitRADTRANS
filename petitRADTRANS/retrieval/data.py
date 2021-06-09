@@ -71,7 +71,7 @@ class Data:
 
         # Data file
         if not os.path.exists(path_to_observations):
-            print(path_to_observations = "Does not exist!")
+            print(path_to_observations + " Does not exist!")
             sys.exit(7)
 
         # Sanity check distance
@@ -231,9 +231,9 @@ class Data:
         distance : float
             The distance to the object in cgs units.
         """
-        scale = (new_dist/self.distance)**2
+        scale = (self.distance/new_dist)**2
         self.flux *= scale
-        if self.covariance: 
+        if self.covariance is not None: 
             self.covariance *= scale**2
             self.inv_cov = np.linalg.inv(self.covariance)
             self.flux_error = np.sqrt(self.covariance.diagonal())

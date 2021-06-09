@@ -244,8 +244,10 @@ class Retrieval:
             summary.write(self.output_dir + '\n\n')
             summary.write("Fixed Parameters\n")
             for key,value in self.parameters.items():
+                if key in ['pressure_simple', 'pressure_width', 'pressure_scaling']:
+                    continue
                 if not value.is_free_parameter:
-                    summary.write(key + " = " + str(round(value.value,3)) + '\n')
+                    summary.write("    " + key + " = " + str(round(value.value,3)) + '\n')
             summary.write('\n')
             summary.write("Free Parameters, Prior^-1(0), Prior^-1(1)\n")
             for key,value in self.parameters.items():
@@ -255,22 +257,22 @@ class Retrieval:
                     if value.corner_transform is not None:
                         low = value.corner_transform(low)
                         high = value.corner_transform(high)
-                    summary.write(key + " = " + str(round(low,3)) + ", " + str(round(high,3)) + '\n')
+                    summary.write("    " +key + " = " + str(round(low,3)) + ", " + str(round(high,3)) + '\n')
             summary.write('\n')
             summary.write("Data\n")
             for name,dd in self.data.items():
                 summary.write(name+'\n')
                 summary.write("     " + dd.path_to_observations + '\n')
                 if dd.model_generating_function is not None:
-                    summary.write("     " + dd.model_generating_function.__name__+ '\n')
+                    summary.write("    " + dd.model_generating_function.__name__+ '\n')
                 if dd.scale:
-                    summary.write("     scale factor = " + str(dd.scale_factor)+ '\n')
+                    summary.write("    scale factor = " + str(dd.scale_factor)+ '\n')
                 if dd.data_resolution is not None:
-                    summary.write("     data resolution = " + str(dd.data_resolution)+ '\n')
+                    summary.write("    data resolution = " + str(dd.data_resolution)+ '\n')
                 if dd.model_resolution is not None:
-                    summary.write("     model resolution = " + str(dd.model_resolution)+ '\n')
+                    summary.write("    model resolution = " + str(dd.model_resolution)+ '\n')
                 if dd.photometry:
-                    summary.write("     photometric width = " + str(dd.photometry_range[0]) + "--" + str(dd.photometry_range[1]) + " um"+ '\n')
+                    summary.write("    photometric width = " + str(dd.photometry_range[0]) + "--" + str(dd.photometry_range[1]) + " um"+ '\n')
                     summary.write("     " + dd.photometric_transformation_function.__name__+ '\n')
             summary.write('\n')
             if stats is not None:
@@ -280,6 +282,8 @@ class Retrieval:
                 summary.write('    ln Z = %.1f +- %.1f\n' % (stats['global evidence'], stats['global evidence error']))
                 summary.write("  Statistical Fit Parameters\n")
                 for p, m in zip(self.parameters.keys(), stats['marginals']):
+                    if not self.parameters[p].is_free_parameter:
+                        continue
                     lo, hi = m['1sigma']
                     med = m['median']
                     sigma = (hi - lo) / 2
@@ -294,6 +298,7 @@ class Retrieval:
             if self.run_mode == 'evaluate':
                 summary.write("Best Fit Parameters\n")
                 if not self.best_fit_params:
+
                     sample_dict, parameter_dict = self.get_samples(self.output_dir)
                     samples_use = sample_dict[self.retrieval_name]
                     parameters_read = parameter_dict[self.retrieval_name]
@@ -303,7 +308,9 @@ class Retrieval:
                     best_fit_index = np.argmax(logL)
                     self.get_best_fit_params(samples_use[best_fit_index,:-1],parameters_read)
                 for key,value in self.best_fit_params.items():
-                    summary.write(key + " = " + str(round(value.value,3)) + '\n')
+                    if key in ['pressure_simple', 'pressure_width', 'pressure_scaling']:
+                        continue
+                    summary.write("    " +key + " = " + str(round(value.value,3)) + '\n')
         return
 
     def setup_data(self,scaling=10,width = 3):
@@ -413,11 +420,14 @@ class Retrieval:
                                                     self.PT_plot_mode,
                                                     AMR = self.rd.AMR)
                     # Sanity checks on outputs
-                    #print(spectrum_model)
+                    print(spectrum_model)
                     if spectrum_model is None:
                         return -np.inf
                     if np.isnan(spectrum_model).any():
                         return -np.inf
+                    log_likelihood += dd.get_chisq(wlen_model, 
+                                            spectrum_model, 
+                                            self.plotting)
                 else:
                     # Get the PT profile
                     if name == self.rd.plot_kwargs["take_PTs_from"]:
@@ -427,13 +437,10 @@ class Retrieval:
                                                          self.PT_plot_mode,
                                                          AMR = self.rd.AMR)
                         return pressures, temperatures     
-                log_likelihood += dd.get_chisq(wlen_model, 
-                                            spectrum_model, 
-                                            self.plotting)
                 # Save sampled outputs if necessary.
                 if self.run_mode == 'evaluate':
                     np.savetxt(self.output_dir + 'evaluate_' + self.retrieval_name + '/model_spec_best_fit_'+ 
-                            name+'.dat', 
+                            name.replace('/','_').replace('.','_')+'.dat', 
                             np.column_stack((wlen_model, 
                                                 spectrum_model)))
 
@@ -442,16 +449,16 @@ class Retrieval:
                     if self.evaluate_sample_spectra:
                         self.posterior_sample_specs[name] = [wlen_model, \
                                                 spectrum_model]
-                # Check for data using the same pRT object,
-                # calculate log_likelihood
-                for de_name,dede in self.data.items():
-                    if dede.external_pRT_reference != None:
-                        if dede.scale:
-                            dd.scale_factor = self.parameters[de_name + "_scale_factor"].value
-                        if dede.external_pRT_reference == name:
-                            log_likelihood += dede.get_chisq(wlen_model, \
-                                            spectrum_model, \
-                                            self.plotting)
+            # Check for data using the same pRT object,
+            # calculate log_likelihood
+            for de_name,dede in self.data.items():
+                if dede.external_pRT_reference != None:
+                    if dede.scale:
+                        dd.scale_factor = self.parameters[de_name + "_scale_factor"].value
+                    if dede.external_pRT_reference == name:
+                        log_likelihood += dede.get_chisq(wlen_model, \
+                                        spectrum_model, \
+                                        self.plotting)
         #print(log_likelihood)
         return log_likelihood + log_prior  
     
@@ -532,7 +539,7 @@ class Retrieval:
         model_generating_fun : method
             A function that will take in the standard 'model' arguments (pRT_object, params, pt_plot_mode, AMR, resolution)
             and will return the wavlength and flux arrays as calculated by petitRadTrans.
-            If no argument is given, it uses the method of the first dataset included in the retrieval.
+            If no argument is given, it uses the method of the dataset given in the take_PTs_from kwarg.
         ret_name : str
             If plotting a fit from a different retrieval, input the retrieval name to be included.
         
@@ -575,7 +582,7 @@ class Retrieval:
 
         # Check what model function we're using
         if model_generating_func is None:
-            mg_func = list(self.data.values())[0].model_generating_function
+            mg_func = self.data[self.rd.plot_kwargs["take_PTs_from"]].model_generating_function
         else:
             mg_func = model_generating_func 
 
@@ -583,7 +590,7 @@ class Retrieval:
         bf_wlen, bf_spectrum= mg_func(bf_prt, 
                                       self.best_fit_params, 
                                       PT_plot_mode= False,
-                                      AMR = True)
+                                      AMR = self.rd.AMR)
         # Add to the dictionary.
         self.best_fit_specs[ret_name]= [bf_wlen,bf_spectrum]
         return bf_wlen, bf_spectrum
@@ -741,10 +748,19 @@ class Retrieval:
                 if dd.external_pRT_reference == None:
                     best_fit_binned = dd.photometric_transformation_function(self.best_fit_specs[name][0],
                                                                          self.best_fit_specs[name][1])
+                    # Species functions give tuples of (flux,error)
+                    try:
+                        best_fit_binned = best_fit_binned[0]
+                    except:
+                        pass
+
                 else:
                     best_fit_binned = dd.photometric_transformation_function(self.best_fit_specs[dd.external_pRT_reference][0],
                                                                             self.best_fit_specs[dd.external_pRT_reference][1])
-            
+                    try:
+                        best_fit_binned = best_fit_binned[0]
+                    except:
+                        pass
             # Plot the data
             if not dd.photometry:
                 ax.errorbar(wlen, \
@@ -753,12 +769,13 @@ class Retrieval:
                             marker='o', markeredgecolor='k', linewidth = 0, elinewidth = 2, \
                             label = dd.name, zorder =10, alpha = 0.9,)
             else:
+                # Don't label photometry?
                 ax.errorbar(wlen, \
                             flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
                             yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
                             xerr = dd.wlen_bins/2., linewidth = 0, elinewidth = 2, \
                             marker='o', markeredgecolor='k', zorder = 10, \
-                            label = dd.name, alpha = 0.9)
+                            label = None, alpha = 0.9)
             # Plot the residuals
             col = ax.get_lines()[-1].get_color()
             if dd.external_pRT_reference == None:

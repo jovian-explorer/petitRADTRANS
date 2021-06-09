@@ -135,13 +135,13 @@ def emission_model_diseq(pRT_object,
         R_pl = np.sqrt(nc.G*parameters['mass'].value/gravity)
     elif 'log_g' in parameters.keys():
         gravity= 10**parameters['log_g'].value
+        R_pl = parameters['R_pl'].value
     elif 'mass' in parameters.keys():
         R_pl = parameters['R_pl'].value
         gravity = nc.G * parameters['mass'].value/R_pl**2
     else:
         print("Pick two of log_g, R_pl and mass priors!")
         sys.exit(5)
-
     pRT_object.calc_flux(temperatures, 
                         abundances, 
                         gravity, 
@@ -267,13 +267,14 @@ def guillot_free_emission(pRT_object, \
         R_pl = np.sqrt(nc.G*parameters['mass'].value/gravity)
     elif 'log_g' in parameters.keys():
         gravity= 10**parameters['log_g'].value
+        R_pl = parameters['R_pl'].value
     elif 'mass' in parameters.keys():
         R_pl = parameters['R_pl'].value
         gravity = nc.G * parameters['mass'].value/R_pl**2
     else:
         print("Pick two of log_g, R_pl and mass priors!")
         sys.exit(5)
-
+    print(np.log10(gravity), R_pl/nc.r_jup)
     pRT_object.calc_flux(temperatures, \
                      abundances, \
                      gravity, \
