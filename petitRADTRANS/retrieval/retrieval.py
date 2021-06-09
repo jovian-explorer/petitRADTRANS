@@ -146,7 +146,7 @@ class Retrieval:
         if len(self.output_dir + 'out_PMN/') > 100:
             print("PyMultinest requires output directory names to be <100 characters. Please use a short path name.")
             sys.exit(3)
-            
+
         # How many free parameters?
         n_params = 0
         free_parameter_names = []
@@ -263,18 +263,18 @@ class Retrieval:
             summary.write("Data\n")
             for name,dd in self.data.items():
                 summary.write(name+'\n')
-                summary.write("     " + dd.path_to_observations + '\n')
+                summary.write("    " + dd.path_to_observations + '\n')
                 if dd.model_generating_function is not None:
-                    summary.write("    " + dd.model_generating_function.__name__+ '\n')
+                    summary.write("    Model Function = " + dd.model_generating_function.__name__+ '\n')
                 if dd.scale:
-                    summary.write("    scale factor = " + str(dd.scale_factor)+ '\n')
+                    summary.write("    scale factor = " + str(round(dd.scale_factor,2))+ '\n')
                 if dd.data_resolution is not None:
-                    summary.write("    data resolution = " + str(dd.data_resolution)+ '\n')
+                    summary.write("    data resolution = " + str(int(dd.data_resolution))+ '\n')
                 if dd.model_resolution is not None:
-                    summary.write("    model resolution = " + str(dd.model_resolution)+ '\n')
+                    summary.write("    model resolution = " + str(int(dd.model_resolution))+ '\n')
                 if dd.photometry:
-                    summary.write("    photometric width = " + str(dd.photometry_range[0]) + "--" + str(dd.photometry_range[1]) + " um"+ '\n')
-                    summary.write("     " + dd.photometric_transformation_function.__name__+ '\n')
+                    summary.write("    photometric width = " + str(round(dd.photometry_range[0],4)) + "--" + str(round(dd.photometry_range[1],4)) + " um"+ '\n')
+                    summary.write("    Photometric transform function = " + dd.photometric_transformation_function.__name__+ '\n')
             summary.write('\n')
             if stats is not None:
                 summary.write("Multinest Outputs\n")
@@ -311,7 +311,11 @@ class Retrieval:
                 for key,value in self.best_fit_params.items():
                     if key in ['pressure_simple', 'pressure_width', 'pressure_scaling']:
                         continue
-                    summary.write("    " +key + " = " + str(round(value.value,3)) + '\n')
+                    out = value.value
+                    if self.parameters[key].corner_transform is not None:
+                        out = self.parameters[key].corner_transform(out)
+                    fmt = '%.3f' % out
+                    summary.write("    " +key + " = " + fmt + '\n')
         return
 
     def setup_data(self,scaling=10,width = 3):
