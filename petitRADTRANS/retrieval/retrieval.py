@@ -420,7 +420,7 @@ class Retrieval:
                                                     self.PT_plot_mode,
                                                     AMR = self.rd.AMR)
                     # Sanity checks on outputs
-                    print(spectrum_model)
+                    #print(spectrum_model)
                     if spectrum_model is None:
                         return -np.inf
                     if np.isnan(spectrum_model).any():
@@ -762,11 +762,14 @@ class Retrieval:
                     except:
                         pass
             # Plot the data
+            marker = 'o'
+            if dd.photometry:
+                marker = 's'
             if not dd.photometry:
                 ax.errorbar(wlen, \
                             flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
                             yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
-                            marker='o', markeredgecolor='k', linewidth = 0, elinewidth = 2, \
+                            marker=marker, markeredgecolor='k', linewidth = 0, elinewidth = 2, \
                             label = dd.name, zorder =10, alpha = 0.9,)
             else:
                 # Don't label photometry?
@@ -774,17 +777,18 @@ class Retrieval:
                             flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
                             yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
                             xerr = dd.wlen_bins/2., linewidth = 0, elinewidth = 2, \
-                            marker='o', markeredgecolor='k', zorder = 10, \
-                            label = None, alpha = 0.9)
+                            marker=marker, markeredgecolor='k', color = 'grey', zorder = 10, \
+                            label = None, alpha = 0.4)
             # Plot the residuals
             col = ax.get_lines()[-1].get_color()
             if dd.external_pRT_reference == None:
+
                 ax_r.errorbar(wlen, \
                             ((flux*scale) - best_fit_binned )/error , 
                             yerr = error/error,
                             color = col,
                             linewidth = 0, elinewidth = 2, \
-                            marker='o', markeredgecolor='k', zorder = 10,
+                            marker=marker, markeredgecolor='k', zorder = 10,
                             alpha = 0.9)
             else:
                 ax_r.errorbar(wlen, \
@@ -792,7 +796,7 @@ class Retrieval:
                         yerr = error/error,
                         color = col,
                         linewidth = 0, elinewidth = 2, \
-                        marker='o', markeredgecolor='k', zorder = 10,
+                        marker=marker, markeredgecolor='k', zorder = 10,
                         alpha = 0.9)
         # Plot the best fit model
         ax.plot(bf_wlen, \
