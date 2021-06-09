@@ -107,7 +107,8 @@ class Retrieval:
         self.resume = resume
         # TODO
         self.retrieval_list = plot_multiple_retrieval_names
-
+        self.samples = {}
+        self.param_dict = {}
         # Set up pretty plotting
         if pRT_plot_style:
             import petitRADTRANS.retrieval.plot_style
@@ -299,10 +300,9 @@ class Retrieval:
             if self.run_mode == 'evaluate':
                 summary.write("Best Fit Parameters\n")
                 if not self.best_fit_params:
-
-                    sample_dict, parameter_dict = self.get_samples(self.output_dir)
-                    samples_use = sample_dict[self.retrieval_name]
-                    parameters_read = parameter_dict[self.retrieval_name]
+                    self.get_samples(self.output_dir)
+                    samples_use = self.samples[self.retrieval_name]
+                    parameters_read = self.param_dict[self.retrieval_name]
                     i_p = 0
                     # Get best-fit index
                     logL = samples_use[:,-1]
@@ -469,7 +469,7 @@ class Retrieval:
         #print(log_likelihood)
         return log_likelihood + log_prior  
     
-    def get_samples(self, output_dir = None):
+    def get_samples(self, output_dir = None, ret_names = []):
         """
         getSamples
         This function looks in the given output directory and finds the post_equal_weights
@@ -479,7 +479,9 @@ class Retrieval:
         ----------
         output_dir : str
             Parent directory of the out_PMN/*post_equal_weights.dat file
-        
+        ret_names : List(str)
+            A list of retrieval names to add to the sample and parameter dictionary.
+            Functions the same as setting corner_files during initialisation.
         returns
         -------
         sample_dict : dict
@@ -490,8 +492,6 @@ class Retrieval:
             of the parameters used in the retrieval. The first name corresponds to the first column
             of the samples, and so on.
         """
-        sample_dict = {}
-        parameter_dict = {}
         if output_dir is None:
             output_dir = self.output_dir
         for name in self.corner_files:
@@ -502,9 +502,19 @@ class Retrieval:
             parameters_read = json.load(open(output_dir + 'out_PMN/'+ \
                                         name+ \
                                         '_params.json'))
-            sample_dict[name] = samples
-            parameter_dict[name] = parameters_read
-        return sample_dict, parameter_dict
+            self.samples[name] = samples
+            self.param_dict[name] = parameters_read
+        for name in ret_names:
+            samples = np.genfromtxt(output_dir +'out_PMN/'+ \
+                                    name+ \
+                                    '_post_equal_weights.dat')
+
+            parameters_read = json.load(open(output_dir + 'out_PMN/'+ \
+                                        name+ \
+                                        '_params.json'))
+            self.samples[name] = samples
+            self.param_dict[name] = parameters_read
+        return self.samples, self.param_dict
 
     def get_best_fit_params(self,best_fit_params,parameters_read):
         """
