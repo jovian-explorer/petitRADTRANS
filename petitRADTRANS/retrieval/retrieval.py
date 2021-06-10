@@ -23,31 +23,15 @@ from .plotting import plot_specs,plot_data,contour_corner
 from .rebin_give_width import rebin_give_width as rgw
 
 class Retrieval:
-    def __init__(self,
-                 run_definition,
-                 output_dir = "",
-                 test_plotting = False,
-                 sample_spec = False,
-                 sampling_efficiency = 0.05,\
-                 const_efficiency_mode = True, \
-                 n_live_points = 4000,
-                 resume = True,
-                 bayes_factor_species = None,
-                 corner_plot_names = None,
-                 short_names = None,
-                 pRT_plot_style = True,
-                 plot_multiple_retrieval_names = None):
-        """
-        Retrieval Class
-        This class implements the retrieval method using petitRADTRANS and pymultinest.
-        A RetrievalConfig object is passed to this class to describe the retrieval data, parameters
-        and priors. The run() method then uses pymultinest to sample the parameter space, producing
-        posterior distributions for parameters and bayesian evidence for models.
-        Various useful plotting functions have also been included, and can be run once the retrieval is
-        complete.
+    """
+    This class implements the retrieval method using petitRADTRANS and pymultinest.
+    A RetrievalConfig object is passed to this class to describe the retrieval data, parameters
+    and priors. The run() method then uses pymultinest to sample the parameter space, producing
+    posterior distributions for parameters and bayesian evidence for models.
+    Various useful plotting functions have also been included, and can be run once the retrieval is
+    complete.
 
-        Parameters
-        ----------
+    Args:
         run_definition : RetrievalConfig
             A RetrievalConfig object that describes the retrieval to be run. This is the user facing class
             that must be setup for every retrieval.
@@ -73,7 +57,22 @@ class Retrieval:
             For each corner_plot_name, a shorter name to be included when plotting.
         plot_multiple_retrieval_names : List(Str)
             List of additional retrievals to include when plotting spectra and PT profiles. Not yet implemented.
-        """
+    """
+
+    def __init__(self,
+                 run_definition,
+                 output_dir = "",
+                 test_plotting = False,
+                 sample_spec = False,
+                 sampling_efficiency = 0.05,\
+                 const_efficiency_mode = True, \
+                 n_live_points = 4000,
+                 resume = True,
+                 bayes_factor_species = None,
+                 corner_plot_names = None,
+                 short_names = None,
+                 pRT_plot_style = True,
+                 plot_multiple_retrieval_names = None):
         self.rd = run_definition
 
         # Maybe inherit from retrieval config class?
@@ -137,7 +136,6 @@ class Retrieval:
 
     def run(self):
         """
-        run
         Run mode for the class. Uses pynultinest to sample parameter space
         and produce standard PMN outputs.
         """
@@ -192,10 +190,10 @@ class Retrieval:
 
     def run_ultranest(self):
         """
-        run
         Run mode for the class. Uses ultranest to sample parameter space
         and produce standard outputs.
         """
+
         print("Warning, ultranest mode is still in development. Proceed with caution")
         try:
              import ultranest as un
@@ -227,18 +225,17 @@ class Retrieval:
 
     def generate_retrieval_summary(self,stats = None):
         """
-        generate_retrieval_summary
         This function produces a human-readable text file describing the retrieval.
         It includes all of the fixed and free parameters, the limits of the priors (if uniform),
         a description of the data used, and if the retrieval is complete, a summary of the
         best fit parameters and model evidence.
 
-        parameters
-        ----------
-        stats : dict
-            A Pymultinest stats dictionary, from Analyzer.get_stats(). 
-            This contains the evidence and best fit parameters.
+        Args:
+            stats : dict
+                A Pymultinest stats dictionary, from Analyzer.get_stats(). 
+                This contains the evidence and best fit parameters.
         """
+
         with open(self.output_dir + "evaluate_" + self.retrieval_name + "/" + self.retrieval_name + "_ret_summary.txt", "w+") as summary:
             from datetime import datetime
             summary.write(self.retrieval_name + '\n')
@@ -320,20 +317,19 @@ class Retrieval:
 
     def setup_data(self,scaling=10,width = 3):
         """
-        setup_data
         Creates a pRT object for each data set that asks for a unique object.
         Checks if there are low resolution c-k models from exo-k, and creates them if necessary.
         The scaling and width parameters adjust the AMR grid as described in RetrievalConfig.setup_pres
         and models.fixed_length_amr. It is recommended to keep the defaults.
 
-        arameters
-        ----------
-        scaling : int
-            A multiplicative factor that determines the size of the full high resolution pressure grid,
-            which will have length self.p_global.shape[0] * scaling.
-        width : int
-            The number of cells in the low pressure grid to replace with the high resolution grid.
+        Args:
+            scaling : int
+                A multiplicative factor that determines the size of the full high resolution pressure grid,
+                which will have length self.p_global.shape[0] * scaling.
+            width : int
+                The number of cells in the low pressure grid to replace with the high resolution grid.
         """
+
         for name,dd in self.data.items():
             # Only create if there's no other data
             # object using the same pRT object
@@ -393,6 +389,7 @@ class Retrieval:
         Prior
         pymultinest prior function. Transforms unit hypercube into physical space.
         """
+
         i_p = 0
         for pp in self.parameters:
             if self.parameters[pp].is_free_parameter:
@@ -404,6 +401,7 @@ class Retrieval:
         log_likelihood
         pymultinest required likelihood function.
         """
+
         log_likelihood = 0.
         log_prior      = 0.
 
@@ -471,27 +469,26 @@ class Retrieval:
     
     def get_samples(self, output_dir = None, ret_names = []):
         """
-        getSamples
         This function looks in the given output directory and finds the post_equal_weights
         file associated with the current retrieval name.
 
-        parameters
-        ----------
-        output_dir : str
-            Parent directory of the out_PMN/*post_equal_weights.dat file
-        ret_names : List(str)
-            A list of retrieval names to add to the sample and parameter dictionary.
-            Functions the same as setting corner_files during initialisation.
-        returns
-        -------
-        sample_dict : dict
-            A dictionary with keys being the name of the retrieval, and values are a numpy
-            ndarray containing the samples in the post_equal_weights file
-        parameter_dict : dict
-            A dictionary with keys being the name of the retrieval, and values are a list of names
-            of the parameters used in the retrieval. The first name corresponds to the first column
-            of the samples, and so on.
+        Args:
+            output_dir : str
+                Parent directory of the out_PMN/*post_equal_weights.dat file
+            ret_names : List(str)
+                A list of retrieval names to add to the sample and parameter dictionary.
+                Functions the same as setting corner_files during initialisation.
+
+        Returns:
+            sample_dict : dict
+                A dictionary with keys being the name of the retrieval, and values are a numpy
+                ndarray containing the samples in the post_equal_weights file
+            parameter_dict : dict
+                A dictionary with keys being the name of the retrieval, and values are a list of names
+                of the parameters used in the retrieval. The first name corresponds to the first column
+                of the samples, and so on.
         """
+
         if output_dir is None:
             output_dir = self.output_dir
         for name in self.corner_files:
@@ -518,18 +515,17 @@ class Retrieval:
 
     def get_best_fit_params(self,best_fit_params,parameters_read):
         """
-        get_best_fit_params
         This function converts the sample from the post_equal_weights file with the maximum
         log likelihood, and converts it into a dictionary of Parameters that can be used in
         a model function.
 
-        parameters
-        ----------
-        best_fit_params : numpy.ndarray
-            An array of the best fit parameter values (or any other sample)
-        parameters_read : list
-            A list of the free parameters as read from the output files.
+        Args:
+            best_fit_params : numpy.ndarray
+                An array of the best fit parameter values (or any other sample)
+            parameters_read : list
+                A list of the free parameters as read from the output files.
         """
+
         i_p = 0
         for pp in self.parameters:
             if self.parameters[pp].is_free_parameter:
@@ -543,30 +539,28 @@ class Retrieval:
 
     def get_best_fit_model(self,best_fit_params,parameters_read,model_generating_func = None,ret_name = None):
         """
-        get_best_fit_model
         This function uses the best fit parameters to generate a pRT model that spans the entire wavelength
         range of the retrieval, to be used in plots.
 
-        parameters
-        ----------
-        best_fit_params : numpy.ndarray
-            A numpy array containing the best fit parameters, to be passed to get_best_fit_params
-        parameters_read : list
-            A list of the free parameters as read from the output files.
-        model_generating_fun : method
-            A function that will take in the standard 'model' arguments (pRT_object, params, pt_plot_mode, AMR, resolution)
-            and will return the wavlength and flux arrays as calculated by petitRadTrans.
-            If no argument is given, it uses the method of the dataset given in the take_PTs_from kwarg.
-        ret_name : str
-            If plotting a fit from a different retrieval, input the retrieval name to be included.
-        
-        returns
-        -------
-        bf_wlen : numpy.ndarray
-            The wavelength array of the best fit model
-        bf_spectrum : numpy.ndarray
-            The emission or transmission spectrum array, with the same shape as bf_wlen
+        Args:
+            best_fit_params : numpy.ndarray
+                A numpy array containing the best fit parameters, to be passed to get_best_fit_params
+            parameters_read : list
+                A list of the free parameters as read from the output files.
+            model_generating_fun : method
+                A function that will take in the standard 'model' arguments (pRT_object, params, pt_plot_mode, AMR, resolution)
+                and will return the wavlength and flux arrays as calculated by petitRadTrans.
+                If no argument is given, it uses the method of the dataset given in the take_PTs_from kwarg.
+            ret_name : str
+                If plotting a fit from a different retrieval, input the retrieval name to be included.
+            
+        Returns:
+            bf_wlen : numpy.ndarray
+                The wavelength array of the best fit model
+            bf_spectrum : numpy.ndarray
+                The emission or transmission spectrum array, with the same shape as bf_wlen
         """
+
         print("Computing Best Fit Model, this may take a minute...")
         if ret_name == None:
             ret_name = self.retrieval_name
@@ -627,11 +621,11 @@ class Retrieval:
 #############################################################
     def plot_all(self, output_dir = None):
         """
-        plot_all
         Produces plots for the best fit spectrum, a sample of 100 output spectra,
         the best fit PT profile and a corner plot for parameters specified in the
         run definition.
         """
+
         if output_dir is None:
             output_dir = self.output_dir
         sample_dict, parameter_dict = self.get_samples(output_dir)
@@ -671,29 +665,29 @@ class Retrieval:
 
     def plot_spectra(self,samples_use,parameters_read,model_generating_func = None):
         """
-        plot_spectra
         Plot the best fit spectrum, the data from each dataset and the residuals between the two.
         Saves a file to $OUTPUT_DIR/evaluate_$RETRIEVAL_NAME/best_fit_spec.pdf
-        TODO: include plotting of multiple retrievals
 
-        parameters:
-        samples_use : numpy.ndarray
-            An array of the samples from the post_equal_weights file, used to find the best fit sample
-        parameters_read : list
-            A list of the free parameters as read from the output files.
-        model_generating_fun : method
-            A function that will take in the standard 'model' arguments (pRT_object, params, pt_plot_mode, AMR, resolution)
-            and will return the wavlength and flux arrays as calculated by petitRadTrans.
-            If no argument is given, it uses the method of the first dataset included in the retrieval.
-        
-        returns
-        -------
-        fig : matplotlib.figure
-        ax : matplotlib.axes
-            The upper pane of the plot, containing the best fit spectrum and data
-        ax_r : matplotlib.axes
-            The lower pane of the plot, containing the residuals between the fit and the data
+        Args:
+            samples_use : numpy.ndarray
+                An array of the samples from the post_equal_weights file, used to find the best fit sample
+            parameters_read : list
+                A list of the free parameters as read from the output files.
+            model_generating_fun : method
+                A function that will take in the standard 'model' arguments (pRT_object, params, pt_plot_mode, AMR, resolution)
+                and will return the wavlength and flux arrays as calculated by petitRadTrans.
+                If no argument is given, it uses the method of the first dataset included in the retrieval.
+            
+        Returns:
+            fig : matplotlib.figure
+            ax : matplotlib.axes
+                The upper pane of the plot, containing the best fit spectrum and data
+            ax_r : matplotlib.axes
+                The lower pane of the plot, containing the residuals between the fit and the data
         """
+        
+        #TODO: include plotting of multiple retrievals
+
         print("Plotting Best-fit spectrum")
         fig, axes = fig, axes = plt.subplots(nrows=2, ncols=1, sharex='col', sharey=False,
                                gridspec_kw={'height_ratios': [2.5, 1],'hspace':0.1},
@@ -903,14 +897,13 @@ class Retrieval:
 
     def plot_sampled(self,samples_use,parameters_read):
         """
-        plot_sampled
         Plot a set of randomly sampled output spectra
 
-        Parameters:
-        -----------
-        samples_use : np.ndarray
-            posterior samples from pynmultinest outputs (post_equal_weights)
+        Args:
+            samples_use : np.ndarray
+                posterior samples from pynmultinest outputs (post_equal_weights)
         """
+
         print("Plotting Best-fit spectrum with "+ str(self.rd.plot_kwargs["nsample"]) + " samples.")
         print("This could take some time...")
         len_samples = samples_use.shape[0]
@@ -950,22 +943,20 @@ class Retrieval:
 
     def plot_PT(self,sample_dict,parameters_read):
         """
-        plot_PT
         Plot the PT profile with error contours
 
-        Parameters:
-        -----------
-        samples_use : np.ndarray
-            posterior samples from pynmultinest outputs (post_equal_weights)
-        parameters_read : List
-            Used to plot correct parameters, as some in self.parameters are not free, and
-            aren't included in the PMN outputs
+        Args:
+            samples_use : np.ndarray
+                posterior samples from pynmultinest outputs (post_equal_weights)
+            parameters_read : List
+                Used to plot correct parameters, as some in self.parameters are not free, and
+                aren't included in the PMN outputs
 
-        returns
-        -------
-        fig : matplotlib.figure
-        ax : matplotlib.axes
+        Returns:
+            fig : matplotlib.figure
+            ax : matplotlib.axes
         """
+
         print("Plotting PT profiles")
         self.PT_plot_mode = True
         samples_use = cp.copy(sample_dict[self.retrieval_name])
@@ -1020,19 +1011,18 @@ class Retrieval:
 
     def plot_corner(self,sample_dict,parameter_dict,parameters_read):
         """
-        plot_corner
         Make the corner plots
 
-        Parameters:
-        -----------
-        samples_dict : Dict
-            Dictionary of samples from PMN outputs, with keys being retrieval names
-        parameter_dict : Dict
-            Dictionary of parameters for each of the retrievals to be plotted.
-        parameters_read : List
-            Used to plot correct parameters, as some in self.parameters are not free, and
-            aren't included in the PMN outputs
+        Args:
+            samples_dict : Dict
+                Dictionary of samples from PMN outputs, with keys being retrieval names
+            parameter_dict : Dict
+                Dictionary of parameters for each of the retrievals to be plotted.
+            parameters_read : List
+                Used to plot correct parameters, as some in self.parameters are not free, and
+                aren't included in the PMN outputs
         """
+
         print("Making corner plot")
         sample_use_dict = {}
         p_plot_inds = {}

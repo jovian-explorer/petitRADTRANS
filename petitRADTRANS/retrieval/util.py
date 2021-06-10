@@ -8,6 +8,12 @@ import numpy as np
 import math as math
 from sys import platform
 #import threading, subprocess
+"""
+util module
+    This module contains a set of useful functions that don't really fit anywhere 
+    else. This includes flux conversions, prior functions, mean molecular weight
+    calculations, transforms from mass to number fractions, and fits file output.
+"""
 
 SQRT2 = math.sqrt(2.)
 
@@ -18,19 +24,18 @@ def surf_to_meas(flux,p_rad,dist):
     """
     surf_to_meas
     Convert from emission flux to measured flux at earth
-    parameters:
-    -----------
-    flux : numpy.ndarray
-        Absolute flux value or spectrum as emitted by a source of radius p_rad
-    p_rad : float
-        Planet radius, in same units as dist
-    dist : float
-        Distance to the object, in the same units as p_rad
-    returns:
-    --------
-    m_flux : numpy.ndarray
-        Apparent flux
+    Args:
+        flux : numpy.ndarray
+            Absolute flux value or spectrum as emitted by a source of radius p_rad
+        p_rad : float
+            Planet radius, in same units as dist
+        dist : float
+            Distance to the object, in the same units as p_rad
+    Returns:
+        m_flux : numpy.ndarray
+            Apparent flux
     """
+
     m_flux = flux * p_rad**2/dist**2
     return m_flux
 
@@ -100,12 +105,12 @@ def calc_MMW(abundances):
     calc_MMW
     Calculate the mean molecular weight in each layer.
     
-    parameters
-    ----------
-    abundances : dict
-        dictionary of abundance arrays, each array must have the shape of the pressure array used in pRT,
-        and contain the abundance at each layer in the atmosphere.
+    Args:
+        abundances : dict
+            dictionary of abundance arrays, each array must have the shape of the pressure array used in pRT,
+            and contain the abundance at each layer in the atmosphere.
     """
+
     MMW = 0.
     for key in abundances.keys():
         # exo_k resolution
@@ -121,18 +126,18 @@ def get_MMW_from_mfrac(m_frac):
     """
     wraps calc_MMW
     """
+
     calc_MMW(m_frac)
 
 def get_MMW_from_nfrac(n_frac):
     """
-    get_MMW_from_nfrac
     Calculate the mean molecular weight from a number fraction
 
-    parameters:
-    -----------
-    n_fracs : dict
-        A dictionary of number fractions
+    Args:
+        n_fracs : dict
+            A dictionary of number fractions
     """
+
     mass = 0.0
     for key,value in n_frac.items():
         spec = key.split("_R_")[0]
@@ -141,14 +146,13 @@ def get_MMW_from_nfrac(n_frac):
 
 def mass_to_number(m_frac):
     """
-    mass_to_number
     Convert mass fractions to number fractions
 
-    parameters:
-    -----------
-    m_fracs : dict
-        A dictionary of mass fractions
+    Args:
+        m_fracs : dict
+            A dictionary of mass fractions
     """
+
     n_frac = {}
     MMW = get_MMW_from_mfrac(m_frac)
     for key,value in m_frac.items():
@@ -158,14 +162,13 @@ def mass_to_number(m_frac):
 
 def number_to_mass(n_fracs):
     """
-    number_to_mass
     Convert number fractions to mass fractions
 
-    parameters:
-    -----------
-    n_fracs : dict
-        A dictionary of number fractions
+    Args:
+        n_fracs : dict
+            A dictionary of number fractions
     """
+    
     m_frac = {}
     MMW = get_MMW_from_nfrac(n_fracs)
     for key,value in n_fracs.items():
@@ -175,29 +178,27 @@ def number_to_mass(n_fracs):
 
 def fits_output(wavelength, spectrum, covariance, object, output_dir = "", correlation = None):
     """
-    fits_output
     Generate a fits file that can be used as an input to a pRT retrieval.
 
-    Parameters:
-    -----------
-    wavelength : numpy.ndarray
-        The wavelength bin centers in micron. dim(N)
-    spectrum : numpy.ndarray
-        The flux density in W/m2/micron at each wavelength bin. dim(N)
-    covariance : numpy.ndarray
-        The covariance of the flux in (W/m2/micron)^2 dim(N,N)
-    object : string
-        The name of the object, used for file naming.
-    output_dir : string
-        The parent directory of the output file.
-    correlation : numpy.ndarray
-        The correlation matrix of the flux points (See Brogi & Line 2018, https://arxiv.org/pdf/1811.01681.pdf)
+    Args:
+        wavelength : numpy.ndarray
+            The wavelength bin centers in micron. dim(N)
+        spectrum : numpy.ndarray
+            The flux density in W/m2/micron at each wavelength bin. dim(N)
+        covariance : numpy.ndarray
+            The covariance of the flux in (W/m2/micron)^2 dim(N,N)
+        object : string
+            The name of the object, used for file naming.
+        output_dir : string
+            The parent directory of the output file.
+        correlation : numpy.ndarray
+            The correlation matrix of the flux points (See Brogi & Line 2018, https://arxiv.org/pdf/1811.01681.pdf)
     
-    returns
-    -------
-    hdul : astropy.fits.HDUlist
-        The HDUlist object storing the spectrum.
+    Returns:
+        hdul : astropy.fits.HDUlist
+            The HDUlist object storing the spectrum.
     """
+
     from astropy.io import fits
     primary_hdu = fits.PrimaryHDU([])
     primary_hdu.header['OBJECT'] = object

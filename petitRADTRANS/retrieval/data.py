@@ -5,30 +5,14 @@ from scipy.ndimage.filters import gaussian_filter
 import petitRADTRANS.nat_cst as nc
 
 class Data:
-    def __init__(self,
-                 name,
-                 path_to_observations = None,
-                 data_resolution = None,
-                 model_resolution = None,
-                 distance = None,
-                 external_pRT_reference = None,
-                 model_generating_function = None,
-                 wlen_range_micron = None,
-                 scale = False,
-                 wlen_bins = None,
-                 photometry = False,
-                 photometric_transformation_function = None,
-                 photometric_bin_edges = None):
-        """
-        Data class initializer
-        This class stores the spectral data to be retrieved from a single instrument or observation.
-        Each dataset is associated with an instance of petitRadTrans and an atmospheric model.
-        The pRT instance can be overwritten, and associated with an existing pRT instance with the 
-        external_pRT_reference parameter.
-        This setup allows for joint or independant retrievals on multiple datasets.
+    """
+    This class stores the spectral data to be retrieved from a single instrument or observation.
+    Each dataset is associated with an instance of petitRadTrans and an atmospheric model.
+    The pRT instance can be overwritten, and associated with an existing pRT instance with the 
+    external_pRT_reference parameter.
+    This setup allows for joint or independant retrievals on multiple datasets.
 
-        parameters
-        -----------
+    Args:
         name : str
             Identifier for this data set.
         path_to_observations : str
@@ -59,7 +43,22 @@ class Data:
             Transform the photometry (account for filter transmission etc.)
         photometric_bin_edges : Tuple, numpy.ndarray
             The width of the photometric bin. [low,high]
-        """
+    """
+
+    def __init__(self,
+                 name,
+                 path_to_observations = None,
+                 data_resolution = None,
+                 model_resolution = None,
+                 distance = None,
+                 external_pRT_reference = None,
+                 model_generating_function = None,
+                 wlen_range_micron = None,
+                 scale = False,
+                 wlen_bins = None,
+                 photometry = False,
+                 photometric_transformation_function = None,
+                 photometric_bin_edges = None):
         #print("Adding " +name)
         self.name = name
         self.path_to_observations = path_to_observations
@@ -147,24 +146,23 @@ class Data:
 
     def loadtxt(self, path, delimiter = ',', comments = '#'):
         """
-        loadtxt
         This function reads in a .txt or .dat file containing the spectrum. Headers should be commented out with #,
         the first column must be the wavelength in micron, the second column the flux or transit depth, 
         and the final column must be the error on each data point.
         Checks will be performed to determine the correct delimiter, but the recommended format is to use a 
         csv file with columns for wavlength, flux and error.
 
-        parameters
-        ----------
-        path : str
-            Directory and filename of the data.
-        delimiter : string, int
-            The string used to separate values. By default, commas act as delimiter. 
-            An integer or sequence of integers can also be provided as width(s) of each field.
-        comments : string
-            The character used to indicate the start of a comment. 
-            All the characters occurring on a line after a comment are discarded
+        Args:
+            path : str
+                Directory and filename of the data.
+            delimiter : string, int
+                The string used to separate values. By default, commas act as delimiter. 
+                An integer or sequence of integers can also be provided as width(s) of each field.
+            comments : string
+                The character used to indicate the start of a comment. 
+                All the characters occurring on a line after a comment are discarded
         """
+
         if self.photometry:
             return
         obs = np.genfromtxt(path,delimiter = delimiter, comments = comments)
@@ -188,16 +186,15 @@ class Data:
 
     def loadfits(self,path):
         """
-        loadfits
         Load in a particular style of fits file.
         Must include extension SPECTRUM with fields WAVLENGTH, FLUX
         and COVARIANCE.
 
-        parameters
-        ----------
-        path : str
-            Directory and filename of the data.
+        Args:
+            path : str
+                Directory and filename of the data.
         """
+
         from astropy.io import fits
         if self.photometry:
             return
@@ -210,28 +207,26 @@ class Data:
 
     def set_distance(self,distance):
         """
-        set_distance
         Sets the distance variable in the data class.
         This does NOT rescale the flux to the new distance.
         In order to rescale the flux and error, use the scale_to_distance method.
-        parameters:
-        -----------
-        distance : float
-            The distance to the object in cgs units.
+        Args:
+            distance : float
+                The distance to the object in cgs units.
         """
+
         self.distance = distance
         return self.distance
 
     def scale_to_distance(self, new_dist):
         """
-        set_distance
         Updates the distance variable in the data class.
         This will rescale the flux to the new distance.
-        parameters:
-        -----------
-        distance : float
-            The distance to the object in cgs units.
+        Args:
+            new_dist : float
+                The distance to the object in cgs units.
         """
+
         scale = (self.distance/new_dist)**2
         self.flux *= scale
         if self.covariance is not None: 
@@ -247,18 +242,20 @@ class Data:
                   spectrum_model, \
                   plotting):
         """
-        get_chisq
         Calculate the chi square between the model and the data.
 
-        parameters
-        ----------
-        wlen_model : numpy.ndarray
-            The wavlengths of the model
-        spectrum_model : numpy.ndarray
-            The model flux in the same units as the data.
-        plotting : bool
-            Show test plots. 
+        Args:
+            wlen_model : numpy.ndarray
+                The wavlengths of the model
+            spectrum_model : numpy.ndarray
+                The model flux in the same units as the data.
+            plotting : bool
+                Show test plots. 
+        Returns:
+            logL : float
+                The log likelihood of the model given the data.
         """
+
         if plotting:
             import pylab as plt
         # Convolve to data resolution
@@ -304,23 +301,21 @@ class Data:
                  input_flux, \
                  instrument_res):
         """
-        convolve
         This function convolves a model spectrum to the instrumental wavelength
         using the provided data_resolution
-        parameters:
-        -----------
-        input_wavelength : numpy.ndarray
-            The wavelength grid of the model spectrum
-        input_flux : numpy.ndarray
-            The flux as computed by the model
-        instrument_res : float
-            λ/∆λ, the width of the gaussian kernel to convolve with the model spectrum.
+        Args:
+            input_wavelength : numpy.ndarray
+                The wavelength grid of the model spectrum
+            input_flux : numpy.ndarray
+                The flux as computed by the model
+            instrument_res : float
+                λ/∆λ, the width of the gaussian kernel to convolve with the model spectrum.
 
-        returns:
-        --------
-        flux_LSF
-            The convolved spectrum.
+        Returns:
+            flux_LSF
+                The convolved spectrum.
         """
+        
         # From talking to Ignas: delta lambda of resolution element
         # is FWHM of the LSF's standard deviation, hence:
         sigma_LSF = 1./instrument_res/(2.*np.sqrt(2.*np.log(2.)))

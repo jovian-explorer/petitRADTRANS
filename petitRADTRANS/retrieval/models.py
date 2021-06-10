@@ -13,78 +13,76 @@ from petitRADTRANS import Radtrans
 from petitRADTRANS import nat_cst as nc
 from petitRADTRANS.retrieval import cloud_cond as fc
 import pdb
+"""
+Models Module
+    This module contains a set of functions that generate the spectra used 
+    in the petitRADTRANS retrieval. This includes setting up the
+    pressure-temperature structure, the chemistry, and the radiative
+    transfer to compute the emission or transmission spectrum.
+
+    All models must take the same set of inputs:
+    pRT_object : petitRADTRANS.RadTrans
+        This is the pRT object that is used to compute the spectrum
+        It must be fully initialized prior to be used in the model function
+    parameters : dict
+        A dictionary of Parameter objects. The naming of the parameters
+        must be consistent between the Priors and the model function you
+        are using.
+    PT_plot_mode : bool
+        If this argument is True, the model function should return the pressure 
+        and temperature arrays before computing the flux.
+    AMR : bool
+        If this parameter is True, your model should allow for reshaping of the 
+        pressure and temperature arrays based on the position of the clouds or
+        the location of the photosphere, increasing the resolution where required.
+        For example, using the fixed_length_amr function defined below.
+"""
 
     
 
 # Global constants to reduce calculations and initializations.
 p_global = np.logspace(-6,3,1000)
 
-#######################################################
-# Define retrieval models
-#######################################################
-# All models must take the same set of inputs
-#   pRT_object : petitRADTRANS.RadTrans
-#       This is the pRT object that is used to compute the spectrum
-#       It must be fully initialized prior to be used in the model function
-#   parameters : dict
-#       A dictionary of Parameter objects. The naming of the parameters
-#       must be consistent between the Priors and the model function you
-#       are using.
-#   PT_plot_mode : bool
-#       If this argument is True, the model function should return the pressure 
-#       and temperature arrays before computing the flux.
-#       TODO: Split this off into a separate function???
-#   AMR : bool
-#       If this parameter is True, your model should allow for reshaping of the 
-#       pressure and temperature arrays based on the position of the clouds or
-#       the location of the photosphere, increasing the resolution where required.
-#       For example, using the fixed_length_amr function defined below.
-
-
 def emission_model_diseq(pRT_object, 
                          parameters,
                          PT_plot_mode = False,
                          AMR = True):
     """
-    emission_model_diseq
     This model computes an emission spectrum based on disequilibrium carbon chemistry,
     equilibrium clouds and a spline temperature-pressure profile. (Molliere 2020).
     
-    parameters
-    -----------
-    pRT_object : object
-        An instance of the pRT class, with optical properties as defined in the RunDefinition.
-    parameters : dict
-        Dictionary of required parameters:
-            D_pl : Distance to the planet in [cm]
-            log_g : Log of surface gravity
-            R_pl : planet radius [cm]
-            T_int : Interior temperature of the planet [K]
-            T3 : Innermost temperature spline [K]
-            T2 : Middle temperature spline [K]
-            T1 : Outer temperature spline [K]
-            alpha : power law index in tau = delta * press_cgs**alpha
-            log_delta : proportionality factor in tau = delta * press_cgs**alpha
-            sigma_lnorm : Width of cloud particle size distribution (log normal)
-            log_pquench : Pressure at which CO, CH4 and H2O abundances become vertically constant
-            Fe/H : Metallicity
-            C/O : Carbon to oxygen ratio
-            log_kzz : Vertical mixing parameter
-            fsed : sedimentation parameter
-            log_X_cb_* : Scaling factor for equilibrium cloud abundances.
-    PT_plot_mode : bool
-        Return only the pressure-temperature profile for plotting. Evaluate mode only.
-    AMR : 
-        Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
-    
-    returns
-    -------
-    wlen_model : np.array
-        Wavlength array of computed model, not binned to data [um]
-    spectrum_model : np.array
-        Computed emission spectrum [W/m2/micron]
+    Args:
+        pRT_object : object
+            An instance of the pRT class, with optical properties as defined in the RunDefinition.
+        parameters : dict
+            Dictionary of required parameters:
+                D_pl : Distance to the planet in [cm]
+                log_g : Log of surface gravity
+                R_pl : planet radius [cm]
+                T_int : Interior temperature of the planet [K]
+                T3 : Innermost temperature spline [K]
+                T2 : Middle temperature spline [K]
+                T1 : Outer temperature spline [K]
+                alpha : power law index in tau = delta * press_cgs**alpha
+                log_delta : proportionality factor in tau = delta * press_cgs**alpha
+                sigma_lnorm : Width of cloud particle size distribution (log normal)
+                log_pquench : Pressure at which CO, CH4 and H2O abundances become vertically constant
+                Fe/H : Metallicity
+                C/O : Carbon to oxygen ratio
+                log_kzz : Vertical mixing parameter
+                fsed : sedimentation parameter
+                log_X_cb_* : Scaling factor for equilibrium cloud abundances.
+        PT_plot_mode : bool
+            Return only the pressure-temperature profile for plotting. Evaluate mode only.
+        AMR : 
+            Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
+        
+    Returns:
+        wlen_model : np.array
+            Wavlength array of computed model, not binned to data [um]
+        spectrum_model : np.array
+            Computed emission spectrum [W/m2/micron]
     """
-    
 
     pglobal_check(pRT_object.press,
                     parameters['pressure_simple'].value,
@@ -170,41 +168,39 @@ def guillot_free_emission(pRT_object, \
                             PT_plot_mode = False,
                             AMR = False):
     """
-    guillot_free_model_spec
     This model computes an emission spectrum based on free retrieval chemistry,
     free Ackermann-Marley clouds and a Guillot temperature-pressure profile. (Molliere 2018).
     
-    parameters
-    -----------
-    pRT_object : object
-        An instance of the pRT class, with optical properties as defined in the RunDefinition.
-    parameters : dict
-        Dictionary of required parameters:
-            D_pl : Distance to the planet in [cm]
-            log_g : Log of surface gravity
-            R_pl : planet radius [cm]
-            T_int : Interior temperature of the planet [K]
-            T_equ : Equilibrium temperature of the planet
-            gamma :
-            log_kappa_IR : 
-            sigma_lnorm : Width of cloud particle size distribution (log normal)
-            log_kzz : Vertical mixing parameter
-            fsed : sedimentation parameter
-            species : Log abundances for each species in rd.line_list (species stands in for the actual name)
-            log_X_cb_* : Log cloud abundances.
-            Pbase_* : log of cloud base pressure for each species.
-    PT_plot_mode : bool
-        Return only the pressure-temperature profile for plotting. Evaluate mode only.
-    AMR : 
-        Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
+    Args:
+        pRT_object : object
+            An instance of the pRT class, with optical properties as defined in the RunDefinition.
+        parameters : dict
+            Dictionary of required parameters:
+                D_pl : Distance to the planet in [cm]
+                log_g : Log of surface gravity
+                R_pl : planet radius [cm]
+                T_int : Interior temperature of the planet [K]
+                T_equ : Equilibrium temperature of the planet
+                gamma :
+                log_kappa_IR : 
+                sigma_lnorm : Width of cloud particle size distribution (log normal)
+                log_kzz : Vertical mixing parameter
+                fsed : sedimentation parameter
+                species : Log abundances for each species in rd.line_list (species stands in for the actual name)
+                log_X_cb_* : Log cloud abundances.
+                Pbase_* : log of cloud base pressure for each species.
+        PT_plot_mode : bool
+            Return only the pressure-temperature profile for plotting. Evaluate mode only.
+        AMR : 
+            Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
 
-    returns
-    -------
-    wlen_model : np.array
-        Wavlength array of computed model, not binned to data [um]
-    spectrum_model : np.array
-        Computed emission spectrum [W/m2/micron]
+    Returns:
+        wlen_model : np.array
+            Wavlength array of computed model, not binned to data [um]
+        spectrum_model : np.array
+            Computed emission spectrum [W/m2/micron]
     """
+
     #for key, val in parameters.items():
     #    print(key,val.value)
 
@@ -303,38 +299,36 @@ def guillot_eqchem_transmission(pRT_object, \
                                     PT_plot_mode = False,
                                     AMR = False):
     """
-    retrieval_model_eq_transmission
     This model computes a transmission spectrum based on equilibrium chemistry
     and a Guillot temperature-pressure profile. 
     
-    parameters
-    -----------
-    pRT_object : object
-        An instance of the pRT class, with optical properties as defined in the RunDefinition.
-    parameters : dict
-        Dictionary of required parameters:
-            Rstar : Radius of the host star [cm]
-            log_g : Log of surface gravity
-            R_pl : planet radius [cm]
-            T_int : Interior temperature of the planet [K]
-            T_equ : Equilibrium temperature of the planet
-            gamma :
-            kappa_IR : 
-            Fe/H : Metallicity
-            C/O : Carbon to oxygen ratio
-            Pcloud : optional, cloud base pressure of a grey cloud deck.
-    PT_plot_mode : bool
-        Return only the pressure-temperature profile for plotting. Evaluate mode only.
-    AMR : 
-        Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
+    Args:
+        pRT_object : object
+            An instance of the pRT class, with optical properties as defined in the RunDefinition.
+        parameters : dict
+            Dictionary of required parameters:
+                Rstar : Radius of the host star [cm]
+                log_g : Log of surface gravity
+                R_pl : planet radius [cm]
+                T_int : Interior temperature of the planet [K]
+                T_equ : Equilibrium temperature of the planet
+                gamma :
+                kappa_IR : 
+                Fe/H : Metallicity
+                C/O : Carbon to oxygen ratio
+                Pcloud : optional, cloud base pressure of a grey cloud deck.
+        PT_plot_mode : bool
+            Return only the pressure-temperature profile for plotting. Evaluate mode only.
+        AMR : 
+            Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
 
-    returns
-    -------
-    wlen_model : np.array
-        Wavlength array of computed model, not binned to data [um]
-    spectrum_model : np.array
-        Computed transmission spectrum R_pl**2/Rstar**2
+    Returns:
+        wlen_model : np.array
+            Wavlength array of computed model, not binned to data [um]
+        spectrum_model : np.array
+            Computed transmission spectrum R_pl**2/Rstar**2
     """
+
     try: 
         from petitRADTRANS import poor_mans_nonequ_chem as pm
     except ImportError:
@@ -398,38 +392,36 @@ def isothermal_eqchem_transmission(pRT_object, \
                                     PT_plot_mode = False,
                                     AMR = False):
     """
-    retrieval_model_eq_transmission
     This model computes a transmission spectrum based on equilibrium chemistry
     and a Guillot temperature-pressure profile. 
     
-    parameters
-    -----------
-    pRT_object : object
-        An instance of the pRT class, with optical properties as defined in the RunDefinition.
-    parameters : dict
-        Dictionary of required parameters:
-            Rstar : Radius of the host star [cm]
-            log_g : Log of surface gravity
-            R_pl : planet radius [cm]
-            T_int : Interior temperature of the planet [K]
-            T_equ : Equilibrium temperature of the planet
-            gamma :
-            kappa_IR : 
-            Fe/H : Metallicity
-            C/O : Carbon to oxygen ratio
-            Pcloud : optional, cloud base pressure of a grey cloud deck.
-    PT_plot_mode : bool
-        Return only the pressure-temperature profile for plotting. Evaluate mode only.
-    AMR : 
-        Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
+    Args:
+        pRT_object : object
+            An instance of the pRT class, with optical properties as defined in the RunDefinition.
+        parameters : dict
+            Dictionary of required parameters:
+                Rstar : Radius of the host star [cm]
+                log_g : Log of surface gravity
+                R_pl : planet radius [cm]
+                T_int : Interior temperature of the planet [K]
+                T_equ : Equilibrium temperature of the planet
+                gamma :
+                kappa_IR : 
+                Fe/H : Metallicity
+                C/O : Carbon to oxygen ratio
+                Pcloud : optional, cloud base pressure of a grey cloud deck.
+        PT_plot_mode : bool
+            Return only the pressure-temperature profile for plotting. Evaluate mode only.
+        AMR : 
+            Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
 
-    returns
-    -------
-    wlen_model : np.array
-        Wavlength array of computed model, not binned to data [um]
-    spectrum_model : np.array
-        Computed transmission spectrum R_pl**2/Rstar**2
+    Returns:
+        wlen_model : np.array
+            Wavlength array of computed model, not binned to data [um]
+        spectrum_model : np.array
+            Computed transmission spectrum R_pl**2/Rstar**2
     """
+
     try: 
         from petitRADTRANS import poor_mans_nonequ_chem as pm
     except ImportError:
@@ -493,34 +485,32 @@ def isothermal_free_transmission(pRT_object, \
                                 PT_plot_mode = False,
                                 AMR = False):
     """
-    retrieval_model_eq_transmission
     This model computes a transmission spectrum based on free retrieval chemistry
     and an isothermal temperature-pressure profile. 
     
-    parameters
-    -----------
-    pRT_object : object
-        An instance of the pRT class, with optical properties as defined in the RunDefinition.
-    parameters : dict
-        Dictionary of required parameters:
-            Rstar : Radius of the host star [cm]
-            log_g : Log of surface gravity
-            R_pl : planet radius [cm]
-            Temp : Isothermal temperature [K]
-            species : Abundances for each species used in the retrieval
-            Pcloud : optional, cloud base pressure of a grey cloud deck.
-    PT_plot_mode : bool
-        Return only the pressure-temperature profile for plotting. Evaluate mode only.
-    AMR : 
-        Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
+    Args:
+        pRT_object : object
+            An instance of the pRT class, with optical properties as defined in the RunDefinition.
+        parameters : dict
+            Dictionary of required parameters:
+                Rstar : Radius of the host star [cm]
+                log_g : Log of surface gravity
+                R_pl : planet radius [cm]
+                Temp : Isothermal temperature [K]
+                species : Abundances for each species used in the retrieval
+                Pcloud : optional, cloud base pressure of a grey cloud deck.
+        PT_plot_mode : bool
+            Return only the pressure-temperature profile for plotting. Evaluate mode only.
+        AMR : 
+            Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
 
-    returns
-    -------
-    wlen_model : np.array
-        Wavlength array of computed model, not binned to data [um]
-    spectrum_model : np.array
-        Computed transmission spectrum R_pl**2/Rstar**2
+    Returns:
+        wlen_model : np.array
+            Wavlength array of computed model, not binned to data [um]
+        spectrum_model : np.array
+            Computed transmission spectrum R_pl**2/Rstar**2
     """
+
     # Make the P-T profile
     pressures = pRT_object.press/1e6
     temperatures = parameters['Temp'].value * np.ones_like(pressures)
@@ -597,6 +587,7 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv = True):
     CO: C/O for the nabla_ad interpolation
     FeH: metallicity for the nabla_ad interpolation
     '''
+
     try: 
         from petitRADTRANS import poor_mans_nonequ_chem as pm
     except ImportError:
@@ -775,16 +766,19 @@ def make_half_pressure_better(P_clouds, press):
 
 def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
     """
-    fixed_length_amr
     This function takes in the cloud base pressures for each cloud,
     and returns an array of pressures with a high resolution mesh 
     in the region where the cloud is located.
 
-    parameters
-    ----------
-    P_clouds : numpy.ndarray
-        The cloud base pressures in bar
-    press : np.ndarray
+    Args:
+        P_clouds : numpy.ndarray
+            The cloud base pressures in bar
+        press : np.ndarray
+            The high resolution pressure array.
+        scaling : int
+            The factor by which the low resolution pressure array is scaled
+        width : int
+            The number of low resolution bins to be replaced for each cloud layer.
     """
     # P_clouds is array of pressures
     # press should be ~len scaling*100
@@ -885,35 +879,32 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
 
 def get_abundances(pressures, temperatures, line_species, cloud_species, parameters, AMR = False):
     """
-    get_abundances
     This function takes in the C/O ratio, metallicity, and quench pressures and uses them
     to compute the gas phase and equilibrium condensate abundances.
     Clouds are currently hard coded into the function.
 
-    parameters:
-    -----------
-    pressures : numpy.ndarray
-        A log spaced pressure array. If AMR is on it should be the full high resolution grid.
-    temperatures : numpy.ndarray
-        A temperature array with the same shape as pressures
-    line_species : List(str)
-        A list of gas species that will contribute to the line-by-line opacity of the pRT atmosphere.
-    cloud_species : List(str)
-        A list of condensate species that will contribute to the cloud opacity of the pRT atmosphere.
-    parameters : dict
-        A dictionary of model parameters, in particular it must contain the names C/O, Fe/H and
-        log_pquench. Additionally the cloud parameters log_X_cb_Fe(c) and MgSiO3(c) must be present.
-    AMR : bool
-        Turn the adaptive mesh grid on or off. See fixed_length_amr for implementation.
+    Args:
+        pressures : numpy.ndarray
+            A log spaced pressure array. If AMR is on it should be the full high resolution grid.
+        temperatures : numpy.ndarray
+            A temperature array with the same shape as pressures
+        line_species : List(str)
+            A list of gas species that will contribute to the line-by-line opacity of the pRT atmosphere.
+        cloud_species : List(str)
+            A list of condensate species that will contribute to the cloud opacity of the pRT atmosphere.
+        parameters : dict
+            A dictionary of model parameters, in particular it must contain the names C/O, Fe/H and
+            log_pquench. Additionally the cloud parameters log_X_cb_Fe(c) and MgSiO3(c) must be present.
+        AMR : bool
+            Turn the adaptive mesh grid on or off. See fixed_length_amr for implementation.
 
-    returns:
-    --------
-    abundances : dict
-        Mass fraction abundances of all atmospheric species
-    MMW : numpy.ndarray
-        Array of the mean molecular weights in each pressure bin
-    small_index : numpy.ndarray
-        The indices of the high resolution grid to use to define the adaptive grid.
+    Returns:
+        abundances : dict
+            Mass fraction abundances of all atmospheric species
+        MMW : numpy.ndarray
+            Array of the mean molecular weights in each pressure bin
+        small_index : numpy.ndarray
+            The indices of the high resolution grid to use to define the adaptive grid.
     """
     try: 
         from petitRADTRANS import poor_mans_nonequ_chem as pm
@@ -996,18 +987,16 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
 
 def pglobal_check(press,shape,scaling):
     """
-    pglobal_check
     Check to ensure that the global pressure array has the correct length.
     Updates p_global.
 
-    parameters
-    ----------
-    press : numpy.ndarray
-        Pressure array from a pRT_object. Used to set the min and max values of p_global
-    shape : int
-        the shape of the pressure array if no AMR is used
-    scaling : 
-        The factor by which the pressure array resolution should be scaled.
+    Args:
+        press : numpy.ndarray
+            Pressure array from a pRT_object. Used to set the min and max values of p_global
+        shape : int
+            the shape of the pressure array if no AMR is used
+        scaling : 
+            The factor by which the pressure array resolution should be scaled.
     """
     global p_global
     if p_global.shape[0] != int(scaling*shape):  
