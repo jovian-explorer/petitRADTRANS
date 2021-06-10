@@ -58,7 +58,7 @@ species you downloaded in there.
 .. _`via Dropbox here`: https://www.dropbox.com/sh/w7sa20v8qp19b4d/AABKF0GsjghsYLJMUJXDgrHma?dl=0
 
 Installation via pip install
-________________________
+____________________________
 
 To install pRT via pip install just type
 

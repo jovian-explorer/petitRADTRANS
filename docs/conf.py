@@ -15,9 +15,9 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('../'))
-autodoc_mock_imports = ['petitRADTRANS.fort_input', 'petitRADTRANS.fort_spec', \
-                        'petitRADTRANS.fort_rebin', 'numpy', 'petitRADTRANS.nat_cst', 'scipy', 'glob', \
-                        'os', 'sys', 'pdb', 'h5py']
+autodoc_mock_imports = ['numpy', 'petitRADTRANS.fort_input', 'petitRADTRANS.fort_spec', \
+                        'petitRADTRANS.fort_rebin', 'scipy', 'glob', \
+                        'os', 'sys', 'pdb', 'h5py', 'exo_k', 'pymultinest']
 
 # -- Project information -----------------------------------------------------
 
