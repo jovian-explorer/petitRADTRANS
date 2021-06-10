@@ -1,5 +1,5 @@
 petitRadTrans Retrieval Tutorial
-===============================
+================================
 
 .. toctree::
    :maxdepth: 2
