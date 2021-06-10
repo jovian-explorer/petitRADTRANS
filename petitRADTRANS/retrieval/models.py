@@ -1,11 +1,13 @@
 """
 Models Module
-    This module contains a set of functions that generate the spectra used 
-    in the petitRADTRANS retrieval. This includes setting up the
-    pressure-temperature structure, the chemistry, and the radiative
-    transfer to compute the emission or transmission spectrum.
 
-    All models must take the same set of inputs:
+This module contains a set of functions that generate the spectra used 
+in the petitRADTRANS retrieval. This includes setting up the
+pressure-temperature structure, the chemistry, and the radiative
+transfer to compute the emission or transmission spectrum.
+
+All models must take the same set of inputs:
+
     pRT_object : petitRADTRANS.RadTrans
         This is the pRT object that is used to compute the spectrum
         It must be fully initialized prior to be used in the model function
@@ -58,22 +60,22 @@ def emission_model_diseq(pRT_object,
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
         parameters : dict
             Dictionary of required parameters:
-            * D_pl : Distance to the planet in [cm]
-            * log_g : Log of surface gravity
-            * R_pl : planet radius [cm]
-            * T_int : Interior temperature of the planet [K]
-            * T3 : Innermost temperature spline [K]
-            * T2 : Middle temperature spline [K]
-            * T1 : Outer temperature spline [K]
-            * alpha : power law index in tau = delta * press_cgs**alpha
-            * log_delta : proportionality factor in tau = delta * press_cgs**alpha
-            * sigma_lnorm : Width of cloud particle size distribution (log normal)
-            * log_pquench : Pressure at which CO, CH4 and H2O abundances become vertically constant
-            * Fe/H : Metallicity
-            * C/O : Carbon to oxygen ratio
-            * log_kzz : Vertical mixing parameter
-            * fsed : sedimentation parameter
-            * log_X_cb_ : Scaling factor for equilibrium cloud abundances.
+                *  D_pl : Distance to the planet in [cm]
+                *  log_g : Log of surface gravity
+                *  R_pl : planet radius [cm]
+                *  T_int : Interior temperature of the planet [K]
+                *  T3 : Innermost temperature spline [K]
+                *  T2 : Middle temperature spline [K]
+                *  T1 : Outer temperature spline [K]
+                *  alpha : power law index in tau = delta * press_cgs**alpha
+                *  log_delta : proportionality factor in tau = delta * press_cgs**alpha
+                *  sigma_lnorm : Width of cloud particle size distribution (log normal)
+                *  log_pquench : Pressure at which CO, CH4 and H2O abundances become vertically constant
+                *  Fe/H : Metallicity
+                *  C/O : Carbon to oxygen ratio
+                *  log_kzz : Vertical mixing parameter
+                *  fsed : sedimentation parameter
+                *  log_X_cb : Scaling factor for equilibrium cloud abundances.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
         AMR : 
@@ -180,19 +182,19 @@ def guillot_free_emission(pRT_object, \
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
         parameters : dict
             Dictionary of required parameters:
-            * D_pl : Distance to the planet in [cm]
-            * log_g : Log of surface gravity
-            * R_pl : planet radius [cm]
-            * T_int : Interior temperature of the planet [K]
-            * T_equ : Equilibrium temperature of the planet
-            * gamma : Guillot gamma parameter
-            * log_kappa_IR : The log of the ratio between the infrared and optical opacities
-            * sigma_lnorm : Width of cloud particle size distribution (log normal)
-            * log_kzz : Vertical mixing parameter
-            * fsed : sedimentation parameter
-            * species : Log abundances for each species in rd.line_list (species stands in for the actual name)
-            * log_X_cb_ : Log cloud abundances.
-            * Pbase_ : log of cloud base pressure for each species.
+                *  D_pl : Distance to the planet in [cm]
+                *  log_g : Log of surface gravity
+                *  R_pl : planet radius [cm]
+                *  T_int : Interior temperature of the planet [K]
+                *  T_equ : Equilibrium temperature of the planet
+                *  gamma : Guillot gamma parameter
+                *  log_kappa_IR : The log of the ratio between the infrared and optical opacities
+                *  sigma_lnorm : Width of cloud particle size distribution (log normal)
+                *  log_kzz : Vertical mixing parameter
+                *  fsed : sedimentation parameter
+                *  species : Log abundances for each species in rd.line_list (species stands in for the actual name)
+                *  log_X_cb : Log cloud abundances.
+                *  Pbase : log of cloud base pressure for each species.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
         AMR : 
@@ -313,16 +315,16 @@ def guillot_eqchem_transmission(pRT_object, \
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
         parameters : dict
             Dictionary of required parameters:
-            * Rstar : Radius of the host star [cm]
-            * log_g : Log of surface gravity
-            * R_pl : planet radius [cm]
-            * T_int : Interior temperature of the planet [K]
-            * T_equ : Equilibrium temperature of the planet
-            * gamma : Guillot gamma parameter
-            * log_kappa_IR : The log of the ratio between the infrared and optical opacities
-            * Fe/H : Metallicity
-            * C/O : Carbon to oxygen ratio
-            * Pcloud : optional, cloud base pressure of a grey cloud deck.
+                *  Rstar : Radius of the host star [cm]
+                *  log_g : Log of surface gravity
+                *  R_pl : planet radius [cm]
+                *  T_int : Interior temperature of the planet [K]
+                *  T_equ : Equilibrium temperature of the planet
+                *  gamma : Guillot gamma parameter
+                *  log_kappa_IR : The log of the ratio between the infrared and optical opacities
+                *  Fe/H : Metallicity
+                *  C/O : Carbon to oxygen ratio
+                *  Pcloud : optional, cloud base pressure of a grey cloud deck.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
         AMR : 
@@ -408,14 +410,14 @@ def isothermal_eqchem_transmission(pRT_object, \
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
         parameters : dict
             Dictionary of required parameters:
-            * Rstar : Radius of the host star [cm]
-            * log_g : Log of surface gravity
-            * R_pl : planet radius [cm]
-            * T_int : Interior temperature of the planet [K]
-            * T_equ : Equilibrium temperature of the planet
-            * Fe/H : Metallicity
-            * C/O : Carbon to oxygen ratio
-            * Pcloud : optional, cloud base pressure of a grey cloud deck.
+                *  Rstar : Radius of the host star [cm]
+                *  log_g : Log of surface gravity
+                *  R_pl : planet radius [cm]
+                *  T_int : Interior temperature of the planet [K]
+                *  T_equ : Equilibrium temperature of the planet
+                *  Fe/H : Metallicity
+                *  C/O : Carbon to oxygen ratio
+                *  Pcloud : optional, cloud base pressure of a grey cloud deck.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
         AMR : 
@@ -501,12 +503,12 @@ def isothermal_free_transmission(pRT_object, \
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
         parameters : dict
             Dictionary of required parameters:
-            * Rstar : Radius of the host star [cm]
-            * log_g : Log of surface gravity
-            * R_pl : planet radius [cm]
-            * Temp : Isothermal temperature [K]
-            * species : Abundances for each species used in the retrieval
-            * Pcloud : optional, cloud base pressure of a grey cloud deck.
+                *  Rstar : Radius of the host star [cm]
+                *  log_g : Log of surface gravity
+                *  R_pl : planet radius [cm]
+                *  Temp : Isothermal temperature [K]
+                *  species : Abundances for each species used in the retrieval
+                *  Pcloud : optional, cloud base pressure of a grey cloud deck.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
         AMR : 
@@ -581,19 +583,28 @@ def isothermal_free_transmission(pRT_object, \
 def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv = True):
     '''
     Self-luminous retrieval P-T model.
-    It has 7 free parameters:
-    T3 = np.array([t1, t2, t3]): temperature points to be added on top
-      of the radiative Eddington structure (above tau = 0.1).
-      Use spline interpolation, t1 < t2 < t3 < tconnect as prior.
-    delta: proportionality factor in tau = delta * press_cgs**alpha
-    alpha: power law index in tau = delta * press_cgs**alpha
-       For the tau model: use proximity to kappa_rosseland photosphere
-       as prior.
-    tint: internal temperature of the Eddington model
-    press: input pressure profile in bar
-    conv: enforce convective adiabat yes/no
-    CO: C/O for the nabla_ad interpolation
-    FeH: metallicity for the nabla_ad interpolation
+
+    Arsg:
+        T3 : np.array([t1, t2, t3])
+            temperature points to be added on top
+            radiative Eddington structure (above tau = 0.1).
+            Use spline interpolation, t1 < t2 < t3 < tconnect as prior.
+        delta : 
+            proportionality factor in tau = delta * press_cgs**alpha
+        alpha: 
+            power law index in tau = delta * press_cgs**alpha
+            For the tau model: use proximity to kappa_rosseland photosphere
+            as prior.
+        tint: 
+            internal temperature of the Eddington model
+        press: 
+            input pressure profile in bar
+        conv: 
+            enforce convective adiabat yes/no
+        CO: 
+            C/O for the nabla_ad interpolation
+        FeH: 
+            metallicity for the nabla_ad interpolation
     '''
 
     try: 
@@ -742,7 +753,7 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv = True):
     # The last two are needed for the priors on the P-T profile.
     return tret#, press_tau(1.)/1e6, tfintp(p_bot_spline)
 
-def make_half_pressure_better(P_clouds, press):
+def _make_half_pressure_better(P_clouds, press):
     # Obsolete, replaced with fixed_length_amr
     press_plus_index = np.zeros((press.shape[0],2))
     press_plus_index[:,0] = press
@@ -788,6 +799,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
         width : int
             The number of low resolution bins to be replaced for each cloud layer.
     """
+
     # P_clouds is array of pressures
     # press should be ~len scaling*100
     # guarantees total length will be press.shape[0] + P_clouds.shape[0]*width*(scaling - 1)
@@ -914,6 +926,7 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
         small_index : numpy.ndarray
             The indices of the high resolution grid to use to define the adaptive grid.
     """
+
     try: 
         from petitRADTRANS import poor_mans_nonequ_chem as pm
     except ImportError:
@@ -1006,6 +1019,7 @@ def pglobal_check(press,shape,scaling):
         scaling : 
             The factor by which the pressure array resolution should be scaled.
     """
+
     global p_global
     if p_global.shape[0] != int(scaling*shape):  
         p_global = np.logspace(np.log10(press[0]),
