@@ -2,7 +2,7 @@ Code documentation
 ==================
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    code_radtrans
    code_nat_cst

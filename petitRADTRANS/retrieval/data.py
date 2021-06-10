@@ -1,12 +1,14 @@
-import sys,os
+import sys, os
 import numpy as np
-from .rebin_give_width import rebin_give_width
 from scipy.ndimage.filters import gaussian_filter
+
+from petitRADTRANS.retrieval.rebin_give_width import rebin_give_width
 import petitRADTRANS.nat_cst as nc
 
 class Data:
     """
     This class stores the spectral data to be retrieved from a single instrument or observation.
+
     Each dataset is associated with an instance of petitRadTrans and an atmospheric model.
     The pRT instance can be overwritten, and associated with an existing pRT instance with the 
     external_pRT_reference parameter.
@@ -24,7 +26,8 @@ class Data:
             Spectral resolution of the instrument. Optional, allows convolution of model to instrumental line width.
         model_resolution : float
             The resolution of the c-k opacity tables in pRT. This will generate a new c-k table using exo-k. The default 
-            (and maximum) correlated k resolution in pRT is λ/∆λ = 1000 (R=500). Lowering the resolution will speed up the computation.
+            (and maximum) correlated k resolution in pRT is :math:`\lambda/\Delta \lambda > 1000` (R=500). 
+            Lowering the resolution will speed up the computation.
         external_pRT_instance : object
             An existing RadTrans object. Leave as none unless you're sure of what you're doing.
         model_generating_function : method
@@ -59,15 +62,15 @@ class Data:
                  photometry = False,
                  photometric_transformation_function = None,
                  photometric_bin_edges = None):
-        #print("Adding " +name)
+        
         self.name = name
         self.path_to_observations = path_to_observations
 
         # To be filled later
         self.pRT_object = None
-        self.wlen = None
-        self.flux = None
-        self.flux_error = None
+        self.wlen = None #: The wavelength bin centers
+        self.flux = None #: The flux or transit depth
+        self.flux_error = None #: The error on the flux or transit depth
 
         # Data file
         if not os.path.exists(path_to_observations):
@@ -146,7 +149,7 @@ class Data:
 
     def loadtxt(self, path, delimiter = ',', comments = '#'):
         """
-        This function reads in a .txt or .dat file containing the spectrum. Headers should be commented out with #,
+        This function reads in a .txt or .dat file containing the spectrum. Headers should be commented out with '#',
         the first column must be the wavelength in micron, the second column the flux or transit depth, 
         and the final column must be the error on each data point.
         Checks will be performed to determine the correct delimiter, but the recommended format is to use a 
@@ -210,6 +213,7 @@ class Data:
         Sets the distance variable in the data class.
         This does NOT rescale the flux to the new distance.
         In order to rescale the flux and error, use the scale_to_distance method.
+
         Args:
             distance : float
                 The distance to the object in cgs units.
@@ -222,6 +226,7 @@ class Data:
         """
         Updates the distance variable in the data class.
         This will rescale the flux to the new distance.
+
         Args:
             new_dist : float
                 The distance to the object in cgs units.
@@ -251,6 +256,7 @@ class Data:
                 The model flux in the same units as the data.
             plotting : bool
                 Show test plots. 
+
         Returns:
             logL : float
                 The log likelihood of the model given the data.
@@ -309,13 +315,13 @@ class Data:
             input_flux : numpy.ndarray
                 The flux as computed by the model
             instrument_res : float
-                λ/∆λ, the width of the gaussian kernel to convolve with the model spectrum.
+                :math:`\lambda/\Delta \lambda`, the width of the gaussian kernel to convolve with the model spectrum.
 
         Returns:
             flux_LSF
                 The convolved spectrum.
         """
-        
+
         # From talking to Ignas: delta lambda of resolution element
         # is FWHM of the LSF's standard deviation, hence:
         sigma_LSF = 1./instrument_res/(2.*np.sqrt(2.*np.log(2.)))

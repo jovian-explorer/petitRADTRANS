@@ -71,7 +71,7 @@ def emission_model_diseq(pRT_object,
                 C/O : Carbon to oxygen ratio
                 log_kzz : Vertical mixing parameter
                 fsed : sedimentation parameter
-                log_X_cb_* : Scaling factor for equilibrium cloud abundances.
+                log_X_cb_ : Scaling factor for equilibrium cloud abundances.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
         AMR : 
@@ -187,8 +187,8 @@ def guillot_free_emission(pRT_object, \
                 log_kzz : Vertical mixing parameter
                 fsed : sedimentation parameter
                 species : Log abundances for each species in rd.line_list (species stands in for the actual name)
-                log_X_cb_* : Log cloud abundances.
-                Pbase_* : log of cloud base pressure for each species.
+                log_X_cb_ : Log cloud abundances.
+                Pbase_ : log of cloud base pressure for each species.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
         AMR : 

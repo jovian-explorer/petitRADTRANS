@@ -1,12 +1,11 @@
 import sys, os
 # To not have numpy start parallelizing on its own
 os.environ["OMP_NUM_THREADS"] = "1"
+import numpy as np
 
 from .data import Data
 from .parameter import Parameter
-from petitRADTRANS import nat_cst as nc
 
-import numpy as np
 
 class RetrievalConfig:
     """
@@ -54,7 +53,7 @@ class RetrievalConfig:
             A log-spaced array of pressures over which to retrieve. 100 points is standard, between 
             10^-6 and 10^3.
     """
-    
+
     def __init__(self,
                  retrieval_name = "retrieval_name",
                  run_mode = "retrieval",
@@ -79,12 +78,13 @@ class RetrievalConfig:
             self.p_global = pressures
         else: 
             self.p_global = np.logspace(-6,3,100)
+
         self.plotting = plotting
         self.scattering = scattering 
         self.op_mode = opacities
         self.lbl_sampling = lbl_opacity_sampling
-        self.parameters = {}
-        self.data = {}
+        self.parameters = {} #: Dictionary of the parameters passed to the model generating function
+        self.data = {} #: Dictionary of the datasets used in the retrieval.
         self.instruments = []
         self.line_species = []
         self.cloud_species = []

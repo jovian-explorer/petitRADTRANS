@@ -104,10 +104,12 @@ class Retrieval:
         self.const_efficiency_mode = const_efficiency_mode
         self.n_live_points = n_live_points
         self.resume = resume
+
         # TODO
         self.retrieval_list = plot_multiple_retrieval_names
-        self.samples = {}
-        self.param_dict = {}
+
+        self.samples = {} #: The samples produced by pymultinest.
+        self.param_dict = {} 
         # Set up pretty plotting
         if pRT_plot_style:
             import petitRADTRANS.retrieval.plot_style
