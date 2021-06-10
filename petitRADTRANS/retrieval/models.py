@@ -48,6 +48,8 @@ def emission_model_diseq(pRT_object,
                          PT_plot_mode = False,
                          AMR = True):
     """
+    Disequilibrium Chemistry Emission Model
+
     This model computes an emission spectrum based on disequilibrium carbon chemistry,
     equilibrium clouds and a spline temperature-pressure profile. (Molliere 2020).
     
@@ -56,22 +58,22 @@ def emission_model_diseq(pRT_object,
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
         parameters : dict
             Dictionary of required parameters:
-                D_pl : Distance to the planet in [cm]
-                log_g : Log of surface gravity
-                R_pl : planet radius [cm]
-                T_int : Interior temperature of the planet [K]
-                T3 : Innermost temperature spline [K]
-                T2 : Middle temperature spline [K]
-                T1 : Outer temperature spline [K]
-                alpha : power law index in tau = delta * press_cgs**alpha
-                log_delta : proportionality factor in tau = delta * press_cgs**alpha
-                sigma_lnorm : Width of cloud particle size distribution (log normal)
-                log_pquench : Pressure at which CO, CH4 and H2O abundances become vertically constant
-                Fe/H : Metallicity
-                C/O : Carbon to oxygen ratio
-                log_kzz : Vertical mixing parameter
-                fsed : sedimentation parameter
-                log_X_cb_ : Scaling factor for equilibrium cloud abundances.
+            * D_pl : Distance to the planet in [cm]
+            * log_g : Log of surface gravity
+            * R_pl : planet radius [cm]
+            * T_int : Interior temperature of the planet [K]
+            * T3 : Innermost temperature spline [K]
+            * T2 : Middle temperature spline [K]
+            * T1 : Outer temperature spline [K]
+            * alpha : power law index in tau = delta * press_cgs**alpha
+            * log_delta : proportionality factor in tau = delta * press_cgs**alpha
+            * sigma_lnorm : Width of cloud particle size distribution (log normal)
+            * log_pquench : Pressure at which CO, CH4 and H2O abundances become vertically constant
+            * Fe/H : Metallicity
+            * C/O : Carbon to oxygen ratio
+            * log_kzz : Vertical mixing parameter
+            * fsed : sedimentation parameter
+            * log_X_cb_ : Scaling factor for equilibrium cloud abundances.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
         AMR : 
@@ -168,6 +170,8 @@ def guillot_free_emission(pRT_object, \
                             PT_plot_mode = False,
                             AMR = False):
     """
+    Free Chemistry Emission Model
+
     This model computes an emission spectrum based on free retrieval chemistry,
     free Ackermann-Marley clouds and a Guillot temperature-pressure profile. (Molliere 2018).
     
@@ -176,19 +180,19 @@ def guillot_free_emission(pRT_object, \
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
         parameters : dict
             Dictionary of required parameters:
-                D_pl : Distance to the planet in [cm]
-                log_g : Log of surface gravity
-                R_pl : planet radius [cm]
-                T_int : Interior temperature of the planet [K]
-                T_equ : Equilibrium temperature of the planet
-                gamma :
-                log_kappa_IR : 
-                sigma_lnorm : Width of cloud particle size distribution (log normal)
-                log_kzz : Vertical mixing parameter
-                fsed : sedimentation parameter
-                species : Log abundances for each species in rd.line_list (species stands in for the actual name)
-                log_X_cb_ : Log cloud abundances.
-                Pbase_ : log of cloud base pressure for each species.
+            * D_pl : Distance to the planet in [cm]
+            * log_g : Log of surface gravity
+            * R_pl : planet radius [cm]
+            * T_int : Interior temperature of the planet [K]
+            * T_equ : Equilibrium temperature of the planet
+            * gamma : Guillot gamma parameter
+            * log_kappa_IR : The log of the ratio between the infrared and optical opacities
+            * sigma_lnorm : Width of cloud particle size distribution (log normal)
+            * log_kzz : Vertical mixing parameter
+            * fsed : sedimentation parameter
+            * species : Log abundances for each species in rd.line_list (species stands in for the actual name)
+            * log_X_cb_ : Log cloud abundances.
+            * Pbase_ : log of cloud base pressure for each species.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
         AMR : 
@@ -299,6 +303,8 @@ def guillot_eqchem_transmission(pRT_object, \
                                     PT_plot_mode = False,
                                     AMR = False):
     """
+    Equilibrium Chemistry Transmission Model, Guillot Profile
+
     This model computes a transmission spectrum based on equilibrium chemistry
     and a Guillot temperature-pressure profile. 
     
@@ -307,16 +313,16 @@ def guillot_eqchem_transmission(pRT_object, \
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
         parameters : dict
             Dictionary of required parameters:
-                Rstar : Radius of the host star [cm]
-                log_g : Log of surface gravity
-                R_pl : planet radius [cm]
-                T_int : Interior temperature of the planet [K]
-                T_equ : Equilibrium temperature of the planet
-                gamma :
-                kappa_IR : 
-                Fe/H : Metallicity
-                C/O : Carbon to oxygen ratio
-                Pcloud : optional, cloud base pressure of a grey cloud deck.
+            * Rstar : Radius of the host star [cm]
+            * log_g : Log of surface gravity
+            * R_pl : planet radius [cm]
+            * T_int : Interior temperature of the planet [K]
+            * T_equ : Equilibrium temperature of the planet
+            * gamma : Guillot gamma parameter
+            * log_kappa_IR : The log of the ratio between the infrared and optical opacities
+            * Fe/H : Metallicity
+            * C/O : Carbon to oxygen ratio
+            * Pcloud : optional, cloud base pressure of a grey cloud deck.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
         AMR : 
@@ -337,7 +343,7 @@ def guillot_eqchem_transmission(pRT_object, \
     # Make the P-T profile
     pressures = pRT_object.press/1e6
     temperatures = nc.guillot_global(pressures, \
-                                    parameters['kappa_IR'].value, \
+                                    10**parameters['log_kappa_IR'].value, \
                                     parameters['gamma'].value, \
                                     10**parameters['log_g'].value, \
                                     parameters['Tint'].value, \
@@ -392,6 +398,8 @@ def isothermal_eqchem_transmission(pRT_object, \
                                     PT_plot_mode = False,
                                     AMR = False):
     """
+    Equilibrium Chemistry Transmission Model, Isothermal Profile
+
     This model computes a transmission spectrum based on equilibrium chemistry
     and a Guillot temperature-pressure profile. 
     
@@ -400,16 +408,14 @@ def isothermal_eqchem_transmission(pRT_object, \
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
         parameters : dict
             Dictionary of required parameters:
-                Rstar : Radius of the host star [cm]
-                log_g : Log of surface gravity
-                R_pl : planet radius [cm]
-                T_int : Interior temperature of the planet [K]
-                T_equ : Equilibrium temperature of the planet
-                gamma :
-                kappa_IR : 
-                Fe/H : Metallicity
-                C/O : Carbon to oxygen ratio
-                Pcloud : optional, cloud base pressure of a grey cloud deck.
+            * Rstar : Radius of the host star [cm]
+            * log_g : Log of surface gravity
+            * R_pl : planet radius [cm]
+            * T_int : Interior temperature of the planet [K]
+            * T_equ : Equilibrium temperature of the planet
+            * Fe/H : Metallicity
+            * C/O : Carbon to oxygen ratio
+            * Pcloud : optional, cloud base pressure of a grey cloud deck.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
         AMR : 
@@ -485,6 +491,8 @@ def isothermal_free_transmission(pRT_object, \
                                 PT_plot_mode = False,
                                 AMR = False):
     """
+    Free Chemistry Transmission Model, Guillot Profile
+
     This model computes a transmission spectrum based on free retrieval chemistry
     and an isothermal temperature-pressure profile. 
     
@@ -493,12 +501,12 @@ def isothermal_free_transmission(pRT_object, \
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
         parameters : dict
             Dictionary of required parameters:
-                Rstar : Radius of the host star [cm]
-                log_g : Log of surface gravity
-                R_pl : planet radius [cm]
-                Temp : Isothermal temperature [K]
-                species : Abundances for each species used in the retrieval
-                Pcloud : optional, cloud base pressure of a grey cloud deck.
+            * Rstar : Radius of the host star [cm]
+            * log_g : Log of surface gravity
+            * R_pl : planet radius [cm]
+            * Temp : Isothermal temperature [K]
+            * species : Abundances for each species used in the retrieval
+            * Pcloud : optional, cloud base pressure of a grey cloud deck.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
         AMR : 
