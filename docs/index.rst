@@ -85,5 +85,3 @@ ________________
 .. toctree::
    :maxdepth: 2
    :caption: Code documentation:
-
-   content/code

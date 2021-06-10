@@ -44,6 +44,7 @@ extensions = [
     'nbsphinx',
     'sphinx.ext.mathjax'
 ]
+autoapi_type = 'python'
 autoapi_dirs = ['../petitRADTRANS']
 exclude_patterns = ['_build', '**.ipynb_checkpoints']
 

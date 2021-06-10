@@ -58,48 +58,41 @@ def contour_corner(sampledict, \
                 parameter_ranges = None, \
                 parameter_plot_indices = None, \
                 true_values = None, \
-                max_val_ratio = None,
                 short_name = None,
                 legend = False):
     """
-    contour_corner
     Use the corner package to plot the posterior distributions produced by pymultinest.
 
-    parameters
-    ----------
-    sampledict : dict
-        A dictionary of samples, each sample has shape (N_Samples,N_params). The keys of the 
-        dictionary correspond to the names of each retrieval, and are the prefixes to the
-        post_equal_weights.dat files. These are passed as arguments to retrieve.py.
-        By default, this is only the current retrieval, and plots the posteriors for a single
-        retrieval. If multiple names are passed, they are overplotted on the same figure.
-    parameter_names : dict
-        A dictionary with keys for each retrieval name, as in sampledict. Each value of the 
-        dictionary is the names of the parameters to beplotted, as set in the
-        run_definition file.
-    output_file : str
-        Output file name
-    parameter_ranges : dict
-        A dictionary with keys for each retrieval name as in sampledict. Each value 
-        contains the ranges of parameters that have a range set with corner_range in the
-        parameter class. Otherwise the range is +/- 4 sigma
-    parameter_plot_indicies : dict
-        A dictionary with keys for each retrieval name as in sampledict. Each value
-        contains the indices of the sample to plot, as set by the plot_in_corner
-        parameter of the parameter class
-    true_values : dict
-         A dictionary with keys for each retrieval name as in sampledict. Each value
-        contains the known values of the parameters.
-    max_val_ratio : int
-        deprecated
-    short_name : dict
-         A dictionary with keys for each retrieval name as in sampledict. Each value
-        contains the names to be plotted in the corner plot legend. If non, uses the 
-        retrieval names used as keys for sampledict
-    legend : bool
-        Turn the legend on or off
-    color_list : list
-        List of colors for each retrieval. If none uses a default color scheme (Up to 4 runs)
+    Args:
+        sampledict : dict
+            A dictionary of samples, each sample has shape (N_Samples,N_params). The keys of the 
+            dictionary correspond to the names of each retrieval, and are the prefixes to the
+            post_equal_weights.dat files. These are passed as arguments to retrieve.py.
+            By default, this is only the current retrieval, and plots the posteriors for a single
+            retrieval. If multiple names are passed, they are overplotted on the same figure.
+        parameter_names : dict
+            A dictionary with keys for each retrieval name, as in sampledict. Each value of the 
+            dictionary is the names of the parameters to beplotted, as set in the
+            run_definition file.
+        output_file : str
+            Output file name
+        parameter_ranges : dict
+            A dictionary with keys for each retrieval name as in sampledict. Each value 
+            contains the ranges of parameters that have a range set with corner_range in the
+            parameter class. Otherwise the range is +/- 4 sigma
+        parameter_plot_indicies : dict
+            A dictionary with keys for each retrieval name as in sampledict. Each value
+            contains the indices of the sample to plot, as set by the plot_in_corner
+            parameter of the parameter class
+        true_values : dict
+            A dictionary with keys for each retrieval name as in sampledict. Each value
+            contains the known values of the parameters.
+        short_name : dict
+            A dictionary with keys for each retrieval name as in sampledict. Each value
+            contains the names to be plotted in the corner plot legend. If non, uses the 
+            retrieval names used as keys for sampledict
+        legend : bool
+            Turn the legend on or off
     """
     from .plot_style import prt_colours
     color_list = prt_colours
