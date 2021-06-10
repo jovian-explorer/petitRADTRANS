@@ -172,3 +172,43 @@ def number_to_mass(n_fracs):
         spec = key.split("_R_")[0]
         m_frac[key] = value*MMWs[spec]/MMW
     return m_frac
+
+def fits_output(wavelength, spectrum, covariance, object, output_dir = "", correlation = None):
+    """
+    fits_output
+    Generate a fits file that can be used as an input to a pRT retrieval.
+
+    Parameters:
+    -----------
+    wavelength : numpy.ndarray
+        The wavelength bin centers in micron. dim(N)
+    spectrum : numpy.ndarray
+        The flux density in W/m2/micron at each wavelength bin. dim(N)
+    covariance : numpy.ndarray
+        The covariance of the flux in (W/m2/micron)^2 dim(N,N)
+    object : string
+        The name of the object, used for file naming.
+    output_dir : string
+        The parent directory of the output file.
+    correlation : numpy.ndarray
+        The correlation matrix of the flux points (See Brogi & Line 2018, https://arxiv.org/pdf/1811.01681.pdf)
+    
+    returns
+    -------
+    hdul : astropy.fits.HDUlist
+        The HDUlist object storing the spectrum.
+    """
+    from astropy.io import fits
+    primary_hdu = fits.PrimaryHDU([])
+    primary_hdu.header['OBJECT'] = object
+    c1 = fits.Column(name = "WAVELENGTH", array = wavelength, format = 'D',unit = "micron")
+    c2 = fits.Column(name = "FLUX", array = spectrum, format = 'D',unit = "W/m2/micron")
+    c3 = fits.Column(name = "COVARIANCE", array = covariance, format = str(covariance.shape[0])+'D',unit = "[W/m2/micron]^2")
+    if correlation is not None:
+        c4 = fits.Column(name = "CORRELATION", array = correlation, format =  str(correlation.shape[0])+'D',unit = " - ")
+    columns = [c1,c2,c3,c4]
+    table_hdu = fits.BinTableHDU.from_columns(columns,name = 'SPECTRUM')
+    hdul = fits.HDUList([primary_hdu,table_hdu])
+    outstring = os.path.join(output_dir, object + "_spectrum.fits")
+    hdul.writeto(outstring,overwrite=True,checksum=True,output_verify='exception')
+    return hdul
