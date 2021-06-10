@@ -42,7 +42,7 @@ release = '2.1.0'
 extensions = [
     'autoapi.extension',
     'nbsphinx',
-    'sphinx.ext.mathjax'
+    'sphinx.ext.mathjax',
 ]
 autoapi_type = 'python'
 autoapi_dirs = ['../petitRADTRANS']

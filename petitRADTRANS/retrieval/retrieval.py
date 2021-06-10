@@ -388,8 +388,7 @@ class Retrieval:
 
     def prior(self, cube, ndim, nparams):
         """
-        Prior
-        pymultinest prior function. Transforms unit hypercube into physical space.
+        pyMultinest Prior function. Transforms unit hypercube into physical space.
         """
 
         i_p = 0
@@ -400,8 +399,28 @@ class Retrieval:
 
     def log_likelihood(self,cube,ndim,nparam):
         """
-        log_likelihood
-        pymultinest required likelihood function.
+        pyMultiNest required likelihood function.
+
+        This function wraps the model computation and log-likelihood calculations
+        for pyMultiNest to sample. If PT_plot_mode is True, it will return the
+        calculate only the pressure and temperature arrays rather than the wavlength
+        and flux. If run_mode is evaluate, it will save the provided sample to the 
+        best-fit spectrum file, and add it to the best_fit_specs dictionary.
+        If evaluate_sample_spectra is true, it will store the spectrum in 
+        posterior_sample_specs. 
+
+        Args:
+            cube : numpy.ndarray
+                The transformed unit hypercube, providing the parameter values
+                to be passed to the model_generating_function.
+            ndim : int
+                The number of dimensions of the problem
+            nparam : int
+                The number of parameters in the fit.
+        
+        Returns:
+            log_likelihood : float
+                The (negative) log likelihood of the model given the data.
         """
 
         log_likelihood = 0.
@@ -446,16 +465,18 @@ class Retrieval:
                         return pressures, temperatures     
                 # Save sampled outputs if necessary.
                 if self.run_mode == 'evaluate':
-                    np.savetxt(self.output_dir + 'evaluate_' + self.retrieval_name + '/model_spec_best_fit_'+ 
-                            name.replace('/','_').replace('.','_')+'.dat', 
-                            np.column_stack((wlen_model, 
-                                                spectrum_model)))
-
-                    self.best_fit_specs[name] = [wlen_model, \
-                                            spectrum_model]
                     if self.evaluate_sample_spectra:
                         self.posterior_sample_specs[name] = [wlen_model, \
                                                 spectrum_model]
+                    else:
+                        np.savetxt(self.output_dir + 'evaluate_' + self.retrieval_name + '/model_spec_best_fit_'+ 
+                                name.replace('/','_').replace('.','_')+'.dat', 
+                                np.column_stack((wlen_model, 
+                                                    spectrum_model)))
+
+                        self.best_fit_specs[name] = [wlen_model, \
+                                                spectrum_model]
+
             # Check for data using the same pRT object,
             # calculate log_likelihood
             for de_name,dede in self.data.items():
