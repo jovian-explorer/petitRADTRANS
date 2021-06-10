@@ -1,18 +1,3 @@
-import sys, os
-import copy as cp
-
-# To not have numpy start parallelizing on its own
-os.environ["OMP_NUM_THREADS"] = "1"
-import numpy as np
-from scipy.interpolate import interp1d,splev,splrep,CubicSpline
-
-from .data import Data
-from .parameter import Parameter
-from .util import surf_to_meas, calc_MMW
-from petitRADTRANS import Radtrans
-from petitRADTRANS import nat_cst as nc
-from petitRADTRANS.retrieval import cloud_cond as fc
-import pdb
 """
 Models Module
     This module contains a set of functions that generate the spectra used 
@@ -37,6 +22,21 @@ Models Module
         the location of the photosphere, increasing the resolution where required.
         For example, using the fixed_length_amr function defined below.
 """
+
+import sys, os
+import copy as cp
+os.environ["OMP_NUM_THREADS"] = "1"
+import numpy as np
+from scipy.interpolate import interp1d,splev,splrep,CubicSpline
+
+from .data import Data
+from .parameter import Parameter
+from .util import surf_to_meas, calc_MMW
+from petitRADTRANS import Radtrans
+from petitRADTRANS import nat_cst as nc
+from petitRADTRANS.retrieval import cloud_cond as fc
+import pdb
+
 
     
 

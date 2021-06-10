@@ -154,7 +154,8 @@ def get_PHOENIX_spec(temperature):
     return specDat
 
 def get_PHOENIX_spec_rad(temperature):
-    ''' Returns a matrix where the first column is the wavelength in cm
+    ''' 
+    Returns a matrix where the first column is the wavelength in cm
     and the second is the stellar flux :math:`F_\\nu` in units of
     :math:`\\rm erg/cm^2/s/Hz`, at the surface of the star.
     The spectra are PHOENIX models from (Husser et al. 2013), the spectral
@@ -162,10 +163,12 @@ def get_PHOENIX_spec_rad(temperature):
 
     UPDATE: It also returns a float that is the corresponding estimate
     of the stellar radius.
+
     Args:
         temperature (float):
             stellar effective temperature in K.
     '''
+    
     logTemp = np.log10(temperature)
     interpolationIndex = np.searchsorted(logTempGrid, logTemp)
 

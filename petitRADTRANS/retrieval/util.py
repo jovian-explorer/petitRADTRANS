@@ -1,3 +1,10 @@
+"""
+util module
+    This module contains a set of useful functions that don't really fit anywhere 
+    else. This includes flux conversions, prior functions, mean molecular weight
+    calculations, transforms from mass to number fractions, and fits file output.
+"""
+
 import sys, os
 # To not have numpy start parallelizing on its own
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -8,12 +15,7 @@ import numpy as np
 import math as math
 from sys import platform
 #import threading, subprocess
-"""
-util module
-    This module contains a set of useful functions that don't really fit anywhere 
-    else. This includes flux conversions, prior functions, mean molecular weight
-    calculations, transforms from mass to number fractions, and fits file output.
-"""
+
 
 SQRT2 = math.sqrt(2.)
 
@@ -168,7 +170,7 @@ def number_to_mass(n_fracs):
         n_fracs : dict
             A dictionary of number fractions
     """
-    
+
     m_frac = {}
     MMW = get_MMW_from_nfrac(n_fracs)
     for key,value in n_fracs.items():

@@ -474,7 +474,7 @@ class Retrieval:
 
         Args:
             output_dir : str
-                Parent directory of the out_PMN/*post_equal_weights.dat file
+                Parent directory of the out_PMN/RETRIEVALNAME_post_equal_weights.dat file
             ret_names : List(str)
                 A list of retrieval names to add to the sample and parameter dictionary.
                 Functions the same as setting corner_files during initialisation.
@@ -666,7 +666,7 @@ class Retrieval:
     def plot_spectra(self,samples_use,parameters_read,model_generating_func = None):
         """
         Plot the best fit spectrum, the data from each dataset and the residuals between the two.
-        Saves a file to $OUTPUT_DIR/evaluate_$RETRIEVAL_NAME/best_fit_spec.pdf
+        Saves a file to OUTPUT_DIR/evaluate_RETRIEVAL_NAME/best_fit_spec.pdf
 
         Args:
             samples_use : numpy.ndarray
@@ -680,12 +680,13 @@ class Retrieval:
             
         Returns:
             fig : matplotlib.figure
+                The matplotlib figure, containing the data, best fit spectrum and residuals.
             ax : matplotlib.axes
                 The upper pane of the plot, containing the best fit spectrum and data
             ax_r : matplotlib.axes
                 The lower pane of the plot, containing the residuals between the fit and the data
         """
-        
+
         #TODO: include plotting of multiple retrievals
 
         print("Plotting Best-fit spectrum")

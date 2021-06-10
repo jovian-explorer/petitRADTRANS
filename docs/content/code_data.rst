@@ -1,5 +1,5 @@
 Data class
 ==========
 
-.. autoclass:: petitRADTRANS.Data
+.. autoclass:: petitRADTRANS.retrieval.data
     :members:
