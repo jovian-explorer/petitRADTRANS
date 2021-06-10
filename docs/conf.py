@@ -40,10 +40,11 @@ release = '2.1.0'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autodoc',
+    'autoapi.extension',
     'nbsphinx',
     'sphinx.ext.mathjax'
 ]
+autoapi_dirs = ['../petitRADTRANS']
 exclude_patterns = ['_build', '**.ipynb_checkpoints']
 
 #pdf_documents = [('index', u'rst2pdf', u'pRTdoc', u'Molliere'),]

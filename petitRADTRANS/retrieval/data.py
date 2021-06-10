@@ -2,7 +2,7 @@ import sys, os
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter
 
-from petitRADTRANS.retrieval.rebin_give_width import rebin_give_width
+from .rebin_give_width import rebin_give_width
 import petitRADTRANS.nat_cst as nc
 
 class Data:
@@ -34,7 +34,7 @@ class Data:
             A function, typically defined in run_definition.py that returns the model wavelength and spectrum (emission or transmission).
             This is the function that contains the physics of the model, and calls pRT in order to compute the spectrum.
         wlen_range_micron : tuple,list
-            Set the wavelength range of the pRT object. Defaults to a range ±5% greater than that of the data. Must at least be 
+            Set the wavelength range of the pRT object. Defaults to a range +/-5% greater than that of the data. Must at least be 
             equal to the range of the data. 
         scale : bool
             Turn on or off scaling the data by a constant factor. Set to True if scaling the data during the retrieval.
@@ -143,9 +143,7 @@ class Data:
                 self.wlen_bins = self.width_photometry[1]-self.width_photometry[0]
                 if self.data_resolution is None:
                     self.data_resolution = np.mean(self.width_photometry)/self.wlen_bins
-           
-       
-
+        return
 
     def loadtxt(self, path, delimiter = ',', comments = '#'):
         """
