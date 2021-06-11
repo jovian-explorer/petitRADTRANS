@@ -1,7 +1,16 @@
+import sys
+import os
+import copy as cp
+os.environ["OMP_NUM_THREADS"] = "1"
+import numpy as np
+from scipy.interpolate import interp1d,CubicSpline
+from petitRADTRANS import nat_cst as nc
+from petitRADTRANS.retrieval import cloud_cond as fc
+from .util import surf_to_meas, calc_MMW
 """
 Models Module
 
-This module contains a set of functions that generate the spectra used 
+This module contains a set of functions that generate the spectra used
 in the petitRADTRANS retrieval. This includes setting up the
 pressure-temperature structure, the chemistry, and the radiative
 transfer to compute the emission or transmission spectrum.
@@ -16,36 +25,18 @@ All models must take the same set of inputs:
         must be consistent between the Priors and the model function you
         are using.
     PT_plot_mode : bool
-        If this argument is True, the model function should return the pressure 
+        If this argument is True, the model function should return the pressure
         and temperature arrays before computing the flux.
     AMR : bool
-        If this parameter is True, your model should allow for reshaping of the 
+        If this parameter is True, your model should allow for reshaping of the
         pressure and temperature arrays based on the position of the clouds or
         the location of the photosphere, increasing the resolution where required.
         For example, using the fixed_length_amr function defined below.
 """
-
-import sys, os
-import copy as cp
-os.environ["OMP_NUM_THREADS"] = "1"
-import numpy as np
-from scipy.interpolate import interp1d,splev,splrep,CubicSpline
-
-from .data import Data
-from .parameter import Parameter
-from .util import surf_to_meas, calc_MMW
-from petitRADTRANS import Radtrans
-from petitRADTRANS import nat_cst as nc
-from petitRADTRANS.retrieval import cloud_cond as fc
-import pdb
-
-
-    
-
 # Global constants to reduce calculations and initializations.
-p_global = np.logspace(-6,3,1000)
+PGLOBAL = np.logspace(-6,3,1000)
 
-def emission_model_diseq(pRT_object, 
+def emission_model_diseq(pRT_object,
                          parameters,
                          PT_plot_mode = False,
                          AMR = True):
@@ -54,7 +45,7 @@ def emission_model_diseq(pRT_object,
 
     This model computes an emission spectrum based on disequilibrium carbon chemistry,
     equilibrium clouds and a spline temperature-pressure profile. (Molliere 2020).
-    
+
     Args:
         pRT_object : object
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
@@ -78,9 +69,9 @@ def emission_model_diseq(pRT_object,
                 *  log_X_cb : Scaling factor for equilibrium cloud abundances.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
-        AMR : 
+        AMR :
             Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
-        
+
     Returns:
         wlen_model : np.array
             Wavlength array of computed model, not binned to data [um]
@@ -103,25 +94,30 @@ def emission_model_diseq(pRT_object,
     # Make the P-T profile
     temp_arr = np.array([T1,T2,T3])
     temperatures = PT_ret_model(temp_arr, \
-                            delta, 
-                            parameters['alpha'].value, 
+                            delta,
+                            parameters['alpha'].value,
                             parameters['T_int'].value,
-                            p_global,
+                            PGLOBAL,
                             parameters['Fe/H'].value,
                             parameters['C/O'].value,
                             conv=True)
     if PT_plot_mode:
-        return p_global, temperatures
+        return PGLOBAL, temperatures
 
     # If in evaluation mode, and PTs are supposed to be plotted
-    abundances, MMW, small_index = get_abundances(p_global,temperatures,pRT_object.line_species,pRT_object.cloud_species,parameters,AMR =AMR)
-    Kzz_use = (10**parameters['log_kzz'].value ) * np.ones_like(p_global)
+    abundances, MMW, small_index = get_abundances(PGLOBAL,
+                                                  temperatures,
+                                                  pRT_object.line_species,
+                                                  pRT_object.cloud_species,
+                                                  parameters,
+                                                  AMR =AMR)
+    Kzz_use = (10**parameters['log_kzz'].value ) * np.ones_like(PGLOBAL)
 
     # Only include the high resolution pressure array near the cloud base.
-    pressures = p_global
+    pressures = PGLOBAL
     if AMR:
         temperatures = temperatures[small_index]
-        pressures = p_global[small_index]
+        pressures = PGLOBAL[small_index]
         MMW = MMW[small_index]
         Kzz_use = Kzz_use[small_index]
         #pRT_object.setup_opa_structure(pressures)
@@ -144,10 +140,10 @@ def emission_model_diseq(pRT_object,
     else:
         print("Pick two of log_g, R_pl and mass priors!")
         sys.exit(5)
-    pRT_object.calc_flux(temperatures, 
-                        abundances, 
-                        gravity, 
-                        MMW, 
+    pRT_object.calc_flux(temperatures,
+                        abundances,
+                        gravity,
+                        MMW,
                         contribution = False,
                         fsed = parameters['fsed'].value,
                         Kzz = Kzz_use,
@@ -162,7 +158,7 @@ def emission_model_diseq(pRT_object,
     #f_lambda = f_lambda * 1e-4
     # convert from ergs to Joule
     f_lambda = f_lambda * 1e-7
-    spectrum_model = surf_to_meas(f_lambda, 
+    spectrum_model = surf_to_meas(f_lambda,
                                   R_pl,
                                   parameters['D_pl'].value)    #print(wlen_model,spectrum_model)
     return wlen_model, spectrum_model
@@ -176,7 +172,7 @@ def guillot_free_emission(pRT_object, \
 
     This model computes an emission spectrum based on free retrieval chemistry,
     free Ackermann-Marley clouds and a Guillot temperature-pressure profile. (Molliere 2018).
-    
+
     Args:
         pRT_object : object
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
@@ -192,12 +188,13 @@ def guillot_free_emission(pRT_object, \
                 *  sigma_lnorm : Width of cloud particle size distribution (log normal)
                 *  log_kzz : Vertical mixing parameter
                 *  fsed : sedimentation parameter
-                *  species : Log abundances for each species in rd.line_list (species stands in for the actual name)
+                *  species : Log abundances for each species in rd.line_list
+                   (species stands in for the actual name)
                 *  log_X_cb : Log cloud abundances.
                 *  Pbase : log of cloud base pressure for each species.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
-        AMR : 
+        AMR :
             Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
 
     Returns:
@@ -214,29 +211,32 @@ def guillot_free_emission(pRT_object, \
                   parameters['pressure_simple'].value,
                   parameters['pressure_scaling'].value)
 
-    temperatures = nc.guillot_global(p_global, \
-                                10**parameters['log_kappa_IR'].value, 
+    temperatures = nc.guillot_global(PGLOBAL, \
+                                10**parameters['log_kappa_IR'].value,
                                 parameters['gamma'].value, \
                                 10**parameters['log_g'].value, \
                                 parameters['T_int'].value, \
                                 parameters['T_equ'].value)
     Pbases = {}
     # TODO - identify species rather than hard coding
-    Pbases['Fe(c)'] = fc.simple_cdf_Fe_free(p_global, temperatures, 
+    Pbases['Fe(c)'] = fc.simple_cdf_Fe_free(PGLOBAL, temperatures,
                                 10**parameters['log_X_cb_Fe(c)'].value)
-    Pbases['MgSiO3(c)'] = fc.simple_cdf_MgSiO3_free(p_global, temperatures, 
+    Pbases['MgSiO3(c)'] = fc.simple_cdf_MgSiO3_free(PGLOBAL, temperatures,
                                 10**parameters['log_X_cb_MgSiO3(c)'].value)
-    
+
     if AMR:
         p_clouds = np.array(list(Pbases.values()))
-        pressures,small_index = fixed_length_amr(p_clouds,p_global,parameters['pressure_scaling'].value,parameters['pressure_width'].value)
+        pressures,small_index = fixed_length_amr(p_clouds,
+                                                 PGLOBAL,
+                                                 parameters['pressure_scaling'].value,
+                                                 parameters['pressure_width'].value)
         pRT_object.press = pressures * 1e6
         temperatures = temperatures[small_index]
     else:
         pressures = pRT_object.press/1e6
 
     # If in evaluation mode, and PTs are supposed to be plotted
-    if PT_plot_mode:    
+    if PT_plot_mode:
         return pressures, temperatures
     abundances = {}
     msum = 0.0
@@ -285,7 +285,7 @@ def guillot_free_emission(pRT_object, \
                      fsed = parameters['fsed'].value,
                      Kzz = 10**parameters['log_kzz'].value * np.ones_like(pressures),
                      sigma_lnorm = parameters['sigma_lnorm'].value)
-                    
+
     wlen_model = nc.c/pRT_object.freq/1e-4
     wlen = nc.c/pRT_object.freq
     f_lambda = pRT_object.flux*nc.c/wlen**2.
@@ -295,9 +295,9 @@ def guillot_free_emission(pRT_object, \
     #f_lambda = f_lambda * 1e-4
     # convert from ergs to Joule
     f_lambda = f_lambda * 1e-7
-    spectrum_model = surf_to_meas(f_lambda, 
+    spectrum_model = surf_to_meas(f_lambda,
                                   R_pl,
-                                  parameters['D_pl'].value)  
+                                  parameters['D_pl'].value)
     return wlen_model, spectrum_model
 
 def guillot_eqchem_transmission(pRT_object, \
@@ -308,8 +308,8 @@ def guillot_eqchem_transmission(pRT_object, \
     Equilibrium Chemistry Transmission Model, Guillot Profile
 
     This model computes a transmission spectrum based on equilibrium chemistry
-    and a Guillot temperature-pressure profile. 
-    
+    and a Guillot temperature-pressure profile.
+
     Args:
         pRT_object : object
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
@@ -327,7 +327,7 @@ def guillot_eqchem_transmission(pRT_object, \
                 *  Pcloud : optional, cloud base pressure of a grey cloud deck.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
-        AMR : 
+        AMR :
             Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
 
     Returns:
@@ -337,11 +337,11 @@ def guillot_eqchem_transmission(pRT_object, \
             Computed transmission spectrum R_pl**2/Rstar**2
     """
 
-    try: 
+    try:
         from petitRADTRANS import poor_mans_nonequ_chem as pm
     except ImportError:
         print("Could not import poor_mans_nonequ_chemistry. Exiting.")
-        sys.exit(2) 
+        sys.exit(2)
     # Make the P-T profile
     pressures = pRT_object.press/1e6
     temperatures = nc.guillot_global(pressures, \
@@ -350,15 +350,15 @@ def guillot_eqchem_transmission(pRT_object, \
                                     10**parameters['log_g'].value, \
                                     parameters['Tint'].value, \
                                     parameters['Tequ'].value)
-    
+
     # If in evaluation mode, and PTs are supposed to be plotted
     if PT_plot_mode:
         return pressures, temperatures
-    
+
     # Make the abundance profile
     COs = parameters['C/O'].value * np.ones_like(pressures)
     FeHs = parameters['[Fe/H]'].value * np.ones_like(pressures)
-    
+
     abundances_interp = pm.interpol_abundances(COs, \
                                                FeHs, \
                                                temperatures, \
@@ -370,7 +370,7 @@ def guillot_eqchem_transmission(pRT_object, \
                     species.split('_R_')[0].replace('_all_iso', '').replace('C2H2','C2H2,acetylene')]
     abundances['H2'] = abundances_interp['H2']
     abundances['He'] = abundances_interp['He']
-    
+
     MMW = abundances_interp['MMW']
 
     # Calculate the spectrum
@@ -392,7 +392,7 @@ def guillot_eqchem_transmission(pRT_object, \
 
     wlen_model = nc.c/pRT_object.freq/1e-4
     spectrum_model = (pRT_object.transm_rad/parameters['Rstar'].value)**2.
-    
+
     return wlen_model, spectrum_model
 
 def isothermal_eqchem_transmission(pRT_object, \
@@ -403,8 +403,8 @@ def isothermal_eqchem_transmission(pRT_object, \
     Equilibrium Chemistry Transmission Model, Isothermal Profile
 
     This model computes a transmission spectrum based on equilibrium chemistry
-    and a Guillot temperature-pressure profile. 
-    
+    and a Guillot temperature-pressure profile.
+
     Args:
         pRT_object : object
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
@@ -420,7 +420,7 @@ def isothermal_eqchem_transmission(pRT_object, \
                 *  Pcloud : optional, cloud base pressure of a grey cloud deck.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
-        AMR : 
+        AMR :
             Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
 
     Returns:
@@ -430,7 +430,7 @@ def isothermal_eqchem_transmission(pRT_object, \
             Computed transmission spectrum R_pl**2/Rstar**2
     """
 
-    try: 
+    try:
         from petitRADTRANS import poor_mans_nonequ_chem as pm
     except ImportError:
         print("Could not import poor_mans_nonequ_chemistry. Exiting.")
@@ -438,15 +438,15 @@ def isothermal_eqchem_transmission(pRT_object, \
     # Make the P-T profile
     pressures = pRT_object.press/1e6
     temperatures = parameters['Temp'].value * np.ones_like(pressures)
-    
+
     # If in evaluation mode, and PTs are supposed to be plotted
     if PT_plot_mode:
         return pressures, temperatures
-    
+
     # Make the abundance profile
     COs = parameters['C/O'].value * np.ones_like(pressures)
     FeHs = parameters['[Fe/H]'].value * np.ones_like(pressures)
-    
+
     abundances_interp = pm.interpol_abundances(COs, \
                                                FeHs, \
                                                temperatures, \
@@ -458,7 +458,7 @@ def isothermal_eqchem_transmission(pRT_object, \
                     species.split('_R_')[0].replace('_all_iso', '').replace('C2H2','C2H2,acetylene')]
     abundances['H2'] = abundances_interp['H2']
     abundances['He'] = abundances_interp['He']
-    
+
     MMW = abundances_interp['MMW']
     pcloud = None
     if 'log_Pcloud' in parameters.keys():
@@ -496,8 +496,8 @@ def isothermal_free_transmission(pRT_object, \
     Free Chemistry Transmission Model, Guillot Profile
 
     This model computes a transmission spectrum based on free retrieval chemistry
-    and an isothermal temperature-pressure profile. 
-    
+    and an isothermal temperature-pressure profile.
+
     Args:
         pRT_object : object
             An instance of the pRT class, with optical properties as defined in the RunDefinition.
@@ -511,7 +511,7 @@ def isothermal_free_transmission(pRT_object, \
                 *  Pcloud : optional, cloud base pressure of a grey cloud deck.
         PT_plot_mode : bool
             Return only the pressure-temperature profile for plotting. Evaluate mode only.
-        AMR : 
+        AMR :
             Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
 
     Returns:
@@ -539,7 +539,7 @@ def isothermal_free_transmission(pRT_object, \
         return None, None
     abundances['H2'] = 0.766 * (1.0-msum) * np.ones_like(pressures)
     abundances['He'] = 0.234 * (1.0-msum) * np.ones_like(pressures)
-    
+
     #MMW = abundances_interp['MMW']
     MMW = calc_MMW(abundances)
 
@@ -589,25 +589,25 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv = True):
             temperature points to be added on top
             radiative Eddington structure (above tau = 0.1).
             Use spline interpolation, t1 < t2 < t3 < tconnect as prior.
-        delta : 
+        delta :
             proportionality factor in tau = delta * press_cgs**alpha
-        alpha: 
+        alpha:
             power law index in tau = delta * press_cgs**alpha
             For the tau model: use proximity to kappa_rosseland photosphere
             as prior.
-        tint: 
+        tint:
             internal temperature of the Eddington model
-        press: 
+        press:
             input pressure profile in bar
-        conv: 
+        conv:
             enforce convective adiabat yes/no
-        CO: 
+        CO:
             C/O for the nabla_ad interpolation
-        FeH: 
+        FeH:
             metallicity for the nabla_ad interpolation
     '''
 
-    try: 
+    try:
         from petitRADTRANS import poor_mans_nonequ_chem as pm
     except ImportError:
         print("Could not import poor_mans_nonequ_chemistry. Exiting.")
@@ -647,7 +647,7 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv = True):
                 t_take = cp.copy(tedd)
             else:
                 t_take = cp.copy(tfinal)
-            
+
             ab = pm.interpol_abundances(CO*np.ones_like(t_take), \
                 FeH*np.ones_like(t_take), \
                 t_take, \
@@ -673,7 +673,7 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv = True):
             if np.max(np.abs(t_take-tfinal)/t_take) < 0.01:
                 #print('n_ad', 1./(1.-nabla_ad[conv_index]))
                 break
-            
+
     else:
         tfinal = tedd
 
@@ -695,8 +695,11 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv = True):
                              4)
 
             # Create the pressure coordinates for the spline support nodes at high pressure,
-            # the corresponding temperatures for these nodes will be taken from the radiative+convective solution
-            support_points_high = 1e1**np.arange(np.log10(p_bot_spline), np.log10(press_cgs[-1]), np.diff(np.log10(support_points_low))[0])
+            # the corresponding temperatures for these nodes will be taken from the
+            # radiative+convective solution
+            support_points_high = 1e1**np.arange(np.log10(p_bot_spline),
+                                                 np.log10(press_cgs[-1]),
+                                                 np.diff(np.log10(support_points_low))[0])
 
             # Combine into one support node array, don't add the p_bot_spline point twice.
             support_points = np.zeros(len(support_points_low)+len(support_points_high)-1)
@@ -711,7 +714,8 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv = True):
                              7)
 
             # Create the pressure coordinates for the spline support nodes at high pressure,
-            # the corresponding temperatures for these nodes will be taken from the radiative+convective solution
+            # the corresponding temperatures for these nodes will be taken from the
+            # radiative+convective solution
             support_points_high = np.logspace(np.log10(p_bot_spline), np.log10(press_cgs[-1]), 7)
 
             # Combine into one support node array, don't add the p_bot_spline point twice.
@@ -731,40 +735,46 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv = True):
             # t_support[:3] = tfintp(support_points_low)
             # The temperature at pressures above p_bot_spline
             # (from the radiative-convectice solution)
-            t_support[int(len(support_points_low)):] = tfintp(support_points[(int(len(support_points_low))):])
-            
+            t_support[int(len(support_points_low)):] = \
+                tfintp(support_points[(int(len(support_points_low))):])
+
         else:
             tfintp1 = interp1d(press_cgs, tret,kind='cubic')
-            t_support[:(int(len(support_points_low))-1)] = tfintp1(support_points[:(int(len(support_points_low))-1)])
+            t_support[:(int(len(support_points_low))-1)] = \
+                tfintp1(support_points[:(int(len(support_points_low))-1)])
 
             tfintp = interp1d(press_cgs, tfinal)
             # The temperature at p_bot_spline (from the radiative-convectice solution)
             t_support[int(len(support_points_low))-1] = tfintp(p_bot_spline)
             #print('diff', t_connect_calc - tfintp(p_bot_spline))
-            t_support[int(len(support_points_low)):] = tfintp(support_points[(int(len(support_points_low))):])
-            
+            t_support[int(len(support_points_low)):] = \
+                tfintp(support_points[(int(len(support_points_low))):])
+
         # Make the temperature spline interpolation to be returned to the user
         cs = CubicSpline(np.log10(support_points), t_support)
         tret = cs(np.log10(press_cgs))
 
-    tret[tret<0.0] = 10.0   
+    tret[tret<0.0] = 10.0
     # Return the temperature, the pressure at tau = 1,
     # and the temperature at the connection point.
     # The last two are needed for the priors on the P-T profile.
     return tret#, press_tau(1.)/1e6, tfintp(p_bot_spline)
 
 def _make_half_pressure_better(P_clouds, press):
+    """
+    deprecated
+    """
     # Obsolete, replaced with fixed_length_amr
     press_plus_index = np.zeros((press.shape[0],2))
     press_plus_index[:,0] = press
     press_plus_index[:,1] = range(len(press))
-    
+
     press_small = press_plus_index[::24, :]
     press_plus_index = press_plus_index[::2,:]
 
     indexes_small = press_small[:,0] > 0.
     indexes       = press_plus_index[:,0] > 0.
-    
+
     for cname,P_cloud in P_clouds.items():
         indexes_small = indexes_small & \
             ((np.log10(press_small[:,0]/P_cloud) > 0.05) | \
@@ -786,7 +796,7 @@ def _make_half_pressure_better(P_clouds, press):
 def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
     """
     This function takes in the cloud base pressures for each cloud,
-    and returns an array of pressures with a high resolution mesh 
+    and returns an array of pressures with a high resolution mesh
     in the region where the cloud is located.
 
     Args:
@@ -817,8 +827,8 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
         # Find out where the clouds are in the high res grid
         idx = (np.abs(press_plus_index[:,0] - P_cloud)).argmin()
         # constant length list of indices around that point
-        inds = np.linspace(int(idx-(width*scaling/2.0)),int(idx+(width*scaling/2.0))-1,int(scaling*width),dtype=int) 
-        c_list.append(inds) 
+        inds = np.linspace(int(idx-(width*scaling/2.0)),int(idx+(width*scaling/2.0))-1,int(scaling*width),dtype=int)
+        c_list.append(inds)
     # We need to return a list that's always the same length
     # So we need to check for duplicates
     total_inds = []
@@ -836,7 +846,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
             done = 0
             while len(total_inds) < sl+int(scaling*width):
                 if start-ind < 0:
-                    start = start + len(c_list[j]) 
+                    start = start + len(c_list[j])
                     ind = done
                 if np.in1d(start-ind,np.array(total_inds)).any():
                     ind += 1
@@ -867,7 +877,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
                     done += 1
         else:
             # This loop takes care of cases where we're between existing entries
-            # it adds indices until duplicates are found, then keeps incrementing 
+            # it adds indices until duplicates are found, then keeps incrementing
             # until there is a free index to add.
             start = np.array(total_inds)[np.where(np.array(total_inds)==c_list[j][0])[0]]
             sl = len(total_inds)
@@ -891,7 +901,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
         press_out = np.vstack((press_small,press_plus_index[total_inds]))
     except:
         print("AMR returned incorrect length")
-        return p_global, np.array([0])
+        return PGLOBAL, np.array([0])
     press_out = np.sort(press_out, axis = 0)
     p_out,ind = np.unique(press_out[:,0],return_index = True)
     return p_out,  press_out[ind, 1].astype('int')
@@ -927,7 +937,7 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
             The indices of the high resolution grid to use to define the adaptive grid.
     """
 
-    try: 
+    try:
         from petitRADTRANS import poor_mans_nonequ_chem as pm
     except ImportError:
         print("Could not import poor_mans_nonequ_chemistry. Exiting.")
@@ -955,13 +965,13 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
     MMW = abundances_interp['MMW']
 
     Pbases = {}
-    Pbases['Fe(c)'] = fc.simple_cdf_Fe(pressures, temperatures, 
+    Pbases['Fe(c)'] = fc.simple_cdf_Fe(pressures, temperatures,
                                 parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
-    Pbases['MgSiO3(c)'] = fc.simple_cdf_MgSiO3(pressures, temperatures, 
+    Pbases['MgSiO3(c)'] = fc.simple_cdf_MgSiO3(pressures, temperatures,
                                 parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
-    #Pbases['KCL(c)'] = fc.simple_cdf_KCL(pressures, temperatures, 
+    #Pbases['KCL(c)'] = fc.simple_cdf_KCL(pressures, temperatures,
     #                            parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
-    #Pbases['Na2S(c)'] = fc.simple_cdf_Na2S(pressures, temperatures, 
+    #Pbases['Na2S(c)'] = fc.simple_cdf_Na2S(pressures, temperatures,
     #                            parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
     fseds = {}
     abundances = {}
@@ -972,8 +982,11 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
     p_clouds = np.array(p_clouds)
 
     if AMR:
-        press_use, small_index = fixed_length_amr(p_clouds, pressures,parameters['pressure_scaling'].value,parameters['pressure_width'].value)
-    else : 
+        press_use, small_index = fixed_length_amr(p_clouds,
+                                                  pressures,
+                                                  parameters['pressure_scaling'].value,
+                                                  parameters['pressure_width'].value)
+    else :
         #TODO: Test
         press_use = pressures
         small_index = np.indices(press_use)
@@ -1009,28 +1022,29 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
 def pglobal_check(press,shape,scaling):
     """
     Check to ensure that the global pressure array has the correct length.
-    Updates p_global.
+    Updates PGLOBAL.
 
     Args:
         press : numpy.ndarray
-            Pressure array from a pRT_object. Used to set the min and max values of p_global
+            Pressure array from a pRT_object. Used to set the min and max values of PGLOBAL
         shape : int
             the shape of the pressure array if no AMR is used
-        scaling : 
+        scaling :
             The factor by which the pressure array resolution should be scaled.
     """
 
-    global p_global
-    if p_global.shape[0] != int(scaling*shape):  
-        p_global = np.logspace(np.log10(press[0]),
+    global PGLOBAL
+    if PGLOBAL.shape[0] != int(scaling*shape):
+        PGLOBAL = np.logspace(np.log10(press[0]),
                                 np.log10(press[1]),
                                 int(scaling*shape))
-    return
 
 def set_resolution(lines,abundances,resolution):
+    """
+    deprecated
+    """
     # Set correct key names in abundances for pRT, with set resolution
     # Only needed for free chemistry retrieval
-    # Obsolete 
     #print(lines)
     #print(abundances)
     if resolution is None:

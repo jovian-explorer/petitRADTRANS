@@ -1,8 +1,8 @@
-import sys, os
+import sys
+import os
 # To not have numpy start parallelizing on its own
 os.environ["OMP_NUM_THREADS"] = "1"
 import numpy as np
-
 from .data import Data
 from .parameter import Parameter
 
@@ -33,7 +33,8 @@ class RetrievalConfig:
             Produce plots for each sample to check that the retrieval is running properly. Only
             set to true on a local machine.
         opacities : str
-            Should the retrieval be run using correlated-k opacities (default, 'c-k'), or line by line ('lbl')opacities?
+            Should the retrieval be run using correlated-k opacities (default, 'c-k'),
+            or line by line ('lbl') opacities?
             If 'lbl' is selected, it is HIGHLY recommended to set the lbl_opacity_sampling parameter.
         lbl_opacity_sampling : (Optional[int]):
             Will be ``None`` by default. If integer positive value, and if
@@ -50,7 +51,7 @@ class RetrievalConfig:
         scattering : bool
             If using emission spectra, turn scattering on or off.
         pressures : numpy.array
-            A log-spaced array of pressures over which to retrieve. 100 points is standard, between 
+            A log-spaced array of pressures over which to retrieve. 100 points is standard, between
             10^-6 and 10^3.
     """
 
@@ -76,11 +77,11 @@ class RetrievalConfig:
         self.AMR = AMR
         if pressures is not None:
             self.p_global = pressures
-        else: 
+        else:
             self.p_global = np.logspace(-6,3,100)
 
         self.plotting = plotting
-        self.scattering = scattering 
+        self.scattering = scattering
         self.op_mode = opacities
         self.lbl_sampling = lbl_opacity_sampling
         self.parameters = {} #: Dictionary of the parameters passed to the model generating function
@@ -124,7 +125,7 @@ class RetrievalConfig:
         """
         This converts the standard pressure grid into the correct length
         for the AMR pressure grid. The scaling adjusts the resolution of the
-        high resolution grid, while the width determines the size of the high 
+        high resolution grid, while the width determines the size of the high
         pressure region. This function is automatically called in
         Retrieval.setupData().
 
@@ -165,11 +166,11 @@ class RetrievalConfig:
             value : float
                 The value of the parameter in the units used by the model function.
             transform_prior_cube_coordinate : method
-                A function that transforms the unit interval to the physical units of the parameter. 
+                A function that transforms the unit interval to the physical units of the parameter.
                 Typically given as a lambda function.
         """
 
-        self.parameters[name] = Parameter(name, free, value, 
+        self.parameters[name] = Parameter(name, free, value,
                                           transform_prior_cube_coordinate = transform_prior_cube_coordinate)
     def list_available_line_species(self):
         """
@@ -177,7 +178,7 @@ class RetrievalConfig:
         """
 
         prt_path = os.environ.get("pRT_input_data_path")
-        if prt_path == None:
+        if prt_path is None:
             print('Path to input data not specified!')
             print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
             print('    import os')
@@ -191,7 +192,7 @@ class RetrievalConfig:
         if self.op_mode == 'lbl':
             files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/lbl/")]
             files = set(files)
-        [print(f) for f in files]
+        for f in files: print(f)
         return files
     def list_available_cloud_species(self):
         """
@@ -199,7 +200,7 @@ class RetrievalConfig:
         """
 
         prt_path = os.environ.get("pRT_input_data_path")
-        if prt_path == None:
+        if prt_path is None:
             print('Path to input data not specified!')
             print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
             print('    import os')
@@ -209,8 +210,7 @@ class RetrievalConfig:
 
         files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/continuum/clouds/")]
         files = set(files)
-        [print(f) for f in files]
-
+        for f in files: print(f)
         return files
     def list_available_cia_species(self):
         """
@@ -218,7 +218,7 @@ class RetrievalConfig:
         """
 
         prt_path = os.environ.get("pRT_input_data_path")
-        if prt_path == None:
+        if prt_path is None:
             print('Path to input data not specified!')
             print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
             print('    import os')
@@ -228,13 +228,15 @@ class RetrievalConfig:
 
         files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/continuum/cia/")]
         files = set(files)
-        [print(f) for f in files]
+        for f in files: print(f)
         return files
     def set_line_species(self,linelist,free=False,abund_lim=(-6.0,6.0)):
         """
-        This function adds a list of species to the pRT object that will define the line opacities of the model.
-        The values in the list are strings, with the names matching the pRT opacity names, which vary between 
-        the c-k line opacities and the line-by-line opacities.
+        Set RadTrans.line_species
+
+        This function adds a list of species to the pRT object that will define the line
+        opacities of the model. The values in the list are strings, with the names matching
+        the pRT opacity names, which vary between the c-k line opacities and the line-by-line opacities.
 
         Args:
             linelist : List(str)
@@ -243,9 +245,10 @@ class RetrievalConfig:
                 If true, the retrieval should use free chemistry, and Parameters for the abundance of each
                 species in the linelist will be added to the retrieval
             abund_lim : Tuple(float,float)
-                If free is True, this sets the boundaries of the uniform prior that will be applied for 
-                each species in linelist. The range of the prior goes from abund_lim[0] to abund_lim[0] + abund_lim[1].
-                The abundance limits must be given in log10 units of the mass fraction.
+                If free is True, this sets the boundaries of the uniform prior that will be applied for
+                each species in linelist. The range of the prior goes from abund_lim[0]
+                to abund_lim[0] + abund_lim[1]. The abundance limits must be given in
+                log10 units of the mass fraction.
         """
 
         self.line_species = linelist
@@ -288,7 +291,7 @@ class RetrievalConfig:
                 If true, the retrieval should use free chemistry, and Parameters for the abundance of the
                 species will be added to the retrieval
             abund_lim : Tuple(float,float)
-                If free is True, this sets the boundaries of the uniform prior that will be applied the species given. 
+                If free is True, this sets the boundaries of the uniform prior that will be applied the species given.
                 The range of the prior goes from abund_lim[0] to abund_lim[0] + abund_lim[1].
                 The abundance limits must be given in log10 units of the mass fraction.
         """
@@ -310,7 +313,7 @@ class RetrievalConfig:
                 The species to remove from the retrieval
             free : bool
                 If true, the retrieval should use free chemistry, and Parameters for the abundance of the
-                species will be removed to the retrieval    
+                species will be removed to the retrieval
         """
 
         if species in self.line_species:
@@ -321,7 +324,7 @@ class RetrievalConfig:
     def add_cloud_species(self,species,eq = True, abund_lim = (-3.5,4.5), PBase_lim = (-5.0,7.0)):
         """
         This function adds a single cloud species to the list of species. Optionally,
-        it will add parameters to allow for a retrieval using an ackermann-marley model. 
+        it will add parameters to allow for a retrieval using an ackermann-marley model.
         If an equilibrium condensation model is used in th retrieval model function (eq=True),
         then a parameter is added that scales the equilibrium cloud abundance, as in Molliere (2020).
         If eq is false, two parameters are added, the cloud abundnace and the cloud base pressure.
@@ -353,7 +356,7 @@ class RetrievalConfig:
         #self.parameters['Pbase_'+cname] = Parameter('Pbase_'+cname,True,\
         #                     transform_prior_cube_coordinate = \
         #                     lambda x : PBase_lim[0] + PBase_lim[1]*x)
-        
+
     def add_data(self, name, path,
                  model_generating_function,
                  data_resolution = None,
@@ -372,26 +375,29 @@ class RetrievalConfig:
                 Path to observations file, including filename. This can be a txt or dat file containing the wavelength,
                 flux, transit depth and error, or a fits file containing the wavelength, spectrum and covariance matrix.
             model_generating_function : fnc
-                A function, typically defined in run_definition.py that returns the model wavelength and spectrum (emission or transmission).
-                This is the function that contains the physics of the model, and calls pRT in order to compute the spectrum.
+                A function, typically defined in run_definition.py that returns the model wavelength and
+                spectrum (emission or transmission). This is the function that contains the physics
+                of the model, and calls pRT in order to compute the spectrum.
             data_resolution : float
                 Spectral resolution of the instrument. Optional, allows convolution of model to instrumental line width.
             model_resolution : float
                 Spectral resolution of the model, allowing for low resolution correlated k tables from exo-k.
             distance : float
-                The distance to the object in cgs units. Defaults to a 10pc normalized distance. All data must be scaled to the 
-                same distance before running the retrieval, which can be done using the scale_to_distance method in the Data class.
+                The distance to the object in cgs units. Defaults to a 10pc normalized distance. All data must
+                be scaled to the same distance before running the retrieval, which can be done using the
+                scale_to_distance method in the Data class.
             scale : bool
                 Turn on or off scaling the data by a constant factor.
             wlen_range_micron : Tuple
-                A pair of wavelenths in units of micron that determine the lower and upper boundaries of the model computation.
+                A pair of wavelenths in units of micron that determine the lower and upper boundaries of the
+                model computation.
             external_pRT_reference : str
                 The name of an existing Data object. This object's pRT_object will be used to calculate the chi squared
                 of the new Data object. This is useful when two datasets overlap, as only one model computation is required
                 to compute the log likelihood of both datasets.
         """
 
-        self.data[name] = Data(name, path, 
+        self.data[name] = Data(name, path,
                                 model_generating_function = model_generating_function,
                                 data_resolution = data_resolution,
                                 model_resolution = model_resolution,
@@ -399,12 +405,12 @@ class RetrievalConfig:
                                 scale = scale,
                                 wlen_range_micron = wlen_range_micron,
                                 external_pRT_reference=external_pRT_reference)
-        return
-    def add_photometry(self, path, 
+
+    def add_photometry(self, path,
                        model_generating_function,
-                       model_resolution = 10, 
+                       model_resolution = 10,
                        distance = None,
-                       scale = False, 
+                       scale = False,
                        wlen_range_micron = None,
                        photometric_transformation_function = None,
                        external_pRT_reference = None):
@@ -425,20 +431,22 @@ class RetrievalConfig:
             model_resolution : float
                 Spectral resolution of the model, allowing for low resolution correlated k tables from exo-k.
             scale : bool
-                Turn on or off scaling the data by a constant factor. Currently only set up to scale all photometric data
-                in a given file.
+                Turn on or off scaling the data by a constant factor. Currently only set up to scale all
+                photometric data in a given file.
             distance : float
-                The distance to the object in cgs units. Defaults to a 10pc normalized distance. All data must be scaled to the 
-                same distance before running the retrieval, which can be done using the scale_to_distance method in the Data class.
+                The distance to the object in cgs units. Defaults to a 10pc normalized distance. All data must
+                be scaled to the same distance before running the retrieval, which can be done using the
+                scale_to_distance method in the Data class.
             wlen_range_micron : Tuple
-                A pair of wavelenths in units of micron that determine the lower and upper boundaries of the model computation.
+                A pair of wavelenths in units of micron that determine the lower and upper boundaries of
+                the model computation.
             external_pRT_reference : str
-                The name of an existing Data object. This object's pRT_object will be used to calculate the chi squared
-                of the new Data object. This is useful when two datasets overlap, as only one model computation is required
-                to compute the log likelihood of both datasets.
+                The name of an existing Data object. This object's pRT_object will be used to calculate the
+                chi squared of the new Data object. This is useful when two datasets overlap, as only
+                one model computation is required to compute the log likelihood of both datasets.
             photometric_transformation_function : method
-                A function that will transform a spectrum into an average synthetic photometric point, typicall accounting for 
-                filter transmission.
+                A function that will transform a spectrum into an average synthetic photometric point,
+                typicall accounting for filter transmission.
         """
 
         photometry = open(path)
@@ -462,14 +470,14 @@ class RetrievalConfig:
                 transform = species.SyntheticPhotometry(name).spectrum_to_flux
             else:
                 transform = photometric_transformation_function
-            
+
             if wlen_range_micron is None:
                 wbins = [0.95*wlow,1.05*whigh]
             else:
                 wbins = wlen_range_micron
-            self.data[name] = Data(name, 
-                                    path, 
-                                    model_generating_function = model_generating_function,   
+            self.data[name] = Data(name,
+                                    path,
+                                    model_generating_function = model_generating_function,
                                     distance = distance,
                                     photometry = True,
                                     wlen_range_micron = wbins,
@@ -481,4 +489,3 @@ class RetrievalConfig:
                                     external_pRT_reference=external_pRT_reference)
             self.data[name].flux = flux
             self.data[name].flux_error = err
-        return

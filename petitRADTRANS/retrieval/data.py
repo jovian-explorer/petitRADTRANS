@@ -1,16 +1,16 @@
-import sys, os
+import sys
+import os
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter
-
-from .rebin_give_width import rebin_give_width
 import petitRADTRANS.nat_cst as nc
+from .rebin_give_width import rebin_give_width
 
 class Data:
     """
     This class stores the spectral data to be retrieved from a single instrument or observation.
 
     Each dataset is associated with an instance of petitRadTrans and an atmospheric model.
-    The pRT instance can be overwritten, and associated with an existing pRT instance with the 
+    The pRT instance can be overwritten, and associated with an existing pRT instance with the
     external_pRT_reference parameter.
     This setup allows for joint or independant retrievals on multiple datasets.
 
@@ -25,8 +25,8 @@ class Data:
         data_resolution : float
             Spectral resolution of the instrument. Optional, allows convolution of model to instrumental line width.
         model_resolution : float
-            The resolution of the c-k opacity tables in pRT. This will generate a new c-k table using exo-k. The default 
-            (and maximum) correlated k resolution in pRT is :math:`\lambda/\Delta \lambda > 1000` (R=500). 
+            The resolution of the c-k opacity tables in pRT. This will generate a new c-k table using exo-k. The default
+            (and maximum) correlated k resolution in pRT is :math:`\lambda/\Delta \lambda > 1000` (R=500).
             Lowering the resolution will speed up the computation.
         external_pRT_instance : object
             An existing RadTrans object. Leave as none unless you're sure of what you're doing.
@@ -34,8 +34,8 @@ class Data:
             A function, typically defined in run_definition.py that returns the model wavelength and spectrum (emission or transmission).
             This is the function that contains the physics of the model, and calls pRT in order to compute the spectrum.
         wlen_range_micron : tuple,list
-            Set the wavelength range of the pRT object. Defaults to a range +/-5% greater than that of the data. Must at least be 
-            equal to the range of the data. 
+            Set the wavelength range of the pRT object. Defaults to a range +/-5% greater than that of the data. Must at least be
+            equal to the range of the data.
         scale : bool
             Turn on or off scaling the data by a constant factor. Set to True if scaling the data during the retrieval.
         wlen_bins : numpy.ndarray
@@ -62,7 +62,7 @@ class Data:
                  photometry = False,
                  photometric_transformation_function = None,
                  photometric_bin_edges = None):
-        
+
         self.name = name
         self.path_to_observations = path_to_observations
 
@@ -82,7 +82,7 @@ class Data:
         if not distance:
             self.distance = 10.* nc.pc
         if self.distance < 1.0*nc.pc:
-            print("Your distance is less than 1pc, are you sure you're using cgs units?")  
+            print("Your distance is less than 1pc, are you sure you're using cgs units?")
 
 
         self.data_resolution = data_resolution
@@ -101,7 +101,7 @@ class Data:
         self.flux_error = None
         self.scale = scale
         self.scale_factor = 1.0
-        
+
         # Bins and photometry
         self.wlen_bins = wlen_bins
         self.photometry = photometry
@@ -118,16 +118,16 @@ class Data:
         self.width_photometry = photometric_bin_edges
 
         # Read in data
-        if path_to_observations != None:
+        if path_to_observations is not None:
             if not photometry:
                 if path_to_observations.endswith('.fits'):
                     self.loadfits(path_to_observations)
                 else:
                     self.loadtxt(path_to_observations)
-                
+
                 self.wlen_range_pRT = [0.95 * self.wlen[0], \
                                     1.05 * self.wlen[-1]]
-                if wlen_bins != None:
+                if wlen_bins is not None:
                     self.wlen_bins = wlen_bins
                 else:
                     self.wlen_bins = np.zeros_like(self.wlen)
@@ -136,31 +136,30 @@ class Data:
             else:
                 if wlen_range_micron is not None:
                     self.wlen_range_pRT = wlen_range_micron
-                else: 
+                else:
                     self.wlen_range_pRT = [0.95*self.width_photometry[0],
                                             1.05*self.width_photometry[1]]
                 # For binning later
                 self.wlen_bins = self.width_photometry[1]-self.width_photometry[0]
                 if self.data_resolution is None:
                     self.data_resolution = np.mean(self.width_photometry)/self.wlen_bins
-        return
 
     def loadtxt(self, path, delimiter = ',', comments = '#'):
         """
         This function reads in a .txt or .dat file containing the spectrum. Headers should be commented out with '#',
-        the first column must be the wavelength in micron, the second column the flux or transit depth, 
+        the first column must be the wavelength in micron, the second column the flux or transit depth,
         and the final column must be the error on each data point.
-        Checks will be performed to determine the correct delimiter, but the recommended format is to use a 
+        Checks will be performed to determine the correct delimiter, but the recommended format is to use a
         csv file with columns for wavlength, flux and error.
 
         Args:
             path : str
                 Directory and filename of the data.
             delimiter : string, int
-                The string used to separate values. By default, commas act as delimiter. 
+                The string used to separate values. By default, commas act as delimiter.
                 An integer or sequence of integers can also be provided as width(s) of each field.
             comments : string
-                The character used to indicate the start of a comment. 
+                The character used to indicate the start of a comment.
                 All the characters occurring on a line after a comment are discarded
         """
 
@@ -204,7 +203,6 @@ class Data:
         self.covariance = fits.getdata(path,'SPECTRUM').field("COVARIANCE")
         self.inv_cov = np.linalg.inv(self.covariance)
         self.flux_error = np.sqrt(self.covariance.diagonal())
-        return
 
     def set_distance(self,distance):
         """
@@ -232,7 +230,7 @@ class Data:
 
         scale = (self.distance/new_dist)**2
         self.flux *= scale
-        if self.covariance is not None: 
+        if self.covariance is not None:
             self.covariance *= scale**2
             self.inv_cov = np.linalg.inv(self.covariance)
             self.flux_error = np.sqrt(self.covariance.diagonal())
@@ -253,7 +251,7 @@ class Data:
             spectrum_model : numpy.ndarray
                 The model flux in the same units as the data.
             plotting : bool
-                Show test plots. 
+                Show test plots.
 
         Returns:
             logL : float
@@ -264,9 +262,9 @@ class Data:
             import pylab as plt
         # Convolve to data resolution
         if self.data_resolution is not None:
-                spectrum_model = self.convolve(wlen_model, \
-                            spectrum_model, \
-                            self.data_resolution)
+            spectrum_model = self.convolve(wlen_model, \
+                        spectrum_model, \
+                        self.data_resolution)
 
         if not self.photometry:
             # Rebin to model observation
@@ -334,7 +332,7 @@ class Data:
         # Calculate the sigma to be used in the gauss filter in units
         # of input wavelength bins
         sigma_LSF_gauss_filter = sigma_LSF/spacing
-    
+
         flux_LSF = gaussian_filter(input_flux, \
                                    sigma = sigma_LSF_gauss_filter, \
                                    mode = 'nearest')
