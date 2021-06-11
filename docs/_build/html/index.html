@@ -22,12 +22,12 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
-        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
         <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})</script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
@@ -37,6 +37,9 @@
   
   <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Installation" href="content/installation.html" /> 
@@ -90,7 +93,7 @@
               
             
             
-              <p><span class="caption-text">Guide:</span></p>
+              <p class="caption"><span class="caption-text">Guide:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="content/installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="content/tutorial.html">Tutorial</a></li>
@@ -98,9 +101,10 @@
 <li class="toctree-l1"><a class="reference internal" href="content/retrieval_examples.html">Retrieval Examples</a></li>
 <li class="toctree-l1"><a class="reference internal" href="content/opa_add.html">Adding opacities</a></li>
 </ul>
-<p><span class="caption-text">Code documentation:</span></p>
+<p class="caption"><span class="caption-text">Code documentation:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="content/code.html">Code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="content/nat_cst_doc.html">nat_cst constants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="autoapi/index.html">API Reference</a></li>
 </ul>
 
             
@@ -193,54 +197,39 @@
 <h1>petitRADTRANS documentation<a class="headerlink" href="#petitradtrans-documentation" title="Permalink to this headline">¶</a></h1>
 <p>Welcome to the <strong>petitRADTRANS</strong> (pRT) documentation. pRT is a
 Python package for calculating transmission and emission spectra
-of exoplanets, at low (<span class="math notranslate nohighlight">\(\lambda/\Delta\lambda=1000\)</span>) and high
-(<span class="math notranslate nohighlight">\(\lambda/\Delta\lambda=10^6\)</span>) resolution, for clear and cloudy
-atmospheres.</p>
-<div class="admonition important">
-<p class="admonition-title">Important</p>
-<p>In addition to transmission spectra, <strong>pRT now includes scattering also for emission spectra</strong>, if specifically turned on (note that scattering increases the runtime), see <a class="reference external" href="content/notebooks/emis_scat.html">Scattering for Emission Spectra</a>.</p>
-</div>
+of exoplanets <strong>and incorporates (new!) an easy subpackage for running retrievals with nested sampling</strong>.</p>
+<p>pRT has two different opacity treatment modes. The low resolution mode runs calculations
+at <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda\leq 1000\)</span> using the so-called correlated-k treatment for opacities.
+The high resolution mode runs calculations at <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda\leq 10^6\)</span>, using a line-by-line opacity treatment.</p>
+<p>pRT’s low-resolution opacities are initially stored at <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda = 1000\)</span> but can be rebinned to lower
+resolution by the user on the fly, for which we make use of the <a class="reference external" href="https://pypi.org/project/exo-k/">Exo_k</a> package.
+This is explained <a class="reference external" href="ADD">here</a> (ADD LINK).</p>
+<p>The high-resolution opacities are initially stored at <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda = 10^6\)</span>, and example calculations are shown
+<a class="reference external" href="content/notebooks/highres.html">here</a>. Opacities can also be undersampled, to run at a lower resolution, and to speed up
+spectral calculations. The user should verify whether this leads to solutions which are identical to the rebinned results of the fiducial
+<span class="math notranslate nohighlight">\(\lambda/\Delta\lambda = 10^6\)</span> resolution. Undersampling is done with the <code class="docutils literal notranslate"><span class="pre">lbl_opacity_sampling</span></code> parameter
+described in the <a class="reference external" href="autoapi/petitRADTRANS/radtrans/index.html#petitRADTRANS.radtrans.Radtrans">API</a> here.</p>
+<p>pRT can calculate transmission and emission spectra of exoplanets, for clear or cloudy atmospheres. The different cloud treatment
+(gray clouds, power law clouds, “real” clouds using optical constants) are described in the tutorial <a class="reference external" href="content/notebooks/clouds.html">here</a>. Scattering is
+included in pRT, but must be specifically turned on for emission spectra (note that scattering increases the runtime),
+see <a class="reference external" href="content/notebooks/emis_scat.html">Scattering for Emission Spectra</a>. pRT can also calculate the reflection of light
+at the surface of rocky planets, for which the use can specify wavelength-dependent albedos and emissivities. This is likewise
+explained in <a class="reference external" href="content/notebooks/emis_scat.html">Scattering for Emission Spectra</a>.</p>
+<p>The newly added retrieval subpackage is documented <a class="reference external" href="content/notebooks/pRT_Retrieval_Example.html">here</a>.
+At the moment pRT retrievals are making use of the <a class="reference external" href="https://johannesbuchner.github.io/PyMultiNest/">PyMultiNest</a>
+package for parameter inference. Of course you are free to use pRT spectral synthesis routines with any other inference tool of your liking.</p>
 <p>petitRADTRANS is available under the MIT License, and documented in
 <a class="reference external" href="https://arxiv.org/abs/1904.11504">Mollière et al. (2019)</a>, for the general code, and <a class="reference external" href="https://arxiv.org/abs/2006.09394">Mollière et al. (2020)</a>, Alei et al. (in prep.), for the scattering implementation. Please cite these papers if you make use of petitRADTRANS in your work.</p>
-<p>This documentation webpage currently contains an installation guide, a
-tutorial, a first code documentation, and an implemented retrieval
-example for mock JWST emission and transmission spectra.
-Also, we give a tutorial on how to include opacities that may be
-missing from our database.</p>
-<section id="news">
-<h2>News<a class="headerlink" href="#news" title="Permalink to this headline">¶</a></h2>
-<dl class="simple">
-<dt><strong>December 2020: stellar and planetary surface scattering added</strong></dt><dd><p>pRT now includes the scattering of the incoming stellar flux for irradiated planets. Also a scattering surface for terrestrial planets has been added, see <a class="reference external" href="content/notebooks/emis_scat.html">Scattering for Emission Spectra</a>. The surface albedo and emissivity are both freely tunable parameters (as a function of wavelength). Surface scattering is treated to be isotropic (that is, assuming that the surface is Lambertian).</p>
-</dd>
-<dt><strong>September 2020: self-scattering for emission spectra and chemical equilibrium interpolation now available</strong></dt><dd><p>pRT now includes scattering also for emission spectra, if specifically turned on (note that scattering increases the runtime), see <a class="reference external" href="content/notebooks/emis_scat.html">Scattering for Emission Spectra</a>. Currently the self-scattering by the planetary atmosphere is included, which is appropriate for, for example, brown dwarf and directly imaged atmospheres. In addition, you can now download our chemical equilibrium interpolation package, which is documented in <a class="reference external" href="content/notebooks/poor_man.html">Interpolating chemical equilibrium abundances</a></p>
-</dd>
-<dt><strong>September 2020: petitRADTRANS opacities available on the Exomol website</strong></dt><dd><p>Opacity tables created specifically in the petitRADTRANS format
-are now available on the <a class="reference external" href="http://www.exomol.com/data/data-types/opacity/">Exomol website</a>, also see <a class="reference external" href="https://arxiv.org/abs/2009.00687">Chubb et al. (2020)</a> for the accompanying paper.
-The opacities can be installed in petitRADTRANS in an easy plug-and-play fashion.
-Please see Section <a class="reference external" href="content/opa_add.html">Adding opacities</a> for more information.</p>
-</dd>
-<dt><strong>September 2020: More high-temperature atom and ion opacities available</strong></dt><dd><p>We have added more atom and ion opacities, bringing the total list to
-Al, AlII, AlIII, AlIV, AlV, AlVI, B, BII, BIII, Be, BeII, C, CII, CIII, CIV,
-Ca, CaII, Cr, Fe, FeII, K, KII, KIII, KIV, KV, KVI, Li, Mg, MgII, MgIII, MgIV,
-MgV, MgVI, N, NII, NIII, NIV, NV, Na, NaII, NaIII, NaIV, NaV, NaVI, Si, SiII, Ti,
-TiII, V, VII, Y</p>
-</dd>
-<dt><strong>May 2019: high-temperature atom and ion opacities now available</strong></dt><dd><p>We have added the opacities of Fe, Fe+, Mg, Mg+, Li, Ca, Ca+,
-Si, Si+, O, O+, Al, Al+, Ti, Ti+, V and V+, up to temperatures of
-4000 K. As usual, if the atmospheric temperatures increase
-above 4000 K, petitRADTRANS will use the absorbers respective
-opacities at 4000 K. <strong>Please make sure to install the latest
-petitRADTRANS version to make use of the high-temperature
-points of the new opacity tables!</strong></p>
-</dd>
-</dl>
-</section>
+<p>This documentation webpage contains an installation guide, a
+tutorial, an API documentation. Also, we give a tutorial and a list of easy-to-use resources on how to include
+opacities that may be missing from <a class="reference external" href="content/available_opacities.html">our database</a>. For the easiest cases this may correspond to simply dropping a file
+into the pRT opacity folder, please see Section <a class="reference external" href="content/opa_add.html">Adding opacities</a> for more information.</p>
 <section id="developers">
 <h2>Developers<a class="headerlink" href="#developers" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
 <li><p>Paul Mollière</p></li>
-<li><p>Eleonora Alei</p></li>
 <li><p>Evert Nasedkin</p></li>
+<li><p>Eleonora Alei</p></li>
 </ul>
 </section>
 <section id="contributors">
@@ -250,7 +239,7 @@ points of the new opacity tables!</strong></p>
 <li><p>Mantas Zilinskas</p></li>
 </ul>
 <div class="toctree-wrapper compound">
-<p><span class="caption-text">Guide:</span></p>
+<p class="caption"><span class="caption-text">Guide:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="content/installation.html">Installation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="content/installation.html#pre-installation-download-the-opacity-data">Pre-installation: download the opacity data</a></li>
@@ -292,11 +281,16 @@ points of the new opacity tables!</strong></p>
 </ul>
 </div>
 <div class="toctree-wrapper compound">
-<p><span class="caption-text">Code documentation:</span></p>
+<p class="caption"><span class="caption-text">Code documentation:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="content/code.html">Code documentation</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="content/code_radtrans.html">Radtrans class</a></li>
-<li class="toctree-l2"><a class="reference internal" href="content/code_nat_cst.html">nat_cst utility functions and constants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="content/nat_cst_doc.html">nat_cst constants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="autoapi/index.html">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/petitRADTRANS/index.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">petitRADTRANS</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/retrieve_emission_paper/index.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">retrieve_emission_paper</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/master_retrieval_model/index.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">master_retrieval_model</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/nice_corner/index.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">nice_corner</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/PT_envelopes/index.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">PT_envelopes</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/retrieve_transmission_paper/index.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">retrieve_transmission_paper</span></code></a></li>
 </ul>
 </li>
 </ul>

@@ -8,69 +8,54 @@ petitRADTRANS documentation
 
 Welcome to the **petitRADTRANS** (pRT) documentation. pRT is a
 Python package for calculating transmission and emission spectra
-of exoplanets, at low (:math:`\lambda/\Delta\lambda=1000`) and high
-(:math:`\lambda/\Delta\lambda=10^6`) resolution, for clear and cloudy
-atmospheres.
+of exoplanets **and incorporates (new!) an easy subpackage for running retrievals with nested sampling**.
 
-.. important::
+pRT has two different opacity treatment modes. The low resolution mode runs calculations
+at :math:`\lambda/\Delta\lambda\leq 1000` using the so-called correlated-k treatment for opacities.
+The high resolution mode runs calculations at :math:`\lambda/\Delta\lambda\leq 10^6`, using a line-by-line opacity treatment.
 
-   In addition to transmission spectra, **pRT now includes scattering also for emission spectra**, if specifically turned on (note that scattering increases the runtime), see `Scattering for Emission Spectra <content/notebooks/emis_scat.html>`_.
+pRT's low-resolution opacities are initially stored at :math:`\lambda/\Delta\lambda = 1000` but can be rebinned to lower
+resolution by the user on the fly, for which we make use of the `Exo_k <https://pypi.org/project/exo-k/>`_ package.
+This is explained `here <ADD>`_ (ADD LINK).
+
+The high-resolution opacities are initially stored at :math:`\lambda/\Delta\lambda = 10^6`, and example calculations are shown
+`here <content/notebooks/highres.html>`_. Opacities can also be undersampled, to run at a lower resolution, and to speed up
+spectral calculations. The user should verify whether this leads to solutions which are identical to the rebinned results of the fiducial
+:math:`\lambda/\Delta\lambda = 10^6` resolution. Undersampling is done with the ``lbl_opacity_sampling`` parameter
+described in the `API <autoapi/petitRADTRANS/radtrans/index.html#petitRADTRANS.radtrans.Radtrans>`_ here.
+
+pRT can calculate transmission and emission spectra of exoplanets, for clear or cloudy atmospheres. The different cloud treatment
+(gray clouds, power law clouds, "real" clouds using optical constants) are described in the tutorial `here <content/notebooks/clouds.html>`_. Scattering is
+included in pRT, but must be specifically turned on for emission spectra (note that scattering increases the runtime),
+see `Scattering for Emission Spectra <content/notebooks/emis_scat.html>`_. pRT can also calculate the reflection of light
+at the surface of rocky planets, for which the use can specify wavelength-dependent albedos and emissivities. This is likewise
+explained in `Scattering for Emission Spectra <content/notebooks/emis_scat.html>`_.
+
+The newly added retrieval subpackage is documented `here <content/notebooks/pRT_Retrieval_Example.html>`_.
+At the moment pRT retrievals are making use of the `PyMultiNest <https://johannesbuchner.github.io/PyMultiNest/>`_
+package for parameter inference. Of course you are free to use pRT spectral synthesis routines with any other inference tool of your liking.
 
 petitRADTRANS is available under the MIT License, and documented in
 `Mollière et al. (2019) <https://arxiv.org/abs/1904.11504>`_, for the general code, and `Mollière et al. (2020) <https://arxiv.org/abs/2006.09394>`_, Alei et al. (in prep.), for the scattering implementation. Please cite these papers if you make use of petitRADTRANS in your work.
 
 .. _contact: molliere@mpia.de
 
-This documentation webpage currently contains an installation guide, a
-tutorial, a first code documentation, and an implemented retrieval
-example for mock JWST emission and transmission spectra.
-Also, we give a tutorial on how to include opacities that may be
-missing from our database.
-
-News
-____
-
-**December 2020: stellar and planetary surface scattering added**
-    pRT now includes the scattering of the incoming stellar flux for irradiated planets. Also a scattering surface for terrestrial planets has been added, see `Scattering for Emission Spectra <content/notebooks/emis_scat.html>`_. The surface albedo and emissivity are both freely tunable parameters (as a function of wavelength). Surface scattering is treated to be isotropic (that is, assuming that the surface is Lambertian).
-
-**September 2020: self-scattering for emission spectra and chemical equilibrium interpolation now available**
-    pRT now includes scattering also for emission spectra, if specifically turned on (note that scattering increases the runtime), see `Scattering for Emission Spectra <content/notebooks/emis_scat.html>`_. Currently the self-scattering by the planetary atmosphere is included, which is appropriate for, for example, brown dwarf and directly imaged atmospheres. In addition, you can now download our chemical equilibrium interpolation package, which is documented in `Interpolating chemical equilibrium abundances <content/notebooks/poor_man.html>`_
-    
-**September 2020: petitRADTRANS opacities available on the Exomol website**
-    Opacity tables created specifically in the petitRADTRANS format
-    are now available on the `Exomol website <http://www.exomol.com/data/data-types/opacity/>`_, also see `Chubb et al. (2020) <https://arxiv.org/abs/2009.00687>`_ for the accompanying paper.
-    The opacities can be installed in petitRADTRANS in an easy plug-and-play fashion.
-    Please see Section `Adding opacities <content/opa_add.html>`_ for more information.
-
-**September 2020: More high-temperature atom and ion opacities available**
-    We have added more atom and ion opacities, bringing the total list to
-    Al, AlII, AlIII, AlIV, AlV, AlVI, B, BII, BIII, Be, BeII, C, CII, CIII, CIV,
-    Ca, CaII, Cr, Fe, FeII, K, KII, KIII, KIV, KV, KVI, Li, Mg, MgII, MgIII, MgIV,
-    MgV, MgVI, N, NII, NIII, NIV, NV, Na, NaII, NaIII, NaIV, NaV, NaVI, Si, SiII, Ti,
-    TiII, V, VII, Y
-
-**May 2019: high-temperature atom and ion opacities now available**
-    We have added the opacities of Fe, Fe+, Mg, Mg+, Li, Ca, Ca+,
-    Si, Si+, O, O+, Al, Al+, Ti, Ti+, V and V+, up to temperatures of
-    4000 K. As usual, if the atmospheric temperatures increase
-    above 4000 K, petitRADTRANS will use the absorbers respective
-    opacities at 4000 K. **Please make sure to install the latest
-    petitRADTRANS version to make use of the high-temperature
-    points of the new opacity tables!**
+This documentation webpage contains an installation guide, a
+tutorial, an API documentation. Also, we give a tutorial and a list of easy-to-use resources on how to include
+opacities that may be missing from `our database <content/available_opacities.html>`_. For the easiest cases this may correspond to simply dropping a file
+into the pRT opacity folder, please see Section `Adding opacities <content/opa_add.html>`_ for more information.
 
 Developers
 ___________
 
 - Paul Mollière
-- Eleonora Alei
 - Evert Nasedkin
+- Eleonora Alei
 
 Contributors
 ________________
 - Karan Molaverdikhani
 - Mantas Zilinskas
-
-
 
 .. toctree::
    :maxdepth: 2
@@ -86,4 +71,4 @@ ________________
    :maxdepth: 2
    :caption: Code documentation:
 
-   content/code
+   content/nat_cst_doc

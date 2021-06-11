@@ -15,9 +15,8 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('../'))
-autodoc_mock_imports = ['numpy', 'petitRADTRANS.fort_input', 'petitRADTRANS.fort_spec', \
-                        'petitRADTRANS.fort_rebin', 'scipy', 'glob', \
-                        'os', 'sys', 'pdb', 'h5py', 'exo_k', 'pymultinest']
+autodoc_mock_imports = ['numpy', 'scipy', 'glob', \
+                        'os', 'sys', 'pdb', 'h5py']
 
 # -- Project information -----------------------------------------------------
 
@@ -41,11 +40,13 @@ release = '2.1.0'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autodoc',
+    'autoapi.extension',
     'nbsphinx',
-    'sphinx.ext.mathjax'
+    'sphinx.ext.mathjax',
 ]
-exclude_patterns = ['_build', '**.ipynb_checkpoints']
+autoapi_type = 'python'
+autoapi_dirs = ['../petitRADTRANS']
+exclude_patterns = ['_build', '**.ipynb_checkpoints', '**.ipynb']
 
 #pdf_documents = [('index', u'rst2pdf', u'pRTdoc', u'Molliere'),]
 

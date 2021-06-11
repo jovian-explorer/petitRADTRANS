@@ -22,12 +22,12 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
-        <script type="text/javascript" src="../_static/jquery.js"></script>
-        <script type="text/javascript" src="../_static/underscore.js"></script>
-        <script type="text/javascript" src="../_static/doctools.js"></script>
-        <script type="text/javascript" src="../_static/language_data.js"></script>
-        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
         <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})</script>
     
     <script type="text/javascript" src="../_static/js/theme.js"></script>
@@ -37,6 +37,9 @@
   
   <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Tutorial" href="tutorial.html" />
@@ -91,7 +94,7 @@
               
             
             
-              <p><span class="caption-text">Guide:</span></p>
+              <p class="caption"><span class="caption-text">Guide:</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#pre-installation-download-the-opacity-data">Pre-installation: download the opacity data</a></li>
@@ -105,9 +108,10 @@
 <li class="toctree-l1"><a class="reference internal" href="retrieval_examples.html">Retrieval Examples</a></li>
 <li class="toctree-l1"><a class="reference internal" href="opa_add.html">Adding opacities</a></li>
 </ul>
-<p><span class="caption-text">Code documentation:</span></p>
+<p class="caption"><span class="caption-text">Code documentation:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="code.html">Code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="nat_cst_doc.html">nat_cst constants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../autoapi/index.html">API Reference</a></li>
 </ul>
 
             
@@ -206,7 +210,7 @@ provides all relevant input files for pRT to run, and contains the
 necessary folder structure if you want to install high-resolution
 opacities later (<span class="math notranslate nohighlight">\(\lambda/\Delta\lambda=10^6\)</span>).</p>
 <p>Thus, to get started download the <a class="reference external" href="https://keeper.mpdl.mpg.de/f/4b9409d9d17d443cb6ee/?dl=1">opacity and input data</a>
-(6.3 GB), unzip them, and put the “input_data” folder somewhere on
+(12.1 GB), unzip them, and put the “input_data” folder somewhere on
 your computer (it does not matter where).</p>
 <p>Next, please add the following environment variable to your
 “.bash_profile” or “.bashrc” file (depending on your operating system)
@@ -250,7 +254,8 @@ overuse.</strong> If you cannot access our files, please contact us <a class="re
 </pre></div>
 </div>
 <p>in a terminal. Note that you must also have downloaded the low-resolution
-opacities either before or after to actually run pRT, see above.</p>
+opacities either before or after to actually run pRT, see
+<a class="reference external" href="#pre-installation-download-the-opacity-data">above</a>.</p>
 </section>
 <section id="compiling-prt-from-source">
 <h2>Compiling pRT from source<a class="headerlink" href="#compiling-prt-from-source" title="Permalink to this headline">¶</a></h2>
@@ -268,11 +273,11 @@ Enter.</p></li>
 <h2>Testing the installation<a class="headerlink" href="#testing-the-installation" title="Permalink to this headline">¶</a></h2>
 <p>Open a new terminal window (this will source the <code class="docutils literal notranslate"><span class="pre">pRT_input_data_path</span></code>). Then open python and type</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">petitRADTRANS</span> <span class="kn">import</span> <span class="n">Radtrans</span>
-<span class="n">atmosphere</span> <span class="o">=</span> <span class="n">Radtrans</span><span class="p">(</span><span class="n">line_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2O&#39;</span><span class="p">])</span>
+<span class="n">atmosphere</span> <span class="o">=</span> <span class="n">Radtrans</span><span class="p">(</span><span class="n">line_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;CH4&#39;</span><span class="p">])</span>
 </pre></div>
 </div>
 <p>This should produce the following output:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span> Read line opacities of H2O...
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span> Read line opacities of CH4...
 Done.
 </pre></div>
 </div>

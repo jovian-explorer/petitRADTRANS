@@ -22,12 +22,12 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
-        <script type="text/javascript" src="../../_static/jquery.js"></script>
-        <script type="text/javascript" src="../../_static/underscore.js"></script>
-        <script type="text/javascript" src="../../_static/doctools.js"></script>
-        <script type="text/javascript" src="../../_static/language_data.js"></script>
-        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
         <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})</script>
     
     <script type="text/javascript" src="../../_static/js/theme.js"></script>
@@ -37,6 +37,9 @@
   
   <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="Scattering for Emission Spectra" href="emis_scat.html" />
@@ -91,7 +94,7 @@
               
             
             
-              <p><span class="caption-text">Guide:</span></p>
+              <p class="caption"><span class="caption-text">Guide:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../tutorial.html">Tutorial</a><ul class="current">
@@ -118,9 +121,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../retrieval_examples.html">Retrieval Examples</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../opa_add.html">Adding opacities</a></li>
 </ul>
-<p><span class="caption-text">Code documentation:</span></p>
+<p class="caption"><span class="caption-text">Code documentation:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../code.html">Code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nat_cst_doc.html">nat_cst constants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../autoapi/index.html">API Reference</a></li>
 </ul>
 
             
@@ -422,10 +426,15 @@ div.rendered_html tbody tr:hover {
 <span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">from</span> <span class="nn">petitRADTRANS</span> <span class="kn">import</span> <span class="n">Radtrans</span>
 
-<span class="n">atmosphere</span> <span class="o">=</span> <span class="n">Radtrans</span><span class="p">(</span><span class="n">line_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2O&#39;</span><span class="p">,</span> <span class="s1">&#39;CO_all_iso&#39;</span><span class="p">,</span> <span class="s1">&#39;CH4&#39;</span><span class="p">,</span> <span class="s1">&#39;CO2&#39;</span><span class="p">,</span> <span class="s1">&#39;Na&#39;</span><span class="p">,</span> <span class="s1">&#39;K&#39;</span><span class="p">],</span> \
-      <span class="n">rayleigh_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2&#39;</span><span class="p">,</span> <span class="s1">&#39;He&#39;</span><span class="p">],</span> \
-      <span class="n">continuum_opacities</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2-H2&#39;</span><span class="p">,</span> <span class="s1">&#39;H2-He&#39;</span><span class="p">],</span> \
-      <span class="n">wlen_bords_micron</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mi">15</span><span class="p">])</span>
+<span class="n">atmosphere</span> <span class="o">=</span> <span class="n">Radtrans</span><span class="p">(</span><span class="n">line_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2O_HITEMP&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;CO_all_iso_HITEMP&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;CH4&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;CO2&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;Na_allard&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;K_allard&#39;</span><span class="p">],</span>
+                      <span class="n">rayleigh_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2&#39;</span><span class="p">,</span> <span class="s1">&#39;He&#39;</span><span class="p">],</span>
+                      <span class="n">continuum_opacities</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2-H2&#39;</span><span class="p">,</span> <span class="s1">&#39;H2-He&#39;</span><span class="p">],</span>
+                      <span class="n">wlen_bords_micron</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mi">15</span><span class="p">])</span>
 
 <span class="n">pressures</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">logspace</span><span class="p">(</span><span class="o">-</span><span class="mi">6</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
 <span class="n">atmosphere</span><span class="o">.</span><span class="n">setup_opa_structure</span><span class="p">(</span><span class="n">pressures</span><span class="p">)</span>
@@ -437,6 +446,10 @@ div.rendered_html tbody tr:hover {
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
+  Read line opacities of CH4...
+ Done.
+  Read line opacities of CO2...
+ Done.
 
   Read CIA opacities for H2-H2...
   Read CIA opacities for H2-He...
@@ -467,12 +480,12 @@ div.rendered_html tbody tr:hover {
 <span class="n">mass_fractions</span> <span class="o">=</span> <span class="p">{}</span>
 <span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;H2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.74</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
 <span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;He&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.24</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
-<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;H2O&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
-<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;CO_all_iso&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.01</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
+<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;H2O_HITEMP&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
+<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;CO_all_iso_HITEMP&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.01</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
 <span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;CO2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.00001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
 <span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;CH4&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.000001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
-<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;Na&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.00001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
-<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;K&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.000001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
+<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;Na_allard&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.00001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
+<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;K_allard&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.000001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
 
 <span class="n">MMW</span> <span class="o">=</span> <span class="mf">2.33</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
 </pre></div>
@@ -710,7 +723,12 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">from</span> <span class="nn">petitRADTRANS</span> <span class="kn">import</span> <span class="n">Radtrans</span>
 
-<span class="n">atmosphere</span> <span class="o">=</span> <span class="n">Radtrans</span><span class="p">(</span><span class="n">line_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2O&#39;</span><span class="p">,</span> <span class="s1">&#39;CO_all_iso&#39;</span><span class="p">,</span> <span class="s1">&#39;CH4&#39;</span><span class="p">,</span> <span class="s1">&#39;CO2&#39;</span><span class="p">,</span> <span class="s1">&#39;Na&#39;</span><span class="p">,</span> <span class="s1">&#39;K&#39;</span><span class="p">],</span> \
+<span class="n">atmosphere</span> <span class="o">=</span> <span class="n">Radtrans</span><span class="p">(</span><span class="n">line_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2O_HITEMP&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;CO_all_iso_HITEMP&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;CH4&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;CO2&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;Na_allard&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;K_allard&#39;</span><span class="p">],</span> \
       <span class="n">cloud_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Mg2SiO4(c)_cd&#39;</span><span class="p">],</span> \
       <span class="n">rayleigh_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2&#39;</span><span class="p">,</span> <span class="s1">&#39;He&#39;</span><span class="p">],</span> \
       <span class="n">continuum_opacities</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2-H2&#39;</span><span class="p">,</span> <span class="s1">&#39;H2-He&#39;</span><span class="p">],</span> \
@@ -726,6 +744,10 @@ X_i = \frac{\mu_i}{\mu}n_i,
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
+  Read line opacities of CH4...
+ Done.
+  Read line opacities of CO2...
+ Done.
 
   Read CIA opacities for H2-H2...
   Read CIA opacities for H2-He...
@@ -756,12 +778,12 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <span class="n">mass_fractions</span> <span class="o">=</span> <span class="p">{}</span>
 <span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;H2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.74</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
 <span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;He&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.24</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
-<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;H2O&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
-<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;CO_all_iso&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.01</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
+<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;H2O_HITEMP&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
+<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;CO_all_iso_HITEMP&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.01</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
 <span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;CO2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.00001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
 <span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;CH4&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.000001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
-<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;Na&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.00001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
-<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;K&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.000001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
+<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;Na_allard&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.00001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
+<span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;K_allard&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.000001</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
 <span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;Mg2SiO4(c)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0000005</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
 
 <span class="n">MMW</span> <span class="o">=</span> <span class="mf">2.33</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
@@ -935,7 +957,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 </section>
 <section id="Emission-spectra">
 <h2>Emission spectra<a class="headerlink" href="#Emission-spectra" title="Permalink to this headline">¶</a></h2>
-<p>We can use the Radtrans object created above to calculate emission spectra as well. Here we will also generate an instance of pRT with scattering turned on, (see <a class="reference external" href="emis_scat.html">“Scattering for Emission Spectra”</a> for an example on how to do this in detail).</p>
+<p>We can use the Radtrans object created above to calculate emission spectra as well. Here we will also generate an instance of pRT with scattering turned on with <code class="docutils literal notranslate"><span class="pre">do_scat_emis</span> <span class="pre">=</span> <span class="pre">True</span></code>, (see <a class="reference external" href="emis_scat.html">“Scattering for Emission Spectra”</a> for an example on how to do this in detail).</p>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
 </pre></div>
@@ -950,12 +972,18 @@ X_i = \frac{\mu_i}{\mu}n_i,
          <span class="n">color</span> <span class="o">=</span> <span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">label</span> <span class="o">=</span> <span class="s1">&#39;cloudy, no scattering&#39;</span><span class="p">,</span> <span class="n">zorder</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span>
 
 <span class="c1"># Load scattering version of pRT</span>
-<span class="n">atmosphere</span> <span class="o">=</span> <span class="n">Radtrans</span><span class="p">(</span><span class="n">line_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2O&#39;</span><span class="p">,</span> <span class="s1">&#39;CO_all_iso&#39;</span><span class="p">,</span> <span class="s1">&#39;CH4&#39;</span><span class="p">,</span> <span class="s1">&#39;CO2&#39;</span><span class="p">,</span> <span class="s1">&#39;Na&#39;</span><span class="p">,</span> <span class="s1">&#39;K&#39;</span><span class="p">],</span> \
+<span class="n">atmosphere</span> <span class="o">=</span> <span class="n">Radtrans</span><span class="p">(</span><span class="n">line_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2O_HITEMP&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;CO_all_iso_HITEMP&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;CH4&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;CO2&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;Na_allard&#39;</span><span class="p">,</span>
+                                      <span class="s1">&#39;K_allard&#39;</span><span class="p">],</span> \
       <span class="n">cloud_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Mg2SiO4(c)_cd&#39;</span><span class="p">],</span> \
       <span class="n">rayleigh_species</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2&#39;</span><span class="p">,</span> <span class="s1">&#39;He&#39;</span><span class="p">],</span> \
       <span class="n">continuum_opacities</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H2-H2&#39;</span><span class="p">,</span> <span class="s1">&#39;H2-He&#39;</span><span class="p">],</span> \
       <span class="n">wlen_bords_micron</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mi">15</span><span class="p">],</span> \
       <span class="n">do_scat_emis</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+
 <span class="n">pressures</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">logspace</span><span class="p">(</span><span class="o">-</span><span class="mi">6</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
 <span class="n">atmosphere</span><span class="o">.</span><span class="n">setup_opa_structure</span><span class="p">(</span><span class="n">pressures</span><span class="p">)</span>
 
@@ -987,6 +1015,10 @@ X_i = \frac{\mu_i}{\mu}n_i,
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
+  Read line opacities of CH4...
+ Done.
+  Read line opacities of CO2...
+ Done.
 
   Read CIA opacities for H2-H2...
   Read CIA opacities for H2-He...

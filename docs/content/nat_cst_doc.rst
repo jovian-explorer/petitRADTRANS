@@ -1,7 +1,7 @@
-nat_cst utility functions and constants
-========================================
+nat_cst constants
+=================
 
-This package contains a few utility functions (see below), as well as the
+This subpackage contains a few utility functions (`see API <../autoapi/petitRADTRANS/nat_cst/index.html>`_), as well as the
 following natural constants, in cgs units:
 
 .. list-table::
@@ -48,6 +48,3 @@ following natural constants, in cgs units:
      - Earth mass
    * - r_earth = 637813660.
      - Earth radius
-       
-.. automodule:: petitRADTRANS.nat_cst
-    :members:

@@ -12,7 +12,7 @@ opacities later (:math:`\lambda/\Delta\lambda=10^6`).
 
 Thus, to get started download the `opacity and input data
 <https://keeper.mpdl.mpg.de/f/4b9409d9d17d443cb6ee/?dl=1>`_
-(6.3 GB), unzip them, and put the "input_data" folder somewhere on
+(12.1 GB), unzip them, and put the "input_data" folder somewhere on
 your computer (it does not matter where).
 
 Next, please add the following environment variable to your
@@ -67,7 +67,8 @@ To install pRT via pip install just type
    pip install petitRADTRANS
 
 in a terminal. Note that you must also have downloaded the low-resolution
-opacities either before or after to actually run pRT, see above.
+opacities either before or after to actually run pRT, see
+`above <#pre-installation-download-the-opacity-data>`_.
 
 Compiling pRT from source
 _________________________
@@ -90,11 +91,11 @@ Open a new terminal window (this will source the ``pRT_input_data_path``). Then 
 .. code-block:: python
 		
    from petitRADTRANS import Radtrans
-   atmosphere = Radtrans(line_species = ['H2O'])
+   atmosphere = Radtrans(line_species = ['CH4'])
 
 This should produce the following output:
 
 .. code-block:: bash
 		
-     Read line opacities of H2O...
+     Read line opacities of CH4...
     Done.
