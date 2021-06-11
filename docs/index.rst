@@ -8,7 +8,11 @@ petitRADTRANS documentation
 
 Welcome to the **petitRADTRANS** (pRT) documentation. pRT is a
 Python package for calculating transmission and emission spectra
-of exoplanets **and incorporates (new!) an easy subpackage for running retrievals with nested sampling**.
+of exoplanets for clear and cloudy planets. pRT also incorporates (**new!**)
+an easy subpackage for running retrievals with nested sampling.
+
+**To get started with some immediate examples on how to run pRT,
+see** `"Getting started" <content/notebooks/getting_started.html>`_. **Otherwise read on for some more general info.**
 
 pRT has two different opacity treatment modes. The low resolution mode runs calculations
 at :math:`\lambda/\Delta\lambda\leq 1000` using the so-called correlated-k treatment for opacities.
@@ -40,10 +44,12 @@ petitRADTRANS is available under the MIT License, and documented in
 
 .. _contact: molliere@mpia.de
 
-This documentation webpage contains an installation guide, a
-tutorial, an API documentation. Also, we give a tutorial and a list of easy-to-use resources on how to include
-opacities that may be missing from `our database <content/available_opacities.html>`_. For the easiest cases this may correspond to simply dropping a file
-into the pRT opacity folder, please see Section `Adding opacities <content/opa_add.html>`_ for more information.
+This documentation webpage contains an `installation guide <content/installation.html>`_, a
+`tutorial <content/tutorial.html>`_, an `API documentation <autoapi/index.html>`_.
+We also give a `list of easy-to-use resources on how to include
+opacities <content/opa_add.html>`_ that may be missing from `our database <content/available_opacities.html>`_.
+For the easiest cases this may correspond to simply dropping a file
+into the pRT opacity folder.
 
 Developers
 ___________

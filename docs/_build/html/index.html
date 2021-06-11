@@ -197,7 +197,10 @@
 <h1>petitRADTRANS documentation<a class="headerlink" href="#petitradtrans-documentation" title="Permalink to this headline">¶</a></h1>
 <p>Welcome to the <strong>petitRADTRANS</strong> (pRT) documentation. pRT is a
 Python package for calculating transmission and emission spectra
-of exoplanets <strong>and incorporates (new!) an easy subpackage for running retrievals with nested sampling</strong>.</p>
+of exoplanets for clear and cloudy planets. pRT also incorporates (<strong>new!</strong>)
+an easy subpackage for running retrievals with nested sampling.</p>
+<p><strong>To get started with some immediate examples on how to run pRT,
+see</strong> <a class="reference external" href="content/notebooks/getting_started.html">“Getting started”</a>. <strong>Otherwise read on for some more general info.</strong></p>
 <p>pRT has two different opacity treatment modes. The low resolution mode runs calculations
 at <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda\leq 1000\)</span> using the so-called correlated-k treatment for opacities.
 The high resolution mode runs calculations at <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda\leq 10^6\)</span>, using a line-by-line opacity treatment.</p>
@@ -220,10 +223,12 @@ At the moment pRT retrievals are making use of the <a class="reference external"
 package for parameter inference. Of course you are free to use pRT spectral synthesis routines with any other inference tool of your liking.</p>
 <p>petitRADTRANS is available under the MIT License, and documented in
 <a class="reference external" href="https://arxiv.org/abs/1904.11504">Mollière et al. (2019)</a>, for the general code, and <a class="reference external" href="https://arxiv.org/abs/2006.09394">Mollière et al. (2020)</a>, Alei et al. (in prep.), for the scattering implementation. Please cite these papers if you make use of petitRADTRANS in your work.</p>
-<p>This documentation webpage contains an installation guide, a
-tutorial, an API documentation. Also, we give a tutorial and a list of easy-to-use resources on how to include
-opacities that may be missing from <a class="reference external" href="content/available_opacities.html">our database</a>. For the easiest cases this may correspond to simply dropping a file
-into the pRT opacity folder, please see Section <a class="reference external" href="content/opa_add.html">Adding opacities</a> for more information.</p>
+<p>This documentation webpage contains an <a class="reference external" href="content/installation.html">installation guide</a>, a
+<a class="reference external" href="content/tutorial.html">tutorial</a>, an <a class="reference external" href="autoapi/index.html">API documentation</a>.
+We also give a <a class="reference external" href="content/opa_add.html">list of easy-to-use resources on how to include
+opacities</a> that may be missing from <a class="reference external" href="content/available_opacities.html">our database</a>.
+For the easiest cases this may correspond to simply dropping a file
+into the pRT opacity folder.</p>
 <section id="developers">
 <h2>Developers<a class="headerlink" href="#developers" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
