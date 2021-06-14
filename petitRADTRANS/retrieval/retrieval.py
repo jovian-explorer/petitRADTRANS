@@ -8,6 +8,7 @@ import numpy as np
 import copy as cp
 import pymultinest
 import json
+import logging
 from scipy.stats import binned_statistic
 # Plotting
 import matplotlib.pyplot as plt
@@ -121,6 +122,7 @@ class Retrieval:
             print('    import os')
             print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
             print('before creating a Radtrans object or loading the nat_cst module.')
+            logging.error("pRT_input_data_path not set")
             sys.exit(1)
         if not self.path.endswith("/"):
             self.path += "/"
@@ -131,7 +133,7 @@ class Retrieval:
             os.makedirs(self.output_dir + 'evaluate_' + self.retrieval_name, exist_ok=True)
 
         # Setup pRT Objects for each data structure.
-        print("Setting up PRT Objects")
+        logging.info("Setting up PRT Objects")
         self.setup_data()
         self.generate_retrieval_summary()
 
@@ -144,7 +146,7 @@ class Retrieval:
         prefix = self.output_dir + 'out_PMN/'+self.retrieval_name+'_'
 
         if len(self.output_dir + 'out_PMN/') > 100:
-            print("PyMultinest requires output directory names to be <100 characters.")
+            logging.error("PyMultinest requires output directory names to be <100 characters.")
             sys.exit(3)
 
         # How many free parameters?
@@ -194,16 +196,16 @@ class Retrieval:
         and produce standard outputs.
         """
 
-        print("Warning, ultranest mode is still in development. Proceed with caution")
+        logging.warning("ultranest mode is still in development. Proceed with caution")
         try:
             import ultranest as un
         except ImportError:
-            print("Could not import ultranest. Exiting.")
+            logging.error("Could not import ultranest. Exiting.")
             sys.exit(1)
         # TODO: autodetect PMN vs UN outputs
         prefix = self.output_dir + 'out_PMN/'+self.retrieval_name+'_'
         if self.run_mode == 'retrieval':
-            print("Starting retrieval: " + self.retrieval_name+'\n')
+            logging.info("Starting retrieval: " + self.retrieval_name+'\n')
             # How many free parameters?
             n_params = 0
             free_parameter_names = []
@@ -355,8 +357,8 @@ class Retrieval:
                                                 wlen_bords_micron = [0.1, 251.])
                         prt_path = self.path
                         ck_path = prt_path + 'opacities/lines/corr_k/'
-                        print("Saving to " + ck_path)
-                        print("Resolution: ", dd.model_resolution)
+                        logging.info("Saving to " + ck_path)
+                        logging.info("Resolution: ", dd.model_resolution)
                         atmosphere.write_out_rebin(int(dd.model_resolution),
                                                     path = ck_path,
                                                     species = species,
@@ -591,7 +593,7 @@ class Retrieval:
                 The emission or transmission spectrum array, with the same shape as bf_wlen
         """
 
-        print("Computing Best Fit Model, this may take a minute...")
+        logging.info("Computing Best Fit Model, this may take a minute...")
         if ret_name is None:
             ret_name = self.retrieval_name
 
@@ -688,7 +690,7 @@ class Retrieval:
                         samples_use[:,i_p] = sample_dict[self.retrieval_name][:, i_s]
                 i_p += 1
 
-        print("Best fit parameters")
+        logging.info("Best fit parameters")
         i_p = 0
         # Get best-fit index
         logL = samples_use[:,-1]
@@ -705,7 +707,7 @@ class Retrieval:
         self.plot_sampled(samples_use, parameters_read)
         self.plot_PT(sample_dict,parameters_read)
         self.plot_corner(sample_dict,parameter_dict,parameters_read)
-        print("Done!")
+        logging.info("Done!")
         return
 
     def plot_spectra(self,samples_use,parameters_read,model_generating_func = None):
@@ -735,7 +737,7 @@ class Retrieval:
 
         #TODO: include plotting of multiple retrievals
 
-        print("Plotting Best-fit spectrum")
+        logging.info("Plotting Best-fit spectrum")
         fig, axes = fig, axes = plt.subplots(nrows=2, ncols=1, sharex='col', sharey=False,
                                gridspec_kw={'height_ratios': [2.5, 1],'hspace':0.1},
                                figsize=(20, 10))
@@ -900,7 +902,7 @@ class Retrieval:
         try:
             ax.xaxis.set_major_formatter('{x:.1f}')
         except:
-            print("Please update to matplotlib 3.3.4 or greater")
+            logging.warning("Please update to matplotlib 3.3.4 or greater")
             pass
 
         if self.rd.plot_kwargs["xscale"] == 'log':
@@ -927,7 +929,7 @@ class Retrieval:
         try:
             ax_r.xaxis.set_major_formatter('{x:.1f}')
         except:
-            print("Please update to matplotlib 3.3.4 or greater")
+            logging.warning("Please update to matplotlib 3.3.4 or greater")
             pass
 
         if self.rd.plot_kwargs["xscale"] == 'log':
@@ -962,8 +964,8 @@ class Retrieval:
                 posterior samples from pynmultinest outputs (post_equal_weights)
         """
 
-        print("Plotting Best-fit spectrum with "+ str(self.rd.plot_kwargs["nsample"]) + " samples.")
-        print("This could take some time...")
+        logging.info("Plotting Best-fit spectrum with "+ str(self.rd.plot_kwargs["nsample"]) + " samples.")
+        logging.info("This could take some time...")
         len_samples = samples_use.shape[0]
         path = self.output_dir + 'evaluate_'+self.retrieval_name + "/"
 
@@ -1015,7 +1017,7 @@ class Retrieval:
             ax : matplotlib.axes
         """
 
-        print("Plotting PT profiles")
+        logging.info("Plotting PT profiles")
         self.PT_plot_mode = True
         samples_use = cp.copy(sample_dict[self.retrieval_name])
         i_p = 0
@@ -1081,7 +1083,7 @@ class Retrieval:
                 aren't included in the PMN outputs
         """
 
-        print("Making corner plot")
+        logging.info("Making corner plot")
         sample_use_dict = {}
         p_plot_inds = {}
         p_ranges = {}

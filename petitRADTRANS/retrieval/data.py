@@ -1,6 +1,7 @@
 import sys
 import os
 import numpy as np
+import logging
 from scipy.ndimage.filters import gaussian_filter
 import petitRADTRANS.nat_cst as nc
 from .rebin_give_width import rebin_give_width
@@ -18,12 +19,14 @@ class Data:
         name : str
             Identifier for this data set.
         path_to_observations : str
-            Path to observations file, including filename. This can be a txt or dat file containing the wavelength,
-            flux, transit depth and error, or a fits file containing the wavelength, spectrum and covariance matrix.
+            Path to observations file, including filename. This can be a txt or dat file
+            containing the wavelength, flux, transit depth and error, or a fits file
+            containing the wavelength, spectrum and covariance matrix.
         distance : float
             The distance to the object in cgs units. Defaults to a 10pc normalized distance.
         data_resolution : float
-            Spectral resolution of the instrument. Optional, allows convolution of model to instrumental line width.
+            Spectral resolution of the instrument. Optional, allows convolution of model to
+            instrumental line width.
         model_resolution : float
             Will be ``None`` by default.  The resolution of the c-k opacity tables in pRT.
             This will generate a new c-k table using exo-k. The default (and maximum)
@@ -39,6 +42,9 @@ class Data:
             this may save time! The user should verify whether this leads to
             solutions which are identical to the rebinned results of the fiducial
             :math:`10^6` resolution. If not, this parameter must not be used.
+            Note the difference between this parameter and the lbl_opacity_sampling
+            parameter in the RadTrans class - the actual desired resolution should
+            be set here.
         external_pRT_instance : object
             An existing RadTrans object. Leave as none unless you're sure of what you're doing.
         model_generating_function : method
@@ -54,9 +60,11 @@ class Data:
         photometry : bool
             Set to True if using photometric data.
         photometric_transformation_function : method
-            Transform the photometry (account for filter transmission etc.)
+            Transform the photometry (account for filter transmission etc.).
+            This function must take in the wavelength and flux of a spectrum,
+            and output a single photometric point (and optionally flux error).
         photometric_bin_edges : Tuple, numpy.ndarray
-            The width of the photometric bin. [low,high]
+            The edges of the photometric bin in micron. [low,high]
         opacity_mode : str
             Should the retrieval be run using correlated-k opacities (default, 'c-k'),
             or line by line ('lbl') opacities? If 'lbl' is selected, it is HIGHLY
@@ -93,7 +101,7 @@ class Data:
 
         # Data file
         if not os.path.exists(path_to_observations):
-            print(path_to_observations + " Does not exist!")
+            logging.error(path_to_observations + " Does not exist!")
             sys.exit(7)
 
         # Sanity check distance
@@ -101,7 +109,7 @@ class Data:
         if not distance:
             self.distance = 10.* nc.pc
         if self.distance < 1.0*nc.pc:
-            print("Your distance is less than 1pc, are you sure you're using cgs units?")
+            logging.warning("Your distance is less than 1pc, are you sure you're using cgs units?")
 
 
         self.data_resolution = data_resolution
@@ -110,13 +118,18 @@ class Data:
         self.model_generating_function = model_generating_function
         self.opacity_mode = opacity_mode
         if opacity_mode is not 'c-k' and opacity_mode is not 'lbl':
-            print("opacity_mode must be either 'c-k' or 'lbl'!")
+            logging.error("opacity_mode must be either 'c-k' or 'lbl'!")
             sys.exit(10)
         # Sanity check model function
         if not model_generating_function and not external_pRT_reference:
-            print("Please provide a model generating function or external reference for " + name + "!")
+            logging.error("Please provide a model generating function or external reference for " + name + "!")
             sys.exit(8)
-
+        if model_resolution is not None:
+            if opacity_mode is 'c_k' and model_resolution > 1000:
+                logging.warning("The maximum opacity for c-k mode is 1000!")
+                self.model_resolution = None
+            if opacity_mode is 'lbl' and model_resolution < 1000:
+                logging.warning("Your resolution is lower than R=1000, it's recommended to use 'c-k' mode.")
         # Optional, covariance and scaling
         self.covariance = None
         self.inv_cov = None
@@ -131,10 +144,10 @@ class Data:
             photometric_transformation_function
         if photometry:
             if photometric_transformation_function is None:
-                print("Please provide a photometry transformation function for " + name + "!")
+                logging.error("Please provide a photometry transformation function for " + name + "!")
                 sys.exit(9)
             if photometric_bin_edges is None:
-                print("You must include the photometric bin size if photometry is True!")
+                logging.error("You must include the photometric bin size if photometry is True!")
                 sys.exit(9)
         self.photometry_range = wlen_range_micron
         self.width_photometry = photometric_bin_edges
@@ -198,10 +211,10 @@ class Data:
 
         # Warnings and errors
         if obs.shape[1] != 3:
-            print("Failed to properly load data in " + path + "!!!")
+            logging.error("Failed to properly load data in " + path + "!!!")
             sys.exit(6)
         if np.isnan(obs).any():
-            print("WARNING: nans present in " + path + ", please verify your data before running the retrieval!")
+            logging.warning("nans present in " + path + ", please verify your data before running the retrieval!")
         self.wlen = obs[:,0]
         self.flux = obs[:,1]
         self.flux_error = obs[:,-1]
@@ -210,7 +223,7 @@ class Data:
         """
         Load in a particular style of fits file.
         Must include extension SPECTRUM with fields WAVLENGTH, FLUX
-        and COVARIANCE.
+        and COVARIANCE (or ERROR).
 
         Args:
             path : str
@@ -222,9 +235,16 @@ class Data:
             return
         self.wlen = fits.getdata(path, 'SPECTRUM').field("WAVELENGTH")
         self.flux = fits.getdata(path, 'SPECTRUM').field("FLUX")
-        self.covariance = fits.getdata(path,'SPECTRUM').field("COVARIANCE")
-        self.inv_cov = np.linalg.inv(self.covariance)
-        self.flux_error = np.sqrt(self.covariance.diagonal())
+        try:
+            self.covariance = fits.getdata(path,'SPECTRUM').field("COVARIANCE")
+            self.inv_cov = np.linalg.inv(self.covariance)
+
+            # Note that this will only be the uncorrelated error.
+            # Dot with the correlation matrix (if available) to get
+            # the full error.
+            self.flux_error = np.sqrt(self.covariance.diagonal())
+        except:
+            self.flux_error = fits.getdata(path,'SPECTRUM').field("ERROR")
 
     def set_distance(self,distance):
         """

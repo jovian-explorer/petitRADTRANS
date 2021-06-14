@@ -1,5 +1,6 @@
 import sys
 import os
+import logging
 # To not have numpy start parallelizing on its own
 os.environ["OMP_NUM_THREADS"] = "1"
 import numpy as np
@@ -54,7 +55,7 @@ class RetrievalConfig:
             run_mode = 'retrieval'
         self.run_mode = run_mode
         if self.run_mode != 'retrieval' and self.run_mode != 'evaluate':
-            print("run_mode must be either 'retrieval' or 'evaluate'!")
+            logging.error("run_mode must be either 'retrieval' or 'evaluate'!")
             sys.exit(1)
         self.AMR = AMR
         if pressures is not None:
@@ -117,7 +118,7 @@ class RetrievalConfig:
                 The number of cells in the low pressure grid to replace with the high resolution grid.
         """
 
-        print("Setting up AMR pressure grid.")
+        logging.info("Setting up AMR pressure grid.")
         self.scaling = scaling
         self.width = width
         nclouds = len(self.cloud_species)
@@ -164,6 +165,7 @@ class RetrievalConfig:
             print('    import os')
             print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
             print('before creating a Radtrans object or loading the nat_cst module.')
+            logging.error("pRT_input_data_path variable not set")
             sys.exit(1)
 
         if self.op_mode == 'c-k':
@@ -186,12 +188,14 @@ class RetrievalConfig:
             print('    import os')
             print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
             print('before creating a Radtrans object or loading the nat_cst module.')
+            logging.error("pRT_input_data_path variable not set")
             sys.exit(1)
 
         files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/continuum/clouds/")]
         files = set(files)
         for f in files: print(f)
         return files
+
     def list_available_cia_species(self):
         """
         List the currently installed opacity tables that are available for CIA species.
@@ -204,6 +208,7 @@ class RetrievalConfig:
             print('    import os')
             print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
             print('before creating a Radtrans object or loading the nat_cst module.')
+            logging.error("pRT_input_data_path variable not set")
             sys.exit(1)
 
         files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/continuum/cia/")]
@@ -325,8 +330,8 @@ class RetrievalConfig:
         """
 
         if species.endswith("(c)"):
-            print("Ensure you set the cloud particle shape, typically with the _cd tag!")
-            print(species + " was not added to the list of cloud species")
+            logging.warning("Ensure you set the cloud particle shape, typically with the _cd tag!")
+            logging.warning(species + " was not added to the list of cloud species")
             return
         self.cloud_species.append(species)
         cname = species.split('_')[0]
@@ -435,7 +440,8 @@ class RetrievalConfig:
                 import species
                 species.SpeciesInit()
             except:
-                print("Please provide a function to transform a spectrum into photometry, or pip install species")
+                logging.error("Please provide a function to transform a spectrum into photometry, or pip install species")
+                sys.exit(12)
         for line in photometry:
             # # must be the comment character
             if line[0] == '#':
