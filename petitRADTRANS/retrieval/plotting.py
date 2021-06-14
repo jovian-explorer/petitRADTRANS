@@ -13,33 +13,37 @@ from .data import Data
 
 def plot_specs(fig, ax, path, name, nsample, color1, color2, zorder, rebin_val = None):
     specs = [f for f in glob.glob(path+'/' + name + '*.dat')]
+    wlen = np.genfromtxt(specs[i_s])[:,0]
+
+    if rebin_val != None:
+        wlen = nc.running_mean(wlen, rebin_val)[::rebin_val]
+    npoints = int(len(wlen))
+    spectra= np.zeros((nsample*npoints))
     for i_s in range(nsample):
         if rebin_val != None:
-            wlen = np.genfromtxt(specs[i_s])[:,0]
-            wlen = nc.running_mean(wlen, rebin_val)[::rebin_val]
             npoints = int(len(wlen))
-            spectra= np.zeros((nsample*npoints))
             spectra[i_s, :]= nc.running_mean(np.genfromtxt(specs[i_s])[:,1], \
                                                 rebin_val)[::rebin_val]
         else:
             wlen = np.genfromtxt(specs[i_s])[:,0]
             npoints = int(len(wlen))
-            spectra = np.zeros((nsample,npoints))
             for i_s in range(nsample):
                 spectra[i_s, :] = np.genfromtxt(specs[i_s])[:,1]
 
     sort_spec = np.sort(spectra, axis = 0)
 
     # 3 sigma
-    ax.fill_between(wlen, \
-                      y1 = sort_spec[int(nsample*0.02275), :], \
-                      y2 = sort_spec[int(nsample*(1.-0.02275)), :], \
-                      color = color1, zorder = zorder*2)
+    if int(nsample*0.02275) > 1:
+        ax.fill_between(wlen, \
+                        y1 = sort_spec[int(nsample*0.02275), :], \
+                        y2 = sort_spec[int(nsample*(1.-0.02275)), :], \
+                        color = color1, zorder = zorder*2)
     # 1 sigma
     ax.fill_between(wlen, \
                       y1 = sort_spec[int(nsample*0.16), :], \
                       y2 = sort_spec[int(nsample*0.84), :], \
                       color = color2, zorder = zorder*2+1)
+    return fig,ax
 
 def plot_data(fig,ax,data,resolution = None, scaling = 1.0):
     scale = 1.0
@@ -177,9 +181,7 @@ def contour_corner(sampledict, \
                 else:
                     range_list.append((low,high))
             else:
-                range_mean = np.mean(samples[len(samples)-S:,i])
-                range_std = np.std(samples[len(samples)-S:,i])
-                range_take = (range_mean-4*range_std, range_mean+4*range_std)
+                range_take = (parameter_ranges[key][i][0],parameter_ranges[key][i][1])
                 range_list.append(range_take)
         try:
             truths_list = []

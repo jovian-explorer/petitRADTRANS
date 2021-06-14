@@ -1007,15 +1007,15 @@ class Retrieval:
                                                  self.posterior_sample_specs[name][1])))
         # TODO: option for plotting of full bf model rather than by dataset
         for name,dd in data_use.items():
-            plot_specs(fig,ax,path, name,
-                       self.rd.plot_kwargs["nsample"],
-                       '#ff9f9f', '#ff3d3d',
-                       -10, rebin_val = downsample_factor)
+            fig, ax = plot_specs(fig,ax,path, name,
+                                self.rd.plot_kwargs["nsample"],
+                                '#ff9f9f', '#ff3d3d',
+                                0, rebin_val = downsample_factor)
 
         for name,dd in self.data.items():
-            plot_data(fig,ax,dd,
-                      resolution = self.rd.plot_kwargs["resolution"],
-                      scaling = self.rd.plot_kwargs["y_axis_scaling"])
+            fig, ax = plot_data(fig,ax,dd,
+                                resolution = self.rd.plot_kwargs["resolution"],
+                                scaling = self.rd.plot_kwargs["y_axis_scaling"])
             #plt.ylim([0.006, 0.0085])
 
         ax.set_xlabel('Wavelength [micron]')
