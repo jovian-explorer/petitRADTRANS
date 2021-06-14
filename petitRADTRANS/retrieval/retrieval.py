@@ -673,6 +673,9 @@ class Retrieval:
         run definition.
         """
 
+        if not self.run_mode == 'evaluate':
+            logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
+            self.run_mode = 'evaluate'
         if output_dir is None:
             output_dir = self.output_dir
         sample_dict, parameter_dict = self.get_samples(output_dir)
@@ -736,7 +739,9 @@ class Retrieval:
         """
 
         #TODO: include plotting of multiple retrievals
-
+        if not self.run_mode == 'evaluate':
+            logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
+            self.run_mode = 'evaluate'
         print("Plotting Best-fit spectrum")
         fig, axes = fig, axes = plt.subplots(nrows=2, ncols=1, sharex='col', sharey=False,
                                gridspec_kw={'height_ratios': [2.5, 1],'hspace':0.1},
@@ -964,6 +969,9 @@ class Retrieval:
                 posterior samples from pynmultinest outputs (post_equal_weights)
         """
 
+        if not self.run_mode == 'evaluate':
+            logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
+            self.run_mode = 'evaluate'
         print("Plotting Best-fit spectrum with "+ str(self.rd.plot_kwargs["nsample"]) + " samples.")
         print("This could take some time...")
         len_samples = samples_use.shape[0]
@@ -1018,6 +1026,9 @@ class Retrieval:
         """
 
         print("Plotting PT profiles")
+        if not self.run_mode == 'evaluate':
+            logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
+            self.run_mode = 'evaluate'
         self.PT_plot_mode = True
         samples_use = cp.copy(sample_dict[self.retrieval_name])
         i_p = 0
@@ -1083,7 +1094,10 @@ class Retrieval:
                 aren't included in the PMN outputs
         """
 
-        logging.info("Making corner plot")
+        if not self.run_mode == 'evaluate':
+            logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
+            self.run_mode = 'evaluate'
+        print("Making corner plot")
         sample_use_dict = {}
         p_plot_inds = {}
         p_ranges = {}
