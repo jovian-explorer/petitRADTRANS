@@ -117,7 +117,9 @@ class Data:
         self.external_pRT_reference = external_pRT_reference
         self.model_generating_function = model_generating_function
         self.opacity_mode = opacity_mode
-
+        if opacity_mode not in ['c-k','lbl']:
+            logging.error("opacity_mode must be either 'c-k' or 'lbl'!")
+            sys.exit(10)
         # Sanity check model function
         if not model_generating_function and not external_pRT_reference:
             logging.error("Please provide a model generating function or external reference for " + name + "!")
