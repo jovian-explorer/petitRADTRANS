@@ -9,5 +9,6 @@ Tutorial
    notebooks/clouds
    notebooks/emis_scat
    notebooks/analysis
+   notebooks/pRT_Retrieval_Example
    notebooks/nat_cst_utility
    notebooks/poor_man

@@ -29,7 +29,7 @@ def plot_specs(fig,ax,path, name, color1, color2, zorder, rebin_val = None):
             spectra[i_s, :] = np.genfromtxt(specs[i_s])[:,1]
 
     sort_spec = np.sort(spectra, axis = 0)
-    
+
     ax.fill_between(wlen, \
                       y1 = sort_spec[int(nspectra*0.02275), :], \
                       y2 = sort_spec[int(nspectra*(1.-0.02275)), :], \
@@ -58,52 +58,45 @@ def contour_corner(sampledict, \
                 parameter_ranges = None, \
                 parameter_plot_indices = None, \
                 true_values = None, \
-                max_val_ratio = None,
                 short_name = None,
                 legend = False):
     """
-    contour_corner
     Use the corner package to plot the posterior distributions produced by pymultinest.
 
-    parameters
-    ----------
-    sampledict : dict
-        A dictionary of samples, each sample has shape (N_Samples,N_params). The keys of the 
-        dictionary correspond to the names of each retrieval, and are the prefixes to the
-        post_equal_weights.dat files. These are passed as arguments to retrieve.py.
-        By default, this is only the current retrieval, and plots the posteriors for a single
-        retrieval. If multiple names are passed, they are overplotted on the same figure.
-    parameter_names : dict
-        A dictionary with keys for each retrieval name, as in sampledict. Each value of the 
-        dictionary is the names of the parameters to beplotted, as set in the
-        run_definition file.
-    output_file : str
-        Output file name
-    parameter_ranges : dict
-        A dictionary with keys for each retrieval name as in sampledict. Each value 
-        contains the ranges of parameters that have a range set with corner_range in the
-        parameter class. Otherwise the range is +/- 4 sigma
-    parameter_plot_indicies : dict
-        A dictionary with keys for each retrieval name as in sampledict. Each value
-        contains the indices of the sample to plot, as set by the plot_in_corner
-        parameter of the parameter class
-    true_values : dict
-         A dictionary with keys for each retrieval name as in sampledict. Each value
-        contains the known values of the parameters.
-    max_val_ratio : int
-        deprecated
-    short_name : dict
-         A dictionary with keys for each retrieval name as in sampledict. Each value
-        contains the names to be plotted in the corner plot legend. If non, uses the 
-        retrieval names used as keys for sampledict
-    legend : bool
-        Turn the legend on or off
-    color_list : list
-        List of colors for each retrieval. If none uses a default color scheme (Up to 4 runs)
+    Args:
+        sampledict : dict
+            A dictionary of samples, each sample has shape (N_Samples,N_params). The keys of the
+            dictionary correspond to the names of each retrieval, and are the prefixes to the
+            post_equal_weights.dat files. These are passed as arguments to retrieve.py.
+            By default, this is only the current retrieval, and plots the posteriors for a single
+            retrieval. If multiple names are passed, they are overplotted on the same figure.
+        parameter_names : dict
+            A dictionary with keys for each retrieval name, as in sampledict. Each value of the
+            dictionary is the names of the parameters to beplotted, as set in the
+            run_definition file.
+        output_file : str
+            Output file name
+        parameter_ranges : dict
+            A dictionary with keys for each retrieval name as in sampledict. Each value
+            contains the ranges of parameters that have a range set with corner_range in the
+            parameter class. Otherwise the range is +/- 4 sigma
+        parameter_plot_indicies : dict
+            A dictionary with keys for each retrieval name as in sampledict. Each value
+            contains the indices of the sample to plot, as set by the plot_in_corner
+            parameter of the parameter class
+        true_values : dict
+            A dictionary with keys for each retrieval name as in sampledict. Each value
+            contains the known values of the parameters.
+        short_name : dict
+            A dictionary with keys for each retrieval name as in sampledict. Each value
+            contains the names to be plotted in the corner plot legend. If non, uses the
+            retrieval names used as keys for sampledict
+        legend : bool
+            Turn the legend on or off
     """
     from .plot_style import prt_colours
     color_list = prt_colours
-
+    #color_list = ['#009FB8','#FF695C', '#70FF92',  '#FFBB33', '#6171FF', "#FF1F69", "#52AC25", '#E574FF', "#FF261D", "#B429FF" ]
     N_samples = []
     range_list = []
     handles = []
@@ -143,7 +136,7 @@ def contour_corner(sampledict, \
                     range_list[i] = range_take
                 else:
                     range_list.append((low,high))
-            else:    
+            else:
                 range_mean = np.mean(samples[len(samples)-S:,i])
                 range_std = np.std(samples[len(samples)-S:,i])
                 range_take = (range_mean-4*range_std, range_mean+4*range_std)
@@ -154,12 +147,17 @@ def contour_corner(sampledict, \
                 truths_list.append(true_values[key][i])
         except:
             pass
-        fig = plt.figure(figsize = (30,30))
-        label_kwargs = {'fontsize':18}
-        title_kwargs = {'fontsize':16}#{'fontsize':int(48/len(parameter_plot_indices[key]))}
-        hist2d_kwargs = {'fontsize':12}
-        
-        #TODO reset default figsize
+        fig = plt.figure(figsize = (60,60),dpi=80)
+        label_kwargs = {'fontsize':54}
+        title_kwargs = {'fontsize':42}#{'fontsize':int(48/len(parameter_plot_indices[key]))}
+        hist2d_kwargs = {'fontsize':42}
+        hist_kwargs = {"linewidth":6}
+        contour_kwargs = {"linewidths":6}
+        import matplotlib as mpl
+        mpl.rcParams['axes.linewidth'] = 1
+        #mpl.rcParams['figure.figsize']=(40,40)
+        #mpl.rcParams['figure.dpi']=100
+
         if count == 0:
             fig = corner.corner(np.array(data_list).T,
                                 fig = fig,
@@ -174,6 +172,8 @@ def contour_corner(sampledict, \
                                 quantiles=[0.16, 0.5, 0.84],
                                 hist2d_kwargs = hist2d_kwargs,
                                 plot_contours = True,
+                                contour_kwargs = contour_kwargs,
+                                hist_kwargs = hist_kwargs,
                                 levels=[1-np.exp(-0.5),1-np.exp(-2),1-np.exp(-4.5)]
                                 )
             count +=1
@@ -190,22 +190,27 @@ def contour_corner(sampledict, \
                           label_kwargs = label_kwargs,
                           hist2d_kwargs = hist2d_kwargs,
                           plot_contours = True,
+                          contour_kwargs = contour_kwargs,
+                          hist_kwargs = hist_kwargs,
                           levels=[1-np.exp(-0.5),1-np.exp(-2),1-np.exp(-4.5)]
                           )
             count += 1
         for ax in fig.get_axes():
-            ax.tick_params(axis='both', labelsize=18, direction="in")
-        if dimensions == 1:
-            plt.tight_layout(h_pad=0, w_pad=0)
+            ax.tick_params(axis='both', labelsize=36, direction="in")
+            ax.tick_params(axis='both',which = 'major', length = 24)
+            ax.tick_params(axis='both',which = 'minor', length = 12)
+        #if dimensions == 1:
+        #    plt.tight_layout(h_pad=0, w_pad=0)
         if short_name is None:
             label = key
         else:
             label = short_name[key]
         handles.append(Line2D([0], [0], marker = 'o',color=color_list[count], label = label,markersize = 15))
+    fig.subplots_adjust( wspace=0.005, hspace=0.005)
     if legend:
         fig.get_axes()[2].legend(handles = handles,
                                  loc = 'upper right' )
-    plt.savefig(output_file)
+    plt.savefig(output_file,dpi=300, bbox_inches='tight')
 
 
 
@@ -241,16 +246,16 @@ def nice_corner(samples, \
                                         len(parameter_names)-1).astype('int')
     except:
         pass
-                                        
+
     if max_val_ratio == None:
         max_val_ratio = 5.
 
     data_list = []
     labels_list = []
     range_list = []
-    
+
     for i in parameter_plot_indices:
-        
+
         data_list.append(samples[len(samples)-S:,i])
         labels_list.append(parameter_names[i])
 
@@ -267,7 +272,7 @@ def nice_corner(samples, \
             range_std = np.std(samples[len(samples)-S:,i])
             range_take = (range_mean-4*range_std, range_mean+4*range_std)
             range_list.append(range_take)
-            
+
     try:
         truths_list = []
         for i in parameter_plot_indices:
@@ -317,12 +322,12 @@ def nice_corner(samples, \
                                linestyle = '--', linewidth = 2.5)
             except:
                 pass
-            
+
             if i_col > 0:
                 ax.get_yaxis().set_visible(False)
 
         elif i_col == i_lin:
-            
+
             med = np.median(data_list[i_col])
             up = str(np.round(np.percentile(data_list[i_col], 84) - med,2))
             do = str(np.round(med - np.percentile(data_list[i_col], 16),2))
@@ -330,11 +335,11 @@ def nice_corner(samples, \
             med = med.split('.')[0]+'.'+med.split('.')[1].ljust(2, '0')
             up = up.split('.')[0]+'.'+up.split('.')[1].ljust(2, '0')
             do = do.split('.')[0]+'.'+do.split('.')[1].ljust(2, '0')
-            
+
             ax.set_title(med+r'$^{+'+up+'}_{-'+do+'}$', \
                              fontdict=font, fontsize = \
                              int(22*5./len(parameter_plot_indices)))
-            
+
             import copy as cp
             use_data = cp.copy(data_list[i_col])
             index = (use_data >= range_list[i_col][0]) & \
@@ -342,7 +347,7 @@ def nice_corner(samples, \
             use_data = use_data[index]
             sns.distplot(use_data, bins=22, kde=False, \
                              rug=False, ax=ax, color = 'gray')
-                             
+
             ax.set_xlim([range_list[i_col][0], range_list[i_col][1]])
             ax.get_yaxis().set_visible(False)
             try:
@@ -350,7 +355,7 @@ def nice_corner(samples, \
                                    linestyle = '--', linewidth = 2.5)
             except:
                 pass
-            
+
             ax.axvline(float(med)+float(up), color = 'black', \
                            linestyle = ':', linewidth=1.0)
             ax.axvline(float(med), color = 'black', \

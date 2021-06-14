@@ -15,7 +15,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('../'))
-autodoc_mock_imports = ['numpy', 'scipy', 'glob', \
+autodoc_mock_imports = ['petitRADTRANS', 'numpy', 'scipy', 'glob', \
                         'os', 'sys', 'pdb', 'h5py']
 
 # -- Project information -----------------------------------------------------
@@ -46,7 +46,7 @@ extensions = [
 ]
 autoapi_type = 'python'
 autoapi_dirs = ['../petitRADTRANS']
-exclude_patterns = ['_build', '**.ipynb_checkpoints', '**.ipynb']
+exclude_patterns = ['_build', '**.ipynb_checkpoints']
 
 #pdf_documents = [('index', u'rst2pdf', u'pRTdoc', u'Molliere'),]
 
