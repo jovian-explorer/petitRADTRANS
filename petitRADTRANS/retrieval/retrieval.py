@@ -1141,7 +1141,7 @@ class Retrieval:
 
 
         output_file = self.output_dir + 'evaluate_'+self.retrieval_name +'/corner_nice.pdf'
-        max_val_ratio = 5.
+
 
         # from Plotting
         contour_corner(sample_use_dict, \
