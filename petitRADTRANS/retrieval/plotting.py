@@ -12,9 +12,9 @@ from petitRADTRANS import nat_cst as nc
 from .data import Data
 
 def plot_specs(fig, ax, path, name, nsample, color1, color2, zorder, rebin_val = None):
+    # TODO write generic plotting functions rather than copy pasting code.
     specs = [f for f in glob.glob(path+'/' + name + '*.dat')]
-    wlen = np.genfromtxt(specs[i_s])[:,0]
-
+    wlen = np.genfromtxt(specs[0])[:,0]
     if rebin_val != None:
         wlen = nc.running_mean(wlen, rebin_val)[::rebin_val]
     npoints = int(len(wlen))
@@ -31,7 +31,6 @@ def plot_specs(fig, ax, path, name, nsample, color1, color2, zorder, rebin_val =
                 spectra[i_s, :] = np.genfromtxt(specs[i_s])[:,1]
 
     sort_spec = np.sort(spectra, axis = 0)
-
     # 3 sigma
     if int(nsample*0.02275) > 1:
         ax.fill_between(wlen, \
@@ -59,12 +58,6 @@ def plot_data(fig,ax,data,resolution = None, scaling = 1.0):
                 error,_,_ = binned_statistic(data.wlen,data.flux_error,\
                                             'mean',data.wlen.shape[0]/ratio)/np.sqrt(ratio)
                 wlen = np.array([(edges[i]+edges[i+1])/2.0 for i in range(edges.shape[0]-1)])
-                # Old method
-                #wlen = nc.running_mean(data.wlen, int(ratio))[::int(ratio)]
-                #error = nc.running_mean(data.flux_error / int(np.sqrt(ratio)), \
-                #                        int(ratio))[::int(ratio)]
-                #flux = nc.running_mean(data.flux, \
-                #                        int(ratio))[::int(ratio)]
             else:
                 wlen = data.wlen
                 error = data.flux_error

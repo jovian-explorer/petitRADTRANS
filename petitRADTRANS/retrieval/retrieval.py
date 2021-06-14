@@ -965,7 +965,7 @@ class Retrieval:
         plt.savefig(self.output_dir + 'evaluate_'+self.rd.retrieval_name +'/best_fit_spec.pdf')
         return fig, ax, ax_r
 
-    def plot_sampled(self,samples_use,parameters_read, downsample_factor = 5):
+    def plot_sampled(self,samples_use,parameters_read, downsample_factor = None):
         """
         Plot a set of randomly sampled output spectra for each dataset in
         the retrieval.
@@ -975,7 +975,7 @@ class Retrieval:
                 posterior samples from pynmultinest outputs (post_equal_weights)
             downsample_factor : int
                 Factor by which to reduce the resolution of the sampled model,
-                for smoother plotting. Defaults to 5. A value of None will result
+                for smoother plotting. Defaults to None. A value of None will result
                 in the full resolution spectrum. Note that this factor can only
                 reduce the resolution from the underlying model_resolution of the
                 data.
@@ -1006,8 +1006,8 @@ class Retrieval:
                                 np.column_stack((self.posterior_sample_specs[name][0],
                                                  self.posterior_sample_specs[name][1])))
         # TODO: option for plotting of full bf model rather than by dataset
-        for name,dd in data_use.items():
-            fig, ax = plot_specs(fig,ax,path, name,
+        for name,dd in self.data.items():
+            fig, ax = plot_specs(fig,ax,path, name.replace(' ','_').replace('/','_'),
                                 self.rd.plot_kwargs["nsample"],
                                 '#ff9f9f', '#ff3d3d',
                                 0, rebin_val = downsample_factor)
@@ -1023,6 +1023,7 @@ class Retrieval:
         ax.legend(loc='best')
         plt.tight_layout()
         plt.savefig(path +'sampled_data.pdf',bbox_inches = 0.)
+        self.evaluate_sample_spectra = False
         return fig, ax
 
     def plot_PT(self,sample_dict,parameters_read):
