@@ -368,6 +368,10 @@ class Retrieval:
                     # Otherwise for 'lbl' or no model_resolution binning,
                     # we just use the default species.
                     species = cp.copy(self.rd.line_species)
+                lbl_samp = None
+                if dd.opacity_mode == 'lbl' and dd.model_resolution is not None:
+                    lbl_samp = int(10e6/dd.model_resolution)
+
                 # Setup the pRT objects for the given dataset
                 rt_object = Radtrans(line_species = cp.copy(species), \
                                     rayleigh_species= cp.copy(self.rd.rayleigh_species), \
@@ -376,7 +380,7 @@ class Retrieval:
                                     mode=dd.opacity_mode, \
                                     wlen_bords_micron = dd.wlen_range_pRT,
                                     do_scat_emis = self.rd.scattering,
-                                    lbl_opacity_sampling = dd.model_resolution)
+                                    lbl_opacity_sampling = lbl_samp)
 
                 # Create random P-T profile to create RT arrays of the Radtrans object.
                 if self.rd.AMR:
