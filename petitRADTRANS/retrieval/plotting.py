@@ -15,16 +15,16 @@ def plot_specs(fig, ax, path, name, nsample, color1, color2, zorder, rebin_val =
     specs = [f for f in glob.glob(path+'/' + name + '*.dat')]
     for i_s in range(nsample):
         if rebin_val != None:
-            wlen = np.genfromtxt(specs[0])[:,0]
+            wlen = np.genfromtxt(specs[i_s])[:,0]
             wlen = nc.running_mean(wlen, rebin_val)[::rebin_val]
             npoints = int(len(wlen))
-            spectra= np.zeros(nsample*npoints).reshape(nsample,npoints)
+            spectra= np.zeros((nsample*npoints))
             spectra[i_s, :]= nc.running_mean(np.genfromtxt(specs[i_s])[:,1], \
                                                 rebin_val)[::rebin_val]
         else:
-            wlen = np.genfromtxt(specs[0])[:,0]
+            wlen = np.genfromtxt(specs[i_s])[:,0]
             npoints = int(len(wlen))
-            spectra = np.zeros(nsample*npoints).reshape(nsample,npoints)
+            spectra = np.zeros((nsample,npoints))
             for i_s in range(nsample):
                 spectra[i_s, :] = np.genfromtxt(specs[i_s])[:,1]
 
