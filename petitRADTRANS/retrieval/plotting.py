@@ -18,7 +18,7 @@ def plot_specs(fig, ax, path, name, nsample, color1, color2, zorder, rebin_val =
     if rebin_val != None:
         wlen = nc.running_mean(wlen, rebin_val)[::rebin_val]
     npoints = int(len(wlen))
-    spectra= np.zeros((nsample*npoints))
+    spectra= np.zeros((nsample,npoints))
     for i_s in range(nsample):
         if rebin_val != None:
             npoints = int(len(wlen))

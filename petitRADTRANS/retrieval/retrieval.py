@@ -995,10 +995,12 @@ class Retrieval:
             nsample_name = str(int(self.rd.plot_kwargs["nsample"])).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))
             if not os.path.exists(path + name.replace(' ','_').replace('/','_')+'_sampled_'+ nsample_name +'.dat'):
                 data_use[name] = dd
+        # TODO: doesn't guarantee same samples will be saved to file!
         fig,ax = plt.subplots(figsize = (16,10))
         for i_sample in range(int(self.rd.plot_kwargs["nsample"])):
             random_index = int(np.random.uniform()*len_samples)
-            self.log_likelihood(samples_use[random_index, :-1], 0, 0)
+            if data_use:
+                self.log_likelihood(samples_use[random_index, :-1], 0, 0)
             for name,dd in data_use.items():
                 if dd.external_pRT_reference is None:
                     np.savetxt(path +name.replace(' ','_').replace('/','_')+'_sampled_'+
