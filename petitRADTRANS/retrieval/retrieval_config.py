@@ -168,14 +168,16 @@ class RetrievalConfig:
             logging.error("pRT_input_data_path variable not set")
             sys.exit(1)
 
-        if self.op_mode == 'c-k':
-            files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/corr_k/")]
-            files = set([f.split('_R_')[0] for f in files])
-        if self.op_mode == 'lbl':
-            files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/lbl/")]
-            files = set(files)
+        files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/corr_k/")]
+        files = set([f.split('_R_')[0] for f in files])
+        print("\ncorrelated-k opacities")
         for f in files: print(f)
-        return files
+
+        lbl = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/lbl/")]
+        lbl = set(lbl)
+        print("\nline-by-line opacities")
+        for f in lbl: print(f)
+        return files.union(lbl)
     def list_available_cloud_species(self):
         """
         List the currently installed opacity tables that are available for cloud species.
