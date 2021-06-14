@@ -1147,7 +1147,6 @@ class Retrieval:
         contour_corner(sample_use_dict, \
                         p_use_dict, \
                         output_file, \
-                        parameter_plot_indices = p_plot_inds, \
-                        max_val_ratio = max_val_ratio, \
+                        parameter_plot_indices = p_plot_inds,
                         parameter_ranges = p_ranges, \
                         true_values = None)
