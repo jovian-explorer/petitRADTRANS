@@ -338,18 +338,21 @@ class Retrieval:
             # Only create if there's no other data
             # object using the same pRT object
             if dd.external_pRT_reference is None:
-                # Use ExoK to have low res models.
-                if dd.model_resolution is not None:
+                if dd.opacity_mode == 'c-k' and dd.model_resolution is not None:
+                    # Use ExoK to have low res models.
                     species = []
                     # Check if low res opacities already exist
                     for line in self.rd.line_species:
-                        if not os.path.isdir(self.path + "opacities/lines/corr_k/" +line + "_R_" + \
-                                             str(dd.model_resolution)):
+                        if not os.path.isdir(self.path + "opacities/lines/corr_k/" +\
+                                                line + "_R_" + \
+                                                str(dd.model_resolution)):
                             species.append(line)
                     # If not, setup low-res c-k tables
                     if len(species)>0:
                         from .util import MMWs as masses
-                        atmosphere = Radtrans(line_species = species, wlen_bords_micron = [0.1, 251.])
+                        # Automatically build the entire table
+                        atmosphere = Radtrans(line_species = species,
+                                                wlen_bords_micron = [0.1, 251.])
                         prt_path = self.path
                         ck_path = prt_path + 'opacities/lines/corr_k/'
                         print("Saving to " + ck_path)
@@ -359,26 +362,21 @@ class Retrieval:
                                                     species = species,
                                                     masses = masses)
                     species = []
-                    # Setup the pRT objects for the given dataset
                     for spec in self.rd.line_species:
                         species.append(spec + "_R_" + str(dd.model_resolution))
-                    rt_object = Radtrans(line_species = cp.copy(species), \
-                                        rayleigh_species= cp.copy(self.rd.rayleigh_species), \
-                                        continuum_opacities = cp.copy(self.rd.continuum_opacities), \
-                                        cloud_species = cp.copy(self.rd.cloud_species), \
-                                        mode=self.rd.op_mode, \
-                                        wlen_bords_micron = dd.wlen_range_pRT,
-                                        do_scat_emis = self.rd.scattering,
-                                        lbl_opacity_sampling = self.rd.lbl_sampling)
                 else:
-                    rt_object = Radtrans(line_species = cp.copy(self.rd.line_species), \
-                                        rayleigh_species= cp.copy(self.rd.rayleigh_species), \
-                                        continuum_opacities = cp.copy(self.rd.continuum_opacities), \
-                                        cloud_species = cp.copy(self.rd.cloud_species), \
-                                        mode=self.rd.op_mode, \
-                                        wlen_bords_micron = dd.wlen_range_pRT,
-                                        do_scat_emis = self.rd.scattering,
-                                        lbl_opacity_sampling = self.rd.lbl_sampling)
+                    # Otherwise for 'lbl' or no model_resolution binning,
+                    # we just use the default species.
+                    species = cp.copy(self.rd.line_species)
+                # Setup the pRT objects for the given dataset
+                rt_object = Radtrans(line_species = cp.copy(species), \
+                                    rayleigh_species= cp.copy(self.rd.rayleigh_species), \
+                                    continuum_opacities = cp.copy(self.rd.continuum_opacities), \
+                                    cloud_species = cp.copy(self.rd.cloud_species), \
+                                    mode=dd.opacity_mode, \
+                                    wlen_bords_micron = dd.wlen_range_pRT,
+                                    do_scat_emis = self.rd.scattering,
+                                    lbl_opacity_sampling = dd.model_resolution)
 
                 # Create random P-T profile to create RT arrays of the Radtrans object.
                 if self.rd.AMR:

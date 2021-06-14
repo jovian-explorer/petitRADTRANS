@@ -25,9 +25,20 @@ class Data:
         data_resolution : float
             Spectral resolution of the instrument. Optional, allows convolution of model to instrumental line width.
         model_resolution : float
-            The resolution of the c-k opacity tables in pRT. This will generate a new c-k table using exo-k. The default
-            (and maximum) correlated k resolution in pRT is :math:`\lambda/\Delta \lambda > 1000` (R=500).
+            Will be ``None`` by default.  The resolution of the c-k opacity tables in pRT.
+            This will generate a new c-k table using exo-k. The default (and maximum)
+            correlated k resolution in pRT is :math:`\lambda/\Delta \lambda > 1000` (R=500).
             Lowering the resolution will speed up the computation.
+            If integer positive value, and if ``opacities == 'lbl'`` is ``True``, then this
+            will only consider every model_resolution-nth point of the high-resolution opacities.
+            This may be desired in the case where medium-resolution spectra are
+            required with a :math:`\lambda/\Delta \lambda > 1000`, but much smaller than
+            :math:`10^6`, which is the resolution of the ``lbl`` mode. In this case it
+            may make sense to carry out the calculations with lbl_opacity_sampling = 10,
+            for example, and then rebinning to the final desired resolution:
+            this may save time! The user should verify whether this leads to
+            solutions which are identical to the rebinned results of the fiducial
+            :math:`10^6` resolution. If not, this parameter must not be used.
         external_pRT_instance : object
             An existing RadTrans object. Leave as none unless you're sure of what you're doing.
         model_generating_function : method
@@ -46,6 +57,13 @@ class Data:
             Transform the photometry (account for filter transmission etc.)
         photometric_bin_edges : Tuple, numpy.ndarray
             The width of the photometric bin. [low,high]
+        opacity_mode : str
+            Should the retrieval be run using correlated-k opacities (default, 'c-k'),
+            or line by line ('lbl') opacities? If 'lbl' is selected, it is HIGHLY
+            recommended to set the model_resolution parameter. In general,
+            'c-k' mode is recommended for retrievals of everything other than
+            high-resolution (R>40000) spectra.
+
     """
 
     def __init__(self,
@@ -61,7 +79,8 @@ class Data:
                  wlen_bins = None,
                  photometry = False,
                  photometric_transformation_function = None,
-                 photometric_bin_edges = None):
+                 photometric_bin_edges = None,
+                 opacity_mode = 'c-k'):
 
         self.name = name
         self.path_to_observations = path_to_observations
@@ -89,7 +108,10 @@ class Data:
         self.model_resolution = model_resolution
         self.external_pRT_reference = external_pRT_reference
         self.model_generating_function = model_generating_function
-
+        self.opacity_mode = opacity_mode
+        if opacity_mode is not 'c-k' and opacity_mode is not 'lbl':
+            print("opacity_mode must be either 'c-k' or 'lbl'!")
+            sys.exit(10)
         # Sanity check model function
         if not model_generating_function and not external_pRT_reference:
             print("Please provide a model generating function or external reference for " + name + "!")
