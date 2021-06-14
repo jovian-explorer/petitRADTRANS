@@ -1,10 +1,8 @@
 """
-util module
-    This module contains a set of useful functions that don't really fit anywhere 
-    else. This includes flux conversions, prior functions, mean molecular weight
-    calculations, transforms from mass to number fractions, and fits file output.
+This module contains a set of useful functions that don't really fit anywhere
+else. This includes flux conversions, prior functions, mean molecular weight
+calculations, transforms from mass to number fractions, and fits file output.
 """
-
 import sys, os
 # To not have numpy start parallelizing on its own
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -106,7 +104,7 @@ def calc_MMW(abundances):
     """
     calc_MMW
     Calculate the mean molecular weight in each layer.
-    
+
     Args:
         abundances : dict
             dictionary of abundance arrays, each array must have the shape of the pressure array used in pRT,
@@ -121,7 +119,7 @@ def calc_MMW(abundances):
             MMW += abundances[key]/MMWs['CO']
         else:
             MMW += abundances[key]/MMWs[spec]
-    
+
     return 1./MMW
 
 def get_MMW_from_mfrac(m_frac):
@@ -195,7 +193,7 @@ def fits_output(wavelength, spectrum, covariance, object, output_dir = "", corre
             The parent directory of the output file.
         correlation : numpy.ndarray
             The correlation matrix of the flux points (See Brogi & Line 2018, https://arxiv.org/pdf/1811.01681.pdf)
-    
+
     Returns:
         hdul : astropy.fits.HDUlist
             The HDUlist object storing the spectrum.

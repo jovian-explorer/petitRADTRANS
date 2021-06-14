@@ -4,6 +4,9 @@ import pylab as plt
 from petitRADTRANS import Radtrans
 from petitRADTRANS import nat_cst as nc
 
+import os
+os.environ["pRT_input_data_path"] = "/Applications/ownpy/petitRADTRANS/petitRADTRANS/input_data"
+
 wlen_ranges = [[0.04, 20],
                [0.5, 300],
                [0.5, 20],

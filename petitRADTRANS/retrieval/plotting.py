@@ -1,55 +1,95 @@
 import numpy as np
 import glob
 import seaborn as sns
+import corner
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from matplotlib import rcParams
 from matplotlib import rc
-import corner
+from scipy.stats import binned_statistic
 from petitRADTRANS import nat_cst as nc
 from .data import Data
 
-def plot_specs(fig,ax,path, name, color1, color2, zorder, rebin_val = None):
-    specs = [f for f in glob.glob(path+'/*.dat')]
-    nspectra = int(len(specs))
-    wlen = np.genfromtxt(specs[0])[:,0]
-
-    if rebin_val != None:
-        wlen = nc.running_mean(wlen, rebin_val)[::rebin_val]
-        npoints = int(len(wlen))
-        spectra = np.zeros(nspectra*npoints).reshape(nspectra,npoints)
-        for i_s in range(nspectra):
-            spectra[i_s, :] = nc.running_mean(np.genfromtxt(specs[i_s])[:,1], \
-                                              rebin_val)[::rebin_val]
-    else:
-        npoints = int(len(wlen))
-        spectra = np.zeros(nspectra*npoints).reshape(nspectra,npoints)
-        for i_s in range(nspectra):
-            spectra[i_s, :] = np.genfromtxt(specs[i_s])[:,1]
+def plot_specs(fig, ax, path, name, nsample, color1, color2, zorder, rebin_val = None):
+    specs = [f for f in glob.glob(path+'/' + name + '*.dat')]
+    for i_s in range(nsample):
+        if rebin_val != None:
+            wlen = np.genfromtxt(specs[0])[:,0]
+            wlen = nc.running_mean(wlen, rebin_val)[::rebin_val]
+            npoints = int(len(wlen))
+            spectra= np.zeros(nsample*npoints).reshape(nsample,npoints)
+            spectra[i_s, :]= nc.running_mean(np.genfromtxt(specs[i_s])[:,1], \
+                                                rebin_val)[::rebin_val]
+        else:
+            wlen = np.genfromtxt(specs[0])[:,0]
+            npoints = int(len(wlen))
+            spectra = np.zeros(nsample*npoints).reshape(nsample,npoints)
+            for i_s in range(nsample):
+                spectra[i_s, :] = np.genfromtxt(specs[i_s])[:,1]
 
     sort_spec = np.sort(spectra, axis = 0)
 
+    # 3 sigma
     ax.fill_between(wlen, \
-                      y1 = sort_spec[int(nspectra*0.02275), :], \
-                      y2 = sort_spec[int(nspectra*(1.-0.02275)), :], \
+                      y1 = sort_spec[int(nsample*0.02275), :], \
+                      y2 = sort_spec[int(nsample*(1.-0.02275)), :], \
                       color = color1, zorder = zorder*2)
+    # 1 sigma
     ax.fill_between(wlen, \
-                      y1 = sort_spec[int(nspectra*0.16), :], \
-                      y2 = sort_spec[int(nspectra*0.84), :], \
-                      color = color2, label = name, zorder = zorder*2+1)
+                      y1 = sort_spec[int(nsample*0.16), :], \
+                      y2 = sort_spec[int(nsample*0.84), :], \
+                      color = color2, zorder = zorder*2+1)
 
-def plot_data(fig,ax,data, name, color, zorder, rebin_val = None):
-    sf = 1.0
+def plot_data(fig,ax,data,resolution = None, scaling = 1.0):
+    scale = 1.0
     if data.scale:
-        sf = data.scale_factor
-    x,y,err = data.wlen, data.flux*sf, data.flux_error*sf
-    if rebin_val != None:
-        x = nc.running_mean(x, rebin_val)[::rebin_val]
-        y = nc.running_mean(y, rebin_val)[::rebin_val]
-        err = nc.running_mean(err, rebin_val)[::rebin_val]/np.sqrt(rebin_val)
-    #fig,ax = plt.subplots(figsize = (16,10))
-    ax.errorbar(x, y, yerr = err, fmt = 'o', label = name, mec = 'black', ecolor='black')
+        scale = data.scale_factor
+    if not data.photometry:
+        try:
+            # Sometimes this fails, I'm not super sure why.
+            resolution_data = np.mean(data.wlen[1:]/np.diff(data.wlen))
+            ratio = resolution_data / resolution
+            if int(ratio) > 1:
+                flux,edges,_ = binned_statistic(data.wlen,data.flux,'mean',data.wlen.shape[0]/ratio)
+                error,_,_ = binned_statistic(data.wlen,data.flux_error,\
+                                            'mean',data.wlen.shape[0]/ratio)/np.sqrt(ratio)
+                wlen = np.array([(edges[i]+edges[i+1])/2.0 for i in range(edges.shape[0]-1)])
+                # Old method
+                #wlen = nc.running_mean(data.wlen, int(ratio))[::int(ratio)]
+                #error = nc.running_mean(data.flux_error / int(np.sqrt(ratio)), \
+                #                        int(ratio))[::int(ratio)]
+                #flux = nc.running_mean(data.flux, \
+                #                        int(ratio))[::int(ratio)]
+            else:
+                wlen = data.wlen
+                error = data.flux_error
+                flux = data.flux
+        except:
+            wlen = data.wlen
+            error = data.flux_error
+            flux = data.flux
+    else:
+        wlen = np.mean(data.width_photometry)
+        flux = data.flux
+        error = data.flux_error
+        wlen_bins = data.wlen_bins
+    marker = 'o'
+    if data.photometry:
+        marker = 's'
+    if not data.photometry:
+        ax.errorbar(wlen, \
+            flux * scaling * scale, \
+            yerr = error * scaling *scale, \
+            marker=marker, markeredgecolor='k', linewidth = 0, elinewidth = 2, \
+            label = data.name, zorder =10, alpha = 0.9,)
+    else:
+        ax.errorbar(wlen, \
+                    flux * scaling * scale, \
+                    yerr = error * scaling *scale, \
+                    xerr = data.wlen_bins/2., linewidth = 0, elinewidth = 2, \
+                    marker=marker, markeredgecolor='k', color = 'grey', zorder = 10, \
+                    label = None, alpha = 0.6)
     return fig,ax
 
 def contour_corner(sampledict, \

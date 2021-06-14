@@ -117,7 +117,7 @@ class Data:
         self.external_pRT_reference = external_pRT_reference
         self.model_generating_function = model_generating_function
         self.opacity_mode = opacity_mode
-        if opacity_mode is not 'c-k' and opacity_mode is not 'lbl':
+        if opacity_mode not in ['c-k','lbl']:
             logging.error("opacity_mode must be either 'c-k' or 'lbl'!")
             sys.exit(10)
         # Sanity check model function
@@ -130,6 +130,7 @@ class Data:
                 self.model_resolution = None
             if opacity_mode is 'lbl' and model_resolution < 1000:
                 logging.warning("Your resolution is lower than R=1000, it's recommended to use 'c-k' mode.")
+
         # Optional, covariance and scaling
         self.covariance = None
         self.inv_cov = None

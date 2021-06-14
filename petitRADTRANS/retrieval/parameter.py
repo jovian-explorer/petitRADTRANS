@@ -1,5 +1,5 @@
 import sys
-
+import logging
 class Parameter:
     """
     Parameter
@@ -51,11 +51,11 @@ class Parameter:
     def get_param_uniform(self, cube):
         if self.is_free_parameter:
             return self.transform_prior_cube_coordinate(cube)
-        print('Error! Parameter '+self.name+' is not a free parameter!')
+        logging.error('Error! Parameter '+self.name+' is not a free parameter!')
         sys.exit(1)
     def set_param(self, value):
         if self.is_free_parameter:
             self.value = value
             return
-        print('Error! Parameter '+self.name+' is not a free parameter!')
+        logging.error('Error! Parameter '+self.name+' is not a free parameter!')
         sys.exit(1)

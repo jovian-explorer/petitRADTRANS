@@ -636,6 +636,10 @@ class Retrieval:
                                       AMR = self.rd.AMR)
         # Add to the dictionary.
         self.best_fit_specs[ret_name]= [bf_wlen,bf_spectrum]
+        np.save(self.output_dir + "evaluate_" + \
+                self.retrieval_name + "/" + \
+                ret_name + "best_fit_model_full",
+                np.column_stack([bf_wlen,bf_spectrum]))
         return bf_wlen, bf_spectrum
 
     def get_abundances(self,sample):
@@ -673,6 +677,9 @@ class Retrieval:
         run definition.
         """
 
+        if not self.run_mode == 'evaluate':
+            logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
+            self.run_mode = 'evaluate'
         if output_dir is None:
             output_dir = self.output_dir
         sample_dict, parameter_dict = self.get_samples(output_dir)
@@ -735,8 +742,11 @@ class Retrieval:
                 The lower pane of the plot, containing the residuals between the fit and the data
         """
 
+        self.evaluate_sample_spectra = False
         #TODO: include plotting of multiple retrievals
-
+        if not self.run_mode == 'evaluate':
+            logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
+            self.run_mode = 'evaluate'
         print("Plotting Best-fit spectrum")
         fig, axes = fig, axes = plt.subplots(nrows=2, ncols=1, sharex='col', sharey=False,
                                gridspec_kw={'height_ratios': [2.5, 1],'hspace':0.1},
@@ -955,15 +965,26 @@ class Retrieval:
         plt.savefig(self.output_dir + 'evaluate_'+self.rd.retrieval_name +'/best_fit_spec.pdf')
         return fig, ax, ax_r
 
-    def plot_sampled(self,samples_use,parameters_read):
+    def plot_sampled(self,samples_use,parameters_read, downsample_factor = 5):
         """
-        Plot a set of randomly sampled output spectra
+        Plot a set of randomly sampled output spectra for each dataset in
+        the retrieval.
 
         Args:
             samples_use : np.ndarray
                 posterior samples from pynmultinest outputs (post_equal_weights)
+            downsample_factor : int
+                Factor by which to reduce the resolution of the sampled model,
+                for smoother plotting. Defaults to 5. A value of None will result
+                in the full resolution spectrum. Note that this factor can only
+                reduce the resolution from the underlying model_resolution of the
+                data.
         """
 
+        self.evaluate_sample_spectra = True
+        if not self.run_mode == 'evaluate':
+            logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
+            self.run_mode = 'evaluate'
         print("Plotting Best-fit spectrum with "+ str(self.rd.plot_kwargs["nsample"]) + " samples.")
         print("This could take some time...")
         len_samples = samples_use.shape[0]
@@ -972,26 +993,29 @@ class Retrieval:
         data_use= {}
         for name, dd in self.data.items():
             nsample_name = str(int(self.rd.plot_kwargs["nsample"])).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))
-            if not os.path.exists(path + name.replace(' ','_')+'_sampled_'+ nsample_name +'.dat'):
+            if not os.path.exists(path + name.replace(' ','_').replace('/','_')+'_sampled_'+ nsample_name +'.dat'):
                 data_use[name] = dd
-
+        fig,ax = plt.subplots(figsize = (16,10))
         for i_sample in range(int(self.rd.plot_kwargs["nsample"])):
             random_index = int(np.random.uniform()*len_samples)
             self.log_likelihood(samples_use[random_index, :-1], 0, 0)
             for name,dd in data_use.items():
                 if dd.external_pRT_reference is None:
-                    np.savetxt(path +name.replace(' ','_')+'_sampled_'+
+                    np.savetxt(path +name.replace(' ','_').replace('/','_')+'_sampled_'+
                                 str(int(i_sample+1)).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))+'.dat',
                                 np.column_stack((self.posterior_sample_specs[name][0],
                                                  self.posterior_sample_specs[name][1])))
-
-        fig,ax = plt.subplots(figsize = (16,10))
-        plot_specs(fig,ax,path, 'Retrieved', '#ff9f9f', '#ff3d3d', -10, rebin_val = 5)
-        #print("Plotting sample spectrum failed, are you sure you allowed sampling?")
-        #return None
+        # TODO: option for plotting of full bf model rather than by dataset
+        for name,dd in data_use.items():
+            plot_specs(fig,ax,path, name,
+                       self.rd.plot_kwargs["nsample"],
+                       '#ff9f9f', '#ff3d3d',
+                       -10, rebin_val = downsample_factor)
 
         for name,dd in self.data.items():
-            plot_data(fig,ax,dd, name, 'white', 0, rebin_val = 5)
+            plot_data(fig,ax,dd,
+                      resolution = self.rd.plot_kwargs["resolution"],
+                      scaling = self.rd.plot_kwargs["y_axis_scaling"])
             #plt.ylim([0.006, 0.0085])
 
         ax.set_xlabel('Wavelength [micron]')
@@ -1018,6 +1042,9 @@ class Retrieval:
         """
 
         print("Plotting PT profiles")
+        if not self.run_mode == 'evaluate':
+            logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
+            self.run_mode = 'evaluate'
         self.PT_plot_mode = True
         samples_use = cp.copy(sample_dict[self.retrieval_name])
         i_p = 0
@@ -1083,7 +1110,10 @@ class Retrieval:
                 aren't included in the PMN outputs
         """
 
-        logging.info("Making corner plot")
+        if not self.run_mode == 'evaluate':
+            logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
+            self.run_mode = 'evaluate'
+        print("Making corner plot")
         sample_use_dict = {}
         p_plot_inds = {}
         p_ranges = {}
@@ -1117,7 +1147,6 @@ class Retrieval:
         contour_corner(sample_use_dict, \
                         p_use_dict, \
                         output_file, \
-                        parameter_plot_indices = p_plot_inds, \
-                        max_val_ratio = max_val_ratio, \
+                        parameter_plot_indices = p_plot_inds,
                         parameter_ranges = p_ranges, \
                         true_values = None)

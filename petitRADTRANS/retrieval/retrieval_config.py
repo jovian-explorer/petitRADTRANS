@@ -168,14 +168,16 @@ class RetrievalConfig:
             logging.error("pRT_input_data_path variable not set")
             sys.exit(1)
 
-        if self.op_mode == 'c-k':
-            files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/corr_k/")]
-            files = set([f.split('_R_')[0] for f in files])
-        if self.op_mode == 'lbl':
-            files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/lbl/")]
-            files = set(files)
+        files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/corr_k/")]
+        files = set([f.split('_R_')[0] for f in files])
+        print("\ncorrelated-k opacities")
         for f in files: print(f)
-        return files
+
+        lbl = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/lbl/")]
+        lbl = set(lbl)
+        print("\nline-by-line opacities")
+        for f in lbl: print(f)
+        return files.union(lbl)
     def list_available_cloud_species(self):
         """
         List the currently installed opacity tables that are available for cloud species.
@@ -349,7 +351,8 @@ class RetrievalConfig:
                  distance = None,
                  scale = False,
                  wlen_range_micron = None,
-                 external_pRT_reference = None):
+                 external_pRT_reference = None,
+                 opacity_mode = 'c-k'):
         """
         Create a Data class object.
 
@@ -380,6 +383,12 @@ class RetrievalConfig:
                 The name of an existing Data object. This object's pRT_object will be used to calculate the chi squared
                 of the new Data object. This is useful when two datasets overlap, as only one model computation is required
                 to compute the log likelihood of both datasets.
+            opacity_mode : str
+                Should the retrieval be run using correlated-k opacities (default, 'c-k'),
+                or line by line ('lbl') opacities? If 'lbl' is selected, it is HIGHLY
+                recommended to set the model_resolution parameter. In general,
+                'c-k' mode is recommended for retrievals of everything other than
+                high-resolution (R>40000) spectra.
         """
 
         self.data[name] = Data(name, path,
@@ -389,7 +398,8 @@ class RetrievalConfig:
                                 distance = distance,
                                 scale = scale,
                                 wlen_range_micron = wlen_range_micron,
-                                external_pRT_reference=external_pRT_reference)
+                                external_pRT_reference=external_pRT_reference,
+                                opacity_mode = opacity_mode)
 
     def add_photometry(self, path,
                        model_generating_function,
@@ -398,7 +408,8 @@ class RetrievalConfig:
                        scale = False,
                        wlen_range_micron = None,
                        photometric_transformation_function = None,
-                       external_pRT_reference = None):
+                       external_pRT_reference = None,
+                       opacity_mode = 'c-k'):
         """
         Create a Data class object for each photometric point in a photometry file.
         The photometry file must be a csv file and have the following structure:
@@ -461,6 +472,8 @@ class RetrievalConfig:
                 wbins = [0.95*wlow,1.05*whigh]
             else:
                 wbins = wlen_range_micron
+            if opacity_mode is 'lbl':
+                logging.warning("Are you sure you want a high resolution model for photometry?")
             self.data[name] = Data(name,
                                     path,
                                     model_generating_function = model_generating_function,
@@ -472,6 +485,7 @@ class RetrievalConfig:
                                     model_resolution = model_resolution,
                                     scale = scale,
                                     photometric_transformation_function = transform,
-                                    external_pRT_reference=external_pRT_reference)
+                                    external_pRT_reference=external_pRT_reference,
+                                    opacity_mode=opacity_mode)
             self.data[name].flux = flux
             self.data[name].flux_error = err

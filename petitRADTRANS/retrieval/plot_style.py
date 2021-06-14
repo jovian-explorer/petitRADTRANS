@@ -1,14 +1,16 @@
+"""
+This file creates a default plotting style for all pRT plots
+
+All of these can be changed when calling most plotting functions.
+This will affect the matplotlib rcParams, which can be reset to
+the default values after pRT is finished.
+"""
+
 import matplotlib as mpl
 import os
 have_display = bool(os.environ.get('DISPLAY', None))
 if not have_display:
     mpl.use('Agg')
-# ******************************
-#
-# This file creates a default plotting style for all pRT plots
-# All of these can be changed when calling most plotting functions.
-#
-# ******************************
 prt_colours = ['#009FB8','#FF695C', '#70FF92',  '#FFBB33', '#6171FF', "#FF1F69", "#52AC25", '#E574FF', "#FF261D", "#B429FF" ]
 font = {'family' : 'serif',
         'size'   : 24}
