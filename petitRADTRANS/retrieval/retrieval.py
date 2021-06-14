@@ -1013,7 +1013,9 @@ class Retrieval:
                        -10, rebin_val = downsample_factor)
 
         for name,dd in self.data.items():
-            plot_data(fig,ax,dd, name, 'white', 0, rebin_val = 5)
+            plot_data(fig,ax,dd,
+                      resolution = self.rd.plot_kwargs["resolution"],
+                      scaling = self.rd.plot_kwargs["y_axis_scaling"])
             #plt.ylim([0.006, 0.0085])
 
         ax.set_xlabel('Wavelength [micron]')
