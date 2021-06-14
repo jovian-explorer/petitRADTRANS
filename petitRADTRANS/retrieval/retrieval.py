@@ -965,13 +965,20 @@ class Retrieval:
         plt.savefig(self.output_dir + 'evaluate_'+self.rd.retrieval_name +'/best_fit_spec.pdf')
         return fig, ax, ax_r
 
-    def plot_sampled(self,samples_use,parameters_read):
+    def plot_sampled(self,samples_use,parameters_read, downsample_factor = 5):
         """
-        Plot a set of randomly sampled output spectra
+        Plot a set of randomly sampled output spectra for each dataset in
+        the retrieval.
 
         Args:
             samples_use : np.ndarray
                 posterior samples from pynmultinest outputs (post_equal_weights)
+            downsample_factor : int
+                Factor by which to reduce the resolution of the sampled model,
+                for smoother plotting. Defaults to 5. A value of None will result
+                in the full resolution spectrum. Note that this factor can only
+                reduce the resolution from the underlying model_resolution of the
+                data.
         """
 
         self.evaluate_sample_spectra = True
@@ -988,7 +995,7 @@ class Retrieval:
             nsample_name = str(int(self.rd.plot_kwargs["nsample"])).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))
             if not os.path.exists(path + name.replace(' ','_').replace('/','_')+'_sampled_'+ nsample_name +'.dat'):
                 data_use[name] = dd
-
+        fig,ax = plt.subplots(figsize = (16,10))
         for i_sample in range(int(self.rd.plot_kwargs["nsample"])):
             random_index = int(np.random.uniform()*len_samples)
             self.log_likelihood(samples_use[random_index, :-1], 0, 0)
@@ -998,11 +1005,12 @@ class Retrieval:
                                 str(int(i_sample+1)).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))+'.dat',
                                 np.column_stack((self.posterior_sample_specs[name][0],
                                                  self.posterior_sample_specs[name][1])))
-
-        fig,ax = plt.subplots(figsize = (16,10))
-        plot_specs(fig,ax,path, 'Retrieved', '#ff9f9f', '#ff3d3d', -10, rebin_val = 5)
-        #print("Plotting sample spectrum failed, are you sure you allowed sampling?")
-        #return None
+        # TODO: option for plotting of full bf model rather than by dataset
+        for name,dd in data_use.items():
+            plot_specs(fig,ax,path, name,
+                       self.rd.plot_kwargs["nsample"],
+                       '#ff9f9f', '#ff3d3d',
+                       -10, rebin_val = downsample_factor)
 
         for name,dd in self.data.items():
             plot_data(fig,ax,dd, name, 'white', 0, rebin_val = 5)
