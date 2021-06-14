@@ -738,6 +738,7 @@ class Retrieval:
                 The lower pane of the plot, containing the residuals between the fit and the data
         """
 
+        self.evaluate_sample_spectra = False
         #TODO: include plotting of multiple retrievals
         if not self.run_mode == 'evaluate':
             logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
@@ -969,6 +970,7 @@ class Retrieval:
                 posterior samples from pynmultinest outputs (post_equal_weights)
         """
 
+        self.evaluate_sample_spectra = True
         if not self.run_mode == 'evaluate':
             logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
             self.run_mode = 'evaluate'
