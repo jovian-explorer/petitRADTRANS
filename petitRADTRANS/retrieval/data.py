@@ -130,6 +130,7 @@ class Data:
                 self.model_resolution = None
             if opacity_mode is 'lbl' and model_resolution < 1000:
                 logging.warning("Your resolution is lower than R=1000, it's recommended to use 'c-k' mode.")
+
         # Optional, covariance and scaling
         self.covariance = None
         self.inv_cov = None
