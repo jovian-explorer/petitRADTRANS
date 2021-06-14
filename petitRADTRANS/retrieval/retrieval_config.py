@@ -118,7 +118,7 @@ class RetrievalConfig:
                 The number of cells in the low pressure grid to replace with the high resolution grid.
         """
 
-        logging.info("Setting up AMR pressure grid.")
+        print("Setting up AMR pressure grid.")
         self.scaling = scaling
         self.width = width
         nclouds = len(self.cloud_species)

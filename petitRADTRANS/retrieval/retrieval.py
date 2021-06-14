@@ -133,7 +133,7 @@ class Retrieval:
             os.makedirs(self.output_dir + 'evaluate_' + self.retrieval_name, exist_ok=True)
 
         # Setup pRT Objects for each data structure.
-        logging.info("Setting up PRT Objects")
+        print("Setting up PRT Objects")
         self.setup_data()
         self.generate_retrieval_summary()
 
@@ -205,7 +205,7 @@ class Retrieval:
         # TODO: autodetect PMN vs UN outputs
         prefix = self.output_dir + 'out_PMN/'+self.retrieval_name+'_'
         if self.run_mode == 'retrieval':
-            logging.info("Starting retrieval: " + self.retrieval_name+'\n')
+            print("Starting retrieval: " + self.retrieval_name+'\n')
             # How many free parameters?
             n_params = 0
             free_parameter_names = []
@@ -357,8 +357,8 @@ class Retrieval:
                                                 wlen_bords_micron = [0.1, 251.])
                         prt_path = self.path
                         ck_path = prt_path + 'opacities/lines/corr_k/'
-                        logging.info("Saving to " + ck_path)
-                        logging.info("Resolution: ", dd.model_resolution)
+                        print("Saving to " + ck_path)
+                        print("Resolution: ", dd.model_resolution)
                         atmosphere.write_out_rebin(int(dd.model_resolution),
                                                     path = ck_path,
                                                     species = species,
@@ -593,7 +593,7 @@ class Retrieval:
                 The emission or transmission spectrum array, with the same shape as bf_wlen
         """
 
-        logging.info("Computing Best Fit Model, this may take a minute...")
+        print("Computing Best Fit Model, this may take a minute...")
         if ret_name is None:
             ret_name = self.retrieval_name
 
@@ -690,7 +690,7 @@ class Retrieval:
                         samples_use[:,i_p] = sample_dict[self.retrieval_name][:, i_s]
                 i_p += 1
 
-        logging.info("Best fit parameters")
+        print("Best fit parameters")
         i_p = 0
         # Get best-fit index
         logL = samples_use[:,-1]
@@ -707,7 +707,7 @@ class Retrieval:
         self.plot_sampled(samples_use, parameters_read)
         self.plot_PT(sample_dict,parameters_read)
         self.plot_corner(sample_dict,parameter_dict,parameters_read)
-        logging.info("Done!")
+        print("Done!")
         return
 
     def plot_spectra(self,samples_use,parameters_read,model_generating_func = None):
@@ -737,7 +737,7 @@ class Retrieval:
 
         #TODO: include plotting of multiple retrievals
 
-        logging.info("Plotting Best-fit spectrum")
+        print("Plotting Best-fit spectrum")
         fig, axes = fig, axes = plt.subplots(nrows=2, ncols=1, sharex='col', sharey=False,
                                gridspec_kw={'height_ratios': [2.5, 1],'hspace':0.1},
                                figsize=(20, 10))
@@ -964,8 +964,8 @@ class Retrieval:
                 posterior samples from pynmultinest outputs (post_equal_weights)
         """
 
-        logging.info("Plotting Best-fit spectrum with "+ str(self.rd.plot_kwargs["nsample"]) + " samples.")
-        logging.info("This could take some time...")
+        print("Plotting Best-fit spectrum with "+ str(self.rd.plot_kwargs["nsample"]) + " samples.")
+        print("This could take some time...")
         len_samples = samples_use.shape[0]
         path = self.output_dir + 'evaluate_'+self.retrieval_name + "/"
 
@@ -1017,7 +1017,7 @@ class Retrieval:
             ax : matplotlib.axes
         """
 
-        logging.info("Plotting PT profiles")
+        print("Plotting PT profiles")
         self.PT_plot_mode = True
         samples_use = cp.copy(sample_dict[self.retrieval_name])
         i_p = 0
