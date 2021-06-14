@@ -54,8 +54,8 @@ class Parameter:
         print('Error! Parameter '+self.name+' is not a free parameter!')
         sys.exit(1)
     def set_param(self, value):
-
         if self.is_free_parameter:
             self.value = value
+            return
         print('Error! Parameter '+self.name+' is not a free parameter!')
         sys.exit(1)
