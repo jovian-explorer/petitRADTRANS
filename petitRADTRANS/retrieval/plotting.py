@@ -13,7 +13,7 @@ from .data import Data
 
 def plot_specs(fig, ax, path, name, nsample, color1, color2, zorder, rebin_val = None):
     # TODO write generic plotting functions rather than copy pasting code.
-    specs = [f for f in glob.glob(path+'/' + name + '*.dat')]
+    specs = sorted([f for f in glob.glob(path+'/' + name + '*.dat')])
     wlen = np.genfromtxt(specs[0])[:,0]
     if rebin_val != None:
         wlen = nc.running_mean(wlen, rebin_val)[::rebin_val]

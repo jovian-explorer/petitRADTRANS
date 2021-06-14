@@ -970,6 +970,12 @@ class Retrieval:
         Plot a set of randomly sampled output spectra for each dataset in
         the retrieval.
 
+        This will save nsample files for each dataset included in the retrieval.
+        Note that if you change the model_resolution of your Data and rerun this
+        function, the files will NOT be updated - if the files exists the function
+        defaults to reading from file rather than recomputing. Delete all of the
+        sample functions and run it again.
+
         Args:
             samples_use : np.ndarray
                 posterior samples from pynmultinest outputs (post_equal_weights)
@@ -1004,7 +1010,7 @@ class Retrieval:
             for name,dd in data_use.items():
                 if dd.external_pRT_reference is None:
                     np.savetxt(path +name.replace(' ','_').replace('/','_')+'_sampled_'+
-                                str(int(i_sample+1)).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))+'.dat',
+                                str(int(i_sample+1)).zfill(5)+'.dat',
                                 np.column_stack((self.posterior_sample_specs[name][0],
                                                  self.posterior_sample_specs[name][1])))
         # TODO: option for plotting of full bf model rather than by dataset
