@@ -34,10 +34,10 @@ The linelists available on the `Exomol website <http://www.exomol.com>`_ were re
 2. Navigate to your petitRADTRANS opacity folder, which is the ``path to input_data/opacities/lines/corr_k/`` folder.
 Make a new folder called, for example, ``H2O_Chubb`` and place the ``1H2-16O__POKAZATEL__R1000_0.3-50mu.ktable.petitRADTRANS.h5`` file inside.
 
-You're done! pRT will check automatically if an ``*.h5`` file is in the opacity folder, so as long as you keep the ``.h5`` extension, the file in the ``H2O_Chubb`` folder can be called whatever you like. The name of the folder, which we chose to be ``H2O_Chubb`` here, can also be anything. After dropping the ``.h5`` file in the ``H2O_Chubb`` folder, the opacity species ``H2O_Chubb`` is now ready for use! Note that also the abundances must be specified for ``H2O_Chubb`` when using petitRADTRANS with this opacity table.
+You're done! pRT will check automatically if an ``*.h5`` file is in the opacity folder, so as long as you keep the ``.h5`` extension, the file in the ``H2O_Chubb`` folder can be called whatever you like, as long as it begins with the correct chemical formula for that species. The name of the folder, which we chose to be ``H2O_Chubb`` here, can also be anything. After dropping the ``.h5`` file in the ``H2O_Chubb`` folder, the opacity species ``H2O_Chubb`` is now ready for use! Note that also the abundances must be specified for ``H2O_Chubb`` when using petitRADTRANS with this opacity table.
 
 .. _OWtopRT:
-   
+
 -------------------------------------------------------------------
 Converting cross-section grids from `opacity.world`_
 -------------------------------------------------------------------
@@ -78,7 +78,7 @@ supposed to be put. This example here is for the HDO opacity.
 		path_to_output = 'sigmas_adapted_pRT/'
 		filelist = os.listdir(path_to_files)  # Find all opacity world files in the directory
 
-		
+
 Opacity.world saves the opacities in units of :math:`{\rm cm}^{2}{\rm
 g}^{-1}`, but the petitRADTRANS conversions scripts need :math:`{\rm
 cm}^{2}`. So we will have to convert below. For this it is important
@@ -90,16 +90,16 @@ amu. **Do not forget to adapt this for every new species!**
 		# Properties of chosen species
 		species_mass = 19.
 
-		
+
 This function below will read the binary files downloaded from
 `opacity.world`_:
 
 .. code-block:: python
 
-		def read_bin_single(filename):   
+		def read_bin_single(filename):
 		    """ Read a binary opacity world file.
 		    """
-    
+
 		    # Open file
 		    file = open(filename,mode='rb')
 		    # Read content
@@ -111,12 +111,12 @@ This function below will read the binary files downloaded from
 		    points = int(len(cont)/4)
 		    # Create array of the appropriate length
 		    x = np.ones(points)
-    
+
 		    # Read the binary data into the array
 		    for i in range(int(points)):
     		        test = struct.unpack('f',cont[i*4:(i+1)*4])
 			x[i] = test[0]
-        
+
 		    return x
 
 Finally we define the function that reads the binary `opacity.world`_
@@ -129,15 +129,15 @@ downloaded here: `wlen_petitRADTRANS.dat`_
 
 		def convert():
 
-		    """ Converts opacity.world binary files for further pRT processing 
+		    """ Converts opacity.world binary files for further pRT processing
 		    """
 
 		    # Read the fiducial petitRADTRANS wavelength grid
 		    wavelength_petit = np.genfromtxt('wlen_petitRADTRANS.dat')
 
-		
+
 		    for file in filelist:
-        
+
 		        # Reads oworld file
 			opa = read_bin_single(path_to_files + file)
 
@@ -149,11 +149,11 @@ downloaded here: `wlen_petitRADTRANS.dat`_
 
 			# Wavenumber points from range given in the file names
 			wl_start = int(file[4:9])
-			wl_end = int(file[10:15])        
+			wl_end = int(file[10:15])
 			wlen = np.linspace(wl_start, wl_end, len(opa))
 			# Convert to cm or [micron]
 			wavelength = 1./wlen#/1e-4
-        
+
 			# Invert them to go from a accending wavenumber ordering
 			# to an accending wavelength ordering.
 			wavelength = wavelength[::-1]
@@ -161,18 +161,18 @@ downloaded here: `wlen_petitRADTRANS.dat`_
 
 			# OW opacities cm^2/g, convert to cm^2 by *species_mass*amu
 			sigma = sigma*species_mass*1.66053892e-24
-        
+
 			# Interpolate
 			sig_interp = interp1d(wavelength, sigma,bounds_error=False,fill_value=0.0)
 			sig_interpolated_petit = sig_interp(wavelength_petit)
-        
+
 			# Check if interp values are below 0 or NaN
 			for i in sig_interpolated_petit:
 			if i < 0.:
    			    print (i)
 			elif math.isnan(i):
 			    print (i)
-        
+
 			#### SAVING REBINNED #### Around 300 MB per grid point
 			# New file name is 'sigma_+ temp + .K_ + Pressure + bar.dat'
 		    np.savetxt(path_to_output + 'sigma_' + str(t) + '.K_' + str(p) + 'bar.dat', \
@@ -190,7 +190,7 @@ k-tables. This is done in an analogous way as explained in Section
 :ref:`EXtopPRT` below. When doing this, note that you can omit the step rebinning the cross-section
 files to the petitRADTRANS wavelength grid, because this was already
 done in ``convert()`` above!
-		
+
 .. _opacity.world: http://opacity.world/
 
 The opacities can then be installed as described in Section
@@ -207,7 +207,7 @@ In this example we will show you how to do this using ExoCross, the
 open-source opacity calculator of the `Exomol`_ database.
 ExoCross can be downloaded `here <https://github.com/Trovemaster/exocross>`_, is described in
 `Yurchenko et al. (2018)`_ and documented `here
-<https://exocross.readthedocs.io>`_. 
+<https://exocross.readthedocs.io>`_.
 
 .. _Exomol: http://www.exomol.com
 .. _Yurchenko et al. (2018): https://arxiv.org/abs/1801.09803
@@ -221,7 +221,7 @@ gfortran. The relevant lines in "makefile" should look like this:
 .. code-block:: bash
 
     #FOR  = ifort
-    #FFLAGS =  -O3 -qopenmp -traceback  -ip                                                                                        
+    #FFLAGS =  -O3 -qopenmp -traceback  -ip
     FOR = gfortran
     FFLAGS = -O2 -fopenmp -std=f2008
 
@@ -319,7 +319,7 @@ This calculates the opacity of NaH with the following settings
   Line (2018)`_. Also see the text around Equation 12 in `Sharp &
   Burrows (2007)`_ for more information. Sometimes more detailed
   broadening information is available on Exomol, `see here`_.
-  
+
 .. _Hartmann et al. (2002): http://adsabs.harvard.edu/abs/2002JQSRT..72..117H
 .. _Grimm & Heng (2015): https://arxiv.org/abs/1503.03806
 .. _Amundsen et al. (2014): https://arxiv.org/abs/1402.0814
@@ -331,7 +331,7 @@ If more detailed broadening information is avaiable (not for NaH) you can replac
 the lines below ``species`` with something like
 
 .. code-block:: bash
-		
+
     species
       0 gamma 0.06 n 0.5 t0 296 file path_toH2_broadening_information_file model J ratio 0.860000
       1 gamma 0.06 n 0.5 t0 296 file path_toHe_broadening_information_file model J ratio 0.140000
@@ -412,7 +412,7 @@ calculated above.
 
     import numpy as np
     from scipy.interpolate import interp1d
-    
+
     # Read the opacity file from ExoCross
     dat = np.genfromtxt('NaH_1000K_1em5bar.out.xsec')
     wavelength = 1./dat[:,0]
@@ -461,7 +461,7 @@ folder where the opacity files are. In our simple example (just one
 NaH file at 1000 K and :math:`10^{-5}` bar, its content looks like this:
 
 .. code-block:: bash
-		
+
     NaH_1000K_1em5bar_petit_grid.dat
 
 Let's start with the k-table calculation, for the low-resolution
@@ -472,15 +472,15 @@ are interested in (NaH has 24 amu, so just put 24, like below):
 .. code-block:: fortran
 
     ! (c) Paul Molliere 2014
-    
+
      program calc_k_g
-    
+
       implicit none
 
       !-----------------------------------------------------------
       !            |||               |||                |||      !
       !           \|||/             \|||/              \|||/     !
-      !             v                 v                  v       !    
+      !             v                 v                  v       !
       !----------------------------------------------------------!
       !----------------------------------------------------------!
       ! DO NOT FORGET TO CHANGE THE MASS OF THE MOLECULE
@@ -492,11 +492,11 @@ are interested in (NaH has 24 amu, so just put 24, like below):
       !           /|||\             /|||\              /|||\     !
       !            |||               |||                |||      !
       !----------------------------------------------------------!
- 
+
 Next, compile the Fortran source:
 
 .. code-block:: bash
-		
+
     gfortran -o calc_k_g_r1000_ptrad calc_k_g_r1000_ptrad.f90
 
 Lastly, create a folder called kappa_gs_r1000. Now, take care that the opacity files, the compiled Fortran routine,
@@ -504,7 +504,7 @@ sigma_list.ls, retrieval_NP_16_ggrid.dat and the kappa_gs_r1000 folder
 are all in the same folder. And that you are in this folder. Type
 
 .. code-block:: bash
-		
+
     ./calc_k_g_r1000_ptrad
 
 and all k-tables will be generated and placed into the kappa_gs_r1000
@@ -516,7 +516,7 @@ to have the correct molecule mass. **Do not change the wavelength boundary value
 For NaH, with mass 24, it should look like this:
 
 .. code-block:: bash
-		
+
     # Minimum wavelength in cm
     0.3d-4
     # Maximum wavelength in cm
@@ -527,7 +527,7 @@ For NaH, with mass 24, it should look like this:
 Next, compile the high-resolution opacity conversion routine:
 
 .. code-block:: bash
-		
+
     gfortran -o make_short make_short.f90
 
 Now, again take care that the opacity files, the compiled Fortran routine,
@@ -535,7 +535,7 @@ sigma_list.ls, short_stream_lambs_mass.dat and the short_stream folder
 are all in the same folder. And that you are in this folder. Type
 
 .. code-block:: bash
-		
+
     ./make_short
 
 and all high resolution opacity tables will be generated and placed into the short_stream
@@ -550,7 +550,7 @@ The new opacity files are now ready to be installed. Before that
 create a file called "molparam_id.txt" with the following content
 
 .. code-block:: bash
-		
+
     #### Species ID (A2) format
     06
     #### molparam value
