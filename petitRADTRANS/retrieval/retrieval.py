@@ -361,7 +361,7 @@ class Retrieval:
                         print("Resolution: ", dd.model_resolution)
                         masses = {}
                         for spec in species:
-                            masses[spec] = getMM(spec)
+                            masses[spec.split('_')[0]] = getMM(spec)
                         atmosphere.write_out_rebin(int(dd.model_resolution),
                                                     path = ck_path,
                                                     species = species,
