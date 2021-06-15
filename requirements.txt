@@ -6,3 +6,4 @@ mpi4py>=3.0
 numpy>=1.19
 pymultinest>=2.9
 scipy>=1.5
+molmass

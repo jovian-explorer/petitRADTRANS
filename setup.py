@@ -65,7 +65,8 @@ def setup_function(extensions):
                             'h5py',
                             'corner',
                             'astropy',
-                            'exo_k'],
+                            'exo_k',
+                            'molmass'],
           zip_safe=False,
           ext_modules=extensions,
           )

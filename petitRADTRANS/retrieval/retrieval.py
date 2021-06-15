@@ -351,7 +351,7 @@ class Retrieval:
                             species.append(line)
                     # If not, setup low-res c-k tables
                     if len(species)>0:
-                        from .util import MMWs as masses
+                        from .util import getMM
                         # Automatically build the entire table
                         atmosphere = Radtrans(line_species = species,
                                                 wlen_bords_micron = [0.1, 251.])
@@ -359,6 +359,9 @@ class Retrieval:
                         ck_path = prt_path + 'opacities/lines/corr_k/'
                         print("Saving to " + ck_path)
                         print("Resolution: ", dd.model_resolution)
+                        masses = {}
+                        for spec in species:
+                            masses[spec] = getMM(spec)
                         atmosphere.write_out_rebin(int(dd.model_resolution),
                                                     path = ck_path,
                                                     species = species,

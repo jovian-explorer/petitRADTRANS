@@ -3,15 +3,15 @@ This module contains a set of useful functions that don't really fit anywhere
 else. This includes flux conversions, prior functions, mean molecular weight
 calculations, transforms from mass to number fractions, and fits file output.
 """
-import sys, os
+import sys
+import os
 # To not have numpy start parallelizing on its own
 os.environ["OMP_NUM_THREADS"] = "1"
 import numpy as np
 from scipy.special import gamma,erfcinv
-
 import numpy as np
 import math as math
-from sys import platform
+from molmass import Formula
 #import threading, subprocess
 
 
@@ -80,25 +80,29 @@ def a_b_range(x, a, b):
 ########################
 # Mean Molecular Weights
 ########################
-MMWs = {}
-MMWs['H2'] = 2.
-MMWs['He'] = 4.
-MMWs['H2O'] = 18.
-MMWs['D2O'] = 20.
-MMWs['CH4'] = 16.
-MMWs['CO2'] = 44.
-MMWs['CO'] = 28.
-MMWs['CO_all_iso'] = 28.01
-MMWs['Na'] = 23.
-MMWs['K'] = 39.
-MMWs['NH3'] = 17.
-MMWs['HCN'] = 27.
-MMWs['C2H2'] = 26.
-MMWs['C2H2,acetylene'] = 26.
-MMWs['PH3'] = 34.
-MMWs['H2S'] = 34.
-MMWs['VO'] = 67.
-MMWs['TiO'] = 64.
+
+def getMM(species):
+    """
+    Get the molecular mass of a given species.
+
+    This function uses the molmass package to
+    calculate the mass number for the standard
+    isotope of an input species. If all_iso
+    is part of the input, it will return the
+    mean molar mass.
+
+    Args:
+        species : string
+            The chemical formula of the compound. ie C2H2 or H2O
+    Returns:
+        The molar mass of the compound in atomic mass units.
+    """
+    name = species.split("_")[0]
+    name = name.split(',')[0]
+    f = Formula(name)
+    if "all_iso" in species:
+        return f.mass
+    return f.isotope.massnumber
 
 def calc_MMW(abundances):
     """
@@ -110,16 +114,11 @@ def calc_MMW(abundances):
             dictionary of abundance arrays, each array must have the shape of the pressure array used in pRT,
             and contain the abundance at each layer in the atmosphere.
     """
-
     MMW = 0.
     for key in abundances.keys():
         # exo_k resolution
         spec = key.split("_R_")[0]
-        if spec == 'CO_all_iso':
-            MMW += abundances[key]/MMWs['CO']
-        else:
-            MMW += abundances[key]/MMWs[spec]
-
+        MMW += abundances[key]/getMM(spec)
     return 1./MMW
 
 def get_MMW_from_mfrac(m_frac):
@@ -141,7 +140,7 @@ def get_MMW_from_nfrac(n_frac):
     mass = 0.0
     for key,value in n_frac.items():
         spec = key.split("_R_")[0]
-        mass += value*MMWs[spec]
+        mass += value*getMM(spec)
     return mass
 
 def mass_to_number(m_frac):
@@ -157,7 +156,7 @@ def mass_to_number(m_frac):
     MMW = get_MMW_from_mfrac(m_frac)
     for key,value in m_frac.items():
         spec = key.split("_R_")[0]
-        n_frac[key]=value/MMWs[spec]*MMW
+        n_frac[key]=value/getMM(spec)*MMW
     return n_frac
 
 def number_to_mass(n_fracs):
@@ -173,9 +172,12 @@ def number_to_mass(n_fracs):
     MMW = get_MMW_from_nfrac(n_fracs)
     for key,value in n_fracs.items():
         spec = key.split("_R_")[0]
-        m_frac[key] = value*MMWs[spec]/MMW
+        m_frac[key] = value*getMM(spec)/MMW
     return m_frac
 
+########################
+# File Formatting
+########################
 def fits_output(wavelength, spectrum, covariance, object, output_dir = "", correlation = None):
     """
     Generate a fits file that can be used as an input to a pRT retrieval.
