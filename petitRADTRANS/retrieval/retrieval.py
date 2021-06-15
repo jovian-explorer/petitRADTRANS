@@ -372,7 +372,7 @@ class Retrieval:
                     species = cp.copy(self.rd.line_species)
                 lbl_samp = None
                 if dd.opacity_mode == 'lbl' and dd.model_resolution is not None:
-                    lbl_samp = int(10e6/dd.model_resolution)
+                    lbl_samp = int(1e6/dd.model_resolution)
 
                 # Setup the pRT objects for the given dataset
                 rt_object = Radtrans(line_species = cp.copy(species), \
@@ -965,17 +965,23 @@ class Retrieval:
         plt.savefig(self.output_dir + 'evaluate_'+self.rd.retrieval_name +'/best_fit_spec.pdf')
         return fig, ax, ax_r
 
-    def plot_sampled(self,samples_use,parameters_read, downsample_factor = 5):
+    def plot_sampled(self,samples_use,parameters_read, downsample_factor = None):
         """
         Plot a set of randomly sampled output spectra for each dataset in
         the retrieval.
+
+        This will save nsample files for each dataset included in the retrieval.
+        Note that if you change the model_resolution of your Data and rerun this
+        function, the files will NOT be updated - if the files exists the function
+        defaults to reading from file rather than recomputing. Delete all of the
+        sample functions and run it again.
 
         Args:
             samples_use : np.ndarray
                 posterior samples from pynmultinest outputs (post_equal_weights)
             downsample_factor : int
                 Factor by which to reduce the resolution of the sampled model,
-                for smoother plotting. Defaults to 5. A value of None will result
+                for smoother plotting. Defaults to None. A value of None will result
                 in the full resolution spectrum. Note that this factor can only
                 reduce the resolution from the underlying model_resolution of the
                 data.
@@ -995,27 +1001,29 @@ class Retrieval:
             nsample_name = str(int(self.rd.plot_kwargs["nsample"])).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))
             if not os.path.exists(path + name.replace(' ','_').replace('/','_')+'_sampled_'+ nsample_name +'.dat'):
                 data_use[name] = dd
+        # TODO: doesn't guarantee same samples will be saved to file!
         fig,ax = plt.subplots(figsize = (16,10))
         for i_sample in range(int(self.rd.plot_kwargs["nsample"])):
             random_index = int(np.random.uniform()*len_samples)
-            self.log_likelihood(samples_use[random_index, :-1], 0, 0)
+            if data_use:
+                self.log_likelihood(samples_use[random_index, :-1], 0, 0)
             for name,dd in data_use.items():
                 if dd.external_pRT_reference is None:
                     np.savetxt(path +name.replace(' ','_').replace('/','_')+'_sampled_'+
-                                str(int(i_sample+1)).zfill(int(np.log10(self.rd.plot_kwargs["nsample"])+1))+'.dat',
+                                str(int(i_sample+1)).zfill(5)+'.dat',
                                 np.column_stack((self.posterior_sample_specs[name][0],
                                                  self.posterior_sample_specs[name][1])))
         # TODO: option for plotting of full bf model rather than by dataset
-        for name,dd in data_use.items():
-            plot_specs(fig,ax,path, name,
-                       self.rd.plot_kwargs["nsample"],
-                       '#ff9f9f', '#ff3d3d',
-                       -10, rebin_val = downsample_factor)
+        for name,dd in self.data.items():
+            fig, ax = plot_specs(fig,ax,path, name.replace(' ','_').replace('/','_'),
+                                self.rd.plot_kwargs["nsample"],
+                                '#ff9f9f', '#ff3d3d',
+                                0, rebin_val = downsample_factor)
 
         for name,dd in self.data.items():
-            plot_data(fig,ax,dd,
-                      resolution = self.rd.plot_kwargs["resolution"],
-                      scaling = self.rd.plot_kwargs["y_axis_scaling"])
+            fig, ax = plot_data(fig,ax,dd,
+                                resolution = self.rd.plot_kwargs["resolution"],
+                                scaling = self.rd.plot_kwargs["y_axis_scaling"])
             #plt.ylim([0.006, 0.0085])
 
         ax.set_xlabel('Wavelength [micron]')
@@ -1023,6 +1031,7 @@ class Retrieval:
         ax.legend(loc='best')
         plt.tight_layout()
         plt.savefig(path +'sampled_data.pdf',bbox_inches = 0.)
+        self.evaluate_sample_spectra = False
         return fig, ax
 
     def plot_PT(self,sample_dict,parameters_read):
@@ -1141,7 +1150,7 @@ class Retrieval:
 
 
         output_file = self.output_dir + 'evaluate_'+self.retrieval_name +'/corner_nice.pdf'
-        max_val_ratio = 5.
+
 
         # from Plotting
         contour_corner(sample_use_dict, \

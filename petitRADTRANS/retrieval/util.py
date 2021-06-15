@@ -99,6 +99,7 @@ MMWs['PH3'] = 34.
 MMWs['H2S'] = 34.
 MMWs['VO'] = 67.
 MMWs['TiO'] = 64.
+MMWs['FeH'] = 57.
 
 def calc_MMW(abundances):
     """

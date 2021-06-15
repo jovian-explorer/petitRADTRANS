@@ -199,19 +199,20 @@
 Python package for calculating transmission and emission spectra
 of exoplanets for clear and cloudy planets. pRT also incorporates (<strong>new!</strong>)
 an easy subpackage for running retrievals with nested sampling.</p>
-<p><strong>To get started with some immediate examples on how to run pRT,
+<p><strong>To get started with some examples on how to run pRT immediately,
 see</strong> <a class="reference external" href="content/notebooks/getting_started.html">“Getting started”</a>. <strong>Otherwise read on for some more general info.</strong></p>
 <p>pRT has two different opacity treatment modes. The low resolution mode runs calculations
 at <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda\leq 1000\)</span> using the so-called correlated-k treatment for opacities.
 The high resolution mode runs calculations at <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda\leq 10^6\)</span>, using a line-by-line opacity treatment.</p>
 <p>pRT’s low-resolution opacities are initially stored at <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda = 1000\)</span> but can be rebinned to lower
-resolution by the user on the fly, for which we make use of the <a class="reference external" href="https://pypi.org/project/exo-k/">Exo_k</a> package.
-This is explained <a class="reference external" href="ADD">here</a> (ADD LINK).</p>
+resolution by the user, for which we make use of the <a class="reference external" href="https://pypi.org/project/exo-k/">Exo_k</a> package.
+This is explained <a class="reference external" href="content/notebooks/Rebinning_opacities.html">here</a>.</p>
 <p>The high-resolution opacities are initially stored at <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda = 10^6\)</span>, and example calculations are shown
 <a class="reference external" href="content/notebooks/highres.html">here</a>. Opacities can also be undersampled, to run at a lower resolution, and to speed up
 spectral calculations. The user should verify whether this leads to solutions which are identical to the rebinned results of the fiducial
 <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda = 10^6\)</span> resolution. Undersampling is done with the <code class="docutils literal notranslate"><span class="pre">lbl_opacity_sampling</span></code> parameter
-described in the <a class="reference external" href="autoapi/petitRADTRANS/radtrans/index.html#petitRADTRANS.radtrans.Radtrans">API</a> here.</p>
+described in the <a class="reference external" href="autoapi/petitRADTRANS/radtrans/index.html#petitRADTRANS.radtrans.Radtrans">API</a> here. An example is
+given <a class="reference external" href="content/notebooks/Rebinning_opacities.html">here</a>.</p>
 <p>pRT can calculate transmission and emission spectra of exoplanets, for clear or cloudy atmospheres. The different cloud treatment
 (gray clouds, power law clouds, “real” clouds using optical constants) are described in the tutorial <a class="reference external" href="content/notebooks/clouds.html">here</a>. Scattering is
 included in pRT, but must be specifically turned on for emission spectra (note that scattering increases the runtime),
@@ -260,6 +261,7 @@ into the pRT opacity folder.</p>
 <li class="toctree-l2"><a class="reference internal" href="content/notebooks/emis_scat.html">Scattering for Emission Spectra</a></li>
 <li class="toctree-l2"><a class="reference internal" href="content/notebooks/analysis.html">Analysis tools</a></li>
 <li class="toctree-l2"><a class="reference internal" href="content/notebooks/pRT_Retrieval_Example.html">petitRADTRANS Retrieval Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="content/notebooks/Rebinning_opacities.html">Rebinning opacities</a></li>
 <li class="toctree-l2"><a class="reference internal" href="content/notebooks/nat_cst_utility.html">Utility functions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="content/notebooks/poor_man.html">Interpolating chemical equilibrium abundances</a></li>
 </ul>
