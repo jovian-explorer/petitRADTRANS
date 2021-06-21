@@ -105,7 +105,7 @@ class Retrieval:
         self.const_efficiency_mode = const_efficiency_mode
         self.n_live_points = n_live_points
         self.resume = resume
-
+        self.analyzer = None
         # TODO
         self.retrieval_list = plot_multiple_retrieval_names
 
@@ -706,7 +706,9 @@ class Retrieval:
                 The name of the retrieval that prepends all of the PMN
                 output files.
         """
-
+        # Avoid loading if we just want the current retrievals output
+        if ret_name is "" and self.analyzer is not None:
+            return self.analyzer
         if ret_name is "":
             ret_name = self.retrieval_name
         prefix = self.output_dir + 'out_PMN/'+ret_name+'_'
@@ -722,6 +724,8 @@ class Retrieval:
         # Get the outputs
         analyzer = pymultinest.Analyzer(n_params = n_params,
                                         outputfiles_basename = prefix)
+        if ret_name == self.retrieval_name:
+            self.analyzer = analyzer
         return analyzer
 #############################################################
 # Plotting functions
