@@ -670,6 +670,59 @@ class Retrieval:
                                             params,
                                             AMR=False)
         return abundances, MMW
+
+    def get_evidence(self,ret_name = ""):
+        """
+        Get the log10 Z and error for the retrieval
+
+        This function uses the pymultinest analyzer to
+        get the evidence for the current retrieval_name
+        by default, though any retrieval_name in the
+        out_PMN folder can be passed as an argument -
+        useful for when you're comparing multiple similar
+        models. This value is also printed in the summary file.
+
+        Args:
+            ret_name : string
+                The name of the retrieval that prepends all of the PMN
+                output files.
+        """
+        analyzer = self.get_analyzer(ret_name)
+        s = analyzer.get_stats()
+        return s['global evidence']/np.log(10), s['global evidence error']/np.log(10)
+
+    def get_analyzer(self,ret_name = ""):
+        """
+        Get the PMN analyer from a retrieval run
+
+        This function uses gets the PMN analyzer object
+        for the current retrieval_name by default,
+        though any retrieval_name in the out_PMN folder can
+        be passed as an argument - useful for when you're
+        comparing multiple similar models.
+
+        Args:
+            ret_name : string
+                The name of the retrieval that prepends all of the PMN
+                output files.
+        """
+
+        if ret_name is "":
+            ret_name = self.retrieval_name
+        prefix = self.output_dir + 'out_PMN/'+ret_name+'_'
+
+        # How many free parameters?
+        n_params = 0
+        free_parameter_names = []
+        for pp in self.parameters:
+            if self.parameters[pp].is_free_parameter:
+                free_parameter_names.append(self.parameters[pp].name)
+                n_params += 1
+
+        # Get the outputs
+        analyzer = pymultinest.Analyzer(n_params = n_params,
+                                        outputfiles_basename = prefix)
+        return analyzer
 #############################################################
 # Plotting functions
 #############################################################
