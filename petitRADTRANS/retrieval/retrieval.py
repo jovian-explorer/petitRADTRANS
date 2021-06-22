@@ -180,7 +180,7 @@ class Retrieval:
         print('  parameters:')
 
         free_params = {}
-        for key,value in self.parameters:
+        for key,value in self.parameters.items():
             if value.is_free_parameter:
                 free_params[key] = value
         for p, m in zip(free_params, s['marginals']):
@@ -295,7 +295,7 @@ class Retrieval:
                 summary.write("  Statistical Fit Parameters\n")
 
                 free_params = {}
-                for key,value in self.parameters:
+                for key,value in self.parameters.items():
                     if value.is_free_parameter:
                         free_params[key] = value
 
