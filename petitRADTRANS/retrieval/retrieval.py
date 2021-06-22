@@ -179,11 +179,8 @@ class Retrieval:
         print('    ln Z = %.1f +- %.1f' % (s['global evidence'], s['global evidence error']))
         print('  parameters:')
 
-        free_params = {}
-        for key,value in self.parameters.items():
-            if value.is_free_parameter:
-                free_params[key] = value
-        for p, m in zip(free_params, s['marginals']):
+
+        for p, m in zip(free_parameter_names, s['marginals']):
             lo, hi = m['1sigma']
             med = m['median']
             sigma = (hi - lo) / 2
@@ -192,7 +189,7 @@ class Retrieval:
             else:
                 i = max(0, int(-np.floor(np.log10(sigma))) + 1)
             fmt = '%%.%df' % i
-            fmts = '\t'.join(['    %-15s' + fmt + " +- " + fmt])
+            fmts = '\t'.join(['    %-15s' + fmt + " +- " + fmt]) 
             print(fmts % (p, med, sigma))
 
     def run_ultranest(self):
@@ -294,10 +291,10 @@ class Retrieval:
                               stats['global evidence error']))
                 summary.write("  Statistical Fit Parameters\n")
 
-                free_params = {}
+                free_params = []
                 for key,value in self.parameters.items():
                     if value.is_free_parameter:
-                        free_params[key] = value
+                        free_params.append(key)
 
                 for p, m in zip(free_params, stats['marginals']):
                     lo, hi = m['1sigma']
