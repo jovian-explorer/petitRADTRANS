@@ -105,7 +105,7 @@ class Retrieval:
         self.const_efficiency_mode = const_efficiency_mode
         self.n_live_points = n_live_points
         self.resume = resume
-
+        self.analyzer = None
         # TODO
         self.retrieval_list = plot_multiple_retrieval_names
 
@@ -178,7 +178,12 @@ class Retrieval:
         print('  marginal likelihood:')
         print('    ln Z = %.1f +- %.1f' % (s['global evidence'], s['global evidence error']))
         print('  parameters:')
-        for p, m in zip(self.parameters.keys(), s['marginals']):
+
+        free_params = {}
+        for key,value in self.parameters:
+            if value.is_free_parameter:
+                free_params[key] = value
+        for p, m in zip(free_params, s['marginals']):
             lo, hi = m['1sigma']
             med = m['median']
             sigma = (hi - lo) / 2
@@ -288,9 +293,13 @@ class Retrieval:
                 summary.write('    ln Z = %.1f +- %.1f\n' % (stats['global evidence'], \
                               stats['global evidence error']))
                 summary.write("  Statistical Fit Parameters\n")
-                for p, m in zip(self.parameters.keys(), stats['marginals']):
-                    if not self.parameters[p].is_free_parameter:
-                        continue
+
+                free_params = {}
+                for key,value in self.parameters:
+                    if value.is_free_parameter:
+                        free_params[key] = value
+
+                for p, m in zip(free_params, stats['marginals']):
                     lo, hi = m['1sigma']
                     med = m['median']
                     sigma = (hi - lo) / 2
@@ -351,7 +360,7 @@ class Retrieval:
                             species.append(line)
                     # If not, setup low-res c-k tables
                     if len(species)>0:
-                        from .util import MMWs as masses
+                        from .util import getMM
                         # Automatically build the entire table
                         atmosphere = Radtrans(line_species = species,
                                                 wlen_bords_micron = [0.1, 251.])
@@ -359,6 +368,9 @@ class Retrieval:
                         ck_path = prt_path + 'opacities/lines/corr_k/'
                         print("Saving to " + ck_path)
                         print("Resolution: ", dd.model_resolution)
+                        masses = {}
+                        for spec in species:
+                            masses[spec.split('_')[0]] = getMM(spec)
                         atmosphere.write_out_rebin(int(dd.model_resolution),
                                                     path = ck_path,
                                                     species = species,
@@ -372,7 +384,7 @@ class Retrieval:
                     species = cp.copy(self.rd.line_species)
                 lbl_samp = None
                 if dd.opacity_mode == 'lbl' and dd.model_resolution is not None:
-                    lbl_samp = int(1e6/dd.model_resolution)
+                    lbl_samp = int(10e6/dd.model_resolution)
 
                 # Setup the pRT objects for the given dataset
                 rt_object = Radtrans(line_species = cp.copy(species), \
@@ -667,6 +679,63 @@ class Retrieval:
                                             params,
                                             AMR=False)
         return abundances, MMW
+
+    def get_evidence(self,ret_name = ""):
+        """
+        Get the log10 Z and error for the retrieval
+
+        This function uses the pymultinest analyzer to
+        get the evidence for the current retrieval_name
+        by default, though any retrieval_name in the
+        out_PMN folder can be passed as an argument -
+        useful for when you're comparing multiple similar
+        models. This value is also printed in the summary file.
+
+        Args:
+            ret_name : string
+                The name of the retrieval that prepends all of the PMN
+                output files.
+        """
+        analyzer = self.get_analyzer(ret_name)
+        s = analyzer.get_stats()
+        return s['global evidence']/np.log(10), s['global evidence error']/np.log(10)
+
+    def get_analyzer(self,ret_name = ""):
+        """
+        Get the PMN analyer from a retrieval run
+
+        This function uses gets the PMN analyzer object
+        for the current retrieval_name by default,
+        though any retrieval_name in the out_PMN folder can
+        be passed as an argument - useful for when you're
+        comparing multiple similar models.
+
+        Args:
+            ret_name : string
+                The name of the retrieval that prepends all of the PMN
+                output files.
+        """
+        # Avoid loading if we just want the current retrievals output
+        if ret_name is "" and self.analyzer is not None:
+            return self.analyzer
+        if ret_name is "":
+            ret_name = self.retrieval_name
+        prefix = self.output_dir + 'out_PMN/'+ret_name+'_'
+
+        # How many free parameters?
+        n_params = 0
+        free_parameter_names = []
+        for pp in self.parameters:
+            if self.parameters[pp].is_free_parameter:
+                free_parameter_names.append(self.parameters[pp].name)
+                n_params += 1
+
+        # Get the outputs
+        analyzer = pymultinest.Analyzer(n_params = n_params,
+                                        outputfiles_basename = prefix)
+        if ret_name == self.retrieval_name:
+            self.analyzer = analyzer
+        return analyzer
 #############################################################
 # Plotting functions
 #############################################################
@@ -991,6 +1060,8 @@ class Retrieval:
         if not self.run_mode == 'evaluate':
             logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
             self.run_mode = 'evaluate'
+        self.rd.plot_kwargs["nsample"] = int(self.rd.plot_kwargs["nsample"])
+
         print("Plotting Best-fit spectrum with "+ str(self.rd.plot_kwargs["nsample"]) + " samples.")
         print("This could take some time...")
         len_samples = samples_use.shape[0]

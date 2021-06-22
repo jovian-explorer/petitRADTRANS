@@ -129,8 +129,7 @@ class Data:
                 logging.warning("The maximum opacity for c-k mode is 1000!")
                 self.model_resolution = None
             if opacity_mode is 'lbl' and model_resolution < 1000:
-                logging.warning("Your resolution is lower than R=1000, it's recommended to use 'c-k' mode. "+ \
-                                "It is also not recommended to downsample that strongly in 'lbl' mode.")
+                logging.warning("Your resolution is lower than R=1000, it's recommended to use 'c-k' mode.")
 
         # Optional, covariance and scaling
         self.covariance = None

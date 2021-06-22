@@ -173,11 +173,12 @@ class RetrievalConfig:
         print("\ncorrelated-k opacities")
         for f in files: print(f)
 
-        lbl = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/lbl/")]
+        lbl = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/line_by_line/")]
         lbl = set(lbl)
         print("\nline-by-line opacities")
         for f in lbl: print(f)
         return files.union(lbl)
+
     def list_available_cloud_species(self):
         """
         List the currently installed opacity tables that are available for cloud species.
