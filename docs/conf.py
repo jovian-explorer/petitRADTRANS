@@ -27,7 +27,7 @@ author = u'Paul Molli\u00E8re'
 # The short X.Y version
 version = '2.2'
 # The full version, including alpha/beta/rc tags
-release = '2.2.0'
+release = '2.2.1'
 
 
 # -- General configuration ---------------------------------------------------
