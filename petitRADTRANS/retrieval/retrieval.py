@@ -1060,6 +1060,8 @@ class Retrieval:
         if not self.run_mode == 'evaluate':
             logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
             self.run_mode = 'evaluate'
+        self.rd.plot_kwargs["nsample"] = int(self.rd.plot_kwargs["nsample"])
+
         print("Plotting Best-fit spectrum with "+ str(self.rd.plot_kwargs["nsample"]) + " samples.")
         print("This could take some time...")
         len_samples = samples_use.shape[0]
