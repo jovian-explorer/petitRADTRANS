@@ -1,5 +1,5 @@
-Emission spectrum retrieval
-===========================
+OLD (from Mollière+19): Emission spectrum retrieval
+===================================================
 
 .. toctree::
    :maxdepth: 2

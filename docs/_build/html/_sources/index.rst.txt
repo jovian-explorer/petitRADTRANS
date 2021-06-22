@@ -12,7 +12,8 @@ of exoplanets for clear and cloudy planets. pRT also incorporates (**new!**)
 an easy subpackage for running retrievals with nested sampling.
 
 **To get started with some examples on how to run pRT immediately,
-see** `"Getting started" <content/notebooks/getting_started.html>`_. **Otherwise read on for some more general info.**
+see** `"Getting started" <content/notebooks/getting_started.html>`_. **Otherwise read on for some more general info,
+also on how to best run retrievals.**
 
 pRT has two different opacity treatment modes. The low resolution mode runs calculations
 at :math:`\lambda/\Delta\lambda\leq 1000` using the so-called correlated-k treatment for opacities.
@@ -29,16 +30,17 @@ spectral calculations. The user should verify whether this leads to solutions wh
 described in the `API <autoapi/petitRADTRANS/radtrans/index.html#petitRADTRANS.radtrans.Radtrans>`_ here. An example is
 given `here <content/notebooks/Rebinning_opacities.html>`_.
 
-pRT can calculate transmission and emission spectra of exoplanets, for clear or cloudy atmospheres. The different cloud treatment
-(gray clouds, power law clouds, "real" clouds using optical constants) are described in the tutorial `here <content/notebooks/clouds.html>`_. Scattering is
-included in pRT, but must be specifically turned on for emission spectra (note that scattering increases the runtime),
+pRT can calculate transmission and emission spectra of exoplanets, for clear or cloudy atmospheres. The different cloud treatments
+(gray clouds, power law clouds, "real" clouds using optical constants) are described in the tutorial `here <content/notebooks/clouds.html>`_.
+Scattering is included in pRT, but must be specifically turned on for emission spectra (note that scattering increases the runtime),
 see `Scattering for Emission Spectra <content/notebooks/emis_scat.html>`_. pRT can also calculate the reflection of light
-at the surface of rocky planets, for which the use can specify wavelength-dependent albedos and emissivities. This is likewise
+at the surface of rocky planets, for which the user can specify wavelength-dependent albedos and emissivities. This is likewise
 explained in `Scattering for Emission Spectra <content/notebooks/emis_scat.html>`_.
 
 The newly added retrieval subpackage is documented `here <content/notebooks/pRT_Retrieval_Example.html>`_.
 At the moment pRT retrievals are making use of the `PyMultiNest <https://johannesbuchner.github.io/PyMultiNest/>`_
 package for parameter inference. Of course you are free to use pRT spectral synthesis routines with any other inference tool of your liking.
+For this you will have to setup your own retrieval framework, however (you can modify / check our source code for inspiration).
 
 petitRADTRANS is available under the MIT License, and documented in
 `Mollière et al. (2019) <https://arxiv.org/abs/1904.11504>`_, for the general code, and `Mollière et al. (2020) <https://arxiv.org/abs/2006.09394>`_, Alei et al. (in prep.), for the scattering implementation. Please cite these papers if you make use of petitRADTRANS in your work.

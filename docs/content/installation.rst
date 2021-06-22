@@ -11,7 +11,7 @@ necessary folder structure if you want to install high-resolution
 opacities later (:math:`\lambda/\Delta\lambda=10^6`).
 
 Thus, to get started download the `opacity and input data
-<https://keeper.mpdl.mpg.de/f/4b9409d9d17d443cb6ee/?dl=1>`_
+<https://keeper.mpdl.mpg.de/f/f5aba635d3a244adb3c0/?dl=1>`_
 (12.1 GB), unzip them, and put the "input_data" folder somewhere on
 your computer (it does not matter where).
 

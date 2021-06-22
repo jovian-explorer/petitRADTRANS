@@ -200,7 +200,8 @@ Python package for calculating transmission and emission spectra
 of exoplanets for clear and cloudy planets. pRT also incorporates (<strong>new!</strong>)
 an easy subpackage for running retrievals with nested sampling.</p>
 <p><strong>To get started with some examples on how to run pRT immediately,
-see</strong> <a class="reference external" href="content/notebooks/getting_started.html">“Getting started”</a>. <strong>Otherwise read on for some more general info.</strong></p>
+see</strong> <a class="reference external" href="content/notebooks/getting_started.html">“Getting started”</a>. <strong>Otherwise read on for some more general info,
+also on how to best run retrievals.</strong></p>
 <p>pRT has two different opacity treatment modes. The low resolution mode runs calculations
 at <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda\leq 1000\)</span> using the so-called correlated-k treatment for opacities.
 The high resolution mode runs calculations at <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda\leq 10^6\)</span>, using a line-by-line opacity treatment.</p>
@@ -213,15 +214,16 @@ spectral calculations. The user should verify whether this leads to solutions wh
 <span class="math notranslate nohighlight">\(\lambda/\Delta\lambda = 10^6\)</span> resolution. Undersampling is done with the <code class="docutils literal notranslate"><span class="pre">lbl_opacity_sampling</span></code> parameter
 described in the <a class="reference external" href="autoapi/petitRADTRANS/radtrans/index.html#petitRADTRANS.radtrans.Radtrans">API</a> here. An example is
 given <a class="reference external" href="content/notebooks/Rebinning_opacities.html">here</a>.</p>
-<p>pRT can calculate transmission and emission spectra of exoplanets, for clear or cloudy atmospheres. The different cloud treatment
-(gray clouds, power law clouds, “real” clouds using optical constants) are described in the tutorial <a class="reference external" href="content/notebooks/clouds.html">here</a>. Scattering is
-included in pRT, but must be specifically turned on for emission spectra (note that scattering increases the runtime),
+<p>pRT can calculate transmission and emission spectra of exoplanets, for clear or cloudy atmospheres. The different cloud treatments
+(gray clouds, power law clouds, “real” clouds using optical constants) are described in the tutorial <a class="reference external" href="content/notebooks/clouds.html">here</a>.
+Scattering is included in pRT, but must be specifically turned on for emission spectra (note that scattering increases the runtime),
 see <a class="reference external" href="content/notebooks/emis_scat.html">Scattering for Emission Spectra</a>. pRT can also calculate the reflection of light
-at the surface of rocky planets, for which the use can specify wavelength-dependent albedos and emissivities. This is likewise
+at the surface of rocky planets, for which the user can specify wavelength-dependent albedos and emissivities. This is likewise
 explained in <a class="reference external" href="content/notebooks/emis_scat.html">Scattering for Emission Spectra</a>.</p>
 <p>The newly added retrieval subpackage is documented <a class="reference external" href="content/notebooks/pRT_Retrieval_Example.html">here</a>.
 At the moment pRT retrievals are making use of the <a class="reference external" href="https://johannesbuchner.github.io/PyMultiNest/">PyMultiNest</a>
-package for parameter inference. Of course you are free to use pRT spectral synthesis routines with any other inference tool of your liking.</p>
+package for parameter inference. Of course you are free to use pRT spectral synthesis routines with any other inference tool of your liking.
+For this you will have to setup your own retrieval framework, however (you can modify / check our source code for inspiration).</p>
 <p>petitRADTRANS is available under the MIT License, and documented in
 <a class="reference external" href="https://arxiv.org/abs/1904.11504">Mollière et al. (2019)</a>, for the general code, and <a class="reference external" href="https://arxiv.org/abs/2006.09394">Mollière et al. (2020)</a>, Alei et al. (in prep.), for the scattering implementation. Please cite these papers if you make use of petitRADTRANS in your work.</p>
 <p>This documentation webpage contains an <a class="reference external" href="content/installation.html">installation guide</a>, a
@@ -275,14 +277,14 @@ into the pRT opacity folder.</p>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="content/retrieval_examples.html">Retrieval Examples</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="content/notebooks/pRT_Retrieval_Example.html">petitRADTRANS Retrieval Tutorial</a></li>
-<li class="toctree-l2"><a class="reference internal" href="content/ret_transmission.html">Transmission spectrum retrieval</a></li>
-<li class="toctree-l2"><a class="reference internal" href="content/ret_emission.html">Emission spectrum retrieval</a></li>
-<li class="toctree-l2"><a class="reference internal" href="content/ret_analysis.html">Analysis of results</a></li>
+<li class="toctree-l2"><a class="reference internal" href="content/ret_transmission.html">OLD (from Mollière+19): Transmission spectrum retrieval</a></li>
+<li class="toctree-l2"><a class="reference internal" href="content/ret_emission.html">OLD (from Mollière+19): Emission spectrum retrieval</a></li>
+<li class="toctree-l2"><a class="reference internal" href="content/ret_analysis.html">OLD (from Mollière+19): Analysis of results</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="content/opa_add.html">Adding opacities</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="content/opa_add.html#importing-custom-made-opacity-tables-from-the-exomol-website">Importing custom-made opacity tables from the Exomol website</a></li>
-<li class="toctree-l2"><a class="reference internal" href="content/opa_add.html#converting-cross-section-grids-from-opacity-world">Converting cross-section grids from opacity.world</a></li>
+<li class="toctree-l2"><a class="reference internal" href="content/opa_add.html#converting-cross-section-grids-from-dace">Converting cross-section grids from DACE</a></li>
 <li class="toctree-l2"><a class="reference internal" href="content/opa_add.html#from-line-lists-to-opacities-using-exocross">From line lists to opacities (using ExoCross)</a></li>
 </ul>
 </li>

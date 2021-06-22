@@ -1,15 +1,13 @@
 import numpy as np
 from petitRADTRANS import Radtrans
 
+import os
+os.environ["pRT_input_data_path"] = "/Applications/ownpy/petitRADTRANS/petitRADTRANS/input_data"
+
 Chubb = False
 
 if not Chubb:
     atmosphere = Radtrans(line_species = ['H2O', 'CO_all_iso', 'CH4', 'CO2', 'Na', 'K'], \
-                          rayleigh_species = ['H2', 'He'], \
-                          continuum_opacities = ['H2-H2', 'H2-He'], \
-                          wlen_bords_micron = [0.3, 15.])
-else:
-    atmosphere = Radtrans(line_species = ['H2O_Chubb_mass', 'CO_all_iso', 'CH4', 'CO2', 'Na_Chubb_mass', 'K_Chubb_mass'], \
                           rayleigh_species = ['H2', 'He'], \
                           continuum_opacities = ['H2-H2', 'H2-He'], \
                           wlen_bords_micron = [0.3, 15.])

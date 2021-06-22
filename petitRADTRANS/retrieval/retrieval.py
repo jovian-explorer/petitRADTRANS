@@ -180,7 +180,7 @@ class Retrieval:
         print('  parameters:')
 
         free_params = {}
-        for key,value in self.parameters:
+        for key,value in self.parameters.items():
             if value.is_free_parameter:
                 free_params[key] = value
         for p, m in zip(free_params, s['marginals']):
@@ -295,7 +295,7 @@ class Retrieval:
                 summary.write("  Statistical Fit Parameters\n")
 
                 free_params = {}
-                for key,value in self.parameters:
+                for key,value in self.parameters.items():
                     if value.is_free_parameter:
                         free_params[key] = value
 
@@ -384,7 +384,7 @@ class Retrieval:
                     species = cp.copy(self.rd.line_species)
                 lbl_samp = None
                 if dd.opacity_mode == 'lbl' and dd.model_resolution is not None:
-                    lbl_samp = int(10e6/dd.model_resolution)
+                    lbl_samp = int(1e6/dd.model_resolution)
 
                 # Setup the pRT objects for the given dataset
                 rt_object = Radtrans(line_species = cp.copy(species), \

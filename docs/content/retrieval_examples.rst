@@ -1,15 +1,10 @@
 Retrieval Examples
 ==================
 
-In this section we will give two fully imlemented examples of
-retrievals, using synthetic JWST observations. One retrieval for
-emission and one for transmission spectra.  These are the retrievals
-reported on in the `petitRADTRANS paper
-<https://arxiv.org/abs/1904.11504>`_.
-
-In addition we also give some implemented examples on how to analyze
-the results, by producing contribution functions, corner plots and
-pressure-temperature confidene envelopes.
+In this section we will give fully imlemented examples of
+retrievals. **Please use the** `petitRADTRANS Retrieval Tutorial <notebooks/pRT_Retrieval_Example.html>`_
+**from now on, we still give our old setups from the** `petitRADTRANS paper
+<https://arxiv.org/abs/1904.11504>`_ **though**.
 
 .. toctree::
    :maxdepth: 2

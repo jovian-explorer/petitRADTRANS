@@ -1,5 +1,5 @@
-Transmission spectrum retrieval
-===============================
+OLD (from Mollière+19): Transmission spectrum retrieval
+=======================================================
 
 .. toctree::
    :maxdepth: 2
