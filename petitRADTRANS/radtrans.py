@@ -1563,7 +1563,12 @@ class Radtrans(_read_opacities.ReadOpacities):
                 # Create hdf5 file that Exo-k can read...
                 ################################################
                 f = h5py.File('temp.h5', 'w')
-                f.create_dataset('DOI', (1,), data="--", dtype=dt)
+
+
+                try:
+                    f.create_dataset('DOI', (1,), data="--", dtype=dt)
+                except:
+                    f.create_dataset('DOI', data=['--'])
                 f.create_dataset('bin_centers', data=self.freq[::-1] / nc.c)
                 f.create_dataset('bin_edges', data=self.border_freqs[::-1] / nc.c)
                 ret_opa_table = cp.copy(self.line_grid_kappas_custom_PT[spec])
@@ -1582,7 +1587,10 @@ class Radtrans(_read_opacities.ReadOpacities):
                 f.create_dataset('kcoeff', data=ret_opa_table)
                 f['kcoeff'].attrs.create('units', 'cm^2/molecule')
                 # Add the rest of the stuff that is needed.
-                f.create_dataset('method', (1,), data="petit_samples", dtype=dt)
+                try:
+                    f.create_dataset('method', (1,), data="petit_samples", dtype=dt)
+                except:
+                    f.create_dataset('method', data=['petit_samples'])
                 f.create_dataset('mol_name', data=spec.split('_')[0], dtype=dt)
                 f.create_dataset('mol_mass', data=[masses[spec.split('_')[0]]])
                 f.create_dataset('ngauss', data=len(self.w_gauss))
