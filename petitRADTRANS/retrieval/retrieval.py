@@ -178,7 +178,12 @@ class Retrieval:
         print('  marginal likelihood:')
         print('    ln Z = %.1f +- %.1f' % (s['global evidence'], s['global evidence error']))
         print('  parameters:')
-        for p, m in zip(self.parameters.keys(), s['marginals']):
+
+        free_params = {}
+        for key,value in self.parameters:
+            if value.is_free_parameter:
+                free_params[key] = value
+        for p, m in zip(free_params, s['marginals']):
             lo, hi = m['1sigma']
             med = m['median']
             sigma = (hi - lo) / 2
@@ -288,9 +293,13 @@ class Retrieval:
                 summary.write('    ln Z = %.1f +- %.1f\n' % (stats['global evidence'], \
                               stats['global evidence error']))
                 summary.write("  Statistical Fit Parameters\n")
-                for p, m in zip(self.parameters.keys(), stats['marginals']):
-                    if not self.parameters[p].is_free_parameter:
-                        continue
+
+                free_params = {}
+                for key,value in self.parameters:
+                    if value.is_free_parameter:
+                        free_params[key] = value
+
+                for p, m in zip(free_params, stats['marginals']):
                     lo, hi = m['1sigma']
                     med = m['median']
                     sigma = (hi - lo) / 2
