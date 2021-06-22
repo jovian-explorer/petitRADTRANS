@@ -40,7 +40,7 @@ release = '2.2.1'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'autoapi.extension',
+    'autoapi',
     'nbsphinx',
     'sphinx.ext.mathjax',
 ]
