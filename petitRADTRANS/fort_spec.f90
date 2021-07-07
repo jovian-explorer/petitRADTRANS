@@ -1138,11 +1138,33 @@ end function integ_parab
 !!$ #########################################################################
 
 
-!!$ Subroutine to calculate cloud opacities
+function hansen_size_nr(r,a,b)
 
+   implicit none
+   ! I/O
+   DOUBLE PRECISION :: r, a, b
+   DOUBLE PRECISION :: hansen_size_nr,sigma
+   !sigma = b/a**2d0
+   hansen_size_nr = (r**((1-(3d0*b))/b)) * exp((-1d0*r)/(a*b))
+end function hansen_size_nr
+
+function hansen_size_dndr(r,a,b,k)
+
+   implicit none
+   ! I/O
+   DOUBLE PRECISION :: r, a, b, k
+   DOUBLE PRECISION :: hansen_size_dndr, sigma
+
+   !sigma = b/a**2d0
+   hansen_size_dndr = (((1d0-(3d0*b))*k*r**((1d0-(3d0*b))/(b-1d0)) * &
+                  exp(-1d0*r/(a*b)))/b) -((k*r**((1d0-(3d0*b))/(b))*exp(-1d0*r/(a*b)))/(a*b))
+end function hansen_size_dndr
+
+!!$ Subroutine to calculate cloud opacities
 subroutine calc_cloud_opas(rho,rho_p,cloud_mass_fracs,r_g,sigma_n,cloud_rad_bins,cloud_radii,cloud_lambdas, &
-     cloud_specs_abs_opa,cloud_specs_scat_opa,cloud_aniso,cloud_abs_opa_TOT,cloud_scat_opa_TOT, &
-     cloud_red_fac_aniso_TOT,struc_len,N_cloud_spec,N_cloud_rad_bins, N_cloud_lambda_bins)
+   cloud_specs_abs_opa,cloud_specs_scat_opa,cloud_aniso, &
+   cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT, &
+   struc_len,N_cloud_spec,N_cloud_rad_bins, N_cloud_lambda_bins)
 
   use constants_block
   implicit none
@@ -1157,16 +1179,18 @@ subroutine calc_cloud_opas(rho,rho_p,cloud_mass_fracs,r_g,sigma_n,cloud_rad_bins
   DOUBLE PRECISION, intent(in) :: cloud_specs_abs_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
        cloud_specs_scat_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
        cloud_aniso(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec)
+
   DOUBLE PRECISION, intent(out) :: cloud_abs_opa_TOT(N_cloud_lambda_bins,struc_len), &
        cloud_scat_opa_TOT(N_cloud_lambda_bins,struc_len), &
        cloud_red_fac_aniso_TOT(N_cloud_lambda_bins,struc_len)
+
 
   ! internal
   INTEGER :: i_struc, i_spec, i_lamb
   DOUBLE PRECISION :: N, dndr(N_cloud_rad_bins), integrand_abs(N_cloud_rad_bins), &
        integrand_scat(N_cloud_rad_bins), add_abs, add_scat, integrand_aniso(N_cloud_rad_bins), add_aniso
-  !~~~~~~~~~~~~~~~~
 
+  !~~~~~~~~~~~~~~~~
   cloud_abs_opa_TOT = 0d0
   cloud_scat_opa_TOT = 0d0
   cloud_red_fac_aniso_TOT = 0d0
@@ -1175,13 +1199,11 @@ subroutine calc_cloud_opas(rho,rho_p,cloud_mass_fracs,r_g,sigma_n,cloud_rad_bins
      do i_spec = 1, N_cloud_spec
 
            do i_lamb = 1, N_cloud_lambda_bins
-
               N = 3d0*cloud_mass_fracs(i_struc,i_spec)*rho(i_struc)/4d0/pi/rho_p(i_spec)/ &
-                   r_g(i_struc,i_spec)**3d0*exp(-9d0/2d0*log(sigma_n)**2d0)
+                  r_g(i_struc,i_spec)**3d0*exp(-9d0/2d0*log(sigma_n)**2d0)
 
               dndr = N/(cloud_radii*sqrt(2d0*pi)*log(sigma_n))* &
-                   exp(-log(cloud_radii/r_g(i_struc,i_spec))**2d0/(2d0*log(sigma_n)**2d0))
-
+                  exp(-log(cloud_radii/r_g(i_struc,i_spec))**2d0/(2d0*log(sigma_n)**2d0))
               integrand_abs = 4d0*pi/3d0*cloud_radii**3d0*rho_p(i_spec)*dndr* &
                    cloud_specs_abs_opa(:,i_lamb,i_spec)
               integrand_scat = 4d0*pi/3d0*cloud_radii**3d0*rho_p(i_spec)*dndr* &
@@ -1223,6 +1245,95 @@ subroutine calc_cloud_opas(rho,rho_p,cloud_mass_fracs,r_g,sigma_n,cloud_rad_bins
 
 end subroutine calc_cloud_opas
 
+!!$ Subroutine to calculate cloud opacities
+subroutine calc_hansen_opas(rho,rho_p,cloud_mass_fracs,a_h,b_h,cloud_rad_bins, &
+   cloud_radii,cloud_lambdas,cloud_specs_abs_opa,cloud_specs_scat_opa,cloud_aniso, &
+   cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT, &
+   struc_len,N_cloud_spec,N_cloud_rad_bins, N_cloud_lambda_bins)
+
+  use constants_block
+  implicit none
+
+  ! I/O
+  INTEGER, intent(in) :: struc_len, N_cloud_spec, N_cloud_rad_bins, N_cloud_lambda_bins
+  DOUBLE PRECISION, intent(in) :: rho(struc_len), rho_p(N_cloud_spec)
+  DOUBLE PRECISION, intent(in) :: cloud_mass_fracs(struc_len,N_cloud_spec), &
+       a_h(struc_len,N_cloud_spec), b_h(struc_len,N_cloud_spec)
+  DOUBLE PRECISION, intent(in) :: cloud_rad_bins(N_cloud_rad_bins+1), cloud_radii(N_cloud_rad_bins), &
+       cloud_lambdas(N_cloud_lambda_bins)
+  DOUBLE PRECISION, intent(in) :: cloud_specs_abs_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
+       cloud_specs_scat_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
+       cloud_aniso(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec)
+
+  DOUBLE PRECISION, intent(out) :: cloud_abs_opa_TOT(N_cloud_lambda_bins,struc_len), &
+       cloud_scat_opa_TOT(N_cloud_lambda_bins,struc_len), &
+       cloud_red_fac_aniso_TOT(N_cloud_lambda_bins,struc_len)
+
+
+  ! internal
+  INTEGER :: i_struc, i_spec, i_lamb, i_cloud
+  DOUBLE PRECISION :: N, dndr(N_cloud_rad_bins), integrand_abs(N_cloud_rad_bins), scale_factor, &
+       integrand_scat(N_cloud_rad_bins), add_abs, add_scat, integrand_aniso(N_cloud_rad_bins), add_aniso, &
+       hansen_size_nr
+
+  !~~~~~~~~~~~~~~~~
+
+  cloud_abs_opa_TOT = 0d0
+  cloud_scat_opa_TOT = 0d0
+  cloud_red_fac_aniso_TOT = 0d0
+
+  do i_struc = 1, struc_len
+     do i_spec = 1, N_cloud_spec
+
+           do i_lamb = 1, N_cloud_lambda_bins
+
+              scale_factor = 3d0*cloud_mass_fracs(i_struc,i_spec)*rho(i_struc)/4d0/pi/rho_p(i_spec)
+
+              N = scale_factor/(a_h(i_struc,i_spec)**3d0*exp(-9d0/2d0*log(b_h(i_struc,i_spec))**2d0))
+              do i_cloud = 1, N_cloud_rad_bins
+                 dndr(i_cloud) =  N * hansen_size_nr(cloud_radii(i_cloud),a_h(i_struc,i_spec),&
+                                                     b_h(i_struc,i_spec))
+              end do
+              integrand_abs = 4d0*pi/3d0*cloud_radii**3d0*rho_p(i_spec)*dndr* &
+                   cloud_specs_abs_opa(:,i_lamb,i_spec)
+              integrand_scat = 4d0*pi/3d0*cloud_radii**3d0*rho_p(i_spec)*dndr* &
+                   cloud_specs_scat_opa(:,i_lamb,i_spec)
+              integrand_aniso = integrand_scat*(1d0-cloud_aniso(:,i_lamb,i_spec))
+
+              add_abs = sum(integrand_abs*(cloud_rad_bins(2:N_cloud_rad_bins+1)- &
+                   cloud_rad_bins(1:N_cloud_rad_bins)))
+              cloud_abs_opa_TOT(i_lamb,i_struc) = cloud_abs_opa_TOT(i_lamb,i_struc) + &
+                   add_abs
+
+              add_scat = sum(integrand_scat*(cloud_rad_bins(2:N_cloud_rad_bins+1)- &
+                   cloud_rad_bins(1:N_cloud_rad_bins)))
+              cloud_scat_opa_TOT(i_lamb,i_struc) = cloud_scat_opa_TOT(i_lamb,i_struc) + &
+                   add_scat
+
+              add_aniso = sum(integrand_aniso*(cloud_rad_bins(2:N_cloud_rad_bins+1)- &
+                   cloud_rad_bins(1:N_cloud_rad_bins)))
+              cloud_red_fac_aniso_TOT(i_lamb,i_struc) = cloud_red_fac_aniso_TOT(i_lamb,i_struc) + &
+                   add_aniso
+
+           end do
+
+     end do
+
+     do i_lamb = 1, N_cloud_lambda_bins
+        if (cloud_scat_opa_TOT(i_lamb,i_struc) > 1d-200) then
+           cloud_red_fac_aniso_TOT(i_lamb,i_struc) = cloud_red_fac_aniso_TOT(i_lamb,i_struc)/ &
+                     cloud_scat_opa_TOT(i_lamb,i_struc)
+        else
+           cloud_red_fac_aniso_TOT(i_lamb,i_struc) = 0d0
+        end if
+     end do
+
+     cloud_abs_opa_TOT(:,i_struc) = cloud_abs_opa_TOT(:,i_struc)/rho(i_struc)
+     cloud_scat_opa_TOT(:,i_struc) = cloud_scat_opa_TOT(:,i_struc)/rho(i_struc)
+
+  end do
+
+end subroutine calc_hansen_opas
 !!$ #########################################################################
 !!$ #########################################################################
 !!$ #########################################################################
@@ -1428,15 +1539,15 @@ subroutine get_rg_N(gravity,rho,rho_p,temp,MMW,frain,cloud_mass_fracs, &
         if (r_w(i_str,i_spec) > 1d-16) then
            if (frain(i_spec) > 1d0) then
               do i_rad = 1, N_fit
-                 rad(i_rad) = r_w(i_str,i_spec)/max(sigma_n,1.1d0) + &
-                      (r_w(i_str,i_spec)-r_w(i_str,i_spec)/max(sigma_n,1.1d0))* &
+                 rad(i_rad) = r_w(i_str,i_spec)/max(sigma_n,1.000000001d0) + &
+                      (r_w(i_str,i_spec)-r_w(i_str,i_spec)/max(sigma_n,1.000000001d0))* &
                       DBLE(i_rad-1)/DBLE(N_fit-1)
                  call turbulent_settling_speed(rad(i_rad),gravity,rho(i_str),rho_p(i_spec),temp(i_str), &
                       MMW(i_str),vel(i_rad))
               end do
            else
               do i_rad = 1, N_fit
-                 rad(i_rad) = r_w(i_str,i_spec) + (r_w(i_str,i_spec)*max(sigma_n,1.1d0)- &
+                 rad(i_rad) = r_w(i_str,i_spec) + (r_w(i_str,i_spec)*max(sigma_n,1.000000001d0)- &
                       r_w(i_str,i_spec))* &
                       DBLE(i_rad-1)/DBLE(N_fit-1)
                  call turbulent_settling_speed(rad(i_rad),gravity,rho(i_str),rho_p(i_spec),temp(i_str), &
@@ -1459,6 +1570,73 @@ subroutine get_rg_N(gravity,rho,rho_p,temp,MMW,frain,cloud_mass_fracs, &
   end do
 
 end subroutine get_rg_N
+
+subroutine get_rg_n_hansen(gravity,rho,rho_p,temp,MMW,frain,cloud_mass_fracs, &
+   b_h,Kzz,a_h,struc_len,N_cloud_spec)
+
+use constants_block
+implicit none
+! I/O
+INTEGER, intent(in)  :: struc_len, N_cloud_spec
+DOUBLE PRECISION, intent(in) :: gravity, rho(struc_len), rho_p(N_cloud_spec), temp(struc_len), &
+     MMW(struc_len), frain(N_cloud_spec), cloud_mass_fracs(struc_len,N_cloud_spec), &
+     b_h(struc_len,N_cloud_spec), Kzz(struc_len)
+DOUBLE PRECISION, intent(out) :: a_h(struc_len,N_cloud_spec)
+
+! Internal
+INTEGER, parameter :: N_fit = 100
+INTEGER          :: i_str, i_spec, i_rad
+DOUBLE PRECISION :: bisect_particle_rad
+DOUBLE PRECISION :: w_star(struc_len), H(struc_len)
+DOUBLE PRECISION :: r_w(struc_len,N_cloud_spec), alpha(struc_len,N_cloud_spec)
+DOUBLE PRECISION :: rad(N_fit), vel(N_fit), f_fill(N_cloud_spec)
+DOUBLE PRECISION :: a, b
+
+H = kB*temp/(MMW*amu*gravity)
+w_star = Kzz/H
+f_fill = 1d0
+
+do i_str = 1, struc_len
+   do i_spec = 1, N_cloud_spec
+      r_w(i_str,i_spec) = bisect_particle_rad(1d-16,1d2,gravity,rho(i_str), &
+           rho_p(i_spec),temp(i_str),MMW(i_str),w_star(i_str))
+      if (r_w(i_str,i_spec) > 1d-16) then
+         if (frain(i_spec) > 1d0) then
+            do i_rad = 1, N_fit
+               rad(i_rad) = r_w(i_str,i_spec)*b_h(i_str,i_spec) + &
+                    (r_w(i_str,i_spec)-r_w(i_str,i_spec)*b_h(i_str,i_spec))* &
+                    DBLE(i_rad-1)/DBLE(N_fit-1)
+               call turbulent_settling_speed(rad(i_rad),gravity,rho(i_str),rho_p(i_spec),temp(i_str), &
+                    MMW(i_str),vel(i_rad))
+            end do
+         else
+            do i_rad = 1, N_fit
+               rad(i_rad) = r_w(i_str,i_spec) + (r_w(i_str,i_spec)/b_h(i_str,i_spec)- &
+                    r_w(i_str,i_spec))* &
+                    DBLE(i_rad-1)/DBLE(N_fit-1)
+               call turbulent_settling_speed(rad(i_rad),gravity,rho(i_str),rho_p(i_spec),temp(i_str), &
+                    MMW(i_str),vel(i_rad))
+            end do
+         end if
+
+         call fit_linear(log(rad), log(vel/w_star(i_str)), N_fit, a, b)
+
+         alpha(i_str,i_spec) = b
+         r_w(i_str,i_spec) = exp(-a/b)
+         a_h(i_str,i_spec) = ((b_h(i_str,i_spec)**(-1d0*alpha(i_str,i_spec))*(r_w(i_str,i_spec)**alpha(i_str,i_spec)*&
+                              frain(i_spec))*((b_h(i_str,i_spec)**3d0)*(b_h(i_str,i_spec)**alpha(i_str,i_spec))-&
+                              b_h(i_str,i_spec)+1d0)*gamma(1+ (1d0/b_h(i_str,i_spec))))/&
+                              (((b_h(i_str,i_spec)*alpha(i_str,i_spec))+ (2d0*b_h(i_str,i_spec)) + 1d0)*&
+                              gamma(alpha(i_str,i_spec) + 1d0 + (1d0/b_h(i_str,i_spec)))))**(1d0/alpha(i_str,i_spec))
+      else
+         a_h(i_str,i_spec) = 1d-17
+         alpha(i_str,i_spec) = 1d0
+      end if
+   end do
+
+end do
+
+end subroutine get_rg_n_hansen
 
 subroutine turbulent_settling_speed(x,gravity,rho,rho_p,temp,MMW,turbulent_settling_speed_ret)
 
@@ -2211,7 +2389,7 @@ subroutine feautrier_rad_trans(border_freqs, &
     if ((conv_val < 1d-2) .AND. (i_iter_scat > 9)) then
         exit
     end if
-    
+
  end do
 
   ! Calculate the contribution function.

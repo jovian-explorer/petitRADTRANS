@@ -88,7 +88,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             this may save time! The user should verify whether this leads to
             solutions which are identical to the rebinned results of the fiducial
             :math:`10^6` resolution. If not, this parameter must not be used.
- 
+
     """
     def __init__(self, line_species=[], rayleigh_species=[], cloud_species=[], \
                      continuum_opacities = [], H2H2CIA=False, H2HeCIA=False, \
@@ -477,68 +477,34 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         # bar to cgs
         self.press = P*1e6
-        self.continuum_opa = np.array(np.zeros(self.freq_len*len(P)) \
-                                          .reshape(self.freq_len, \
-                                          len(P)),dtype='d',order='F')
-        self.continuum_opa_scat = np.array(np.zeros(self.freq_len*len(P)) \
-                                            .reshape(self.freq_len, \
-                                            len(P)),dtype='d',order='F')
-        self.continuum_opa_scat_emis = np.array(np.zeros(self.freq_len*len(P)) \
-                                            .reshape(self.freq_len, \
-                                            len(P)),dtype='d',order='F')
-        self.contr_em = np.array(np.zeros(self.freq_len*len(P)) \
-                                     .reshape(len(P),self.freq_len), \
-                                     dtype='d',order='F')
-        self.contr_tr = np.array(np.zeros(self.freq_len*len(P)) \
-                                     .reshape(len(P),self.freq_len), \
-                                     dtype='d',order='F')
+        p_len = P.shape[0]
+        self.continuum_opa = np.zeros((self.freq_len,p_len),dtype='d',order='F')
+        self.continuum_opa_scat = np.zeros((self.freq_len,p_len),dtype='d',order='F')
+        self.continuum_opa_scat_emis = np.zeros((self.freq_len,p_len),dtype='d',order='F')
+        self.contr_em = np.zeros((self.freq_len,p_len),dtype='d',order='F')
+        self.contr_tr = np.zeros((self.freq_len,p_len),type='d',order='F')
         if len(self.line_species) > 0:
-            self.line_struc_kappas = \
-              np.array(np.zeros(self.g_len*self.freq_len*len(P)* \
-                len(self.line_species)).reshape(self.g_len,self.freq_len, \
-                len(self.line_species),len(P)),dtype='d',order='F')
+            self.line_struc_kappas = np.zeros((self.g_len,self.freq_len,p_len,len(self.line_species)),dtype='d',order='F')
 
             if self.mode == 'c-k':
-                self.line_struc_kappas_comb = \
-                np.array(np.zeros(self.g_len*self.freq_len*len(P) \
-                ).reshape(self.g_len,self.freq_len, \
-                len(P)),dtype='d',order='F')
+                self.line_struc_kappas_comb = np.zeros((self.g_len,self.freq_len,p_len),dtype='d',order='F')
 
-            self.total_tau = \
-              np.array(np.zeros_like(self.line_struc_kappas), \
-                           dtype='d',order='F')
-            self.line_abundances = \
-              np.array(np.zeros(len(self.press)*len(self.line_species)) \
-                           .reshape(len(self.press), \
-                            len(self.line_species)),dtype='d',order='F')
+            self.total_tau = np.zeros_like(self.line_struc_kappas,dtype='d',order='F')
+            self.line_abundances = np.zeros((p_len,len(self.line_species)),dtype='d',order='F')
         else: # If there are no specified line species then we need at
               # least an array to contain the continuum opas
               # I'll (mis)use the line_struc_kappas array for that
-            self.line_struc_kappas = \
-              np.array(np.zeros(self.g_len*self.freq_len*len(P)) \
-                           .reshape(self.g_len,self.freq_len, \
-                            1,len(P)),dtype='d',order='F')
-            self.total_tau = \
-              np.array(np.zeros_like(self.line_struc_kappas), \
-                           dtype='d',order='F')
-            self.line_abundances = \
-              np.array(np.zeros(len(self.press)) \
-                           .reshape(len(self.press),1), \
-                           dtype='d',order='F')
+            self.line_struc_kappas = np.zeros((self.g_len,self.freq_len,p_len),dtype='d',order='F')
+            self.total_tau = np.zeros_like(self.line_struc_kappas),dtype='d',order='F')
+            self.line_abundances = np.array(np.zeros(len(self.press)) \
+                                    .reshape(len(self.press),1), \
+                                    dtype='d',order='F')
 
         self.mmw = np.zeros_like(self.press)
 
         if len(self.cloud_species) > 0:
-            self.cloud_mass_fracs = np.array(np.zeros(int(len(self.press))* \
-                        int(len(self.cloud_species))) \
-                            .reshape(int(len(self.press)), \
-                            int(len(self.cloud_species))), \
-                                                 dtype='d',order='F')
-            self.r_g = np.array(np.zeros(int(len(self.press))* \
-                        int(len(self.cloud_species))) \
-                                    .reshape(int(len(self.press)), \
-                                            int(len(self.cloud_species))), \
-                                            dtype='d',order='F')
+            self.cloud_mass_fracs = np.zeros((p_len,len(self.cloud_species)),dtype='d',order='F')
+            self.r_g = np.zeros((p_len,len(self.cloud_species)),dtype='d',order='F')
 
     def interpolate_species_opa(self, temp):
         # Interpolate line opacities to given temperature structure.
@@ -583,7 +549,8 @@ class Radtrans(_read_opacities.ReadOpacities):
     def mix_opa_tot(self, abundances, mmw, gravity, \
                         sigma_lnorm = None, fsed = None, Kzz = None, \
                         radius = None, gray_opacity = None, \
-                        add_cloud_scat_as_abs = None):
+                        add_cloud_scat_as_abs = None,
+                        dist = "lognormal", a_hans = None):
         # Combine total line opacities,
         # according to mass fractions (abundances),
         # also add continuum opacities, i.e. clouds, CIA...
@@ -650,7 +617,8 @@ class Radtrans(_read_opacities.ReadOpacities):
             self.scat = True
             self.calc_cloud_opacity(abundances, mmw, gravity, \
                                         sigma_lnorm, fsed, Kzz, radius, \
-                                        add_cloud_scat_as_abs)
+                                        add_cloud_scat_as_abs,
+                                        dist = dist, a_hans = a_hans)
 
         # Calculate rayleigh scattering opacities
         if len(self.rayleigh_species) != 0:
@@ -714,7 +682,8 @@ class Radtrans(_read_opacities.ReadOpacities):
 
     def calc_cloud_opacity(self,abundances, mmw, gravity, sigma_lnorm, \
                                fsed = None, Kzz = None, \
-                               radius = None, add_cloud_scat_as_abs = None):
+                               radius = None, add_cloud_scat_as_abs = None,
+                               dist = "lognormal", a_hans = None):
         # Function to calculate cloud opacities
         # for defined atmospheric structure.
         rho = self.press/nc.kB/self.temp*mmw*nc.amu
@@ -723,16 +692,27 @@ class Radtrans(_read_opacities.ReadOpacities):
               abundances[self.cloud_species[i_spec]]
             if radius != None:
                 self.r_g[:,i_spec] = radius[self.cloud_species[i_spec]]
+            elif a_hans != None:
+                self.r_g[:,i_spec] = a_hans[self.cloud_species[i_spec]]
 
-        if radius != None:
-            cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
-              fs.calc_cloud_opas(rho,self.rho_cloud_particles, \
-                                self.cloud_mass_fracs,self.r_g,sigma_lnorm, \
-                                self.cloud_rad_bins,self.cloud_radii, \
-                                self.cloud_lambdas, \
-                                self.cloud_specs_abs_opa, \
-                                self.cloud_specs_scat_opa, \
-                                self.cloud_aniso)
+        if radius != None or a_hans is not None:
+            if dist is "lognormal":
+                cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
+                fs.calc_cloud_opas(rho,self.rho_cloud_particles, \
+                                    self.cloud_mass_fracs,self.r_g,sigma_lnorm, \
+                                    self.cloud_rad_bins,self.cloud_radii, \
+                                    self.cloud_lambdas, \
+                                    self.cloud_specs_abs_opa, \
+                                    self.cloud_specs_scat_opa, \
+                                    self.cloud_aniso)
+            else:
+                fs.calc_hansen_opas(rho,self.rho_cloud_particles, \
+                                    self.cloud_mass_fracs,self.r_g,self.b_hans, \
+                                    self.cloud_rad_bins,self.cloud_radii, \
+                                    self.cloud_lambdas, \
+                                    self.cloud_specs_abs_opa, \
+                                    self.cloud_specs_scat_opa, \
+                                    self.cloud_aniso)
         else:
             fseds = np.zeros(len(self.cloud_species))
             for i_spec in range(int(len(self.cloud_species))):
@@ -741,20 +721,35 @@ class Radtrans(_read_opacities.ReadOpacities):
                     fseds[i_spec] = fsed[self.cloud_species[i_spec]]
                 except:
                     fseds[i_spec] = fsed
+            if dist is "lognormal":
+                self.r_g = fs.get_rg_n(gravity,rho,self.rho_cloud_particles, \
+                                        self.temp,mmw,fseds, \
+                                        self.cloud_mass_fracs, \
+                                        sigma_lnorm,Kzz)
 
-            self.r_g = fs.get_rg_n(gravity,rho,self.rho_cloud_particles, \
-                                       self.temp,mmw,fseds, \
-                                       self.cloud_mass_fracs, \
-                                       sigma_lnorm,Kzz)
-            cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
-              fs.calc_cloud_opas(rho,self.rho_cloud_particles, \
-                                     self.cloud_mass_fracs, \
-                                     self.r_g,sigma_lnorm, \
-                                     self.cloud_rad_bins,self.cloud_radii, \
-                                     self.cloud_lambdas, \
-                                     self.cloud_specs_abs_opa, \
-                                     self.cloud_specs_scat_opa, \
-                                     self.cloud_aniso)
+                cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
+                fs.calc_cloud_opas(rho,self.rho_cloud_particles, \
+                                        self.cloud_mass_fracs, \
+                                        self.r_g,sigma_lnorm, \
+                                        self.cloud_rad_bins,self.cloud_radii, \
+                                        self.cloud_lambdas, \
+                                        self.cloud_specs_abs_opa, \
+                                        self.cloud_specs_scat_opa, \
+                                        self.cloud_aniso)
+            else:
+                self.r_g = fs.get_rg_n_hansen(gravity,rho,self.rho_cloud_particles, \
+                        self.temp,mmw,fseds, \
+                        self.cloud_mass_fracs, \
+                        self.b_hans,Kzz)
+                cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
+                fs.calc_hansen_opas(rho,self.rho_cloud_particles, \
+                                        self.cloud_mass_fracs, \
+                                        self.r_g,self.b_hans, \
+                                        self.cloud_rad_bins,self.cloud_radii, \
+                                        self.cloud_lambdas, \
+                                        self.cloud_specs_abs_opa, \
+                                        self.cloud_specs_scat_opa, \
+                                        self.cloud_aniso)
 
         # aniso = (1-g)
         cloud_abs, cloud_abs_plus_scat_aniso, aniso, cloud_abs_plus_scat_no_aniso = \
@@ -768,7 +763,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             if self.hack_cloud_photospheric_tau != None:
                 self.hack_cloud_total_scat_aniso = cloud_abs_plus_scat_aniso - cloud_abs
                 self.hack_cloud_total_abs = cloud_abs
-                
+
         self.continuum_opa_scat += cloud_abs_plus_scat_no_aniso - cloud_abs
 
         if add_cloud_scat_as_abs != None:
@@ -814,12 +809,12 @@ class Radtrans(_read_opacities.ReadOpacities):
                 block2 = True
                 block3 = True
                 block4 = True
-                
+
                 ############################################################################
                 #### BLOCK 1, subtract cloud, calc. tau for gas only
                 ############################################################################
 
-                
+
                 if block1:
 
                     # Get continuum scattering opacity, without clouds:
@@ -829,13 +824,13 @@ class Radtrans(_read_opacities.ReadOpacities):
                     ab = np.ones_like(self.line_abundances)
                     self.line_struc_kappas = fi.mix_opas_ck(ab, \
                                     self.line_struc_kappas,-self.hack_cloud_total_abs)
-                      
+
                     # Calc. cloud-free optical depth
                     self.total_tau[:,:,:1,:], self.photon_destruction_prob = \
                       fs.calc_tau_g_tot_ck_scat(gravity, \
                         self.press,self.line_struc_kappas[:,:,:1,:], \
                         self.do_scat_emis, self.continuum_opa_scat_emis)
-                    
+
                 ############################################################################
                 #### BLOCK 2, calc optical depth of cloud only!
                 ############################################################################
@@ -905,7 +900,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     #print('tau_cloud_at_Phot_clear', tau_cloud_at_Phot_clear)
 
                     Pphot_atmo_clear = optical_depth_integ
-                      
+
                     photo_press = np.zeros(self.freq_len)
                     photo_press_cloud = np.zeros(self.freq_len)
                     for i in range(len(photo_press)):
@@ -939,7 +934,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     plt.ylim([1e2,1e-6])
                     plt.show()
                     '''
-                    
+
                     #self.cloud_scaling_factor = 1.
                     # Apply cloud scaling
                     self.cloud_scaling_factor = self.hack_cloud_photospheric_tau / tau_cloud_at_Phot_clear
@@ -953,7 +948,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     #      max_rescaling, \
                     #      self.cloud_scaling_factor/max_rescaling)
                     self.scaling_physicality = self.cloud_scaling_factor/max_rescaling
-                    
+
                     #print('Block 3 done')
 
                 ############################################################################
@@ -974,7 +969,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                       fs.calc_tau_g_tot_ck_scat(gravity, \
                         self.press,self.line_struc_kappas[:,:,:1,:], \
                         self.do_scat_emis, self.continuum_opa_scat_emis)
-                    
+
             else:
                 self.total_tau[:,:,:1,:], self.photon_destruction_prob = \
                   fs.calc_tau_g_tot_ck_scat(gravity, \
@@ -1079,7 +1074,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                       add_cloud_scat_as_abs = None,\
                       Tstar = None, Rstar=None, semimajoraxis = None,\
                       geometry = 'dayside_ave',theta_star=0, \
-                      hack_cloud_photospheric_tau = None):
+                      hack_cloud_photospheric_tau = None,
+                      dist = "lognormal", a_hans = None, b_hans = None):
         ''' Method to calculate the atmosphere's emitted flux
         (emission spectrum).
 
@@ -1153,6 +1149,21 @@ class Radtrans(_read_opacities.ReadOpacities):
                     Inclination angle of the direct light with respect to
                     the normal to the atmosphere. Used only in the
                     non-isotropic geometry scenario.
+                dist (Optional[string]):
+                    The cloud particle size distribution to use.
+                    Can be either 'lognormal' (default) or 'hansen'.
+                    If hansen, the b_hans parameters must be used.
+                a_hans (Optional[dict]):
+                    A dictionary of the 'a' parameter values for each
+                    included cloud species and for each atmospheric layer,
+                    formatted as the kzz argument. Equivilant to radius arg.
+                    If a_hans is not included and dist is "hansen", then it will
+                    be computed using Kzz and fsed (recommended).
+                b_hans (Optional[dict]):
+                    A dictionary of the 'b' parameter values for each
+                    included cloud species and for each atmospheric layer,
+                    formatted as the kzz argument. This is the width of the hansen
+                    distribution normalized by the particle area (1/a_hans^2)
         '''
 
         self.hack_cloud_photospheric_tau = hack_cloud_photospheric_tau
@@ -1163,13 +1174,18 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.geometry = geometry
         self.mu_star = np.cos(theta_star*np.pi/180.)
         self.fsed = fsed
-
+        if dist.lower() is "hansen":
+            try:
+                self.b_hans = np.array(list(b_hans.values()),dtype='d',order='F').T
+            except:
+                print("You must provide a value for the Hansen distribution width, b_hans!")
         if self.mu_star<=0.:
             self.mu_star=1e-8
         self.get_star_spectrum(Tstar,semimajoraxis,Rstar)
         self.interpolate_species_opa(temp)
         self.mix_opa_tot(abunds,mmw,gravity,sigma_lnorm,fsed,Kzz,radius, \
-                             add_cloud_scat_as_abs = add_cloud_scat_as_abs)
+                             add_cloud_scat_as_abs = add_cloud_scat_as_abs,
+                             dist = dist, a_hans = a_hans)
         self.calc_opt_depth(gravity)
         self.calc_RT(contribution)
         self.calc_tau_cloud(gravity)
