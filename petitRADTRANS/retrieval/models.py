@@ -276,7 +276,6 @@ def guillot_free_emission(pRT_object, \
     else:
         print("Pick two of log_g, R_pl and mass priors!")
         sys.exit(5)
-    print(np.log10(gravity), R_pl/nc.r_jup)
     pRT_object.calc_flux(temperatures, \
                      abundances, \
                      gravity, \

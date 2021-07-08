@@ -523,7 +523,6 @@ class Radtrans(_read_opacities.ReadOpacities):
           factor = (mfrac/mu_part)**2*self.mmw/nc.amu/(nc.L0**2)*self.press/nc.kB/self.temp
           x = CIA_cpair_temp
           y = CIA_cpair_lambda
-          xx, yy = np.meshgrid(x, y)
           z = CIA_cpair_alpha_grid
           f = interpolate.interp2d(x, y, z, kind='linear')
           xnew=self.temp
