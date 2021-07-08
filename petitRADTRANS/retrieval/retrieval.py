@@ -814,7 +814,7 @@ class Retrieval:
             logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
             self.run_mode = 'evaluate'
         print("Plotting Best-fit spectrum")
-        fig, axes = fig, axes = plt.subplots(nrows=2, ncols=1, sharex='col', sharey=False,
+        fig, axes = plt.subplots(nrows=2, ncols=1, sharex='col', sharey=False,
                                gridspec_kw={'height_ratios': [2.5, 1],'hspace':0.1},
                                figsize=(20, 10))
         ax = axes[0] # Normal Spectrum axis

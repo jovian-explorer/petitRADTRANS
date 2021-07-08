@@ -1289,7 +1289,8 @@ subroutine calc_hansen_opas(rho,rho_p,cloud_mass_fracs,a_h,b_h,cloud_rad_bins, &
 
               scale_factor = 3d0*cloud_mass_fracs(i_struc,i_spec)*rho(i_struc)/4d0/pi/rho_p(i_spec)
 
-              N = scale_factor/(a_h(i_struc,i_spec)**3d0*exp(-9d0/2d0*log(b_h(i_struc,i_spec))**2d0))
+              N = scale_factor/(a_h(i_struc,i_spec)**3d0*exp(-9d0/2d0*&
+                              log(b_h(i_struc,i_spec)*(a_h(i_struc,i_spec)**2d0))**2d0))
               do i_cloud = 1, N_cloud_rad_bins
                  dndr(i_cloud) =  N * hansen_size_nr(cloud_radii(i_cloud),a_h(i_struc,i_spec),&
                                                      b_h(i_struc,i_spec))

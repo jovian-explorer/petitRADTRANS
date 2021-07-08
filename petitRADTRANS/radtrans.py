@@ -346,6 +346,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.Pcloud = None
         self.haze_factor = None
         self.gray_opacity = None
+        self.b_hans = None
 
 
         ############################
@@ -481,11 +482,10 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.continuum_opa = np.zeros((self.freq_len,p_len),dtype='d',order='F')
         self.continuum_opa_scat = np.zeros((self.freq_len,p_len),dtype='d',order='F')
         self.continuum_opa_scat_emis = np.zeros((self.freq_len,p_len),dtype='d',order='F')
-        self.contr_em = np.zeros((self.freq_len,p_len),dtype='d',order='F')
-        self.contr_tr = np.zeros((self.freq_len,p_len),type='d',order='F')
+        self.contr_em = np.zeros((p_len,self.freq_len),dtype='d',order='F')
+        self.contr_tr = np.zeros((p_len,self.freq_len),dtype='d',order='F')
         if len(self.line_species) > 0:
-            self.line_struc_kappas = np.zeros((self.g_len,self.freq_len,p_len,len(self.line_species)),dtype='d',order='F')
-
+            self.line_struc_kappas = np.zeros((self.g_len,self.freq_len,len(self.line_species),p_len),dtype='d',order='F')
             if self.mode == 'c-k':
                 self.line_struc_kappas_comb = np.zeros((self.g_len,self.freq_len,p_len),dtype='d',order='F')
 
@@ -494,13 +494,11 @@ class Radtrans(_read_opacities.ReadOpacities):
         else: # If there are no specified line species then we need at
               # least an array to contain the continuum opas
               # I'll (mis)use the line_struc_kappas array for that
-            self.line_struc_kappas = np.zeros((self.g_len,self.freq_len,p_len),dtype='d',order='F')
-            self.total_tau = np.zeros_like(self.line_struc_kappas),dtype='d',order='F')
-            self.line_abundances = np.array(np.zeros(len(self.press)) \
-                                    .reshape(len(self.press),1), \
-                                    dtype='d',order='F')
+            self.line_struc_kappas = np.zeros((self.g_len,self.freq_len,1,p_len),dtype='d',order='F')
+            self.total_tau = np.zeros(self.line_struc_kappas.shape,dtype='d',order='F')
+            self.line_abundances = np.zeros((p_len,1),dtype='d',order='F')
 
-        self.mmw = np.zeros_like(self.press)
+        self.mmw = np.zeros(p_len)
 
         if len(self.cloud_species) > 0:
             self.cloud_mass_fracs = np.zeros((p_len,len(self.cloud_species)),dtype='d',order='F')
@@ -695,7 +693,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             elif a_hans != None:
                 self.r_g[:,i_spec] = a_hans[self.cloud_species[i_spec]]
 
-        if radius != None or a_hans is not None:
+        if radius is not None or a_hans is not None:
             if dist is "lognormal":
                 cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
                 fs.calc_cloud_opas(rho,self.rho_cloud_particles, \
@@ -706,6 +704,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                                     self.cloud_specs_scat_opa, \
                                     self.cloud_aniso)
             else:
+                cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
                 fs.calc_hansen_opas(rho,self.rho_cloud_particles, \
                                     self.cloud_mass_fracs,self.r_g,self.b_hans, \
                                     self.cloud_rad_bins,self.cloud_radii, \
@@ -1174,11 +1173,12 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.geometry = geometry
         self.mu_star = np.cos(theta_star*np.pi/180.)
         self.fsed = fsed
-        if dist.lower() is "hansen":
+        if "hansen" in dist.lower():
             try:
                 self.b_hans = np.array(list(b_hans.values()),dtype='d',order='F').T
             except:
                 print("You must provide a value for the Hansen distribution width, b_hans!")
+                self.b_hans = None
         if self.mu_star<=0.:
             self.mu_star=1e-8
         self.get_star_spectrum(Tstar,semimajoraxis,Rstar)
