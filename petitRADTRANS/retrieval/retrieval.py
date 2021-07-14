@@ -181,8 +181,6 @@ class Retrieval:
             const_efficiency_mode = self.const_efficiency_mode
         if self.ultranest:
             self._run_ultranest(ultranest,
-                                sampling_efficiency,
-                                const_efficiency_mode,
                                 n_live_points,
                                 log_z_convergence,
                                 step_sampler,
@@ -251,15 +249,11 @@ class Retrieval:
             ultranest : bool
                 If true, use Ultranest sampling rather than pymultinest. This is still a work
                 in progress, so use with caution!
-            sampling_efficiency : Float
-                pymultinest sampling efficiency
-            const_efficiency_mode : Bool
-                pymultinest constant efficiency mode
             n_live_points : Int
-                Number of live points to use in pymultinest, or the minimum number of live points to
+                The minimum number of live points to
                 use for the Ultranest reactive sampler.
             log_z_convergence : float
-                If ultranest is being used, the convergence criterion on log z.
+                The convergence criterion on log z.
             step_sampler : bool
                 Use a step sampler to improve the efficiency in ultranest.
             resume : bool
