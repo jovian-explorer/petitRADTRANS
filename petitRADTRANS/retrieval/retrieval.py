@@ -41,12 +41,16 @@ class Retrieval:
             for each sample when pymultinest is run.
         sample_spec : Bool
             Produce plots and data files for 100 randomly sampled outputs from pymultinest.
+        ultranest : bool
+            If true, use Ultranest sampling rather than pymultinest. This is still a work
+            in progress, so use with caution!
         sampling_efficiency : Float
             pymultinest sampling efficiency
         const_efficiency_mode : Bool
             pymultinest constant efficiency mode
         n_live_points : Int
-            Number of live points to use in pymultinest.
+            Number of live points to use in pymultinest, or the minimum number of live points to
+            use for the Ultranest reactive sampler.
         resume : bool
             Continue existing retrieval. If FALSE THIS WILL OVERWRITE YOUR EXISTING RETRIEVAL.
         bayes_factor_species : Str
@@ -55,9 +59,6 @@ class Retrieval:
             List of additional retrieval names that should be included in the corner plot.
         short_names : List(Str)
             For each corner_plot_name, a shorter name to be included when plotting.
-        plot_multiple_retrieval_names : List(Str)
-            List of additional retrievals to include when plotting spectra and PT profiles.
-            Not yet implemented.
     """
 
     def __init__(self,
@@ -65,15 +66,15 @@ class Retrieval:
                  output_dir = "",
                  test_plotting = False,
                  sample_spec = False,
-                 sampling_efficiency = 0.05,\
-                 const_efficiency_mode = True, \
-                 n_live_points = 4000,
-                 resume = True,
+                 ultranest = False,
+                 sampling_efficiency = None,\
+                 const_efficiency_mode = None, \
+                 n_live_points = None,
+                 resume = None,
                  bayes_factor_species = None,
                  corner_plot_names = None,
                  short_names = None,
-                 pRT_plot_style = True,
-                 plot_multiple_retrieval_names = None):
+                 pRT_plot_style = True):
         self.rd = run_definition
 
         # Maybe inherit from retrieval config class?
@@ -81,6 +82,7 @@ class Retrieval:
         self.data = self.rd.data
         self.run_mode = self.rd.run_mode
         self.parameters = self.rd.parameters
+        self.ultranest = ultranest
 
         self.output_dir = output_dir
         if self.output_dir != "" and not self.output_dir.endswith("/"):
@@ -106,8 +108,6 @@ class Retrieval:
         self.n_live_points = n_live_points
         self.resume = resume
         self.analyzer = None
-        # TODO
-        self.retrieval_list = plot_multiple_retrieval_names
 
         self.samples = {} #: The samples produced by pymultinest.
         self.param_dict = {}
@@ -137,11 +137,57 @@ class Retrieval:
         self.setup_data()
         self.generate_retrieval_summary()
 
-    def run(self):
+    def run(self,
+            ultranest = False,
+            sampling_efficiency = 0.5,
+            const_efficiency_mode = True,
+            n_live_points = 4000,
+            log_z_convergence = 0.5,
+            step_sampler = True,
+            resume = True):
         """
         Run mode for the class. Uses pynultinest to sample parameter space
         and produce standard PMN outputs.
+
+        Args:
+            ultranest : bool
+                If true, use Ultranest sampling rather than pymultinest. This is still a work
+                in progress, so use with caution!
+            sampling_efficiency : Float
+                pymultinest sampling efficiency
+            const_efficiency_mode : Bool
+                pymultinest constant efficiency mode
+            n_live_points : Int
+                Number of live points to use in pymultinest, or the minimum number of live points to
+                use for the Ultranest reactive sampler.
+            log_z_convergence : float
+                If ultranest is being used, the convergence criterion on log z.
+            step_sampler : bool
+                Use a step sampler to improve the efficiency in ultranest.
+            resume : bool
+                Continue existing retrieval. If FALSE THIS WILL OVERWRITE YOUR EXISTING RETRIEVAL.
         """
+        if self.sampling_efficiency is not None:
+            logging.warning("Setting sampling_efficiency as a class variable will be deprecated. Use the run method arguments.")
+            sampling_efficiency = self.sampling_efficiency
+        if self.n_live_points:
+            logging.warning("Setting n_live_points as a class variable will be deprecated. Use the run method arguments.")
+            n_live_points = self.n_live_points
+        if self.resume is not None:
+            logging.warning("Setting resume as a class variable will be deprecated. Use the run method arguments.")
+            resume = self.resume
+        if self.const_efficiency_mode is not None:
+            logging.warning("Setting const_efficiency_mode as a class variable will be deprecated. Use the run method arguments.")
+            const_efficiency_mode = self.const_efficiency_mode
+        if self.ultranest:
+            self._run_ultranest(ultranest,
+                                sampling_efficiency,
+                                const_efficiency_mode,
+                                n_live_points,
+                                log_z_convergence,
+                                step_sampler,
+                                resume)
+            return
 
         prefix = self.output_dir + 'out_PMN/'+self.retrieval_name+'_'
 
@@ -164,13 +210,13 @@ class Retrieval:
                             self.prior,
                             n_params,
                             outputfiles_basename=prefix,
-                            resume = self.resume,
+                            resume = resume,
                             verbose = True,
-                            sampling_efficiency = self.sampling_efficiency,
-                            const_efficiency_mode = self.const_efficiency_mode,
-                            n_live_points = self.n_live_points)
+                            sampling_efficiency = sampling_efficiency,
+                            const_efficiency_mode = const_efficiency_mode,
+                            n_live_points = n_live_points)
         self.analyzer = pymultinest.Analyzer(n_params = n_params,
-                                                outputfiles_basename = prefix)
+                                             outputfiles_basename = prefix)
         s = self.analyzer.get_stats()
         self.run_mode = 'evaluate'
         self.generate_retrieval_summary(s)
@@ -192,10 +238,32 @@ class Retrieval:
             fmts = '\t'.join(['    %-15s' + fmt + " +- " + fmt])
             print(fmts % (p, med, sigma))
 
-    def run_ultranest(self):
+    def _run_ultranest(self,
+                       n_live_points = 4000,
+                       log_z_convergence = 0.5,
+                       step_sampler = True,
+                       resume = True):
         """
         Run mode for the class. Uses ultranest to sample parameter space
         and produce standard outputs.
+
+        Args:
+            ultranest : bool
+                If true, use Ultranest sampling rather than pymultinest. This is still a work
+                in progress, so use with caution!
+            sampling_efficiency : Float
+                pymultinest sampling efficiency
+            const_efficiency_mode : Bool
+                pymultinest constant efficiency mode
+            n_live_points : Int
+                Number of live points to use in pymultinest, or the minimum number of live points to
+                use for the Ultranest reactive sampler.
+            log_z_convergence : float
+                If ultranest is being used, the convergence criterion on log z.
+            step_sampler : bool
+                Use a step sampler to improve the efficiency in ultranest.
+            resume : bool
+                Continue existing retrieval. If FALSE THIS WILL OVERWRITE YOUR EXISTING RETRIEVAL.
         """
 
         logging.warning("ultranest mode is still in development. Proceed with caution")
@@ -204,8 +272,6 @@ class Retrieval:
         except ImportError:
             logging.error("Could not import ultranest. Exiting.")
             sys.exit(1)
-        # TODO: autodetect PMN vs UN outputs
-        prefix = self.output_dir + 'out_PMN/'+self.retrieval_name+'_'
         if self.run_mode == 'retrieval':
             print("Starting retrieval: " + self.retrieval_name+'\n')
             # How many free parameters?
@@ -215,17 +281,21 @@ class Retrieval:
                 if self.parameters[pp].is_free_parameter:
                     free_parameter_names.append(self.parameters[pp].name)
                     n_params += 1
-            json.dump(free_parameter_names, \
-                    open(prefix+'_params.json', 'w'))
+
+
             sampler = un.ReactiveNestedSampler(free_parameter_names,
                                                self.log_likelihood,
-                                               self.prior,
+                                               self.prior_ultranest,
                                                log_dir=self.output_dir + "out_" + self.retrieval_name,
-                                               resume=self.resume)
-
-            result = sampler.run()
+                                               resume=resume)
+            if step_sampler:
+                sampler.stepsampler = un.stepsampler.RegionSliceSampler(nsteps=n_live_points,
+                                                                        adaptive_nsteps='move-distance')
+            sampler.run(min_num_live_points=n_live_points,
+                        dlogz = log_z_convergence,)
             sampler.print_results()
-        return result
+            sampler.plot_corner()
+
 
     def generate_retrieval_summary(self,stats = None):
         """
@@ -401,7 +471,7 @@ class Retrieval:
                 rt_object.setup_opa_structure(p)
                 dd.pRT_object = rt_object
 
-    def prior(self, cube, ndim, nparams):
+    def prior(self, cube, ndim=0, nparams=0):
         """
         pyMultinest Prior function. Transforms unit hypercube into physical space.
         """
@@ -411,8 +481,19 @@ class Retrieval:
             if self.parameters[pp].is_free_parameter:
                 cube[i_p] = self.parameters[pp].get_param_uniform(cube[i_p])
                 i_p += 1
+    def prior_ultranest(self, cube):
+        """
+        pyMultinest Prior function. Transforms unit hypercube into physical space.
+        """
+        params = cube.copy()
+        i_p = 0
+        for pp in self.parameters:
+            if self.parameters[pp].is_free_parameter:
+                params[i_p] = self.parameters[pp].get_param_uniform(cube[i_p])
+                i_p += 1
+        return params
 
-    def log_likelihood(self,cube,ndim,nparam):
+    def log_likelihood(self,cube,ndim=0,nparam=0):
         """
         pyMultiNest required likelihood function.
 
@@ -530,6 +611,21 @@ class Retrieval:
 
         if output_dir is None:
             output_dir = self.output_dir
+        if self.ultranest:
+            for name in self.corner_files:
+                samples = np.genfromtxt(output_dir +'out_' + name + '/chains/qual_weighted_post.txt')
+                #TODO formatting of paramname file
+                parameters_read = open(output_dir +'out_' + name + '/chains/weighted_post.paramnames')
+                self.samples[name] = samples
+                self.param_dict[name] = parameters_read
+            for name in ret_names:
+                samples = np.genfromtxt(output_dir +'out_' + name + '/chains/qual_weighted_post.txt')
+                parameters_read = open(output_dir +'out_' + name + '/chains/weighted_post.paramnames')
+                self.samples[name] = samples
+                self.param_dict[name] = parameters_read
+            return self.samples, self.param_dict
+
+        # pymultinest
         for name in self.corner_files:
             samples = np.genfromtxt(output_dir +'out_PMN/'+ \
                                     name+ \
@@ -830,7 +926,8 @@ class Retrieval:
         # Then get the full wavelength range
         bf_wlen, bf_spectrum = self.get_best_fit_model(samples_use[best_fit_index, :-1],\
                                                        parameters_read,model_generating_func)
-
+        gpicol = None
+        sphcol = None
         # Iterate through each dataset, plotting the data and the residuals.
         for name,dd in self.data.items():
             # If the user has specified a resolution, rebin to that
@@ -905,11 +1002,24 @@ class Retrieval:
             if dd.photometry:
                 marker = 's'
             if not dd.photometry:
+                label = dd.name
+                gpicol = None
+                if "GPIH" in dd.name:
+                    label = "GPI"
+                if "K1" in dd.name or "K2" in dd.name:
+                    label = None
+                    gpicol = ax.get_lines()[-1].get_color()
+                if "SPHEREYJ" in dd.name:
+                    if dd.name.endswith("H"):
+                        label = "SPHERE"
+                    else:
+                        label = None
+                        gpicol = ax.get_lines()[-1].get_color()
                 ax.errorbar(wlen, \
                             flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
                             yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
                             marker=marker, markeredgecolor='k', linewidth = 0, elinewidth = 2, \
-                            label = dd.name, zorder =10, alpha = 0.9,)
+                            label = label, zorder =10, alpha = 0.9,color = gpicol)
             else:
                 # Don't label photometry?
                 ax.errorbar(wlen, \

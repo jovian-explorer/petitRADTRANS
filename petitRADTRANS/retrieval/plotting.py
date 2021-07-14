@@ -183,9 +183,9 @@ def contour_corner(sampledict, \
         except:
             pass
         fig = plt.figure(figsize = (60,60),dpi=80)
-        label_kwargs = {'fontsize':54}
-        title_kwargs = {'fontsize':42}#{'fontsize':int(48/len(parameter_plot_indices[key]))}
-        hist2d_kwargs = {'fontsize':42}
+        label_kwargs = {'fontsize':max(98 - 4*len(parameter_plot_indices[key]),8)}
+        title_kwargs = {'fontsize':max(110 - 4*len(parameter_plot_indices[key]),8)}#{'fontsize':int(48/len(parameter_plot_indices[key]))}
+        hist2d_kwargs = {'fontsize':max(84 - 4*len(parameter_plot_indices[key]),8)}
         hist_kwargs = {"linewidth":6}
         contour_kwargs = {"linewidths":6}
         import matplotlib as mpl
@@ -231,7 +231,7 @@ def contour_corner(sampledict, \
                           )
             count += 1
         for ax in fig.get_axes():
-            ax.tick_params(axis='both', labelsize=36, direction="in")
+            ax.tick_params(axis='both', labelsize=max(60 - 2*len(parameter_plot_indices[key]),8), direction="in")
             ax.tick_params(axis='both',which = 'major', length = 24)
             ax.tick_params(axis='both',which = 'minor', length = 12)
         #if dimensions == 1:

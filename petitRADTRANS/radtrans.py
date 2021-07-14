@@ -446,7 +446,6 @@ class Radtrans(_read_opacities.ReadOpacities):
         if self.H2H2CIA or self.H2HeCIA or self.N2N2CIA or self.O2O2CIA \
             or self.N2O2CIA or self.CO2CO2CIA:
             print(' Done.')
-            print()
 
 
         #############################

@@ -1272,9 +1272,9 @@ subroutine calc_hansen_opas(rho,rho_p,cloud_mass_fracs,a_h,b_h,cloud_rad_bins, &
 
   ! internal
   INTEGER :: i_struc, i_spec, i_lamb, i_cloud
-  DOUBLE PRECISION :: N, dndr(N_cloud_rad_bins), integrand_abs(N_cloud_rad_bins), scale_factor, &
+  DOUBLE PRECISION :: N, dndr(N_cloud_rad_bins), integrand_abs(N_cloud_rad_bins), mass_to_vol, &
        integrand_scat(N_cloud_rad_bins), add_abs, add_scat, integrand_aniso(N_cloud_rad_bins), add_aniso, &
-       hansen_size_nr
+       hansen_size_nr, dndr_scale
 
   !~~~~~~~~~~~~~~~~
 
@@ -1287,13 +1287,16 @@ subroutine calc_hansen_opas(rho,rho_p,cloud_mass_fracs,a_h,b_h,cloud_rad_bins, &
 
            do i_lamb = 1, N_cloud_lambda_bins
 
-              scale_factor = 3d0*cloud_mass_fracs(i_struc,i_spec)*rho(i_struc)/4d0/pi/rho_p(i_spec)
+              mass_to_vol= 3d0*cloud_mass_fracs(i_struc,i_spec)*rho(i_struc)/4d0/pi/rho_p(i_spec)
 
-              N = scale_factor/(a_h(i_struc,i_spec)**3d0*exp(-9d0/2d0*&
-                              log(b_h(i_struc,i_spec)*(a_h(i_struc,i_spec)**2d0))**2d0))
+              N = mass_to_vol/((a_h(i_struc,i_spec)**3d0) *(b_h(i_struc,i_spec) -1d0)*&
+                               ((2d0*b_h(i_struc,i_spec)) -1d0))
+              dndr_scale = N * (a_h(i_struc,i_spec)*b_h(i_struc,i_spec))**((2d0*(b_h(i_struc,i_spec))&
+                                 - 1d0)/(b_h(i_struc,i_spec))) /gamma((1d0-(2d0*(b_h(i_struc,i_spec))))/&
+                                 (b_h(i_struc,i_spec)))
               do i_cloud = 1, N_cloud_rad_bins
-                 dndr(i_cloud) =  N * hansen_size_nr(cloud_radii(i_cloud),a_h(i_struc,i_spec),&
-                                                     b_h(i_struc,i_spec))
+                 dndr(i_cloud) =  dndr_scale * hansen_size_nr(cloud_radii(i_cloud),a_h(i_struc,i_spec),&
+                                                              b_h(i_struc,i_spec))
               end do
               integrand_abs = 4d0*pi/3d0*cloud_radii**3d0*rho_p(i_spec)*dndr* &
                    cloud_specs_abs_opa(:,i_lamb,i_spec)
