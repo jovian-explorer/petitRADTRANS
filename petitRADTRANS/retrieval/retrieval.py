@@ -277,12 +277,15 @@ class Retrieval:
                                                log_dir=self.output_dir + "out_" + self.retrieval_name,
                                                resume=resume)
             if step_sampler:
-                import ultranest.stepsampler
-                sampler.run(min_num_live_points = 400, max_ncalls = 400000)
-                sampler.stepsampler = ultranest.stepsampler.RegionSliceSampler(nsteps=n_live_points,adaptive_nsteps='move-distance')
-                sampler.print_results()
-                sampler.plot_corner()
-                return
+                try:
+                    import ultranest.stepsampler
+                    sampler.run(min_num_live_points=400,
+                            max_n_calls = 400000,
+                            region_class =  'RobustEllipsoidRegion')
+                    sampler.stepsampler = ultranest.stepsampler.RegionSliceSampler(nsteps=n_live_points,
+                                                                                   adaptive_nsteps='move-distance')
+                except:
+                    logging.error("Could not use step sampling!")
             sampler.run(min_num_live_points=n_live_points,
                         dlogz = log_z_convergence,
                         region_class =  'RobustEllipsoidRegion')
