@@ -76,6 +76,8 @@ class Retrieval:
                  short_names = None,
                  pRT_plot_style = True):
         self.rd = run_definition
+        if len(self.rd.line_species) < 1:
+            logging.error("There are no line species present in the run definition!")
 
         # Maybe inherit from retrieval config class?
         self.retrieval_name = self.rd.retrieval_name
@@ -286,7 +288,8 @@ class Retrieval:
                 sampler.stepsampler = un.stepsampler.RegionSliceSampler(nsteps=n_live_points,
                                                                         adaptive_nsteps='move-distance')
             sampler.run(min_num_live_points=n_live_points,
-                        dlogz = log_z_convergence,)
+                        dlogz = log_z_convergence,
+                        region_class =  'RobustEllipsoidRegion')
             sampler.print_results()
             sampler.plot_corner()
 
@@ -579,6 +582,8 @@ class Retrieval:
                                         spectrum_model, \
                                         self.plotting)
         #print(log_likelihood)
+        if self.ultranest and np.isinf(log_likelihood+log_prior):
+            return -1e99
         return log_likelihood + log_prior
 
     def get_samples(self, output_dir = None, ret_names = []):
