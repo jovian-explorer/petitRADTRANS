@@ -138,7 +138,6 @@ class Retrieval:
         self.generate_retrieval_summary()
 
     def run(self,
-            ultranest = False,
             sampling_efficiency = 0.5,
             const_efficiency_mode = True,
             n_live_points = 4000,
@@ -150,9 +149,6 @@ class Retrieval:
         and produce standard PMN outputs.
 
         Args:
-            ultranest : bool
-                If true, use Ultranest sampling rather than pymultinest. This is still a work
-                in progress, so use with caution!
             sampling_efficiency : Float
                 pymultinest sampling efficiency
             const_efficiency_mode : Bool
@@ -180,8 +176,7 @@ class Retrieval:
             logging.warning("Setting const_efficiency_mode as a class variable will be deprecated. Use the run method arguments.")
             const_efficiency_mode = self.const_efficiency_mode
         if self.ultranest:
-            self._run_ultranest(ultranest,
-                                n_live_points,
+            self._run_ultranest(n_live_points,
                                 log_z_convergence,
                                 step_sampler,
                                 resume)
@@ -246,9 +241,6 @@ class Retrieval:
         and produce standard outputs.
 
         Args:
-            ultranest : bool
-                If true, use Ultranest sampling rather than pymultinest. This is still a work
-                in progress, so use with caution!
             n_live_points : Int
                 The minimum number of live points to
                 use for the Ultranest reactive sampler.
@@ -283,8 +275,12 @@ class Retrieval:
                                                log_dir=self.output_dir + "out_" + self.retrieval_name,
                                                resume=resume)
             if step_sampler:
-                sampler.stepsampler = un.stepsampler.RegionSliceSampler(nsteps=n_live_points,
-                                                                        adaptive_nsteps='move-distance')
+                import ultranest.stepsampler
+                sampler.run(min_num_live_points = 400, max_ncalls = 400000)
+                sampler.stepsampler = ultranest.stepsampler.RegionSliceSampler(nsteps=n_live_points,adaptive_nsteps='move-distance')
+                sampler.print_results()
+                sampler.plot_corner()
+                return
             sampler.run(min_num_live_points=n_live_points,
                         dlogz = log_z_convergence,)
             sampler.print_results()
