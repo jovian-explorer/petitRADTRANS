@@ -5,10 +5,11 @@
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Corner plots &mdash; petitRADTRANS 1.3.0 documentation</title>
+  <title>Corner plots &mdash; petitRADTRANS 2.2.1 documentation</title>
   
 
   
@@ -21,12 +22,12 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
-        <script type="text/javascript" src="../../_static/jquery.js"></script>
-        <script type="text/javascript" src="../../_static/underscore.js"></script>
-        <script type="text/javascript" src="../../_static/doctools.js"></script>
-        <script type="text/javascript" src="../../_static/language_data.js"></script>
-        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
         <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})</script>
     
     <script type="text/javascript" src="../../_static/js/theme.js"></script>
@@ -36,10 +37,13 @@
   
   <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="Plotting temperature envelopes" href="plot_temp_enve.html" />
-    <link rel="prev" title="Analysis of results" href="../ret_analysis.html" /> 
+    <link rel="prev" title="OLD (from Mollière+19): Analysis of results" href="../ret_analysis.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -66,7 +70,7 @@
             
             
               <div class="version">
-                1.3
+                2.2
               </div>
             
           
@@ -96,9 +100,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorial.html">Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../available_opacities.html">Available opacity species</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../retrieval_examples.html">Retrieval Examples</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../ret_transmission.html">Transmission spectrum retrieval</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../ret_emission.html">Emission spectrum retrieval</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="../ret_analysis.html">Analysis of results</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="pRT_Retrieval_Example.html">petitRADTRANS Retrieval Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ret_transmission.html">OLD (from Mollière+19): Transmission spectrum retrieval</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ret_emission.html">OLD (from Mollière+19): Emission spectrum retrieval</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../ret_analysis.html">OLD (from Mollière+19): Analysis of results</a><ul class="current">
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Corner plots</a></li>
 <li class="toctree-l3"><a class="reference internal" href="plot_temp_enve.html">Plotting temperature envelopes</a></li>
 </ul>
@@ -109,7 +114,8 @@
 </ul>
 <p class="caption"><span class="caption-text">Code documentation:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../code.html">Code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nat_cst_doc.html">nat_cst constants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../autoapi/index.html">API Reference</a></li>
 </ul>
 
             
@@ -157,7 +163,7 @@
         
           <li><a href="../retrieval_examples.html">Retrieval Examples</a> &raquo;</li>
         
-          <li><a href="../ret_analysis.html">Analysis of results</a> &raquo;</li>
+          <li><a href="../ret_analysis.html">OLD (from Mollière+19): Analysis of results</a> &raquo;</li>
         
       <li>Corner plots</li>
     
@@ -400,7 +406,7 @@ div.rendered_html tbody tr:hover {
     text-align: unset;
 }
 </style>
-<div class="section" id="Corner-plots">
+<section id="Corner-plots">
 <h1>Corner plots<a class="headerlink" href="#Corner-plots" title="Permalink to this headline">¶</a></h1>
 <p>This section shows an example for producing a corner plot from a multidimensional array containing the samples of a retrieval run. One option is to use <a class="reference external" href="https://corner.readthedocs.io">the corner package</a>, see <a class="reference external" href="http://joss.theoj.org/papers/10.21105/joss.00024">Foreman-Mackey (2016)</a>. Here we use our quickly self-written (so don’t judge :) !) <code class="docutils literal notranslate"><span class="pre">nice_corner.py</span></code> package which can be found in the <code class="docutils literal notranslate"><span class="pre">petitRADTRANS</span></code> source folder, in the sub folder <code class="docutils literal notranslate"><span class="pre">retrieval_examples/analysis</span></code>. It requires
 <a class="reference external" href="https://seaborn.pydata.org">seaborn</a>.</p>
@@ -558,7 +564,7 @@ div.rendered_html tbody tr:hover {
 </div>
 </div>
 <p>Note that the lower log mass fraction range as defined by the priors (-10) is clearly visible in the plots where only an upper limit on the mass fraction is retrieved.</p>
-</div>
+</section>
 
 
            </div>
@@ -571,7 +577,7 @@ div.rendered_html tbody tr:hover {
         <a href="plot_temp_enve.html" class="btn btn-neutral float-right" title="Plotting temperature envelopes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="../ret_analysis.html" class="btn btn-neutral float-left" title="Analysis of results" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="../ret_analysis.html" class="btn btn-neutral float-left" title="OLD (from Mollière+19): Analysis of results" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

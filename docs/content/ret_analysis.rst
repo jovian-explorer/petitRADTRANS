@@ -1,5 +1,5 @@
-Analysis of results
-===================
+OLD (from Mollière+19): Analysis of results
+===========================================
 
 Here we give some example code for how to analyse one's results after
 having carried out a retrieval. Example code is given for posterior

@@ -15,8 +15,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('../'))
-autodoc_mock_imports = ['petitRADTRANS.fort_input', 'petitRADTRANS.fort_spec', \
-                        'petitRADTRANS.fort_rebin', 'numpy', 'petitRADTRANS.nat_cst', 'scipy', 'glob', \
+autodoc_mock_imports = ['petitRADTRANS', 'numpy', 'scipy', 'glob', \
                         'os', 'sys', 'pdb', 'h5py']
 
 # -- Project information -----------------------------------------------------
@@ -26,9 +25,9 @@ copyright = u'2019-2020, Paul Molli\u00E8re'
 author = u'Paul Molli\u00E8re'
 
 # The short X.Y version
-version = '1.3'
+version = '2.2'
 # The full version, including alpha/beta/rc tags
-release = '1.3.0'
+release = '2.2.1'
 
 
 # -- General configuration ---------------------------------------------------
@@ -41,10 +40,12 @@ release = '1.3.0'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autodoc',
+    'autoapi',
     'nbsphinx',
-    'sphinx.ext.mathjax'
+    'sphinx.ext.mathjax',
 ]
+autoapi_type = 'python'
+autoapi_dirs = ['../petitRADTRANS']
 exclude_patterns = ['_build', '**.ipynb_checkpoints']
 
 #pdf_documents = [('index', u'rst2pdf', u'pRTdoc', u'Molliere'),]

@@ -5,10 +5,11 @@
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Retrieval Examples &mdash; petitRADTRANS 1.3.0 documentation</title>
+  <title>Retrieval Examples &mdash; petitRADTRANS 2.2.1 documentation</title>
   
 
   
@@ -21,13 +22,11 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
-        <script type="text/javascript" src="../_static/jquery.js"></script>
-        <script type="text/javascript" src="../_static/underscore.js"></script>
-        <script type="text/javascript" src="../_static/doctools.js"></script>
-        <script type="text/javascript" src="../_static/language_data.js"></script>
-        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
-        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})</script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     
     <script type="text/javascript" src="../_static/js/theme.js"></script>
 
@@ -36,9 +35,12 @@
   
   <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Transmission spectrum retrieval" href="ret_transmission.html" />
+    <link rel="next" title="OLD (from Mollière+19): Transmission spectrum retrieval" href="ret_transmission.html" />
     <link rel="prev" title="Available opacity species" href="available_opacities.html" /> 
 </head>
 
@@ -66,7 +68,7 @@
             
             
               <div class="version">
-                1.3
+                2.2
               </div>
             
           
@@ -96,16 +98,18 @@
 <li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="available_opacities.html">Available opacity species</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Retrieval Examples</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="ret_transmission.html">Transmission spectrum retrieval</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ret_emission.html">Emission spectrum retrieval</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ret_analysis.html">Analysis of results</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/pRT_Retrieval_Example.html">petitRADTRANS Retrieval Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ret_transmission.html">OLD (from Mollière+19): Transmission spectrum retrieval</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ret_emission.html">OLD (from Mollière+19): Emission spectrum retrieval</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ret_analysis.html">OLD (from Mollière+19): Analysis of results</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="opa_add.html">Adding opacities</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Code documentation:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="code.html">Code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="nat_cst_doc.html">nat_cst constants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../autoapi/index.html">API Reference</a></li>
 </ul>
 
             
@@ -194,35 +198,43 @@
     text-align: unset;
 }
 </style>
-<div class="section" id="retrieval-examples">
+<section id="retrieval-examples">
 <h1>Retrieval Examples<a class="headerlink" href="#retrieval-examples" title="Permalink to this headline">¶</a></h1>
-<p>In this section we will give two fully imlemented examples of
-retrievals, using synthetic JWST observations. One retrieval for
-emission and one for transmission spectra.  These are the retrievals
-reported on in the <a class="reference external" href="https://arxiv.org/abs/1904.11504">petitRADTRANS paper</a>.</p>
-<p>In addition we also give some implemented examples on how to analyze
-the results, by producing contribution functions, corner plots and
-pressure-temperature confidene envelopes.</p>
+<p>In this section we will give fully imlemented examples of
+retrievals. <strong>Please use the</strong> <a class="reference external" href="notebooks/pRT_Retrieval_Example.html">petitRADTRANS Retrieval Tutorial</a>
+<strong>from now on, we still give our old setups from the</strong> <a class="reference external" href="https://arxiv.org/abs/1904.11504">petitRADTRANS paper</a> <strong>though</strong>.</p>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="ret_transmission.html">Transmission spectrum retrieval</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/pRT_Retrieval_Example.html">petitRADTRANS Retrieval Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/pRT_Retrieval_Example.html#Getting-started">Getting started</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/pRT_Retrieval_Example.html#Opacities">Opacities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/pRT_Retrieval_Example.html#Model-Functions">Model Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/pRT_Retrieval_Example.html#Data">Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/pRT_Retrieval_Example.html#Plotting">Plotting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/pRT_Retrieval_Example.html#Running-the-retrieval">Running the retrieval</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/pRT_Retrieval_Example.html#Emission-Spectrum-Example">Emission Spectrum Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/pRT_Retrieval_Example.html#Photometric-data">Photometric data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/pRT_Retrieval_Example.html#Parameters-and-Priors">Parameters and Priors</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ret_transmission.html">OLD (from Mollière+19): Transmission spectrum retrieval</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/ret_transmission_master.html">Transmission spectrum retrieval: main script</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/ret_transmission_retrieval_model.html">Master retrieval model: transmission case</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="ret_emission.html">Emission spectrum retrieval</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="ret_emission.html">OLD (from Mollière+19): Emission spectrum retrieval</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/ret_emission_master.html">Emission spectrum retrieval: main script</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/ret_emission_retrieval_model.html">Master retrieval model: emission case</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="ret_analysis.html">Analysis of results</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="ret_analysis.html">OLD (from Mollière+19): Analysis of results</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/corner_plots.html">Corner plots</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/plot_temp_enve.html">Plotting temperature envelopes</a></li>
 </ul>
 </li>
 </ul>
 </div>
-</div>
+</section>
 
 
            </div>
@@ -232,7 +244,7 @@ pressure-temperature confidene envelopes.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="ret_transmission.html" class="btn btn-neutral float-right" title="Transmission spectrum retrieval" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="ret_transmission.html" class="btn btn-neutral float-right" title="OLD (from Mollière+19): Transmission spectrum retrieval" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="available_opacities.html" class="btn btn-neutral float-left" title="Available opacity species" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
