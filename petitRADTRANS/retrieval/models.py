@@ -1001,7 +1001,7 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
     else :
         #TODO: Test
         press_use = pressures
-        small_index = np.indices(press_use)
+        small_index = np.linspace(press_use[0],press_use[-1],press_use.shape[0],dtype = int)
 
     for cloud in cp.copy(cloud_species):
         cname = cloud.split('_')[0]
