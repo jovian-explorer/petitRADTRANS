@@ -141,7 +141,7 @@ class Retrieval:
 
     def run(self,
             ultranest = False,
-            sampling_efficiency = 0.5,
+            sampling_efficiency = 0.05,
             const_efficiency_mode = True,
             n_live_points = 4000,
             log_z_convergence = 0.5,
@@ -778,7 +778,7 @@ class Retrieval:
                                                 self.data[name].pRT_object.line_species,
                                                 self.data[name].pRT_object.cloud_species,
                                                 self.best_fit_params,
-                                                AMR=True)
+                                                AMR=False)
         else:
             abundances, MMW, _ = get_abundances(self.rd.p_global,
                                         self.data[name].pRT_object.temp,
