@@ -140,11 +140,12 @@ class Retrieval:
         self.generate_retrieval_summary()
 
     def run(self,
-            sampling_efficiency = 0.5,
+            sampling_efficiency = 0.05,
             const_efficiency_mode = True,
             n_live_points = 4000,
             log_z_convergence = 0.5,
             step_sampler = True,
+            warmstart_max_tau=0.5,
             resume = True):
         """
         Run mode for the class. Uses pynultinest to sample parameter space
@@ -181,6 +182,7 @@ class Retrieval:
             self._run_ultranest(n_live_points,
                                 log_z_convergence,
                                 step_sampler,
+                                warmstart_max_tau,
                                 resume)
             return
 
@@ -209,7 +211,8 @@ class Retrieval:
                             verbose = True,
                             sampling_efficiency = sampling_efficiency,
                             const_efficiency_mode = const_efficiency_mode,
-                            n_live_points = n_live_points)
+                            n_live_points = n_live_points,
+                            n_iter_before_update = 10)
         self.analyzer = pymultinest.Analyzer(n_params = n_params,
                                              outputfiles_basename = prefix)
         s = self.analyzer.get_stats()
@@ -237,6 +240,7 @@ class Retrieval:
                        n_live_points = 4000,
                        log_z_convergence = 0.5,
                        step_sampler = True,
+                       warmstart_max_tau=0.5,
                        resume = True):
         """
         Run mode for the class. Uses ultranest to sample parameter space
@@ -257,6 +261,7 @@ class Retrieval:
         logging.warning("ultranest mode is still in development. Proceed with caution")
         try:
             import ultranest as un
+            from ultranest.mlfriends import RobustEllipsoidRegion
         except ImportError:
             logging.error("Could not import ultranest. Exiting.")
             sys.exit(1)
@@ -275,20 +280,21 @@ class Retrieval:
                                                self.log_likelihood,
                                                self.prior_ultranest,
                                                log_dir=self.output_dir + "out_" + self.retrieval_name,
+                                               warmstart_max_tau=warmstart_max_tau,
                                                resume=resume)
             if step_sampler:
                 try:
                     import ultranest.stepsampler
                     sampler.run(min_num_live_points=400,
                             max_n_calls = 400000,
-                            region_class =  'RobustEllipsoidRegion')
+                            region_class =  RobustEllipsoidRegion)
                     sampler.stepsampler = ultranest.stepsampler.RegionSliceSampler(nsteps=n_live_points,
                                                                                    adaptive_nsteps='move-distance')
                 except:
                     logging.error("Could not use step sampling!")
             sampler.run(min_num_live_points=n_live_points,
                         dlogz = log_z_convergence,
-                        region_class =  'RobustEllipsoidRegion')
+                        region_class =  RobustEllipsoidRegion)
             sampler.print_results()
             sampler.plot_corner()
 
@@ -540,9 +546,15 @@ class Retrieval:
                     # Sanity checks on outputs
                     #print(spectrum_model)
                     if spectrum_model is None:
-                        return -np.inf
+                        if self.ultranest:
+                            return -1e99
+                        else:
+                            return -np.inf
                     if np.isnan(spectrum_model).any():
-                        return -np.inf
+                        if self.ultranest:
+                            return -1e99
+                        else:
+                            return -np.inf
                     log_likelihood += dd.get_chisq(wlen_model,
                                             spectrum_model,
                                             self.plotting)
