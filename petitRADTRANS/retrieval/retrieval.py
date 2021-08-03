@@ -757,7 +757,7 @@ class Retrieval:
                 np.column_stack([bf_wlen,bf_spectrum]))
         return bf_wlen, bf_spectrum
 
-    def get_abundances(self,sample):
+    def get_abundances(self,sample,parameters_read=None):
         """
         This function returns the abundances of each species as a function of pressure
 
@@ -772,15 +772,24 @@ class Retrieval:
             MMW : numpy.ndarray
                 The mean molecular weight at each pressure level in the atmosphere.
         """
-        params = self.get_best_fit_params(sample)
+        if not self.best_fit_params:
+            self.get_best_fit_params(sample,parameters_read)
         from petitRADTRANS.retrieval.models import get_abundances
         name = self.rd.plot_kwargs["take_PTs_from"]
-        abundances, MMW, _ = get_abundances(self.rd.p_global,
-                                            self.data[name].pRT_object.temperature,
-                                            self.data[name].pRT_object.line_species,
-                                            self.data[name].pRT_object.cloud_species,
-                                            params,
-                                            AMR=False)
+        if self.rd.AMR:
+            abundances, MMW, _ = get_abundances(self.rd.amr_pressure,
+                                                self.data[name].pRT_object.temp,
+                                                self.data[name].pRT_object.line_species,
+                                                self.data[name].pRT_object.cloud_species,
+                                                self.best_fit_params,
+                                                AMR=True)
+        else:
+            abundances, MMW, _ = get_abundances(self.rd.p_global,
+                                        self.data[name].pRT_object.temp,
+                                        self.data[name].pRT_object.line_species,
+                                        self.data[name].pRT_object.cloud_species,
+                                        self.best_fit_params,
+                                        AMR=False)
         return abundances, MMW
 
     def get_evidence(self,ret_name = ""):

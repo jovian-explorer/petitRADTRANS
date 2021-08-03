@@ -124,7 +124,7 @@ class RetrievalConfig:
         nclouds = len(self.cloud_species)
         if nclouds == 0:
             print("WARNING: there are no clouds in the retrieval, please add cloud species before setting up AMR")
-        new_len = self.p_global.shape[0]  + nclouds*width*(scaling-1)
+        new_len = self.p_global.shape[0]  + nclouds*width*(scaling-1) - 1
         self.amr_pressure = np.logspace(np.log10(self.p_global[0]),np.log10(self.p_global[-1]),new_len)
         self.add_parameter("pressure_scaling",False,value = scaling)
         self.add_parameter("pressure_width",False,value = width)
