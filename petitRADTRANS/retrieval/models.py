@@ -834,6 +834,12 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
     for j in range(len(c_list)):
         # At first, just copy in the list
         if j == 0:
+            if np.any(c_list[j] < 0):
+                total_inds.extend(np.linspace(0,len(c_list[j]),len(c_list[j]),dtype=int))
+                continue
+            if np.any(c_list[j] > press.shape[0]):
+                total_inds.extend(np.linspace(press.shape[0]-len(c_list[j]),press.shape[0],dtype=int))
+                continue
             total_inds.extend(c_list[j])
             continue
         # Check if the next set of indices is lower than the current minimum
@@ -864,7 +870,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
             done = 0
             while len(total_inds) < sl+int(scaling*width):
                 if (start+ind) >= (len(press_plus_index)-1):
-                    start = start - len(c_list[j]) - 1
+                    start = start - len(c_list[j])
                     ind = done
                     continue
                 if np.in1d(start+ind,np.array(total_inds)).any():
@@ -878,13 +884,13 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
             # This loop takes care of cases where we're between existing entries
             # it adds indices until duplicates are found, then keeps incrementing
             # until there is a free index to add.
-            start = np.array(total_inds)[np.where(np.array(total_inds)==c_list[j][0])[0]]
+            start = c_list[j][0]
             sl = len(total_inds)
             ind = 0
             done = 0
             while len(total_inds) < sl+int(scaling*width):
                 if (start+ind) >= (len(press_plus_index)-1):
-                    start = start - len(c_list[j]) - 1
+                    start = start - len(c_list[j])
                     ind = done
                     continue
                 if np.in1d(start+ind,np.array(total_inds)).any():
@@ -894,7 +900,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
                     total_inds.append(int(start+ind))
                     ind+=1
                     done += 1
-    total_inds = np.array(sorted(total_inds,reverse=False))
+    #total_inds = np.array(sorted(total_inds,reverse=False))
     # Stack the low res and high res grids, sort it, and take the unique values
     try:
         press_out = np.vstack((press_small,press_plus_index[total_inds]))
@@ -1035,7 +1041,7 @@ def pglobal_check(press,shape,scaling):
     global PGLOBAL
     if PGLOBAL.shape[0] != int(scaling*shape):
         PGLOBAL = np.logspace(np.log10(press[0]),
-                                np.log10(press[1]),
+                                np.log10(press[-1]),
                                 int(scaling*shape))
 
 def set_resolution(lines,abundances,resolution):

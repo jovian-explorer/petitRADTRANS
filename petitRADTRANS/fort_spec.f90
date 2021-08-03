@@ -1197,13 +1197,14 @@ subroutine calc_cloud_opas(rho,rho_p,cloud_mass_fracs,r_g,sigma_n,cloud_rad_bins
 
   do i_struc = 1, struc_len
      do i_spec = 1, N_cloud_spec
-
            do i_lamb = 1, N_cloud_lambda_bins
               N = 3d0*cloud_mass_fracs(i_struc,i_spec)*rho(i_struc)/4d0/pi/rho_p(i_spec)/ &
                   r_g(i_struc,i_spec)**3d0*exp(-9d0/2d0*log(sigma_n)**2d0)
 
               dndr = N/(cloud_radii*sqrt(2d0*pi)*log(sigma_n))* &
                   exp(-log(cloud_radii/r_g(i_struc,i_spec))**2d0/(2d0*log(sigma_n)**2d0))
+
+
               integrand_abs = 4d0*pi/3d0*cloud_radii**3d0*rho_p(i_spec)*dndr* &
                    cloud_specs_abs_opa(:,i_lamb,i_spec)
               integrand_scat = 4d0*pi/3d0*cloud_radii**3d0*rho_p(i_spec)*dndr* &
