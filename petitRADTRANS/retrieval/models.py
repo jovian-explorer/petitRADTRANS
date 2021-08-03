@@ -93,28 +93,32 @@ def emission_model_diseq(pRT_object,
 
     # Make the P-T profile
     temp_arr = np.array([T1,T2,T3])
+    if AMR:
+        p_use = PGLOBAL
+    else:
+        p_use = pRT_object.press/1e6
     temperatures = PT_ret_model(temp_arr, \
                             delta,
                             parameters['alpha'].value,
                             parameters['T_int'].value,
-                            PGLOBAL,
+                            p_use,
                             parameters['Fe/H'].value,
                             parameters['C/O'].value,
                             conv=True)
     if PT_plot_mode:
-        return PGLOBAL, temperatures
+        return p_use, temperatures
 
     # If in evaluation mode, and PTs are supposed to be plotted
-    abundances, MMW, small_index = get_abundances(PGLOBAL,
+    abundances, MMW, small_index = get_abundances(p_use,
                                                   temperatures,
                                                   pRT_object.line_species,
                                                   pRT_object.cloud_species,
                                                   parameters,
                                                   AMR =AMR)
-    Kzz_use = (10**parameters['log_kzz'].value ) * np.ones_like(PGLOBAL)
+    Kzz_use = (10**parameters['log_kzz'].value ) * np.ones_like(p_use)
 
     # Only include the high resolution pressure array near the cloud base.
-    pressures = PGLOBAL
+    pressures = p_use
     if AMR:
         temperatures = temperatures[small_index]
         pressures = PGLOBAL[small_index]
@@ -210,8 +214,11 @@ def guillot_free_emission(pRT_object, \
     pglobal_check(pRT_object.press,
                   parameters['pressure_simple'].value,
                   parameters['pressure_scaling'].value)
-
-    temperatures = nc.guillot_global(PGLOBAL, \
+    if AMR:
+        p_use = PGLOBAL
+    else:
+        p_use = pRT_object.press/1e6
+    temperatures = nc.guillot_global(p_use, \
                                 10**parameters['log_kappa_IR'].value,
                                 parameters['gamma'].value, \
                                 10**parameters['log_g'].value, \
@@ -219,15 +226,15 @@ def guillot_free_emission(pRT_object, \
                                 parameters['T_equ'].value)
     Pbases = {}
     # TODO - identify species rather than hard coding
-    Pbases['Fe(c)'] = fc.simple_cdf_Fe_free(PGLOBAL, temperatures,
+    Pbases['Fe(c)'] = fc.simple_cdf_Fe_free(p_use, temperatures,
                                 10**parameters['log_X_cb_Fe(c)'].value)
-    Pbases['MgSiO3(c)'] = fc.simple_cdf_MgSiO3_free(PGLOBAL, temperatures,
+    Pbases['MgSiO3(c)'] = fc.simple_cdf_MgSiO3_free(p_use, temperatures,
                                 10**parameters['log_X_cb_MgSiO3(c)'].value)
 
     if AMR:
         p_clouds = np.array(list(Pbases.values()))
         pressures,small_index = fixed_length_amr(p_clouds,
-                                                 PGLOBAL,
+                                                 p_use,
                                                  parameters['pressure_scaling'].value,
                                                  parameters['pressure_width'].value)
         pRT_object.press = pressures * 1e6
