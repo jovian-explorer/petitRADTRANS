@@ -1076,7 +1076,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                       Tstar = None, Rstar=None, semimajoraxis = None,\
                       geometry = 'dayside_ave',theta_star=0, \
                       hack_cloud_photospheric_tau = None,
-                      dist = "lognormal", a_hans = None, b_hans = None):
+                      dist= "lognormal", a_hans = None, b_hans = None):
         ''' Method to calculate the atmosphere's emitted flux
         (emission spectrum).
 
@@ -1177,7 +1177,11 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.fsed = fsed
         if "hansen" in dist.lower():
             try:
-                self.b_hans = np.array(list(b_hans.values()),dtype='d',order='F').T
+                if type(b_hans) is dict:
+                    self.b_hans = np.array(list(b_hans.values()),dtype='d',order='F').T
+                if type(b_hans) is float:
+                    self.b_hans = np.array(np.tile(b_hans * np.ones_like(self.press),(len(self.cloud_species),1)),dtype='d',order='F').T
+                    print(self.b_hans.shape)
             except:
                 print("You must provide a value for the Hansen distribution width, b_hans!")
                 self.b_hans = None
@@ -1684,199 +1688,3 @@ def py_calc_cloud_opas(rho,
         cloud_abs_opa_TOT[:,i_struct] /= rho[i_struct]
         cloud_scat_opa_TOT[:,i_struct] /= rho[i_struct]
     return cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT
-
-@njit
-def numba_calc_cloud_opas(rho,
-            rho_p,
-            cloud_mass_fracs,
-            r_g,
-            sigma_n,
-            cloud_rad_bins,
-            cloud_radii,
-            cloud_lambdas,
-            cloud_specs_abs_opa,
-            cloud_specs_scat_opa,
-            cloud_aniso):
-    ncloud = int(cloud_mass_fracs.shape[1])
-    N_cloud_rad_bins = int(cloud_radii.shape[0])
-    N_cloud_lambda_bins = int(cloud_specs_abs_opa.shape[1])
-    nstruct = int(rho.shape[0])
-
-    cloud_abs_opa_TOT = np.zeros((N_cloud_lambda_bins,nstruct))
-    cloud_scat_opa_TOT = np.zeros((N_cloud_lambda_bins,nstruct))
-    cloud_red_fac_aniso_TOT = np.zeros((N_cloud_lambda_bins,nstruct))
-
-    for i_struct in range(nstruct):
-        for i_c in range(ncloud):
-            for i_lamb in range(N_cloud_lambda_bins):
-                N = 3.0 * cloud_mass_fracs[i_struct,i_c] * rho[i_struct] /(4.0 *np.pi*rho_p[i_c] * (r_g[i_struct,i_c]**3.0))* \
-                    np.exp(-4.5 * np.log(sigma_n)**2.0)
-
-                dndr = N/(cloud_radii * np.sqrt(2.0*np.pi)*np.log(sigma_n)) *\
-                        np.exp(-np.log(cloud_radii/r_g[i_struct,i_c])**2.0 /(2.0*(np.log(sigma_n)**2.0)))
-                integrand_abs = (4.0*np.pi/3.0)*(cloud_radii**3.0)*rho_p[i_c]*\
-                    dndr*cloud_specs_abs_opa[:,i_lamb,i_c]
-                integrand_scat = (4.0*np.pi/3.0)*(cloud_radii**3.0)*rho_p[i_c]*dndr* \
-                    cloud_specs_scat_opa[:,i_lamb,i_c]
-                integrand_aniso = integrand_scat*(1.0-cloud_aniso[:,i_lamb,i_c])
-                add_abs = np.sum(integrand_abs*(cloud_rad_bins[1:N_cloud_rad_bins+1]- \
-                    cloud_rad_bins[0:N_cloud_rad_bins]),axis = 0)
-
-                cloud_abs_opa_TOT[i_lamb,i_struct] = cloud_abs_opa_TOT[i_lamb,i_struct] + add_abs
-
-                add_scat = np.sum(integrand_scat*(cloud_rad_bins[1:N_cloud_rad_bins+1]- \
-                    cloud_rad_bins[0:N_cloud_rad_bins]),axis = 0)
-                cloud_scat_opa_TOT[i_lamb,i_struct] = cloud_scat_opa_TOT[i_lamb,i_struct] + add_scat
-
-                add_aniso = np.sum(integrand_aniso*(cloud_rad_bins[1:N_cloud_rad_bins+1]- \
-                    cloud_rad_bins[0:N_cloud_rad_bins]),axis = 0)
-                cloud_red_fac_aniso_TOT[i_lamb,i_struct] = cloud_red_fac_aniso_TOT[i_lamb,i_struct] + add_aniso
-
-        cloud_red_fac_aniso_TOT[:,i_struct] = cloud_red_fac_aniso_TOT[:,i_struct]/cloud_scat_opa_TOT[:,i_struct]
-        for i_lamb in range(N_cloud_lambda_bins):
-            if cloud_scat_opa_TOT[i_lamb,i_struct]<1e-200:
-                cloud_red_fac_aniso_TOT[i_lamb,i_struct] = 0.0
-        cloud_abs_opa_TOT[:,i_struct] /= rho[i_struct]
-        cloud_scat_opa_TOT[:,i_struct] /= rho[i_struct]
-    return cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT
-
-def nn_combine_opas_sample_ck(line_struc_kappas, g_gauss, weights,nsample):
-    import time
-    t1 = time.time()
-    g_len = line_struc_kappas.shape[0]
-    freq_len = line_struc_kappas.shape[1]
-    N_species = line_struc_kappas.shape[2]
-    struc_len = line_struc_kappas.shape[3]
-
-    line_struc_kappas_out=np.zeros((g_len, freq_len,struc_len))
-    inds_avail = np.array([1, 2, 3, 4, 5, 6, 7, 8, \
-        1, 2, 3, 4, 5, 6, 7, 8, \
-        1, 2, 3, 4, 5, 6, 7, 8, \
-        9, 10, 11, 12, 13, 14, 15, 16 ])-1
-
-    ##$  inds_avail = (/ 1, 2, 3, 4, 5, 6, 7, 8, &
-    ##$       9, 10, 11, 12, 13, 14, 15, 16 /)
-
-    ##$  inds_avail = (/ 1, 2, 3, 4, 5, 6, 7, 8, &
-    ##$       1, 2, 3, 4, 5, 6, 7, 8, &
-    ##$       1, 2, 3, 4, 5, 6, 7, 8, &
-    ##$       1, 2, 3, 4, 5, 6, 7, 8, &
-    ##$       1, 2, 3, 4, 5, 6, 7, 8, &
-    ##$       9, 10, 11, 12, 13, 14, 15, 16 /)
-    sampled_opa_weights = np.zeros((nsample,2,freq_len,struc_len))
-    sampled_opa_weights[:, 1, :, :] = 1.0
-    k_min = np.zeros((freq_len,struc_len))
-    k_max = np.zeros((freq_len,struc_len))
-    weights_use = weights
-    weights_use[0:7] = weights_use[0:7]/3.0
-    take_spec = np.zeros((freq_len,struc_len),dtype=int)
-    take_spec_ind = np.ones((freq_len,struc_len),dtype=int)
-
-    t2 = time.time()
-    print("allocation",t2-t1)
-    np.random.seed()
-
-
-    # In every layer and frequency bin:
-    # find the species with the largest kappa(g=0) value,
-    # save that value.
-    thresh = np.max(line_struc_kappas[0],axis=2)
-    threshold = np.zeros((freq_len,struc_len))
-    print(thresh.shape,threshold.shape)
-    for i_struc in range(struc_len):
-        for i_freq in range(freq_len):
-            threshold[i_freq, i_struc] = np.max(line_struc_kappas[0, i_freq, :,i_struc])
-
-
-    t3= time.time()
-    for i_struc in range(struc_len):
-        for i_spec in range(N_species):
-            for i_freq in range(freq_len):
-                # Only consider a species if kappa(g=1) > 0.01 * treshold
-                if line_struc_kappas[g_len-1, i_freq, i_spec, i_struc] < \
-                    threshold[i_freq, i_struc]*0.01:
-                    continue
-                take_spec[i_freq, i_struc] = take_spec[i_freq, i_struc]+1
-                take_spec_ind[i_freq, i_struc] = i_spec
-    t4 = time.time()
-    print("filtering",t4-t3)
-    t5 = time.time()
-    for i_struc in range(struc_len):
-        for i_spec in range(N_species):
-            for i_freq in range(freq_len):
-
-                # Only do the sampling if more than one species is to be considered.
-                if take_spec[i_freq, i_struc] < 2:
-                    continue
-
-                # Check again: really sample the current species?
-                if line_struc_kappas[g_len-1, i_freq, i_spec, i_struc] < \
-                    threshold[i_freq, i_struc]*0.01:
-                    continue
-
-                r_index = np.random.rand(nsample)
-                ind_use = inds_avail[r_index.astype(int)*(8*4)]
-
-                sampled_opa_weights[:, 0, i_freq, i_struc] = \
-                    sampled_opa_weights[:, 0, i_freq, i_struc] + \
-                    line_struc_kappas[ind_use, i_freq, i_spec, i_struc]
-
-                sampled_opa_weights[:, 1, i_freq, i_struc] = \
-                    sampled_opa_weights[:, 1, i_freq, i_struc] * \
-                    weights_use[ind_use]
-
-                k_min[i_freq, i_struc] = k_min[i_freq, i_struc] + \
-                    np.min(line_struc_kappas[:, i_freq, i_spec, i_struc])
-
-                k_max[i_freq, i_struc]= k_max[i_freq, i_struc] + \
-                    np.max(line_struc_kappas[:, i_freq, i_spec, i_struc])
-    t6 = time.time()
-    print("weighting",t6-t5)
-
-    g_final = np.zeros(nsample+3)
-    k_final = np.zeros(nsample+3)
-    t7= time.time()
-    np.sort(sampled_opa_weights,axis=0,kind = 'stable')
-    sampled_opa_weights[:, 1, :,:] /= np.sum(sampled_opa_weights[:, 1, :, :],axis=0)
-    t8 = time.time()
-    print("sorting",t8-t7)
-    t9 = time.time()
-    for i_struc in range(struc_len):
-        for i_freq in range(freq_len):
-            # Interpolate new corr-k table if more than one species is to be considered
-            if (take_spec[i_freq, i_struc] > 1):
-                #sampled_opa_weights[:, 1, i_freq, i_struc] = \
-                #    sampled_opa_weights[:, 1, i_freq, i_struc] / \
-                #    np.sum(sampled_opa_weights[:, 1, i_freq, i_struc])
-
-                g_sample = np.zeros(nsample)
-                cum_sum = 0.0
-                for i_samp in range(nsample):
-                    g_sample[i_samp]= \
-                        sampled_opa_weights[i_samp, 1, i_freq, i_struc]/2.0 + \
-                        cum_sum
-                    cum_sum = cum_sum + \
-                        sampled_opa_weights[i_samp, 1, i_freq, i_struc]
-
-                g_final[0] = 0.0
-                g_final[1:nsample+1] = g_sample
-                g_final[nsample+2] = 1.0
-
-                k_final[0] = k_min[i_freq, i_struc]
-                k_final[1:nsample+1] = sampled_opa_weights[:, 0, i_freq, i_struc]
-                k_final[nsample+2] = k_max[i_freq, i_struc]
-
-                intpint = np.searchsorted(g_final,g_gauss)
-                for i_g in range(g_len):
-                    line_struc_kappas_out[i_g, i_freq, i_struc] = \
-                        k_final[intpint[i_g]] + \
-                        (k_final[intpint[i_g]+1] - k_final[intpint[i_g]]) / \
-                        (g_final[intpint[i_g]+1] - g_final[intpint[i_g]]) * \
-                        (g_gauss[i_g] - g_final[intpint[i_g]])
-            # Otherwise: just take the opacity of the only species as the full combined k-table
-            else:
-                line_struc_kappas_out[:, i_freq, i_struc] = \
-                    line_struc_kappas[:, i_freq, take_spec_ind[i_freq, i_struc], i_struc]
-    t10 = time.time()
-    print("interpolating",t10-t9)
-    return line_struc_kappas_out

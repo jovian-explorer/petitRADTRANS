@@ -1048,8 +1048,8 @@ def pglobal_check(press,shape,scaling):
     global PGLOBAL
     if PGLOBAL.shape[0] != int(scaling*shape):
         PGLOBAL = np.logspace(np.log10(press[0]),
-                                np.log10(press[-1]),
-                                int(scaling*shape))
+                              np.log10(press[-1]),
+                              int(scaling*shape))
 
 def set_resolution(lines,abundances,resolution):
     """
