@@ -140,7 +140,6 @@ class Retrieval:
         self.generate_retrieval_summary()
 
     def run(self,
-            ultranest = False,
             sampling_efficiency = 0.05,
             const_efficiency_mode = True,
             n_live_points = 4000,
@@ -624,7 +623,7 @@ class Retrieval:
             output_dir = self.output_dir
         if self.ultranest:
             for name in self.corner_files:
-                samples = np.genfromtxt(output_dir +'out_' + name + '/chains/qual_weighted_post.txt')
+                samples = np.genfromtxt(output_dir +'out_' + name + '/chains/equal_weighted_post.txt')
                 #TODO formatting of paramname file
                 parameters_read = open(output_dir +'out_' + name + '/chains/weighted_post.paramnames')
                 self.samples[name] = samples

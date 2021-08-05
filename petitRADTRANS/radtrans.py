@@ -1649,6 +1649,14 @@ def py_calc_cloud_opas(rho,
                     cloud_specs_abs_opa,
                     cloud_specs_scat_opa,
                     cloud_aniso):
+    """
+    This function reimplements calc_cloud_opas from fort_spec.f90. For some reason
+    it runs faster in python than in fortran, so we'll use this from now on.
+    This function integrates the cloud opacity throught the different layers of
+    the atmosphere to get the total optical depth, scattering and anisotropic fraction.
+
+    See the fortran implementation for details of the input arrays.
+    """
     ncloud = int(cloud_mass_fracs.shape[1])
     N_cloud_rad_bins = int(cloud_radii.shape[0])
     N_cloud_lambda_bins = int(cloud_specs_abs_opa.shape[1])
