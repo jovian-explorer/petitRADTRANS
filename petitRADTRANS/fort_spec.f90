@@ -1610,7 +1610,8 @@ subroutine combine_opas_sample_ck(line_struc_kappas, g_gauss, weights, &
 
 !  DOUBLE PRECISION :: time_test, t1, t2, t0
   DOUBLE PRECISION :: threshold(freq_len, struc_len)
-  INTEGER          :: take_spec(freq_len, struc_len), take_spec_ind(freq_len, struc_len)
+  INTEGER          :: take_spec(freq_len, struc_len), take_spec_ind(freq_len, struc_len) !, &
+                        !     not_one, equal_two
 
 
   inds_avail = (/ 1, 2, 3, 4, 5, 6, 7, 8, &
@@ -1674,6 +1675,21 @@ subroutine combine_opas_sample_ck(line_struc_kappas, g_gauss, weights, &
         end do
      end do
   end do
+
+  !not_one = 0
+  !equal_two = 0
+  !do i_struc = 1, struc_len
+  !      do i_freq = 1, freq_len
+  !         if (take_spec(i_freq, i_struc) == 2) then
+  !             equal_two = equal_two+1
+  !         end if
+  !         if (take_spec(i_freq, i_struc) .NE. 1) then
+  !             not_one = not_one+1
+  !         end if
+  !      end do
+  !end do
+
+  !write(*,*) 'not_one, equal_two', not_one, equal_two
 
   !time_test = TIME()
   !t0 = time_test - t0
