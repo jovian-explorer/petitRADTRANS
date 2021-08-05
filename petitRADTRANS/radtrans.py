@@ -876,7 +876,7 @@ class Radtrans(_read_opacities.ReadOpacities):
 
                     else:
                         # Use a smaller wavelength range for the median optical depth
-                        # The units of cloud_wlen are converted from Angstroem to micron
+                        # The units of cloud_wlen are converted from micron to Angstroem
                         wlen_select = (self.lambda_angstroem >= 1e4*cloud_wlen[0]) & \
                                       (self.lambda_angstroem <= 1e4*cloud_wlen[1])
 
