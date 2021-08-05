@@ -93,28 +93,32 @@ def emission_model_diseq(pRT_object,
 
     # Make the P-T profile
     temp_arr = np.array([T1,T2,T3])
+    if AMR:
+        p_use = PGLOBAL
+    else:
+        p_use = pRT_object.press/1e6
     temperatures = PT_ret_model(temp_arr, \
                             delta,
                             parameters['alpha'].value,
                             parameters['T_int'].value,
-                            PGLOBAL,
+                            p_use,
                             parameters['Fe/H'].value,
                             parameters['C/O'].value,
                             conv=True)
     if PT_plot_mode:
-        return PGLOBAL, temperatures
+        return p_use, temperatures
 
     # If in evaluation mode, and PTs are supposed to be plotted
-    abundances, MMW, small_index = get_abundances(PGLOBAL,
+    abundances, MMW, small_index = get_abundances(p_use,
                                                   temperatures,
                                                   pRT_object.line_species,
                                                   pRT_object.cloud_species,
                                                   parameters,
                                                   AMR =AMR)
-    Kzz_use = (10**parameters['log_kzz'].value ) * np.ones_like(PGLOBAL)
+    Kzz_use = (10**parameters['log_kzz'].value ) * np.ones_like(p_use)
 
     # Only include the high resolution pressure array near the cloud base.
-    pressures = PGLOBAL
+    pressures = p_use
     if AMR:
         temperatures = temperatures[small_index]
         pressures = PGLOBAL[small_index]
@@ -210,8 +214,11 @@ def guillot_free_emission(pRT_object, \
     pglobal_check(pRT_object.press,
                   parameters['pressure_simple'].value,
                   parameters['pressure_scaling'].value)
-
-    temperatures = nc.guillot_global(PGLOBAL, \
+    if AMR:
+        p_use = PGLOBAL
+    else:
+        p_use = pRT_object.press/1e6
+    temperatures = nc.guillot_global(p_use, \
                                 10**parameters['log_kappa_IR'].value,
                                 parameters['gamma'].value, \
                                 10**parameters['log_g'].value, \
@@ -219,15 +226,15 @@ def guillot_free_emission(pRT_object, \
                                 parameters['T_equ'].value)
     Pbases = {}
     # TODO - identify species rather than hard coding
-    Pbases['Fe(c)'] = fc.simple_cdf_Fe_free(PGLOBAL, temperatures,
+    Pbases['Fe(c)'] = fc.simple_cdf_Fe_free(p_use, temperatures,
                                 10**parameters['log_X_cb_Fe(c)'].value)
-    Pbases['MgSiO3(c)'] = fc.simple_cdf_MgSiO3_free(PGLOBAL, temperatures,
+    Pbases['MgSiO3(c)'] = fc.simple_cdf_MgSiO3_free(p_use, temperatures,
                                 10**parameters['log_X_cb_MgSiO3(c)'].value)
 
     if AMR:
         p_clouds = np.array(list(Pbases.values()))
         pressures,small_index = fixed_length_amr(p_clouds,
-                                                 PGLOBAL,
+                                                 p_use,
                                                  parameters['pressure_scaling'].value,
                                                  parameters['pressure_width'].value)
         pRT_object.press = pressures * 1e6
@@ -276,7 +283,6 @@ def guillot_free_emission(pRT_object, \
     else:
         print("Pick two of log_g, R_pl and mass priors!")
         sys.exit(5)
-    print(np.log10(gravity), R_pl/nc.r_jup)
     pRT_object.calc_flux(temperatures, \
                      abundances, \
                      gravity, \
@@ -835,6 +841,12 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
     for j in range(len(c_list)):
         # At first, just copy in the list
         if j == 0:
+            if np.any(c_list[j] < 0):
+                total_inds.extend(np.linspace(0,len(c_list[j]),len(c_list[j]),dtype=int))
+                continue
+            if np.any(c_list[j] > press.shape[0]):
+                total_inds.extend(np.linspace(press.shape[0]-len(c_list[j]),press.shape[0],dtype=int))
+                continue
             total_inds.extend(c_list[j])
             continue
         # Check if the next set of indices is lower than the current minimum
@@ -865,7 +877,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
             done = 0
             while len(total_inds) < sl+int(scaling*width):
                 if (start+ind) >= (len(press_plus_index)-1):
-                    start = start - len(c_list[j]) - 1
+                    start = start - len(c_list[j])
                     ind = done
                     continue
                 if np.in1d(start+ind,np.array(total_inds)).any():
@@ -879,13 +891,13 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
             # This loop takes care of cases where we're between existing entries
             # it adds indices until duplicates are found, then keeps incrementing
             # until there is a free index to add.
-            start = np.array(total_inds)[np.where(np.array(total_inds)==c_list[j][0])[0]]
+            start = c_list[j][0]
             sl = len(total_inds)
             ind = 0
             done = 0
             while len(total_inds) < sl+int(scaling*width):
                 if (start+ind) >= (len(press_plus_index)-1):
-                    start = start - len(c_list[j]) - 1
+                    start = start - len(c_list[j])
                     ind = done
                     continue
                 if np.in1d(start+ind,np.array(total_inds)).any():
@@ -895,7 +907,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
                     total_inds.append(int(start+ind))
                     ind+=1
                     done += 1
-    total_inds = np.array(sorted(total_inds,reverse=False))
+    #total_inds = np.array(sorted(total_inds,reverse=False))
     # Stack the low res and high res grids, sort it, and take the unique values
     try:
         press_out = np.vstack((press_small,press_plus_index[total_inds]))
@@ -989,7 +1001,7 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
     else :
         #TODO: Test
         press_use = pressures
-        small_index = np.indices(press_use)
+        small_index = np.linspace(press_use[0],press_use[-1],press_use.shape[0],dtype = int)
 
     for cloud in cp.copy(cloud_species):
         cname = cloud.split('_')[0]
@@ -1036,8 +1048,8 @@ def pglobal_check(press,shape,scaling):
     global PGLOBAL
     if PGLOBAL.shape[0] != int(scaling*shape):
         PGLOBAL = np.logspace(np.log10(press[0]),
-                                np.log10(press[-1]),
-                                int(scaling*shape))
+                              np.log10(press[-1]),
+                              int(scaling*shape))
 
 def set_resolution(lines,abundances,resolution):
     """
