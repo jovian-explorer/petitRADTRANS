@@ -660,7 +660,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             self.line_struc_kappas[:, :, 0, :] = \
               fs.combine_opas_sample_ck(self.line_struc_kappas, \
                                           self.g_gauss, self.w_gauss, \
-                                          1000)
+                                          1000, self.fast)
 
             #stamps.append(time.clock())
             #self.combine_opas_shuffle_ck()
@@ -1074,7 +1074,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                       Tstar = None, Rstar=None, semimajoraxis = None,\
                       geometry = 'dayside_ave',theta_star=0, \
                       hack_cloud_photospheric_tau = None,
-                      dist= "lognormal", a_hans = None, b_hans = None):
+                      dist= "lognormal", a_hans = None, b_hans = None, \
+                      fast = False):
         ''' Method to calculate the atmosphere's emitted flux
         (emission spectrum).
 
@@ -1165,6 +1166,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     distribution normalized by the particle area (1/a_hans^2)
         '''
 
+        self.fast = fast
         self.hack_cloud_photospheric_tau = hack_cloud_photospheric_tau
         self.Pcloud = Pcloud
         self.kappa_zero = kappa_zero
