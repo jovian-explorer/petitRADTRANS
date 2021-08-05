@@ -243,7 +243,10 @@ class Data:
             # Note that this will only be the uncorrelated error.
             # Dot with the correlation matrix (if available) to get
             # the full error.
-            self.flux_error = np.sqrt(self.covariance.diagonal())
+            try:
+                self.flux_error = fits.getdata(path,'SPECTRUM').field("ERROR")
+            except:
+                self.flux_error = np.sqrt(self.covariance.diagonal())
         except:
             self.flux_error = fits.getdata(path,'SPECTRUM').field("ERROR")
 

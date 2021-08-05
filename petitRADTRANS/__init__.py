@@ -8,9 +8,6 @@ __status__ = "Development"
 __version__ = "2.1.0"
 
 from petitRADTRANS.radtrans import Radtrans
-from petitRADTRANS.retrieval.retrieval import Retrieval
-from petitRADTRANS.retrieval.retrieval_config import RetrievalConfig
-from petitRADTRANS.retrieval.data import Data
-from petitRADTRANS.retrieval.parameter import Parameter
+
 
 

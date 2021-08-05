@@ -7,9 +7,9 @@ os.environ["pRT_input_data_path"] = "/Applications/ownpy/petitRADTRANS/petitRADT
 Chubb = False
 
 if not Chubb:
-    atmosphere = Radtrans(line_species = ['H2O', 'CO_all_iso', 'CH4', 'CO2', 'Na', 'K'], \
-                          rayleigh_species = ['H2', 'He'], \
-                          continuum_opacities = ['H2-H2', 'H2-He'], \
+    atmosphere = Radtrans(line_species = ['H2O', 'CO_all_iso', 'CH4', 'CO2', 'Na', 'K'],
+                          rayleigh_species = ['H2', 'He'],
+                          continuum_opacities = ['H2-H2', 'H2-He'],
                           wlen_bords_micron = [0.3, 15])
 
 pressures = np.logspace(-6, 2, 100)
