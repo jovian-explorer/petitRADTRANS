@@ -44,15 +44,6 @@ class Retrieval:
         ultranest : bool
             If true, use Ultranest sampling rather than pymultinest. This is still a work
             in progress, so use with caution!
-        sampling_efficiency : Float
-            pymultinest sampling efficiency
-        const_efficiency_mode : Bool
-            pymultinest constant efficiency mode
-        n_live_points : Int
-            Number of live points to use in pymultinest, or the minimum number of live points to
-            use for the Ultranest reactive sampler.
-        resume : bool
-            Continue existing retrieval. If FALSE THIS WILL OVERWRITE YOUR EXISTING RETRIEVAL.
         bayes_factor_species : Str
             A pRT species that should be removed to test for the bayesian evidence for it's presence.
         corner_plot_names : List(Str)
@@ -945,8 +936,6 @@ class Retrieval:
         # Then get the full wavelength range
         bf_wlen, bf_spectrum = self.get_best_fit_model(samples_use[best_fit_index, :-1],\
                                                        parameters_read,model_generating_func)
-        gpicol = None
-        sphcol = None
         # Iterate through each dataset, plotting the data and the residuals.
         for name,dd in self.data.items():
             # If the user has specified a resolution, rebin to that
@@ -1022,23 +1011,11 @@ class Retrieval:
                 marker = 's'
             if not dd.photometry:
                 label = dd.name
-                gpicol = None
-                if "GPIH" in dd.name:
-                    label = "GPI"
-                if "K1" in dd.name or "K2" in dd.name:
-                    label = None
-                    gpicol = ax.get_lines()[-1].get_color()
-                if "SPHEREYJ" in dd.name:
-                    if dd.name.endswith("H"):
-                        label = "SPHERE"
-                    else:
-                        label = None
-                        gpicol = ax.get_lines()[-1].get_color()
                 ax.errorbar(wlen, \
                             flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
                             yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
                             marker=marker, markeredgecolor='k', linewidth = 0, elinewidth = 2, \
-                            label = label, zorder =10, alpha = 0.9,color = gpicol)
+                            label = label, zorder =10, alpha = 0.9)
             else:
                 # Don't label photometry?
                 ax.errorbar(wlen, \

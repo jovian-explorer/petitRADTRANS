@@ -1544,15 +1544,15 @@ subroutine get_rg_N(gravity,rho,rho_p,temp,MMW,frain,cloud_mass_fracs, &
         if (r_w(i_str,i_spec) > 1d-16) then
            if (frain(i_spec) > 1d0) then
               do i_rad = 1, N_fit
-                 rad(i_rad) = r_w(i_str,i_spec)/max(sigma_n,1.000000001d0) + &
-                      (r_w(i_str,i_spec)-r_w(i_str,i_spec)/max(sigma_n,1.000000001d0))* &
+                 rad(i_rad) = r_w(i_str,i_spec)/max(sigma_n,1.0001d0) + &
+                      (r_w(i_str,i_spec)-r_w(i_str,i_spec)/max(sigma_n,1.0001d0))* &
                       DBLE(i_rad-1)/DBLE(N_fit-1)
                  call turbulent_settling_speed(rad(i_rad),gravity,rho(i_str),rho_p(i_spec),temp(i_str), &
                       MMW(i_str),vel(i_rad))
               end do
            else
               do i_rad = 1, N_fit
-                 rad(i_rad) = r_w(i_str,i_spec) + (r_w(i_str,i_spec)*max(sigma_n,1.000000001d0)- &
+                 rad(i_rad) = r_w(i_str,i_spec) + (r_w(i_str,i_spec)*max(sigma_n,1.0001d0)- &
                       r_w(i_str,i_spec))* &
                       DBLE(i_rad-1)/DBLE(N_fit-1)
                  call turbulent_settling_speed(rad(i_rad),gravity,rho(i_str),rho_p(i_spec),temp(i_str), &

@@ -13,7 +13,6 @@ import os,glob
 import sys,pdb
 from scipy import interpolate
 import h5py
-from numba import njit,vectorize
 
 class Radtrans(_read_opacities.ReadOpacities):
     """ Class defining objects for carrying out spectral calculations for a
@@ -446,7 +445,7 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         if self.H2H2CIA or self.H2HeCIA or self.N2N2CIA or self.O2O2CIA \
             or self.N2O2CIA or self.CO2CO2CIA:
-            print(' Done.')
+            print(' Done.\n')
 
 
         #############################
@@ -507,7 +506,6 @@ class Radtrans(_read_opacities.ReadOpacities):
     def interpolate_species_opa(self, temp):
         # Interpolate line opacities to given temperature structure.
         self.temp = temp
-        test = np.zeros_like(self.line_struc_kappas)
         if len(self.line_species) > 0:
             for i_spec in range(len(self.line_species)):
                 self.line_struc_kappas[:,:,i_spec,:] = fi.interpol_opa_ck(self.press,temp, \
@@ -546,7 +544,7 @@ class Radtrans(_read_opacities.ReadOpacities):
 
     def mix_opa_tot(self, abundances, mmw, gravity, \
                         sigma_lnorm = None, fsed = None, Kzz = None, \
-                        radius = None, gray_opacity = None, \
+                        radius = None, \
                         add_cloud_scat_as_abs = None,
                         dist = "lognormal", a_hans = None):
         # Combine total line opacities,
@@ -1021,7 +1019,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                                         self.do_scat_emis, self.continuum_opa_scat_emis)
         else:
             if ((self.mode == 'lbl') or self.test_ck_shuffle_comp) \
-                and (int(len(self.line_species)) > 1):
+                     and (int(len(self.line_species)) > 1):
 
                 self.flux, self.contr_em = fs.flux_ck(self.freq, \
                                                       self.total_tau[:,:,:1,:], \
