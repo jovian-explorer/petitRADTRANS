@@ -131,7 +131,7 @@ class Retrieval:
         self.generate_retrieval_summary()
 
     def run(self,
-            sampling_efficiency = 0.05,
+            sampling_efficiency = 0.8,
             const_efficiency_mode = True,
             n_live_points = 4000,
             log_z_convergence = 0.5,
