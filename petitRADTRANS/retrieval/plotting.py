@@ -96,7 +96,8 @@ def contour_corner(sampledict, \
                 parameter_plot_indices = None, \
                 true_values = None, \
                 short_name = None,
-                legend = False):
+                legend = False,
+                prt_plot_style = True):
     """
     Use the corner package to plot the posterior distributions produced by pymultinest.
 
@@ -131,7 +132,8 @@ def contour_corner(sampledict, \
         legend : bool
             Turn the legend on or off
     """
-    from .plot_style import prt_colours
+    if prt_plot_style:
+        from .plot_style import prt_colours
     color_list = prt_colours
     #color_list = ['#009FB8','#FF695C', '#70FF92',  '#FFBB33', '#6171FF', "#FF1F69", "#52AC25", '#E574FF', "#FF261D", "#B429FF" ]
     N_samples = []

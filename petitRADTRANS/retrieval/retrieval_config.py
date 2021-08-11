@@ -30,9 +30,6 @@ class RetrievalConfig:
             Use an adaptive high resolution pressure grid around the location of cloud condensation.
             This will increase the size of the pressure grid by a constant factor that can be adjusted
             in the setup_pres function.
-        plotting : bool
-            Produce plots for each sample to check that the retrieval is running properly. Only
-            set to true on a local machine.
         scattering : bool
             If using emission spectra, turn scattering on or off.
         pressures : numpy.array
@@ -44,7 +41,6 @@ class RetrievalConfig:
                  retrieval_name = "retrieval_name",
                  run_mode = "retrieval",
                  AMR = False,
-                 plotting = False,
                  scattering = False,
                  pressures = None,
                  write_out_spec_sample = False):
@@ -63,7 +59,6 @@ class RetrievalConfig:
         else:
             self.p_global = np.logspace(-6,3,100)
 
-        self.plotting = plotting
         self.scattering = scattering
         self.parameters = {} #: Dictionary of the parameters passed to the model generating function
         self.data = {} #: Dictionary of the datasets used in the retrieval.
@@ -218,6 +213,7 @@ class RetrievalConfig:
         files = set(files)
         for f in files: print(f)
         return files
+
     def set_line_species(self,linelist,free=False,abund_lim=(-6.0,6.0)):
         """
         Set RadTrans.line_species
@@ -267,7 +263,7 @@ class RetrievalConfig:
 
         self.continuum_opacities = linelist
 
-    def add_line_species(self,species,free=False,abund_lim=(-8.0,7.0)):
+    def add_line_species(self,species,eq=False,abund_lim=(-8.0,7.0), fixed = False, fixed_abund = None):
         """
         This function adds a single species to the pRT object that will define the line opacities of the model.
         The name must match the pRT opacity name, which vary between the c-k line opacities and the line-by-line opacities.
@@ -275,22 +271,30 @@ class RetrievalConfig:
         Args:
             species : str
                 The species to include in the retrieval
-            free : bool
-                If true, the retrieval should use free chemistry, and Parameters for the abundance of the
-                species will be added to the retrieval
+            eq : bool
+                If False, the retrieval should use free chemistry, and Parameters for the abundance of the
+                species will be added to the retrieval. Otherwise (dis)equilibrium chemistry will be used.
             abund_lim : Tuple(float,float)
                 If free is True, this sets the boundaries of the uniform prior that will be applied the species given.
                 The range of the prior goes from abund_lim[0] to abund_lim[0] + abund_lim[1].
                 The abundance limits must be given in log10 units of the mass fraction.
+            fixed : bool
+                If fixed is true, the value of the species will be fixed to the numerical value of fixed_abund.
+                This species will not be a free parameter in the retrieval.
+            fixed_abund : float
+                The log-mass fraction abundance of the species. Currently only supports vertically constant
+                abundances.
         """
 
         # parameter passed through loglike is log10 abundance
         self.line_species.append(species)
-        if free:
+        if not eq:
             self.parameters[species] = Parameter(species,True,\
                                     transform_prior_cube_coordinate = \
                                     lambda x : abund_lim[0] + abund_lim[1]*x)
-
+        if fixed:
+            self.parameters[species] = Parameter(species,False,\
+                                                value = fixed_abund)
     def remove_species_lines(self,species,free=False):
         """
         This function removes a species from the pRT line list, and if using a free chemistry retrieval,
