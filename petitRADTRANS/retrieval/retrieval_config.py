@@ -335,6 +335,13 @@ class RetrievalConfig:
             PBase_lim : tuple(float,float)
                 Only used if not using an equilibrium model. Sets the limits on teh log of the cloud base pressure.
                 Obsolete.
+            fixed_abund : Optional(float)
+                A vertically constant log mass fraction abundance for the cloud species. If set, this will not be
+                a free parameter in the retrieval. Only compatible with non-equilibrium clouds.
+            fixed_base : Optional(float)
+                The log cloud base pressure. If set, fixes this parameter to a constant value, and it will not be
+                a free parameter in the retrieval. Only compatible with non-equilibrium clouds. Not yet compatible
+                with most built in pRT models.
         """
 
         if species.endswith("(c)"):
