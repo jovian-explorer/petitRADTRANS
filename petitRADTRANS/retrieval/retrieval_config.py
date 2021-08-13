@@ -214,7 +214,7 @@ class RetrievalConfig:
         for f in files: print(f)
         return files
 
-    def set_line_species(self,linelist,free=False,abund_lim=(-6.0,6.0)):
+    def set_line_species(self,linelist,eq=False,abund_lim=(-6.0,6.0)):
         """
         Set RadTrans.line_species
 
@@ -225,9 +225,11 @@ class RetrievalConfig:
         Args:
             linelist : List(str)
                 The list of species to include in the retrieval
-            free : bool
-                If true, the retrieval should use free chemistry, and Parameters for the abundance of each
-                species in the linelist will be added to the retrieval
+            eq : bool
+                If false, the retrieval should use free chemistry, and Parameters for the abundance of each
+                species in the linelist will be added to the retrieval. Otherwise equilibrium chemistry will
+                be used. If you need fine control species, use the add_line_species and set up each species
+                individually.
             abund_lim : Tuple(float,float)
                 If free is True, this sets the boundaries of the uniform prior that will be applied for
                 each species in linelist. The range of the prior goes from abund_lim[0]
@@ -236,7 +238,7 @@ class RetrievalConfig:
         """
 
         self.line_species = linelist
-        if free:
+        if not eq:
             for spec in self.line_species:
                 self.parameters[spec] = Parameter(spec,True,\
                                     transform_prior_cube_coordinate = \
@@ -294,7 +296,7 @@ class RetrievalConfig:
                                     lambda x : abund_lim[0] + abund_lim[1]*x)
         if fixed:
             self.parameters[species] = Parameter(species,False,\
-                                                value = fixed_abund)
+                                                 value = fixed_abund)
     def remove_species_lines(self,species,free=False):
         """
         This function removes a species from the pRT line list, and if using a free chemistry retrieval,
