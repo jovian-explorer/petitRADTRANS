@@ -15,7 +15,8 @@ prt_colours = ['#009FB8','#FF695C', '#70FF92',  '#FFBB33', '#6171FF', "#FF1F69",
 font = {'family' : 'serif',
         'size'   : 24}
 lines = {'markeredgecolor' : 'k',
-         'markersize' : 8}
+         'markersize' : 8,
+         'marker' : 'o'}
 
 xtick = {'top' : True,
          'bottom' : True,
@@ -43,6 +44,7 @@ legend = {'fancybox' : True,
           'fontsize' : 20}
 scatter = {'marker' : 'o',
            'edgecolors' : 'k'}
+
 
 print("Using pRT Plotting style!")
 mpl.rc('font', **font)

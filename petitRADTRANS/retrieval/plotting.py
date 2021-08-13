@@ -5,8 +5,6 @@ import corner
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
-from matplotlib import rcParams
-from matplotlib import rc
 from scipy.stats import binned_statistic
 from petitRADTRANS import nat_cst as nc
 from .data import Data
@@ -97,7 +95,8 @@ def contour_corner(sampledict, \
                 true_values = None, \
                 short_name = None,
                 legend = False,
-                prt_plot_style = True):
+                prt_plot_style = True,
+                **kwargs):
     """
     Use the corner package to plot the posterior distributions produced by pymultinest.
 
@@ -131,11 +130,39 @@ def contour_corner(sampledict, \
             retrieval names used as keys for sampledict
         legend : bool
             Turn the legend on or off
+        prt_plot_style : bool
+            Use the prt plot style, changes the colour scheme and fonts to match the rest of
+            the prt plots.
+        kwargs : dict
+            Each kwarg can be one of the kwargs used in corner.corner. These can be used to adjust
+            the title_kwargs,label_kwargs,hist_kwargs, hist2d_kawargs or the contour kwargs. Each
+            kwarg must be a dictionary with the arguments as keys and values as the values.
     """
+    import matplotlib as mpl
     if prt_plot_style:
-        from .plot_style import prt_colours
-    color_list = prt_colours
-    #color_list = ['#009FB8','#FF695C', '#70FF92',  '#FFBB33', '#6171FF', "#FF1F69", "#52AC25", '#E574FF', "#FF261D", "#B429FF" ]
+        mpl.rcParams.update(mpl.rcParamsDefault)
+        font = {'family' : 'serif'}
+        xtick = {'top' : True,
+                 'bottom' : True,
+                 'direction' : 'in'}
+
+        ytick = {'left' : True,
+                 'right' : True,
+                 'direction' : 'in'}
+        xmin = {'visible' : True}
+        ymin = {'visible' : True}
+        mpl.rc('xtick',**xtick)
+        mpl.rc('xtick.minor',**xmin)
+        mpl.rc('ytick',**ytick)
+        mpl.rc('ytick.minor',**ymin)
+        mpl.rc('font', **font)
+
+        color_list = ['#009FB8','#FF695C', '#70FF92',  '#FFBB33', '#6171FF', "#FF1F69", "#52AC25", '#E574FF', "#FF261D", "#B429FF" ]
+    else:
+        mpl.rcParams.update(mpl.rcParamsDefault)
+
+        #from .plot_style import prt_colours
+    #color_list = prt_colours
     N_samples = []
     range_list = []
     handles = []
@@ -184,20 +211,27 @@ def contour_corner(sampledict, \
                 truths_list.append(true_values[key][i])
         except:
             pass
-        fig = plt.figure(figsize = (60,60),dpi=80)
-        label_kwargs = {'fontsize':max(98 - 4*len(parameter_plot_indices[key]),8)}
-        title_kwargs = {'fontsize':max(110 - 4*len(parameter_plot_indices[key]),8)}#{'fontsize':int(48/len(parameter_plot_indices[key]))}
-        hist2d_kwargs = {'fontsize':max(84 - 4*len(parameter_plot_indices[key]),8)}
-        hist_kwargs = {"linewidth":6}
-        contour_kwargs = {"linewidths":6}
-        import matplotlib as mpl
-        mpl.rcParams['axes.linewidth'] = 1
-        #mpl.rcParams['figure.figsize']=(40,40)
-        #mpl.rcParams['figure.dpi']=100
+        #fig = plt.figure(figsize = (60,60),dpi=80)
+        label_kwargs = None
+        title_kwargs = None
+        hist_kwargs = None
+        hist2d_kwargs = None
+        contour_kwargs = None
+        if "label_kwargs" in kwargs.keys():
+            label_kwargs = kwargs["label_kwargs"]
+        if "title_kwargs" in kwargs.keys():
+            title_kwargs = kwargs["title_kwargs"]
+        if "hist_kwargs" in kwargs.keys():
+            hist_kwargs = kwargs["hist_kwargs"]
+        if "hist2d_kwargs" in kwargs.keys():
+            hist2d_kwargs = kwargs["hist2d_kwargs"]
+        if "contour_kwargs" in kwargs.keys():
+            contour_kwargs = kwargs["contour_kwargs"]
 
         if count == 0:
+            print(len(data_list))
             fig = corner.corner(np.array(data_list).T,
-                                fig = fig,
+                                #fig = fig,
                                 smooth=True,
                                 title_fmt = ".2f",
                                 show_titles = True,
@@ -232,10 +266,6 @@ def contour_corner(sampledict, \
                           levels=[1-np.exp(-0.5),1-np.exp(-2),1-np.exp(-4.5)]
                           )
             count += 1
-        for ax in fig.get_axes():
-            ax.tick_params(axis='both', labelsize=max(60 - 2*len(parameter_plot_indices[key]),8), direction="in")
-            ax.tick_params(axis='both',which = 'major', length = 24)
-            ax.tick_params(axis='both',which = 'minor', length = 12)
         #if dimensions == 1:
         #    plt.tight_layout(h_pad=0, w_pad=0)
         if short_name is None:
@@ -243,11 +273,14 @@ def contour_corner(sampledict, \
         else:
             label = short_name[key]
         handles.append(Line2D([0], [0], marker = 'o',color=color_list[count], label = label,markersize = 15))
-    fig.subplots_adjust( wspace=0.005, hspace=0.005)
+    #fig.subplots_adjust( wspace=0.005, hspace=0.005)
     if legend:
         fig.get_axes()[2].legend(handles = handles,
                                  loc = 'upper right' )
     plt.savefig(output_file,dpi=300, bbox_inches='tight')
+    if prt_plot_style:
+        import petitRADTRANS.retrieval.plot_style
+    return fig
 
 
 

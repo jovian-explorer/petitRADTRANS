@@ -861,7 +861,7 @@ class Retrieval:
 #############################################################
 # Plotting functions
 #############################################################
-    def plot_all(self, output_dir = None):
+    def plot_all(self, output_dir = None, ret_names = []):
         """
         Produces plots for the best fit spectrum, a sample of 100 output spectra,
         the best fit PT profile and a corner plot for parameters specified in the
@@ -873,7 +873,7 @@ class Retrieval:
             self.run_mode = 'evaluate'
         if output_dir is None:
             output_dir = self.output_dir
-        sample_dict, parameter_dict = self.get_samples(output_dir)
+        sample_dict, parameter_dict = self.get_samples(output_dir,ret_names=ret_names)
 
         ###########################################
         # Plot best-fit spectrum
@@ -1298,7 +1298,7 @@ class Retrieval:
         plt.savefig(self.output_dir + 'evaluate_'+self.retrieval_name +'/PT_envelopes.pdf')
         return fig, ax
 
-    def plot_corner(self,sample_dict,parameter_dict,parameters_read):
+    def plot_corner(self,sample_dict,parameter_dict,parameters_read,**kwargs):
         """
         Make the corner plots
 
@@ -1310,6 +1310,10 @@ class Retrieval:
             parameters_read : List
                 Used to plot correct parameters, as some in self.parameters are not free, and
                 aren't included in the PMN outputs
+            kwargs : dict
+                Each kwarg can be one of the kwargs used in corner.corner. These can be used to adjust
+                the title_kwargs,label_kwargs,hist_kwargs, hist2d_kawargs or the contour kwargs. Each
+                kwarg must be a dictionary with the arguments as keys and values as the values.
         """
 
         if not self.run_mode == 'evaluate':
@@ -1346,10 +1350,12 @@ class Retrieval:
 
 
         # from Plotting
-        contour_corner(sample_use_dict, \
-                        p_use_dict, \
-                        output_file, \
-                        parameter_plot_indices = p_plot_inds,
-                        parameter_ranges = p_ranges, \
-                        true_values = None,
-                        prt_plot_style=self.self.prt_plot_style)
+        fig = contour_corner(sample_use_dict,
+                             p_use_dict,
+                             output_file,
+                             parameter_plot_indices = p_plot_inds,
+                             parameter_ranges = p_ranges, \
+                             true_values = None,
+                             prt_plot_style=self.prt_plot_style,
+                             **kwargs)
+        return fig
