@@ -265,7 +265,7 @@ class RetrievalConfig:
 
         self.continuum_opacities = linelist
 
-    def add_line_species(self,species,eq=False,abund_lim=(-8.0,7.0), fixed = False, fixed_abund = None):
+    def add_line_species(self,species,eq=False,abund_lim=(-8.0,7.0),  fixed_abund = None):
         """
         This function adds a single species to the pRT object that will define the line opacities of the model.
         The name must match the pRT opacity name, which vary between the c-k line opacities and the line-by-line opacities.
@@ -280,23 +280,22 @@ class RetrievalConfig:
                 If free is True, this sets the boundaries of the uniform prior that will be applied the species given.
                 The range of the prior goes from abund_lim[0] to abund_lim[0] + abund_lim[1].
                 The abundance limits must be given in log10 units of the mass fraction.
-            fixed : bool
-                If fixed is true, the value of the species will be fixed to the numerical value of fixed_abund.
-                This species will not be a free parameter in the retrieval.
             fixed_abund : float
                 The log-mass fraction abundance of the species. Currently only supports vertically constant
-                abundances.
+                abundances. If this is set, then the species will not be a free parameter in the retrieval.
         """
 
         # parameter passed through loglike is log10 abundance
         self.line_species.append(species)
         if not eq:
-            self.parameters[species] = Parameter(species,True,\
-                                    transform_prior_cube_coordinate = \
-                                    lambda x : abund_lim[0] + abund_lim[1]*x)
-        if fixed:
-            self.parameters[species] = Parameter(species,False,\
-                                                 value = fixed_abund)
+            if fixed_abund is not None:
+                self.parameters[species] = Parameter(species,False,\
+                                                    value = fixed_abund)
+            else:
+                self.parameters[species] = Parameter(species,True,\
+                                        transform_prior_cube_coordinate = \
+                                        lambda x : abund_lim[0] + abund_lim[1]*x)
+
     def remove_species_lines(self,species,free=False):
         """
         This function removes a species from the pRT line list, and if using a free chemistry retrieval,
@@ -315,7 +314,7 @@ class RetrievalConfig:
         if free:
             self.parameters.pop(species,None)
 
-    def add_cloud_species(self,species,eq = True, abund_lim = (-3.5,4.5), PBase_lim = (-5.0,7.0)):
+    def add_cloud_species(self,species, eq = True, abund_lim = (-3.5,4.5), PBase_lim = (-5.0,7.0), fixed_abund = None,fixed_base=None):
         """
         This function adds a single cloud species to the list of species. Optionally,
         it will add parameters to allow for a retrieval using an ackermann-marley model.
@@ -342,14 +341,24 @@ class RetrievalConfig:
             logging.warning("Ensure you set the cloud particle shape, typically with the _cd tag!")
             logging.warning(species + " was not added to the list of cloud species")
             return
+
         self.cloud_species.append(species)
         cname = species.split('_')[0]
-        self.parameters['log_X_cb_'+cname] = Parameter('log_X_cb_'+cname,True,\
-                                       transform_prior_cube_coordinate = \
-                                       lambda x : abund_lim[0] + abund_lim[1]*x)
-        #self.parameters['Pbase_'+cname] = Parameter('Pbase_'+cname,True,\
-        #                     transform_prior_cube_coordinate = \
-        #                     lambda x : PBase_lim[0] + PBase_lim[1]*x)
+        if fixed_abund is None:
+            self.parameters['log_X_cb_'+cname] = Parameter('log_X_cb_'+cname,True,\
+                                        transform_prior_cube_coordinate = \
+                                        lambda x : abund_lim[0] + abund_lim[1]*x)
+        else:
+            self.parameters['log_X_cb_'+cname] = Parameter('log_X_cb_'+cname,False,\
+                            value = fixed_abund)
+        if not eq:
+            if fixed_base is None:
+                self.parameters['Pbase_'+cname] =Parameter('Pbase_'+cname,True,\
+                                                               transform_prior_cube_coordinate = \
+                                                               lambda x : PBase_lim[0] + PBase_lim[1]*x)
+            else:
+                self.parameters['Pbase_'+cname] =Parameter('Pbase_'+cname,False,\
+                                                               value = fixed_base)
 
     def add_data(self, name, path,
                  model_generating_function,
