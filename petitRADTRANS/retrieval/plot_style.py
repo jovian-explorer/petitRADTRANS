@@ -15,8 +15,7 @@ prt_colours = ['#009FB8','#FF695C', '#70FF92',  '#FFBB33', '#6171FF', "#FF1F69",
 font = {'family' : 'serif',
         'size'   : 24}
 lines = {'markeredgecolor' : 'k',
-         'markersize' : 8,
-         'marker' : 'o'}
+         'markersize' : 8}
 
 xtick = {'top' : True,
          'bottom' : True,

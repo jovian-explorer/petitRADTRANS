@@ -346,8 +346,6 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.Pcloud = None
         self.haze_factor = None
         self.gray_opacity = None
-        self.b_hans = None
-
 
         ############################
         ############################
@@ -546,7 +544,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                         sigma_lnorm = None, fsed = None, Kzz = None, \
                         radius = None, \
                         add_cloud_scat_as_abs = None,
-                        dist = "lognormal", a_hans = None):
+                        dist = "lognormal", a_hans = None,b_hans=None):
         # Combine total line opacities,
         # according to mass fractions (abundances),
         # also add continuum opacities, i.e. clouds, CIA...
@@ -614,7 +612,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             self.calc_cloud_opacity(abundances, mmw, gravity, \
                                         sigma_lnorm, fsed, Kzz, radius, \
                                         add_cloud_scat_as_abs,
-                                        dist = dist, a_hans = a_hans)
+                                        dist = dist, a_hans = a_hans,b_hans = b_hans)
 
         # Calculate rayleigh scattering opacities
         if len(self.rayleigh_species) != 0:
@@ -680,10 +678,25 @@ class Radtrans(_read_opacities.ReadOpacities):
     def calc_cloud_opacity(self,abundances, mmw, gravity, sigma_lnorm, \
                                fsed = None, Kzz = None, \
                                radius = None, add_cloud_scat_as_abs = None,
-                               dist = "lognormal", a_hans = None):
+                               dist = "lognormal", a_hans = None,b_hans=None):
         # Function to calculate cloud opacities
         # for defined atmospheric structure.
         rho = self.press/nc.kB/self.temp*mmw*nc.amu
+        if "hansen" in dist.lower():
+            try:
+                if isinstance(b_hans, np.ndarray):
+                    if not b_hans.shape == (self.press.shape[0],len(self.cloud_species)):
+                        print("b_hans must be a float, a dictionary with arrays for each cloud species,")
+                        print("or a numpy array with shape (pressures.shape[0],len(cloud_species)).")
+                        sys.exit(15)
+                elif type(b_hans) is dict:
+                    b_hans = np.array(list(b_hans.values()),dtype='d',order='F').T
+                elif type(b_hans) is float:
+                    b_hans = np.array(np.tile(b_hans * np.ones_like(self.press),(len(self.cloud_species),1)),dtype='d',order='F').T
+            except:
+                print("You must provide a value for the Hansen distribution width, b_hans!")
+                b_hans = None
+                sys.exit(15)
         for i_spec in range(int(len(self.cloud_species))):
             self.cloud_mass_fracs[:,i_spec] = \
               abundances[self.cloud_species[i_spec]]
@@ -705,7 +718,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             else:
                 cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
                 fs.calc_hansen_opas(rho,self.rho_cloud_particles, \
-                                    self.cloud_mass_fracs,self.r_g,self.b_hans, \
+                                    self.cloud_mass_fracs,self.r_g,b_hans, \
                                     self.cloud_rad_bins,self.cloud_radii, \
                                     self.cloud_lambdas, \
                                     self.cloud_specs_abs_opa, \
@@ -739,11 +752,11 @@ class Radtrans(_read_opacities.ReadOpacities):
                 self.r_g = fs.get_rg_n_hansen(gravity,rho,self.rho_cloud_particles, \
                         self.temp,mmw,fseds, \
                         self.cloud_mass_fracs, \
-                        self.b_hans,Kzz)
+                        b_hans,Kzz)
                 cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
                 fs.calc_hansen_opas(rho,self.rho_cloud_particles, \
                                         self.cloud_mass_fracs, \
-                                        self.r_g,self.b_hans, \
+                                        self.r_g,b_hans, \
                                         self.cloud_rad_bins,self.cloud_radii, \
                                         self.cloud_lambdas, \
                                         self.cloud_specs_abs_opa, \
@@ -1173,23 +1186,14 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.geometry = geometry
         self.mu_star = np.cos(theta_star*np.pi/180.)
         self.fsed = fsed
-        if "hansen" in dist.lower():
-            try:
-                if type(b_hans) is dict:
-                    self.b_hans = np.array(list(b_hans.values()),dtype='d',order='F').T
-                if type(b_hans) is float:
-                    self.b_hans = np.array(np.tile(b_hans * np.ones_like(self.press),(len(self.cloud_species),1)),dtype='d',order='F').T
-                    print(self.b_hans.shape)
-            except:
-                print("You must provide a value for the Hansen distribution width, b_hans!")
-                self.b_hans = None
+
         if self.mu_star<=0.:
             self.mu_star=1e-8
         self.get_star_spectrum(Tstar,semimajoraxis,Rstar)
         self.interpolate_species_opa(temp)
         self.mix_opa_tot(abunds,mmw,gravity,sigma_lnorm,fsed,Kzz,radius, \
                              add_cloud_scat_as_abs = add_cloud_scat_as_abs,
-                             dist = dist, a_hans = a_hans)
+                             dist = dist, a_hans = a_hans,b_hans = b_hans)
         self.calc_opt_depth(gravity)
         self.calc_RT(contribution)
         self.calc_tau_cloud(gravity)
@@ -1260,7 +1264,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                         kappa_zero = None, \
                         gamma_scat = None, \
                         contribution = False, haze_factor = None, \
-                        gray_opacity = None, variable_gravity=True):
+                        gray_opacity = None, variable_gravity=True,\
+                        dist = "lognormal", b_hans = None, a_hans = None):
         ''' Method to calculate the atmosphere's transmission radius
         (for the transmission spectrum).
 
@@ -1326,6 +1331,21 @@ class Radtrans(_read_opacities.ReadOpacities):
                     If ``True``, 20 % of the cloud scattering opacity will be
                     added to the absorption opacity, introduced to test for the
                     effect of neglecting scattering.
+                dist (Optional[string]):
+                    The cloud particle size distribution to use.
+                    Can be either 'lognormal' (default) or 'hansen'.
+                    If hansen, the b_hans parameters must be used.
+                a_hans (Optional[dict]):
+                    A dictionary of the 'a' parameter values for each
+                    included cloud species and for each atmospheric layer,
+                    formatted as the kzz argument. Equivilant to radius arg.
+                    If a_hans is not included and dist is "hansen", then it will
+                    be computed using Kzz and fsed (recommended).
+                b_hans (Optional[dict]):
+                    A dictionary of the 'b' parameter values for each
+                    included cloud species and for each atmospheric layer,
+                    formatted as the kzz argument. This is the width of the hansen
+                    distribution normalized by the particle area (1/a_hans^2)
         '''
 
         self.Pcloud = Pcloud
@@ -1334,7 +1354,8 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.haze_factor = haze_factor
         self.kappa_zero = kappa_zero
         self.gamma_scat = gamma_scat
-        self.mix_opa_tot(abunds,mmw,gravity,sigma_lnorm,fsed,Kzz,radius)
+        self.mix_opa_tot(abunds,mmw,gravity,sigma_lnorm,fsed,Kzz,radius,
+                             dist = dist, a_hans = a_hans,b_hans = b_hans)
         self.calc_tr_rad(P0_bar,R_pl,gravity,mmw,contribution,variable_gravity)
 
 
@@ -1346,7 +1367,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                              gamma_scat = None, \
                              contribution=False,gray_opacity = None, \
                              add_cloud_scat_as_abs = None, \
-                             variable_gravity=True):
+                             variable_gravity=True,\
+                             dist = "lognormal", b_hans = None, a_hans = None):
         ''' Method to calculate the atmosphere's emission flux *and*
         transmission radius (for the transmission spectrum).
 
@@ -1408,15 +1430,30 @@ class Radtrans(_read_opacities.ReadOpacities):
                     Standard is ``True``. If ``False`` the gravity will be
                     constant as a function of pressure, during the transmission
                     radius calculation.
+                dist (Optional[string]):
+                    The cloud particle size distribution to use.
+                    Can be either 'lognormal' (default) or 'hansen'.
+                    If hansen, the b_hans parameters must be used.
+                a_hans (Optional[dict]):
+                    A dictionary of the 'a' parameter values for each
+                    included cloud species and for each atmospheric layer,
+                    formatted as the kzz argument. Equivilant to radius arg.
+                    If a_hans is not included and dist is "hansen", then it will
+                    be computed using Kzz and fsed (recommended).
+                b_hans (Optional[dict]):
+                    A dictionary of the 'b' parameter values for each
+                    included cloud species and for each atmospheric layer,
+                    formatted as the kzz argument. This is the width of the hansen
+                    distribution normalized by the particle area (1/a_hans^2)
         '''
-
         self.Pcloud = Pcloud
         self.gray_opacity = gray_opacity
         self.kappa_zero = kappa_zero
         self.gamma_scat = gamma_scat
         self.interpolate_species_opa(temp)
         self.mix_opa_tot(abunds,mmw,gravity,sigma_lnorm,fsed,Kzz,radius, \
-                             add_cloud_scat_as_abs = add_cloud_scat_as_abs)
+                             add_cloud_scat_as_abs = add_cloud_scat_as_abs,
+                             dist = dist, a_hans = a_hans,b_hans = b_hans)
         self.calc_opt_depth(gravity)
         self.calc_RT(contribution)
         self.calc_tr_rad(P0_bar,R_pl,gravity,mmw,contribution,variable_gravity)
@@ -1429,7 +1466,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                       kappa_zero = None, \
                       gamma_scat = None, \
                       haze_factor = None, \
-                      add_cloud_scat_as_abs = None):
+                      add_cloud_scat_as_abs = None,\
+                      dist = "lognormal", b_hans = None, a_hans = None):
         ''' Method to calculate the atmosphere's Rosseland and Planck mean opacities.
 
             Args:
@@ -1479,8 +1517,22 @@ class Radtrans(_read_opacities.ReadOpacities):
                 haze_factor (Optional[float]):
                     Scalar factor, increasing the gas Rayleigh scattering
                     cross-section.
+                dist (Optional[string]):
+                    The cloud particle size distribution to use.
+                    Can be either 'lognormal' (default) or 'hansen'.
+                    If hansen, the b_hans parameters must be used.
+                a_hans (Optional[dict]):
+                    A dictionary of the 'a' parameter values for each
+                    included cloud species and for each atmospheric layer,
+                    formatted as the kzz argument. Equivilant to radius arg.
+                    If a_hans is not included and dist is "hansen", then it will
+                    be computed using Kzz and fsed (recommended).
+                b_hans (Optional[dict]):
+                    A dictionary of the 'b' parameter values for each
+                    included cloud species and for each atmospheric layer,
+                    formatted as the kzz argument. This is the width of the hansen
+                    distribution normalized by the particle area (1/a_hans^2)
         '''
-
         if not self.do_scat_emis:
             print('Error: pRT must run in do_scat_emis = True mode to calculate'+ \
                   ' kappa_Rosseland and kappa_Planck')
@@ -1493,7 +1545,8 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.gray_opacity = gray_opacity
         self.interpolate_species_opa(temp)
         self.mix_opa_tot(abunds,mmw,gravity,sigma_lnorm,fsed,Kzz,radius, \
-                             add_cloud_scat_as_abs = add_cloud_scat_as_abs)
+                             add_cloud_scat_as_abs = add_cloud_scat_as_abs,
+                             dist = dist, a_hans = a_hans,b_hans = b_hans)
 
         self.kappa_rosseland = \
                   fs.calc_kappa_rosseland(self.line_struc_kappas[:,:,:1,:], self.temp, \
@@ -1689,7 +1742,9 @@ def py_calc_cloud_opas(rho,
                 cloud_rad_bins[0:N_cloud_rad_bins,np.newaxis]),axis = 0)
             cloud_red_fac_aniso_TOT[:,i_struct] = cloud_red_fac_aniso_TOT[:,i_struct] + add_aniso
 
-        cloud_red_fac_aniso_TOT[:,i_struct] = cloud_red_fac_aniso_TOT[:,i_struct]/cloud_scat_opa_TOT[:,i_struct]
+        cloud_red_fac_aniso_TOT[:,i_struct] = np.divide(cloud_red_fac_aniso_TOT[:,i_struct],
+                                                        cloud_scat_opa_TOT[:,i_struct],
+                                                        where=cloud_scat_opa_TOT[:,i_struct]>1e-200)
         cloud_red_fac_aniso_TOT[cloud_scat_opa_TOT<1e-200] = 0.0
         cloud_abs_opa_TOT[:,i_struct] /= rho[i_struct]
         cloud_scat_opa_TOT[:,i_struct] /= rho[i_struct]
