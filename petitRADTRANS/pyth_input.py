@@ -3,6 +3,66 @@ from __future__ import print_function
 import numpy as np
 from . import nat_cst as nc
 
+def py_calc_cloud_opas(rho,
+                    rho_p,
+                    cloud_mass_fracs,
+                    r_g,
+                    sigma_n,
+                    cloud_rad_bins,
+                    cloud_radii,
+                    cloud_lambdas,
+                    cloud_specs_abs_opa,
+                    cloud_specs_scat_opa,
+                    cloud_aniso):
+    """
+    This function reimplements calc_cloud_opas from fort_spec.f90. For some reason
+    it runs faster in python than in fortran, so we'll use this from now on.
+    This function integrates the cloud opacity throught the different layers of
+    the atmosphere to get the total optical depth, scattering and anisotropic fraction.
+
+    See the fortran implementation for details of the input arrays.
+    """
+    ncloud = int(cloud_mass_fracs.shape[1])
+    N_cloud_rad_bins = int(cloud_radii.shape[0])
+    N_cloud_lambda_bins = int(cloud_specs_abs_opa.shape[1])
+    nstruct = int(rho.shape[0])
+
+    cloud_abs_opa_TOT = np.zeros((N_cloud_lambda_bins,nstruct))
+    cloud_scat_opa_TOT = np.zeros((N_cloud_lambda_bins,nstruct))
+    cloud_red_fac_aniso_TOT = np.zeros((N_cloud_lambda_bins,nstruct))
+
+    for i_struct in range(nstruct):
+        for i_c in range(ncloud):
+            N = 3.0 * cloud_mass_fracs[i_struct,i_c] * rho[i_struct] /(4.0 *np.pi*rho_p[i_c] * (r_g[i_struct,i_c]**3.0))* \
+                np.exp(-4.5 * np.log(sigma_n)**2.0)
+
+            dndr = N/(cloud_radii * np.sqrt(2.0*np.pi)*np.log(sigma_n)) *\
+                    np.exp(-np.log(cloud_radii/r_g[i_struct,i_c])**2.0 /(2.0*(np.log(sigma_n)**2.0)))
+            integrand_abs = (4.0*np.pi/3.0)*(cloud_radii[:,np.newaxis]**3.0)*rho_p[i_c]*\
+                dndr[:,np.newaxis]*cloud_specs_abs_opa[:,:,i_c]
+            integrand_scat = (4.0*np.pi/3.0)*(cloud_radii[:,np.newaxis]**3.0)*rho_p[i_c]*dndr[:,np.newaxis]* \
+                cloud_specs_scat_opa[:,:,i_c]
+            integrand_aniso = integrand_scat*(1.0-cloud_aniso[:,:,i_c])
+            add_abs = np.sum(integrand_abs*(cloud_rad_bins[1:N_cloud_rad_bins+1,np.newaxis]- \
+                cloud_rad_bins[0:N_cloud_rad_bins,np.newaxis]),axis = 0)
+
+            cloud_abs_opa_TOT[:,i_struct] = cloud_abs_opa_TOT[:,i_struct] + add_abs
+
+            add_scat = np.sum(integrand_scat*(cloud_rad_bins[1:N_cloud_rad_bins+1,np.newaxis]- \
+                cloud_rad_bins[0:N_cloud_rad_bins,np.newaxis]),axis = 0)
+            cloud_scat_opa_TOT[:,i_struct] = cloud_scat_opa_TOT[:,i_struct] + add_scat
+
+            add_aniso = np.sum(integrand_aniso*(cloud_rad_bins[1:N_cloud_rad_bins+1,np.newaxis]- \
+                cloud_rad_bins[0:N_cloud_rad_bins,np.newaxis]),axis = 0)
+            cloud_red_fac_aniso_TOT[:,i_struct] = cloud_red_fac_aniso_TOT[:,i_struct] + add_aniso
+
+        cloud_red_fac_aniso_TOT[:,i_struct] = cloud_red_fac_aniso_TOT[:,i_struct]/cloud_scat_opa_TOT[:,i_struct]
+        cloud_red_fac_aniso_TOT[cloud_scat_opa_TOT<1e-200] = 0.0
+        cloud_abs_opa_TOT[:,i_struct] /= rho[i_struct]
+        cloud_scat_opa_TOT[:,i_struct] /= rho[i_struct]
+    return cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT
+
+
 def sigma_hm_ff(lambda_angstroem, temp, P_e):
     '''
     Returns the H- free-free cross-section in units of cm^2

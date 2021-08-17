@@ -2468,6 +2468,480 @@ end subroutine feautrier_rad_trans
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+subroutine feautrier_PT_it(border_freqs, &
+     tau_approx_scat, &
+     temp, &
+     mu, &
+     w_gauss_mu, &
+     w_gauss_ck, &
+     photon_destruct_in, &
+     contribution, &
+     surf_refl, &
+     surf_emi, &
+     I_star_0, &
+     geom, &
+     mu_star, &
+     planet_mode, &
+     flux, &
+     contr_em, &
+     J_bol, &
+     H_bol, &
+     eddington_F, &
+     eddington_Psi, &
+     freq_len_p_1, &
+     struc_len, &
+     N_mu, &
+     N_g)
+
+  use constants_block
+  implicit none
+
+  ! I/O
+  INTEGER, INTENT(IN)             :: freq_len_p_1, struc_len, N_mu, N_g
+  DOUBLE PRECISION, INTENT(IN)    :: mu_star
+  DOUBLE PRECISION, INTENT(IN)    :: surf_refl(freq_len_p_1-1),surf_emi(freq_len_p_1-1) !ELALEI
+  DOUBLE PRECISION, INTENT(IN)    :: I_star_0(freq_len_p_1-1) !ELALEI
+  DOUBLE PRECISION, INTENT(IN)    :: border_freqs(freq_len_p_1)
+  DOUBLE PRECISION, INTENT(IN)    :: tau_approx_scat(N_g,freq_len_p_1-1,struc_len)
+  DOUBLE PRECISION, INTENT(IN)    :: temp(struc_len)
+  DOUBLE PRECISION, INTENT(IN)    :: mu(N_mu)
+  DOUBLE PRECISION, INTENT(IN)    :: w_gauss_mu(N_mu), w_gauss_ck(N_g)
+  DOUBLE PRECISION, INTENT(IN)    :: photon_destruct_in(N_g,freq_len_p_1-1,struc_len)
+  LOGICAL, INTENT(IN)             :: contribution, planet_mode
+  DOUBLE PRECISION, INTENT(OUT)   :: flux(freq_len_p_1-1)
+  DOUBLE PRECISION, INTENT(OUT)   :: contr_em(struc_len,freq_len_p_1-1)
+  DOUBLE PRECISION, INTENT(OUT)   :: J_bol(struc_len), H_bol(struc_len), &
+          eddington_F(struc_len), eddington_Psi
+  DOUBLE PRECISION                :: K_bol(struc_len)
+  CHARACTER*20, intent(in)        :: geom
+
+  ! Internal
+  INTEGER                         :: j,i,k,l
+  DOUBLE PRECISION                :: I_J(struc_len,N_mu), I_H(struc_len,N_mu)
+  DOUBLE PRECISION                :: source(N_g,freq_len_p_1-1,struc_len), &
+       J_planet_scat(N_g,freq_len_p_1-1,struc_len), &
+       photon_destruct(N_g,freq_len_p_1-1,struc_len), &
+       source_planet_scat_n(N_g,freq_len_p_1-1,struc_len), &
+       source_planet_scat_n1(N_g,freq_len_p_1-1,struc_len), &
+       source_planet_scat_n2(N_g,freq_len_p_1-1,struc_len), &
+       source_planet_scat_n3(N_g,freq_len_p_1-1,struc_len)
+   DOUBLE PRECISION                :: J_star_ini(N_g,freq_len_p_1-1,struc_len)
+   DOUBLE PRECISION                :: I_star_calc(N_g,N_mu,struc_len,freq_len_p_1-1)
+   DOUBLE PRECISION                :: flux_old(freq_len_p_1-1), conv_val
+  ! tridag variables
+  DOUBLE PRECISION                :: a(struc_len),b(struc_len),c(struc_len),r(struc_len), &
+       planck(struc_len)
+  DOUBLE PRECISION                :: f1,f2,f3, deriv1, deriv2, I_plus, I_minus
+
+  ! quantities for P-T structure iteration
+  DOUBLE PRECISION                :: J_bol_a(struc_len), H_bol_a(struc_len), K_bol_a(struc_len)
+  DOUBLE PRECISION                :: J_bol_g(struc_len), H_bol_g(struc_len), K_bol_g(struc_len)
+
+  ! ALI
+  DOUBLE PRECISION                :: lambda_loc(N_g,freq_len_p_1-1,struc_len)
+
+  ! control
+  DOUBLE PRECISION                :: inv_del_tau_min
+  INTEGER                         :: iter_scat, i_iter_scat
+
+  ! GCM spec calc
+  LOGICAL                         :: GCM_read
+  DOUBLE PRECISION                :: I_GCM(N_mu,freq_len_p_1-1)
+
+  ! Variables for the contribution function calculation
+  INTEGER :: i_mu, i_str, i_freq
+  DOUBLE PRECISION :: transm_mu(N_g,freq_len_p_1-1,struc_len), &
+                     transm_all(freq_len_p_1-1,struc_len), transm_all_loc(struc_len)
+
+  ! PAUL NEW
+  ! Variables for surface scattering
+  DOUBLE PRECISION                :: I_plus_surface(N_mu, N_g, freq_len_p_1-1)
+
+  I_plus_surface = 0d0
+  I_minus = 0d0
+  ! END PAUL NEW
+
+  GCM_read = .FALSE.
+  iter_scat = 100
+  source = 0d0
+  flux_old = 0d0
+  flux = 0d0
+
+  J_bol = 0d0
+  H_bol = 0d0
+  K_bol = 0d0
+  eddington_F = 0d0
+  eddington_Psi = 0d0
+
+  source_planet_scat_n = 0d0
+  source_planet_scat_n1 = 0d0
+  source_planet_scat_n2 = 0d0
+  source_planet_scat_n3 = 0d0
+
+  photon_destruct = photon_destruct_in
+
+  ! DO THE STELLAR ATTENUATION CALCULATION
+
+  J_star_ini = 0d0
+
+
+  do i = 1, freq_len_p_1-1
+    ! Irradiation treatment
+    ! Dayside ave: multiply flux by 1/2.
+    ! Planet ave: multiply flux by 1/4
+
+    do i_mu = 1, N_mu
+      if (trim(adjustl(geom)) .EQ. 'dayside_ave') then
+           I_star_calc(:,i_mu,:,i) = 0.5* abs(I_star_0(i))*exp(-tau_approx_scat(:,i,:)/mu(i_mu))
+           J_star_ini(:,i,:) = J_star_ini(:,i,:)+0.5d0*I_star_calc(:,i_mu,:,i)*w_gauss_mu(i_mu)
+      else if (trim(adjustl(geom)) .EQ. 'planetary_ave') then
+           I_star_calc(:,i_mu,:,i) = 0.25* abs(I_star_0(i))*exp(-tau_approx_scat(:,i,:)/mu(i_mu))
+           J_star_ini(:,i,:) = J_star_ini(:,i,:)+0.5d0*I_star_calc(:,i_mu,:,i)*w_gauss_mu(i_mu)
+      else if (trim(adjustl(geom)) .EQ. 'non-isotropic') then
+           J_star_ini(:,i,:) = abs(I_star_0(i)/4.*exp(-tau_approx_scat(:,i,:)/mu_star))
+      else
+          write(*,*) 'Invalid geometry'
+     end if
+   end do
+  end do
+
+
+  do i_iter_scat = 1, iter_scat
+
+    ! TODO: change that planet mode only needs K_bol,
+    ! stellar mode needs H_bol. Also below.
+    if (planet_mode) then
+        H_bol = 0d0
+        K_bol = 0d0
+    end if
+    J_bol = 0d0
+
+    flux_old = flux
+
+    lambda_loc = 0d0
+
+    J_planet_scat = 0d0
+
+    inv_del_tau_min = 1d10
+    J_bol(1) = 0d0
+    I_GCM = 0d0
+
+    do i = 1, freq_len_p_1-1
+
+       flux(i) = 0d0
+
+       J_bol_a = 0d0
+       if (planet_mode) then
+           H_bol_a = 0d0
+           K_bol_a = 0d0
+       end if
+
+       r = 0
+
+       call planck_f_lr(struc_len,temp(1:struc_len),border_freqs(i),border_freqs(i+1),r)
+       planck = r
+
+       do l = 1, N_g
+
+          if (i_iter_scat .EQ. 1) then
+             source(l,i,:) = photon_destruct(l,i,:)*r +  (1d0-photon_destruct(l,i,:))*J_star_ini(l,i,:)
+          else
+             r = source(l,i,:)
+
+          end if
+
+
+          do j = 1, N_mu
+
+
+
+             ! Own boundary treatment
+             f1 = mu(j)/(tau_approx_scat(l,i,1+1)-tau_approx_scat(l,i,1))
+
+             ! own test against instability
+             if (f1 > inv_del_tau_min) then
+                f1 = inv_del_tau_min
+             end if
+             if (f1 .NE. f1) then
+                f1 = inv_del_tau_min
+             end if
+
+             b(1) = 1d0 + 2d0 * f1 * (1d0 + f1)
+             c(1) = -2d0*f1**2d0
+             a(1) = 0d0
+
+             ! Calculate the local approximate lambda iterator
+             lambda_loc(l,i,1) = lambda_loc(l,i,1) + &
+                  w_gauss_mu(j)/(1d0 + 2d0 * f1 * (1d0 + f1))
+
+             do k = 1+1, struc_len-1
+
+                f1 = 2d0*mu(j)/(tau_approx_scat(l,i,k+1)-tau_approx_scat(l,i,k-1))
+                f2 = mu(j)/(tau_approx_scat(l,i,k+1)-tau_approx_scat(l,i,k))
+                f3 = mu(j)/(tau_approx_scat(l,i,k)-tau_approx_scat(l,i,k-1))
+
+                ! own test against instability
+                if (f1 > 0.5d0*inv_del_tau_min) then
+                   f1 = 0.5d0*inv_del_tau_min
+                end if
+                if (f1 .NE. f1) then
+                   f1 = 0.5d0*inv_del_tau_min
+                end if
+                if (f2 > inv_del_tau_min) then
+                   f2 = inv_del_tau_min
+                end if
+                if (f2 .NE. f2) then
+                   f2 = inv_del_tau_min
+                end if
+                if (f3 > inv_del_tau_min) then
+                   f3 = inv_del_tau_min
+                end if
+                if (f3 .NE. f3) then
+                   f3 = inv_del_tau_min
+                end if
+
+                b(k) = 1d0 + f1*(f2+f3)
+                c(k) = -f1*f2
+                a(k) = -f1*f3
+
+                ! Calculate the local approximate lambda iterator
+                lambda_loc(l,i,k) = lambda_loc(l,i,k) + &
+                     w_gauss_mu(j)/(1d0+f1*(f2+f3))
+
+             end do
+
+             ! Own boundary treatment
+             f1 = mu(j)/(tau_approx_scat(l,i,struc_len)-tau_approx_scat(l,i,struc_len-1))
+
+             ! own test against instability
+             if (f1 > inv_del_tau_min) then
+                f1 = inv_del_tau_min
+             end if
+             if (f1 .NE. f1) then
+                f1 = inv_del_tau_min
+             end if
+
+  !!$              b(struc_len) = 1d0 + 2d0*f1**2d0
+  !!$              c(struc_len) = 0d0
+  !!$              a(struc_len) = -2d0*f1**2d0
+  !!$
+  !!$              ! Calculate the local approximate lambda iterator
+  !!$              lambda_loc(l,i,struc_len) = lambda_loc(l,i,struc_len) + &
+  !!$                   w_gauss_mu(j)/(1d0 + 2d0*f1**2d0)
+
+             ! TEST PAUL SCAT
+             b(struc_len) = 1d0
+             c(struc_len) = 0d0
+             a(struc_len) = 0d0
+
+             ! r(struc_len) = I_J(struc_len) = 0.5[I_plus + I_minus]
+             ! where I_plus is the light that goes downwards and
+             ! I_minus is the light that goes upwards.
+             !!!!!!!!!!!!!!!!!! ALWAYS NEEDED !!!!!!!!!!!!!!!!!!
+             I_plus = I_plus_surface(j, l, i)
+
+                            !!!!!!!!!!!!!!! EMISSION ONLY TERM !!!!!!!!!!!!!!!!
+             I_minus = surf_emi(i)*planck(struc_len) &
+                           !!!!!!!!!!!!!!! SURFACE SCATTERING !!!!!!!!!!!!!!!!
+                           ! ----> of the emitted/scattered atmospheric light
+                           ! + surf_refl(i) * SUM(I_plus_surface(:, l, i) * w_gauss_mu) ! OLD PRE 091220
+                           + surf_refl(i) * 2d0 * SUM(I_plus_surface(:, l, i) * mu * w_gauss_mu)
+                           ! ----> of the direct stellar beam (depends on geometry)
+             if  (trim(adjustl(geom)) .NE. 'non-isotropic') then
+               I_minus = I_minus + surf_refl(i) &
+                    ! * SUM(I_star_calc(l,:, struc_len, i) * w_gauss_mu) ! OLD PRE 091220
+                    * 2d0 * SUM(I_star_calc(l,:, struc_len, i) * mu * w_gauss_mu)
+             else
+               !I_minus = I_minus + surf_refl(i) *J_star_ini(l,i,struc_len)  !to be checked! ! OLD PRE 091220
+               I_minus = I_minus + surf_refl(i) *J_star_ini(l,i,struc_len) * 4d0 * mu_star
+             end if
+
+             !sum to get I_J
+             r(struc_len)=0.5*(I_plus + I_minus)
+
+             ! Calculate the local approximate lambda iterator
+             lambda_loc(l,i,struc_len) = lambda_loc(l,i,struc_len) + &
+                  w_gauss_mu(j)/(1d0 + 2d0*f1**2d0)
+
+              call tridag_own(a,b,c,r,I_J(:,j),struc_len)
+
+             I_H(1,j) = -I_J(1,j)
+
+             do k = 1+1, struc_len-1
+                f1 = mu(j)/(tau_approx_scat(l,i,k+1)-tau_approx_scat(l,i,k))
+                f2 = mu(j)/(tau_approx_scat(l,i,k)-tau_approx_scat(l,i,k-1))
+                if (f1 > inv_del_tau_min) then
+                   f1 = inv_del_tau_min
+                end if
+                if (f2 > inv_del_tau_min) then
+                   f2 = inv_del_tau_min
+                end if
+                deriv1 = f1*(I_J(k+1,j)-I_J(k,j))
+                deriv2 = f2*(I_J(k,j)-I_J(k-1,j))
+                I_H(k,j) = -(deriv1+deriv2)/2d0
+
+                ! TEST PAUL SCAT
+                if (k .EQ. struc_len - 1) then
+                   I_plus_surface(j, l, i) = &
+                        I_J(struc_len,j)  - deriv1
+                end if
+                ! END TEST PAUL SCAT
+             end do
+
+             I_H(struc_len,j) = 0d0
+
+             ! TEST PAUL SCAT
+             !I_plus_surface(j, l, i) = I_J(struc_len-1,j)+I_H(struc_len-1,j)
+             ! END TEST PAUL SCAT
+
+          end do
+
+          J_bol_g = 0d0
+          if (planet_mode) then
+              H_bol_g = 0d0
+              K_bol_g = 0d0
+          end if
+
+          do j = 1, N_mu
+
+             J_bol_g = J_bol_g + I_J(:,j) * w_gauss_mu(j)
+
+             if (planet_mode) then
+                 H_bol_g = H_bol_g + I_H(:,j) * mu(j) * w_gauss_mu(j)
+                 K_bol_g = K_bol_g + I_J(:,j)*mu(j)**2d0 &
+                      * w_gauss_mu(j)
+             end if
+
+             flux(i) = flux(i) - I_H(1,j)*mu(j) &
+                  * 4d0*pi * w_gauss_ck(l) * w_gauss_mu(j)
+
+          end do
+
+          ! Save angle-dependent surface flux
+          if (GCM_read) then
+             do j = 1, N_mu
+                I_GCM(j,i) = I_GCM(j,i) - 2d0*I_H(1,j)*w_gauss_ck(l)
+             end do
+          end if
+
+          J_planet_scat(l,i,:) = J_bol_g
+          if (planet_mode) then
+              J_bol_a = J_bol_a + J_bol_g * w_gauss_ck(l)
+              H_bol_a = H_bol_a + H_bol_g * w_gauss_ck(l)
+              K_bol_a = K_bol_a + K_bol_g * w_gauss_ck(l)
+          end if
+
+       end do
+
+       if (planet_mode) then
+           J_bol = J_bol + &
+                J_bol_a*(border_freqs(i)-border_freqs(i+1))
+           H_bol = H_bol + &
+                H_bol_a*(border_freqs(i)-border_freqs(i+1))
+           K_bol = K_bol + K_bol_a*(border_freqs(i)-border_freqs(i+1))
+       end if
+
+    end do
+
+    do k = 1, struc_len
+       do i = 1, freq_len_p_1-1
+          do l = 1, N_g
+             if (photon_destruct(l,i,k) < 1d-10) THEN
+                photon_destruct(l,i,k) = 1d-10
+             end if
+          end do
+       end do
+    end do
+
+    do i = 1, freq_len_p_1-1
+       call planck_f_lr(struc_len,temp(1:struc_len),border_freqs(i),border_freqs(i+1),r)
+       do l = 1, N_g
+         source(l,i,:) = (photon_destruct(l,i,:)*r+(1d0-photon_destruct(l,i,:))* &
+               (J_star_ini(l,i,:)+J_planet_scat(l,i,:)-lambda_loc(l,i,:)*source(l,i,:))) / &
+               (1d0-(1d0-photon_destruct(l,i,:))*lambda_loc(l,i,:))
+       end do
+    end do
+
+    source_planet_scat_n3 = source_planet_scat_n2
+    source_planet_scat_n2 = source_planet_scat_n1
+    source_planet_scat_n1 = source_planet_scat_n
+    source_planet_scat_n  = source
+
+    if (mod(i_iter_scat,4) .EQ. 0) then
+       !write(*,*) 'Ng acceleration!'
+       call NG_source_approx(source_planet_scat_n,source_planet_scat_n1, &
+            source_planet_scat_n2,source_planet_scat_n3,source, &
+            N_g,freq_len_p_1,struc_len)
+    end if
+
+    conv_val = MAXVAL(ABS((flux-flux_old)/flux))
+    if ((conv_val < 1d-2) .AND. (i_iter_scat > 9)) then
+        exit
+    end if
+
+ end do
+
+  ! Calculate the contribution function.
+  ! Copied from flux_ck, here using "source" as the source function
+  ! (before it was the Planck function).
+
+  contr_em = 0d0
+  if (contribution) then
+
+    do i_mu = 1, N_mu
+
+       ! Transmissions for a given incidence angle
+       transm_mu = exp(-tau_approx_scat/mu(i_mu))
+
+       do i_str = 1, struc_len
+          do i_freq = 1, freq_len_p_1-1
+             ! Integrate transmission over g-space
+             transm_all(i_freq,i_str) = sum(transm_mu(:,i_freq,i_str)*w_gauss_ck)
+          end do
+       end do
+
+       ! Do the actual radiative transport
+       do i_freq = 1, freq_len_p_1-1
+          ! Spatial transmissions at given wavelength
+          transm_all_loc = transm_all(i_freq,:)
+          ! Calc Eq. 9 of manuscript (em_deriv.pdf)
+          do i_str = 1, struc_len
+             r(i_str) = sum(source(:,i_freq,i_str)*w_gauss_ck)
+          end do
+          do i_str = 1, struc_len-1
+             contr_em(i_str,i_freq) = contr_em(i_str,i_freq)+ &
+                  (r(i_str)+r(i_str+1)) * &
+                  (transm_all_loc(i_str)-transm_all_loc(i_str+1)) &
+                  *mu(i_mu)*w_gauss_mu(i_mu)
+          end do
+          contr_em(struc_len,i_freq) = contr_em(struc_len,i_freq)+ &
+              !2d0*r(struc_len)*transm_all_loc(struc_len)*mu(i_mu)*w_gauss_mu(i_mu) MODIFIED TO INCLUDE SURFACE
+              2d0*I_minus*transm_all_loc(struc_len)*mu(i_mu)*w_gauss_mu(i_mu)
+       end do
+
+    end do
+
+    do i_freq = 1, freq_len_p_1-1
+       contr_em(:,i_freq) = contr_em(:,i_freq)/SUM(contr_em(:,i_freq))
+    end do
+
+  end if
+
+  if (planet_mode) then
+    eddington_F = K_bol/J_bol
+    eddington_Psi = H_bol(1)/J_bol(1)
+  end if
+
+end subroutine feautrier_PT_it
+
+
+!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
 subroutine NG_source_approx(source_n,source_n1,source_n2,source_n3,source, &
      N_g,freq_len_p_1,struc_len)
 

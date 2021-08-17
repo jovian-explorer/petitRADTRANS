@@ -657,6 +657,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                                           self.g_gauss, self.w_gauss, \
                                           160)
             '''
+            # TODO: change back to 1000, from 10000
             self.line_struc_kappas[:, :, 0, :] = \
               fs.combine_opas_sample_ck(self.line_struc_kappas, \
                                           self.g_gauss, self.w_gauss, \
@@ -695,7 +696,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         if radius is not None or a_hans is not None:
             if dist is "lognormal":
                 cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
-                py_calc_cloud_opas(rho,self.rho_cloud_particles, \
+                pi.py_calc_cloud_opas(rho,self.rho_cloud_particles, \
                                     self.cloud_mass_fracs,self.r_g,sigma_lnorm, \
                                     self.cloud_rad_bins,self.cloud_radii, \
                                     self.cloud_lambdas, \
@@ -726,7 +727,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                                         sigma_lnorm,Kzz)
 
                 cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
-                py_calc_cloud_opas(rho,self.rho_cloud_particles, \
+                pi.py_calc_cloud_opas(rho,self.rho_cloud_particles, \
                                         self.cloud_mass_fracs, \
                                         self.r_g,sigma_lnorm, \
                                         self.cloud_rad_bins,self.cloud_radii, \
@@ -1173,6 +1174,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.geometry = geometry
         self.mu_star = np.cos(theta_star*np.pi/180.)
         self.fsed = fsed
+        # TODO: move into mix_opa_tot function
         if "hansen" in dist.lower():
             try:
                 if type(b_hans) is dict:
@@ -1183,6 +1185,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             except:
                 print("You must provide a value for the Hansen distribution width, b_hans!")
                 self.b_hans = None
+        # End moove into cloud function
         if self.mu_star<=0.:
             self.mu_star=1e-8
         self.get_star_spectrum(Tstar,semimajoraxis,Rstar)
@@ -1636,61 +1639,107 @@ class Radtrans(_read_opacities.ReadOpacities):
                     int(resolution)) + '.h5')
                 os.system('rm temp.h5')
 
-def py_calc_cloud_opas(rho,
-                    rho_p,
-                    cloud_mass_fracs,
-                    r_g,
-                    sigma_n,
-                    cloud_rad_bins,
-                    cloud_radii,
-                    cloud_lambdas,
-                    cloud_specs_abs_opa,
-                    cloud_specs_scat_opa,
-                    cloud_aniso):
-    """
-    This function reimplements calc_cloud_opas from fort_spec.f90. For some reason
-    it runs faster in python than in fortran, so we'll use this from now on.
-    This function integrates the cloud opacity throught the different layers of
-    the atmosphere to get the total optical depth, scattering and anisotropic fraction.
+    def PT_it(self,temp,abunds,gravity,mmw,sigma_lnorm = None, \
+                      fsed = None, Kzz = None, radius = None, \
+                      contribution=False, \
+                      gray_opacity = None, Pcloud = None, \
+                      kappa_zero = None, \
+                      gamma_scat = None, \
+                      add_cloud_scat_as_abs = None,\
+                      Tstar = None, Rstar=None, semimajoraxis = None,\
+                      geometry = 'dayside_ave',theta_star=0, \
+                      hack_cloud_photospheric_tau = None,
+                      dist= "lognormal", a_hans = None, b_hans = None):
 
-    See the fortran implementation for details of the input arrays.
-    """
-    ncloud = int(cloud_mass_fracs.shape[1])
-    N_cloud_rad_bins = int(cloud_radii.shape[0])
-    N_cloud_lambda_bins = int(cloud_specs_abs_opa.shape[1])
-    nstruct = int(rho.shape[0])
+        self.hack_cloud_photospheric_tau = hack_cloud_photospheric_tau
+        self.Pcloud = Pcloud
+        self.kappa_zero = kappa_zero
+        self.gamma_scat = gamma_scat
+        self.gray_opacity = gray_opacity
+        self.geometry = geometry
+        self.mu_star = np.cos(theta_star*np.pi/180.)
+        self.fsed = fsed
+        # TODO: move into mix_opa_tot function
+        if "hansen" in dist.lower():
+            try:
+                if type(b_hans) is dict:
+                    self.b_hans = np.array(list(b_hans.values()),dtype='d',order='F').T
+                if type(b_hans) is float:
+                    self.b_hans = np.array(np.tile(b_hans * np.ones_like(self.press),(len(self.cloud_species),1)),dtype='d',order='F').T
+                    print(self.b_hans.shape)
+            except:
+                print("You must provide a value for the Hansen distribution width, b_hans!")
+                self.b_hans = None
+        # End moove into cloud function
+        if self.mu_star<=0.:
+            self.mu_star=1e-8
+        self.get_star_spectrum(Tstar,semimajoraxis,Rstar)
 
-    cloud_abs_opa_TOT = np.zeros((N_cloud_lambda_bins,nstruct))
-    cloud_scat_opa_TOT = np.zeros((N_cloud_lambda_bins,nstruct))
-    cloud_red_fac_aniso_TOT = np.zeros((N_cloud_lambda_bins,nstruct))
+        self.interpolate_species_opa(temp)
+        self.mix_opa_tot(abunds,mmw,gravity,sigma_lnorm,fsed,Kzz,radius, \
+                             add_cloud_scat_as_abs = add_cloud_scat_as_abs,
+                             dist = dist, a_hans = a_hans)
+        self.calc_opt_depth(gravity)
+        self.calc_RT(contribution)
+        self.calc_tau_cloud(gravity)
 
-    for i_struct in range(nstruct):
-        for i_c in range(ncloud):
-            N = 3.0 * cloud_mass_fracs[i_struct,i_c] * rho[i_struct] /(4.0 *np.pi*rho_p[i_c] * (r_g[i_struct,i_c]**3.0))* \
-                np.exp(-4.5 * np.log(sigma_n)**2.0)
 
-            dndr = N/(cloud_radii * np.sqrt(2.0*np.pi)*np.log(sigma_n)) *\
-                    np.exp(-np.log(cloud_radii/r_g[i_struct,i_c])**2.0 /(2.0*(np.log(sigma_n)**2.0)))
-            integrand_abs = (4.0*np.pi/3.0)*(cloud_radii[:,np.newaxis]**3.0)*rho_p[i_c]*\
-                dndr[:,np.newaxis]*cloud_specs_abs_opa[:,:,i_c]
-            integrand_scat = (4.0*np.pi/3.0)*(cloud_radii[:,np.newaxis]**3.0)*rho_p[i_c]*dndr[:,np.newaxis]* \
-                cloud_specs_scat_opa[:,:,i_c]
-            integrand_aniso = integrand_scat*(1.0-cloud_aniso[:,:,i_c])
-            add_abs = np.sum(integrand_abs*(cloud_rad_bins[1:N_cloud_rad_bins+1,np.newaxis]- \
-                cloud_rad_bins[0:N_cloud_rad_bins,np.newaxis]),axis = 0)
+        # Spec (1)
 
-            cloud_abs_opa_TOT[:,i_struct] = cloud_abs_opa_TOT[:,i_struct] + add_abs
+        '''
+        self.flux, self.contr_em = fs.feautrier_rad_trans(self.border_freqs, \
+                                                          self.total_tau[:, :, 0, :], \
+                                                          self.temp, \
+                                                          self.mu, \
+                                                          self.w_gauss_mu, \
+                                                          self.w_gauss, \
+                                                          self.photon_destruction_prob, \
+                                                          contribution, \
+                                                          self.reflectance, \
+                                                          self.emissivity, \
+                                                          self.stellar_intensity, \
+                                                          self.geometry, \
+                                                          self.mu_star)
+        print('SPEC STAR!')
+        self.flux, self.contr_em, __, H_star, __, __ = fs.feautrier_pt_it(self.border_freqs,
+                                                          self.total_tau[:, :, 0, :],
+                                                          np.zeros_like(self.temp),
+                                                          self.mu,
+                                                          self.w_gauss_mu,
+                                                          self.w_gauss,
+                                                          self.photon_destruction_prob,
+                                                          contribution,
+                                                          self.reflectance,
+                                                          self.emissivity,
+                                                          self.stellar_intensity,
+                                                          self.geometry,
+                                                          self.mu_star,
+                                                          False)
 
-            add_scat = np.sum(integrand_scat*(cloud_rad_bins[1:N_cloud_rad_bins+1,np.newaxis]- \
-                cloud_rad_bins[0:N_cloud_rad_bins,np.newaxis]),axis = 0)
-            cloud_scat_opa_TOT[:,i_struct] = cloud_scat_opa_TOT[:,i_struct] + add_scat
+        '''
+        print('SPEC PLANET!')
+        self.flux, self.contr_em, self.J_bol, __, self.eddington_F, self.eddington_Psi = \
+                        fs.feautrier_pt_it(self.border_freqs,
+                                           self.total_tau[:, :, 0, :],
+                                           self.temp,
+                                           self.mu,
+                                           self.w_gauss_mu,
+                                           self.w_gauss,
+                                           self.photon_destruction_prob,
+                                           contribution,
+                                           self.reflectance,
+                                           self.emissivity,
+                                           np.zeros_like(self.stellar_intensity),
+                                           self.geometry,
+                                           self.mu_star,
+                                           True)
 
-            add_aniso = np.sum(integrand_aniso*(cloud_rad_bins[1:N_cloud_rad_bins+1,np.newaxis]- \
-                cloud_rad_bins[0:N_cloud_rad_bins,np.newaxis]),axis = 0)
-            cloud_red_fac_aniso_TOT[:,i_struct] = cloud_red_fac_aniso_TOT[:,i_struct] + add_aniso
+        self.kappa_planck = \
+            fs.calc_kappa_planck(self.line_struc_kappas[:, :, :1, :], self.temp, \
+                                 self.w_gauss, self.border_freqs, \
+                                 False, self.continuum_opa_scat_emis)
 
-        cloud_red_fac_aniso_TOT[:,i_struct] = cloud_red_fac_aniso_TOT[:,i_struct]/cloud_scat_opa_TOT[:,i_struct]
-        cloud_red_fac_aniso_TOT[cloud_scat_opa_TOT<1e-200] = 0.0
-        cloud_abs_opa_TOT[:,i_struct] /= rho[i_struct]
-        cloud_scat_opa_TOT[:,i_struct] /= rho[i_struct]
-    return cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT
+        self.kappa_rosseland = \
+            fs.calc_kappa_rosseland(self.line_struc_kappas[:, :, 0, :], self.temp, \
+                                    self.w_gauss, self.border_freqs, \
+                                    False, self.continuum_opa_scat_emis)
