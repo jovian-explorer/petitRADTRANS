@@ -2608,11 +2608,10 @@ subroutine feautrier_PT_it(border_freqs, &
 
   do i_iter_scat = 1, iter_scat
 
-    ! TODO: change that planet mode only needs K_bol,
-    ! stellar mode needs H_bol. Also below.
     if (planet_mode) then
-        H_bol = 0d0
         K_bol = 0d0
+    else
+        H_bol = 0d0
     end if
     J_bol = 0d0
 
@@ -2632,8 +2631,9 @@ subroutine feautrier_PT_it(border_freqs, &
 
        J_bol_a = 0d0
        if (planet_mode) then
-           H_bol_a = 0d0
            K_bol_a = 0d0
+       else
+           H_bol_a = 0d0
        end if
 
        r = 0
@@ -2798,8 +2798,9 @@ subroutine feautrier_PT_it(border_freqs, &
 
           J_bol_g = 0d0
           if (planet_mode) then
-              H_bol_g = 0d0
               K_bol_g = 0d0
+          else
+              H_bol_g = 0d0
           end if
 
           do j = 1, N_mu
@@ -2807,9 +2808,10 @@ subroutine feautrier_PT_it(border_freqs, &
              J_bol_g = J_bol_g + I_J(:,j) * w_gauss_mu(j)
 
              if (planet_mode) then
-                 H_bol_g = H_bol_g + I_H(:,j) * mu(j) * w_gauss_mu(j)
                  K_bol_g = K_bol_g + I_J(:,j)*mu(j)**2d0 &
                       * w_gauss_mu(j)
+             else
+                 H_bol_g = H_bol_g + I_H(:,j) * mu(j) * w_gauss_mu(j)
              end if
 
              flux(i) = flux(i) - I_H(1,j)*mu(j) &
@@ -2827,8 +2829,9 @@ subroutine feautrier_PT_it(border_freqs, &
           J_planet_scat(l,i,:) = J_bol_g
           if (planet_mode) then
               J_bol_a = J_bol_a + J_bol_g * w_gauss_ck(l)
-              H_bol_a = H_bol_a + H_bol_g * w_gauss_ck(l)
               K_bol_a = K_bol_a + K_bol_g * w_gauss_ck(l)
+          else
+              H_bol_a = H_bol_a + H_bol_g * w_gauss_ck(l)
           end if
 
        end do
@@ -2836,9 +2839,10 @@ subroutine feautrier_PT_it(border_freqs, &
        if (planet_mode) then
            J_bol = J_bol + &
                 J_bol_a*(border_freqs(i)-border_freqs(i+1))
-           H_bol = H_bol + &
-                H_bol_a*(border_freqs(i)-border_freqs(i+1))
            K_bol = K_bol + K_bol_a*(border_freqs(i)-border_freqs(i+1))
+       else
+           H_bol = H_bol + &
+                   H_bol_a*(border_freqs(i)-border_freqs(i+1))
        end if
 
     end do
