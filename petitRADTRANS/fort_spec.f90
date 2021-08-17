@@ -2610,9 +2610,8 @@ subroutine feautrier_PT_it(border_freqs, &
 
     if (planet_mode) then
         K_bol = 0d0
-    else
-        H_bol = 0d0
     end if
+    H_bol = 0d0
     J_bol = 0d0
 
     flux_old = flux
@@ -2632,9 +2631,8 @@ subroutine feautrier_PT_it(border_freqs, &
        J_bol_a = 0d0
        if (planet_mode) then
            K_bol_a = 0d0
-       else
-           H_bol_a = 0d0
        end if
+       H_bol_a = 0d0
 
        r = 0
 
@@ -2799,9 +2797,8 @@ subroutine feautrier_PT_it(border_freqs, &
           J_bol_g = 0d0
           if (planet_mode) then
               K_bol_g = 0d0
-          else
-              H_bol_g = 0d0
           end if
+          H_bol_g = 0d0
 
           do j = 1, N_mu
 
@@ -2810,9 +2807,8 @@ subroutine feautrier_PT_it(border_freqs, &
              if (planet_mode) then
                  K_bol_g = K_bol_g + I_J(:,j)*mu(j)**2d0 &
                       * w_gauss_mu(j)
-             else
-                 H_bol_g = H_bol_g + I_H(:,j) * mu(j) * w_gauss_mu(j)
              end if
+             H_bol_g = H_bol_g + I_H(:,j) * mu(j) * w_gauss_mu(j)
 
              flux(i) = flux(i) - I_H(1,j)*mu(j) &
                   * 4d0*pi * w_gauss_ck(l) * w_gauss_mu(j)
@@ -2830,9 +2826,8 @@ subroutine feautrier_PT_it(border_freqs, &
           if (planet_mode) then
               J_bol_a = J_bol_a + J_bol_g * w_gauss_ck(l)
               K_bol_a = K_bol_a + K_bol_g * w_gauss_ck(l)
-          else
-              H_bol_a = H_bol_a + H_bol_g * w_gauss_ck(l)
           end if
+          H_bol_a = H_bol_a + H_bol_g * w_gauss_ck(l)
 
        end do
 
@@ -2840,10 +2835,9 @@ subroutine feautrier_PT_it(border_freqs, &
            J_bol = J_bol + &
                 J_bol_a*(border_freqs(i)-border_freqs(i+1))
            K_bol = K_bol + K_bol_a*(border_freqs(i)-border_freqs(i+1))
-       else
-           H_bol = H_bol + &
-                   H_bol_a*(border_freqs(i)-border_freqs(i+1))
        end if
+       H_bol = H_bol + &
+                   H_bol_a*(border_freqs(i)-border_freqs(i+1))
 
     end do
 
