@@ -2478,7 +2478,7 @@ subroutine feautrier_PT_it(border_freqs, &
      contribution, &
      surf_refl, &
      surf_emi, &
-     I_star_0, &
+     H_star_0, & ! Changed from I_star_0
      geom, &
      mu_star, &
      planet_mode, &
@@ -2493,6 +2493,7 @@ subroutine feautrier_PT_it(border_freqs, &
      eddington_Psi, &
      kappa_J, &
      kappa_H, &
+     H_star, &
      freq_len_p_1, &
      struc_len, &
      N_mu, &
@@ -2505,7 +2506,8 @@ subroutine feautrier_PT_it(border_freqs, &
   INTEGER, INTENT(IN)             :: freq_len_p_1, struc_len, N_mu, N_g
   DOUBLE PRECISION, INTENT(IN)    :: mu_star
   DOUBLE PRECISION, INTENT(IN)    :: surf_refl(freq_len_p_1-1),surf_emi(freq_len_p_1-1) !ELALEI
-  DOUBLE PRECISION, INTENT(IN)    :: I_star_0(freq_len_p_1-1) !ELALEI
+  DOUBLE PRECISION, INTENT(IN)    :: H_star_0(freq_len_p_1-1) !ELALEI !Changed from I_star_0
+  DOUBLE PRECISION                :: I_star_0(freq_len_p_1-1)
   DOUBLE PRECISION, INTENT(IN)    :: border_freqs(freq_len_p_1)
   DOUBLE PRECISION, INTENT(IN)    :: tau_approx_scat(N_g,freq_len_p_1-1,struc_len)
   DOUBLE PRECISION, INTENT(IN)    :: temp(struc_len)
@@ -2518,7 +2520,8 @@ subroutine feautrier_PT_it(border_freqs, &
   DOUBLE PRECISION, INTENT(OUT)   :: flux(freq_len_p_1-1)
   DOUBLE PRECISION, INTENT(OUT)   :: contr_em(struc_len,freq_len_p_1-1)
   DOUBLE PRECISION, INTENT(OUT)   :: J_bol(struc_len), H_bol(struc_len), &
-          eddington_F(struc_len), eddington_Psi, kappa_J(struc_len), kappa_H(struc_len)
+          eddington_F(struc_len), eddington_Psi, kappa_J(struc_len), kappa_H(struc_len), &
+          H_star(freq_len_p_1-1,struc_len)
   CHARACTER*20, intent(in)        :: geom
 
   ! Internal
@@ -2545,6 +2548,9 @@ subroutine feautrier_PT_it(border_freqs, &
   DOUBLE PRECISION                :: K_bol(struc_len)
   DOUBLE PRECISION                :: kappa_J_a(struc_len), kappa_H_a(struc_len), &
                                      kappa_tot_g_approx_scat(N_g,freq_len_p_1-1,struc_len)
+  DOUBLE PRECISION                :: H_star_calc(N_g,freq_len_p_1-1,struc_len), &
+                                     H_star_scat(N_g,freq_len_p_1-1,struc_len)
+  LOGICAL                         :: planetary_ave, dayside_ave
 
   ! ALI
   DOUBLE PRECISION                :: lambda_loc(N_g,freq_len_p_1-1,struc_len)
@@ -2605,28 +2611,51 @@ subroutine feautrier_PT_it(border_freqs, &
   ! DO THE STELLAR ATTENUATION CALCULATION
 
   J_star_ini = 0d0
+  H_star_calc = 0d0
 
+  dayside_ave = .FALSE.
+  planetary_ave = .FALSE.
+  if (trim(adjustl(geom)) .EQ. 'dayside_ave') then
+      dayside_ave = .TRUE.
+  else if (trim(adjustl(geom)) .EQ. 'planetary_ave') then
+      planetary_ave = .TRUE.
+  end if
 
-  do i = 1, freq_len_p_1-1
-    ! Irradiation treatment
-    ! Dayside ave: multiply flux by 1/2.
-    ! Planet ave: multiply flux by 1/4
-
-    do i_mu = 1, N_mu
-      if (trim(adjustl(geom)) .EQ. 'dayside_ave') then
-           I_star_calc(:,i_mu,:,i) = 0.5* abs(I_star_0(i))*exp(-tau_approx_scat(:,i,:)/mu(i_mu))
-           J_star_ini(:,i,:) = J_star_ini(:,i,:)+0.5d0*I_star_calc(:,i_mu,:,i)*w_gauss_mu(i_mu)
-      else if (trim(adjustl(geom)) .EQ. 'planetary_ave') then
-           I_star_calc(:,i_mu,:,i) = 0.25* abs(I_star_0(i))*exp(-tau_approx_scat(:,i,:)/mu(i_mu))
-           J_star_ini(:,i,:) = J_star_ini(:,i,:)+0.5d0*I_star_calc(:,i_mu,:,i)*w_gauss_mu(i_mu)
-      else if (trim(adjustl(geom)) .EQ. 'non-isotropic') then
-           J_star_ini(:,i,:) = abs(I_star_0(i)/4.*exp(-tau_approx_scat(:,i,:)/mu_star))
-      else
-          write(*,*) 'Invalid geometry'
-     end if
-   end do
-  end do
-
+  if (.FALSE.) then ! old Eleonora implementation
+      do i = 1, freq_len_p_1-1
+        ! Irradiation treatment
+        ! Dayside ave: multiply flux by 1/2.
+        ! Planet ave: multiply flux by 1/4
+         do i_mu = 1, N_mu
+            if (trim(adjustl(geom)) .EQ. 'dayside_ave') then
+               I_star_calc(:,i_mu,:,i) = 0.5* abs(I_star_0(i))*exp(-tau_approx_scat(:,i,:)/mu(i_mu))
+               J_star_ini(:,i,:) = J_star_ini(:,i,:)+0.5d0*I_star_calc(:,i_mu,:,i)*w_gauss_mu(i_mu)
+            else if (trim(adjustl(geom)) .EQ. 'planetary_ave') then
+               I_star_calc(:,i_mu,:,i) = 0.25* abs(I_star_0(i))*exp(-tau_approx_scat(:,i,:)/mu(i_mu))
+               J_star_ini(:,i,:) = J_star_ini(:,i,:)+0.5d0*I_star_calc(:,i_mu,:,i)*w_gauss_mu(i_mu)
+            else if (trim(adjustl(geom)) .EQ. 'non-isotropic') then
+               J_star_ini(:,i,:) = abs(I_star_0(i)/4.*exp(-tau_approx_scat(:,i,:)/mu_star))
+            else
+               write(*,*) 'Invalid geometry'
+            end if
+         end do
+      end do
+  else
+     do i = 1, freq_len_p_1-1
+         if (dayside_ave .OR. planetary_ave) then
+            do i_mu = 1, N_mu
+               I_star_calc(:,i_mu,:,i) = 4d0*abs(H_star_0(i))*exp(-tau_approx_scat(:,i,:)/mu(i_mu))
+            end do
+            do i_mu = 1, N_mu
+               H_star_calc(:,i,:) = H_star_calc(:,i,:)-0.5d0*I_star_calc(:,i_mu,:,i)*mu(i_mu)*w_gauss_mu(i_mu)
+               J_star_ini(:,i,:) = J_star_ini(:,i,:)+0.5d0*I_star_calc(:,i_mu,:,i)*w_gauss_mu(i_mu)
+            end do
+         else
+            H_star_calc(:,i,:) = H_star_0(i)*exp(-tau_approx_scat(:,i,:)/mu_star)
+            J_star_ini(:,i,:) = abs(H_star_calc(:,i,:))/mu_star
+         end if
+     end do
+  end if
 
   do i_iter_scat = 1, iter_scat
 
@@ -2864,6 +2893,8 @@ subroutine feautrier_PT_it(border_freqs, &
                     kappa_tot_g_approx(l,i,1:struc_len) * &
                     H_bol_g * w_gauss_ck(l)
               end if
+          else
+              H_star_scat(l,i,:) = H_bol_g
           end if
           H_bol_a = H_bol_a + H_bol_g * w_gauss_ck(l)
 
@@ -2971,6 +3002,29 @@ subroutine feautrier_PT_it(border_freqs, &
     eddington_Psi = H_bol(1)/J_bol(1)
     kappa_J = kappa_J / J_bol
     kappa_H = kappa_H / H_bol
+  else
+      H_star = 0d0
+      do i = 1, freq_len_p_1-1
+         !abs_S_nu = 0d0
+         do j = 1, N_g
+            H_star(i,:) = H_star(i,:)+(H_star_calc(j,i,:)-H_star_scat(j,i,:))*w_gauss_ck(j)
+
+            !if (dayside_ave .OR. planetary_ave) then
+            !   do i_mu = 1, N_mu
+            !      abs_S_nu(:) = abs_S_nu(:)+0.5d0*w_gauss_ck(j)*HIT_kappa_tot_g_approx(j,i,:)*I_star_calc(j,i_mu,:,i)* &
+            !           w_gauss_mu(i_mu)
+            !      jstar_for_zbrent(j,i,:) = jstar_for_zbrent(j,i,:) + 0.5d0*I_star_calc(j,i_mu,:,i)*w_gauss_mu(i_mu)
+            !   end do
+            !   !! ADD SCATT!
+            !   abs_S_nu(:) = abs_S_nu(:) + J_star_scat(j,i,:)*HIT_kappa_tot_g_approx(j,i,:)*w_gauss_ck(j)
+            !   jstar_for_zbrent(j,i,:) = jstar_for_zbrent(j,i,:) + J_star_scat(j,i,:)
+            !else
+            !   abs_S_nu(:) = abs_S_nu(:)+(J_star_scat(j,i,:)+abs(H_star_calc(j,i,:))/mu_star)* &
+            !        HIT_kappa_tot_g_approx(j,i,:)*w_gauss_ck(j)
+            !end if
+         end do
+         !abs_S = abs_S + abs_S_nu*(HIT_border_freqs(i)-HIT_border_freqs(i+1))
+      end do
   end if
 
 end subroutine feautrier_PT_it

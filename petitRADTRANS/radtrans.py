@@ -1188,7 +1188,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         # End moove into cloud function
         if self.mu_star<=0.:
             self.mu_star=1e-8
-        self.get_star_spectrum(Tstar,semimajoraxis,Rstar)
+        self.get_star_spectrum(Tstar,semimajoraxis,Rstar,self.mu_star,self.geometry)
         self.interpolate_species_opa(temp)
         self.mix_opa_tot(abunds,mmw,gravity,sigma_lnorm,fsed,Kzz,radius, \
                              add_cloud_scat_as_abs = add_cloud_scat_as_abs,
@@ -1205,7 +1205,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     self.press, \
                     self.kappa_rosseland.reshape(1,1,1,len(self.press))).reshape(len(self.press))
 
-    def get_star_spectrum(self, Tstar, distance, Rstar):
+    def get_star_spectrum(self, Tstar, distance, Rstar, mu_star, geometry):
         '''Method to get the PHOENIX spectrum of the star and rebin it
         to the wavelength points. If Tstar is not explicitly written, the
         spectrum will be 0. If the distance is not explicitly written,
@@ -1247,7 +1247,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                 ###### SCALED INTENSITY (Flux/pi)
                 self.stellar_intensity = self.stellar_intensity/ np.pi * \
                 (rad/distance)**2
-                self.H_star_0 = stellar_intensity/4.
+                self.H_star_0 = self.stellar_intensity/4.
                 if geometry == 'planetary_ave':
                     self.H_star_0 / 4.
                 elif geometry == 'dayside_ave':
@@ -1712,8 +1712,9 @@ class Radtrans(_read_opacities.ReadOpacities):
                                                           self.stellar_intensity, \
                                                           self.geometry, \
                                                           self.mu_star)
+        '''
         print('SPEC STAR!')
-        self.flux, self.contr_em, __, H_star, __, __ = fs.feautrier_pt_it(self.border_freqs,
+        self.flux, __, __, __, __, __, __, __, self.H_star = fs.feautrier_pt_it(self.border_freqs,
                                                           self.total_tau[:, :, 0, :],
                                                           np.zeros_like(self.temp),
                                                           self.mu,
@@ -1723,17 +1724,17 @@ class Radtrans(_read_opacities.ReadOpacities):
                                                           contribution,
                                                           self.reflectance,
                                                           self.emissivity,
-                                                          self.stellar_intensity,
+                                                          self.H_star_0,
                                                           self.geometry,
                                                           self.mu_star,
                                                           False,
                                                           self.do_scat_emis,
-                                                          self.line_struc_kappas[:, :, :1, :],
+                                                          self.line_struc_kappas[:, :, 0, :],
                                                           self.continuum_opa_scat_emis)
 
-        '''
+
         print('SPEC PLANET!')
-        self.flux, self.contr_em, self.J_bol, __, self.eddington_F, self.eddington_Psi, self.kappa_J, self.kappa_H = \
+        self.flux, __, self.J_bol, __, self.eddington_F, self.eddington_Psi, self.kappa_J, self.kappa_H, _ = \
                         fs.feautrier_pt_it(self.border_freqs,
                                            self.total_tau[:, :, 0, :],
                                            self.temp,
@@ -1744,7 +1745,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                                            contribution,
                                            self.reflectance,
                                            self.emissivity,
-                                           np.zeros_like(self.stellar_intensity),
+                                           np.zeros_like(self.H_star_0),
                                            self.geometry,
                                            self.mu_star,
                                            True,
