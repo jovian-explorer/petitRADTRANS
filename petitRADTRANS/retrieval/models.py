@@ -227,11 +227,20 @@ def guillot_free_emission(pRT_object,
                                   10 ** parameters['log_g'].value,
                                   parameters['T_int'].value,
                                   parameters['T_equ'].value)
-    pbases = {
-        'Fe(c)': fc.simple_cdf_Fe_free(p_use, temperatures, 10 ** parameters['log_X_cb_Fe(c)'].value),
-        'MgSiO3(c)': fc.simple_cdf_MgSiO3_free(p_use, temperatures, 10 ** parameters['log_X_cb_MgSiO3(c)'].value)
-    }
+    pbases = {}
     # TODO - identify species rather than hard coding
+    if "Pbase_Fe(c)" not in parameters.keys():
+        pbases['Fe(c)'] = fc.simple_cdf_Fe_free(
+            p_use, temperatures, 10 ** parameters['log_X_cb_Fe(c)'].value
+        )
+    else:
+        pbases['Fe(c)'] = 10 ** parameters["Pbase_Fe(c)"].value
+    if 'MgSiO3(c)' not in parameters.keys():
+        pbases['MgSiO3(c)'] = fc.simple_cdf_MgSiO3_free(
+            p_use, temperatures, 10 ** parameters['log_X_cb_MgSiO3(c)'].value
+        )
+    else:
+        pbases['MgSiO3(c)'] = 10 ** parameters['MgSiO3(c)'].value
 
     if AMR:
         p_clouds = np.array(list(pbases.values()))
