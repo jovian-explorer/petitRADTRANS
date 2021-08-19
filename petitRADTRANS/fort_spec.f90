@@ -2482,12 +2482,17 @@ subroutine feautrier_PT_it(border_freqs, &
      geom, &
      mu_star, &
      planet_mode, &
+     do_scat_emis, &
+     kappa_tot_g_approx, &
+     continuum_opa_scat_emis, &
      flux, &
      contr_em, &
      J_bol, &
      H_bol, &
      eddington_F, &
      eddington_Psi, &
+     kappa_J, &
+     kappa_H, &
      freq_len_p_1, &
      struc_len, &
      N_mu, &
@@ -2507,12 +2512,13 @@ subroutine feautrier_PT_it(border_freqs, &
   DOUBLE PRECISION, INTENT(IN)    :: mu(N_mu)
   DOUBLE PRECISION, INTENT(IN)    :: w_gauss_mu(N_mu), w_gauss_ck(N_g)
   DOUBLE PRECISION, INTENT(IN)    :: photon_destruct_in(N_g,freq_len_p_1-1,struc_len)
-  LOGICAL, INTENT(IN)             :: contribution, planet_mode
+  LOGICAL, INTENT(IN)             :: contribution, planet_mode, do_scat_emis
+  DOUBLE PRECISION, INTENT(IN)    :: kappa_tot_g_approx(N_g,freq_len_p_1-1,struc_len)
+  DOUBLE PRECISION, INTENT(IN)    :: continuum_opa_scat_emis(freq_len_p_1-1,struc_len)
   DOUBLE PRECISION, INTENT(OUT)   :: flux(freq_len_p_1-1)
   DOUBLE PRECISION, INTENT(OUT)   :: contr_em(struc_len,freq_len_p_1-1)
   DOUBLE PRECISION, INTENT(OUT)   :: J_bol(struc_len), H_bol(struc_len), &
-          eddington_F(struc_len), eddington_Psi
-  DOUBLE PRECISION                :: K_bol(struc_len)
+          eddington_F(struc_len), eddington_Psi, kappa_J(struc_len), kappa_H(struc_len)
   CHARACTER*20, intent(in)        :: geom
 
   ! Internal
@@ -2536,6 +2542,9 @@ subroutine feautrier_PT_it(border_freqs, &
   ! quantities for P-T structure iteration
   DOUBLE PRECISION                :: J_bol_a(struc_len), H_bol_a(struc_len), K_bol_a(struc_len)
   DOUBLE PRECISION                :: J_bol_g(struc_len), H_bol_g(struc_len), K_bol_g(struc_len)
+  DOUBLE PRECISION                :: K_bol(struc_len)
+  DOUBLE PRECISION                :: kappa_J_a(struc_len), kappa_H_a(struc_len), &
+                                     kappa_tot_g_approx_scat(N_g,freq_len_p_1-1,struc_len)
 
   ! ALI
   DOUBLE PRECISION                :: lambda_loc(N_g,freq_len_p_1-1,struc_len)
@@ -2551,11 +2560,19 @@ subroutine feautrier_PT_it(border_freqs, &
   ! Variables for the contribution function calculation
   INTEGER :: i_mu, i_str, i_freq
   DOUBLE PRECISION :: transm_mu(N_g,freq_len_p_1-1,struc_len), &
-                     transm_all(freq_len_p_1-1,struc_len), transm_all_loc(struc_len)
+                      transm_all(freq_len_p_1-1,struc_len), transm_all_loc(struc_len)
 
   ! PAUL NEW
   ! Variables for surface scattering
   DOUBLE PRECISION                :: I_plus_surface(N_mu, N_g, freq_len_p_1-1)
+
+  if (do_scat_emis) then
+     do i = 1, N_g
+        kappa_tot_g_approx_scat(i,:,:) = kappa_tot_g_approx(i,:,:) + continuum_opa_scat_emis
+     end do
+  else
+     kappa_tot_g_approx_scat = 0d0
+  end if
 
   I_plus_surface = 0d0
   I_minus = 0d0
@@ -2572,6 +2589,11 @@ subroutine feautrier_PT_it(border_freqs, &
   K_bol = 0d0
   eddington_F = 0d0
   eddington_Psi = 0d0
+  kappa_J = 0d0
+  kappa_H = 0d0
+  kappa_J_a = 0d0
+  kappa_H_a = 0d0
+
 
   source_planet_scat_n = 0d0
   source_planet_scat_n1 = 0d0
@@ -2610,6 +2632,8 @@ subroutine feautrier_PT_it(border_freqs, &
 
     if (planet_mode) then
         K_bol = 0d0
+        kappa_J = 0d0
+        kappa_H = 0d0
     end if
     H_bol = 0d0
     J_bol = 0d0
@@ -2631,6 +2655,8 @@ subroutine feautrier_PT_it(border_freqs, &
        J_bol_a = 0d0
        if (planet_mode) then
            K_bol_a = 0d0
+           kappa_J_a = 0d0
+           kappa_H_a = 0d0
        end if
        H_bol_a = 0d0
 
@@ -2826,6 +2852,18 @@ subroutine feautrier_PT_it(border_freqs, &
           if (planet_mode) then
               J_bol_a = J_bol_a + J_bol_g * w_gauss_ck(l)
               K_bol_a = K_bol_a + K_bol_g * w_gauss_ck(l)
+
+              kappa_J_a = kappa_J_a + &
+                    kappa_tot_g_approx(l,i,1:struc_len) * J_bol_g * w_gauss_ck(l)
+              if (do_scat_emis) then
+                 kappa_H_a = kappa_H_a + &
+                    kappa_tot_g_approx_scat(l,i,1:struc_len) * &
+                    H_bol_g * w_gauss_ck(l)
+              else
+                 kappa_H_a = kappa_H_a + &
+                    kappa_tot_g_approx(l,i,1:struc_len) * &
+                    H_bol_g * w_gauss_ck(l)
+              end if
           end if
           H_bol_a = H_bol_a + H_bol_g * w_gauss_ck(l)
 
@@ -2838,6 +2876,9 @@ subroutine feautrier_PT_it(border_freqs, &
        end if
        H_bol = H_bol + &
                    H_bol_a*(border_freqs(i)-border_freqs(i+1))
+
+       kappa_J = kappa_J + kappa_J_a * (border_freqs(i)-border_freqs(i+1))
+       kappa_H = kappa_H + kappa_H_a * (border_freqs(i)-border_freqs(i+1))
 
     end do
 
@@ -2928,6 +2969,8 @@ subroutine feautrier_PT_it(border_freqs, &
   if (planet_mode) then
     eddington_F = K_bol/J_bol
     eddington_Psi = H_bol(1)/J_bol(1)
+    kappa_J = kappa_J / J_bol
+    kappa_H = kappa_H / H_bol
   end if
 
 end subroutine feautrier_PT_it

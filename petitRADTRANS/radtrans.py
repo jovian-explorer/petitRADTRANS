@@ -1247,6 +1247,14 @@ class Radtrans(_read_opacities.ReadOpacities):
                 ###### SCALED INTENSITY (Flux/pi)
                 self.stellar_intensity = self.stellar_intensity/ np.pi * \
                 (rad/distance)**2
+                self.H_star_0 = stellar_intensity/4.
+                if geometry == 'planetary_ave':
+                    self.H_star_0 / 4.
+                elif geometry == 'dayside_ave':
+                    self.H_star_0 / 2.
+                elif geometry == 'non-isotropic':
+                    self.H_star_0 * mu_star
+
             except TypeError  as e:
                 str='********************************'+\
                 ' Error! Please set the semi-major axis or turn off the calculation '+\
@@ -1670,17 +1678,21 @@ class Radtrans(_read_opacities.ReadOpacities):
             except:
                 print("You must provide a value for the Hansen distribution width, b_hans!")
                 self.b_hans = None
-        # End moove into cloud function
+        # End move into cloud function
         if self.mu_star<=0.:
             self.mu_star=1e-8
-        self.get_star_spectrum(Tstar,semimajoraxis,Rstar)
+        self.get_star_spectrum(Tstar,
+                               semimajoraxis,
+                               Rstar,
+                               self.mu_star,
+                               self.geometry)
 
         self.interpolate_species_opa(temp)
         self.mix_opa_tot(abunds,mmw,gravity,sigma_lnorm,fsed,Kzz,radius, \
                              add_cloud_scat_as_abs = add_cloud_scat_as_abs,
                              dist = dist, a_hans = a_hans)
         self.calc_opt_depth(gravity)
-        self.calc_RT(contribution)
+        #self.calc_RT(contribution)
         self.calc_tau_cloud(gravity)
 
 
@@ -1714,11 +1726,14 @@ class Radtrans(_read_opacities.ReadOpacities):
                                                           self.stellar_intensity,
                                                           self.geometry,
                                                           self.mu_star,
-                                                          False)
+                                                          False,
+                                                          self.do_scat_emis,
+                                                          self.line_struc_kappas[:, :, :1, :],
+                                                          self.continuum_opa_scat_emis)
 
         '''
         print('SPEC PLANET!')
-        self.flux, self.contr_em, self.J_bol, __, self.eddington_F, self.eddington_Psi = \
+        self.flux, self.contr_em, self.J_bol, __, self.eddington_F, self.eddington_Psi, self.kappa_J, self.kappa_H = \
                         fs.feautrier_pt_it(self.border_freqs,
                                            self.total_tau[:, :, 0, :],
                                            self.temp,
@@ -1732,7 +1747,10 @@ class Radtrans(_read_opacities.ReadOpacities):
                                            np.zeros_like(self.stellar_intensity),
                                            self.geometry,
                                            self.mu_star,
-                                           True)
+                                           True,
+                                           self.do_scat_emis,
+                                           self.line_struc_kappas[:, :, 0, :],
+                                           self.continuum_opa_scat_emis)
 
         self.kappa_planck = \
             fs.calc_kappa_planck(self.line_struc_kappas[:, :, :1, :], self.temp, \
