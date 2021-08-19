@@ -265,7 +265,7 @@ class RetrievalConfig:
 
         self.continuum_opacities = linelist
 
-    def add_line_species(self,species,eq=False,abund_lim=(-8.0,7.0),  fixed_abund = None):
+    def add_line_species(self,species,eq=False,abund_lim=(-8.0,7.0), fixed_abund = None):
         """
         This function adds a single species to the pRT object that will define the line opacities of the model.
         The name must match the pRT opacity name, which vary between the c-k line opacities and the line-by-line opacities.
