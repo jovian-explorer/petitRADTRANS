@@ -20,6 +20,7 @@ from .parameter import Parameter
 from .data import Data
 from .plotting import plot_specs,plot_data,contour_corner
 from .rebin_give_width import rebin_give_width as rgw
+from .util import bin_species_exok
 
 class Retrieval:
     """
@@ -431,24 +432,11 @@ class Retrieval:
                             species.append(line)
                     # If not, setup low-res c-k tables
                     if len(species)>0:
-                        from .util import getMM
                         exo_k_check = True
                         print("Exo-k should only be run on a single thread.")
                         print("The retrieval should be run once on a single core to build the c-k\ntables, and then again with multiple cores for the remainder of the retrieval.")
                         # Automatically build the entire table
-                        atmosphere = Radtrans(line_species = species,
-                                                wlen_bords_micron = [0.1, 251.])
-                        prt_path = self.path
-                        ck_path = prt_path + 'opacities/lines/corr_k/'
-                        print("Saving to " + ck_path)
-                        print("Resolution: ", dd.model_resolution)
-                        masses = {}
-                        for spec in species:
-                            masses[spec.split('_')[0]] = getMM(spec)
-                        atmosphere.write_out_rebin(int(dd.model_resolution),
-                                                    path = ck_path,
-                                                    species = species,
-                                                    masses = masses)
+                        bin_species_exok(species,dd.model_resolution)
                     species = []
                     for spec in self.rd.line_species:
                         species.append(spec + "_R_" + str(dd.model_resolution))
@@ -483,6 +471,7 @@ class Retrieval:
             print("c-k tables have been binned with exo-k. Exiting single-core process.")
             print("Please restart the retrieval.")
             sys.exit(12)
+
     def prior(self, cube, ndim=0, nparams=0):
         """
         pyMultinest Prior function. Transforms unit hypercube into physical space.
@@ -680,17 +669,7 @@ class Retrieval:
             parameters_read : list
                 A list of the free parameters as read from the output files.
         """
-
-        i_p = 0
-        for pp in self.parameters:
-            if self.parameters[pp].is_free_parameter:
-                for i_s in range(len(parameters_read)):
-                    if parameters_read[i_s] == self.parameters[pp].name:
-                        self.best_fit_params[self.parameters[pp].name] = \
-                            Parameter(pp,False,value=best_fit_params[i_p])
-                        i_p += 1
-            else:
-                self.best_fit_params[pp] = Parameter(pp,False,value=self.parameters[pp].value)
+        self.best_fit_params = self.build_param_dict(best_fit_params,parameters_read)
         return self.best_fit_params
 
     def get_best_fit_model(self,best_fit_params,parameters_read,model_generating_func = None,ret_name = None):
@@ -858,6 +837,124 @@ class Retrieval:
         if ret_name == self.retrieval_name:
             self.analyzer = analyzer
         return analyzer
+    def build_param_dict(self,sample,free_param_names):
+        """
+        This function builds a dictionary of parameters that can be passed to the
+        model building functions. It requires a numpy array with the same length
+        as the number of free parameters, and a list of all of the parameter names
+        in the order they appear in the array. The returned dictionary will contain
+        all of these parameters, together with the fixed retrieval parameters.
+
+        Args:
+            sample : numpy.ndarray
+                An array or list of free parameter values
+            free_param_names : list(string)
+                A list of names for each of the free parameters.
+        Returns:
+            params : dict
+                A dictionary of Parameters, with values set to the values
+                in sample.
+        """
+        params = {}
+        i_p = 0
+        for pp in self.parameters:
+            if self.parameters[pp].is_free_parameter:
+                for i_s in range(len(free_param_names)):
+                    if free_param_names[i_s] == self.parameters[pp].name:
+                        params[self.parameters[pp].name] = \
+                            Parameter(pp,False,value=sample[i_p])
+                        i_p += 1
+        else:
+            params[pp] = Parameter(pp,False,value=self.parameters[pp].value)
+        return params
+
+    def sample_teff(self,sample_dict,param_dict,ret_names = None,nsample = None,resolution=40):
+        """
+        This function samples the outputs of a retrieval and computes Teff
+        for each sample. For each sample, a model is computed at low resolution,
+        and integrated to find the total radiant emittance, which is converted into
+        a temperature using the stefan boltzmann law: $j^{\star} = \sigma T^{4}$.
+        Teff itself is computed using util.calc_teff.
+
+        Args:
+            sample_dict : dict
+                A dictionary, where each key is the name of a retrieval, and the values
+                are the equal weighted samples.
+            param_dict : dict
+                A dictionary where each key is the name of a retrieval, and the values
+                are the names of the free parameters associated with that retrieval.
+            ret_names : Optional(list(string))
+                A list of retrieval names, each should be included in the sample_dict.
+                If left as none, it defaults to only using the current retrieval name.
+            nsample : Optional(int)
+                The number of times to compute Teff. If left empty, uses the "take_PTs_from"
+                plot_kwarg. Recommended to use ~300 samples, probably more than is set in
+                the kwarg!
+            resolution : int
+                The spectra resolution to compute the models at. Typically, this should be very
+                low in order to enable rapid calculation.
+        Returns:
+            tdict : dict
+                A dictionary with retrieval names for keys, and the values are the calculated
+                values of Teff for each sample.
+        """
+        from .util import teff_calc
+        if ret_names is None:
+            ret_names = [self.retrieval_name]
+        if nsample is None:
+            nsample = self.rd.plot_kwargs["nsample"]
+
+        # Setup the pRT object
+        species = []
+        for line in self.rd.line_species:
+            if not os.path.isdir(self.path + "opacities/lines/corr_k/" +\
+                                 line + "_R_" + \
+                                 str(resolution)):
+                species.append(line)
+        # If not, setup low-res c-k tables
+        if len(species)>0:
+            exo_k_check = True
+            print("Exo-k should only be run on a single thread.")
+            print("The retrieval should be run once on a single core to build the c-k\ntables, and then again with multiple cores for the remainder of the retrieval.")
+            # Automatically build the entire table
+            bin_species_exok(species,resolution)
+        species = []
+        for spec in self.rd.line_species:
+            species.append(spec + "_R_" + str(resolution))
+
+        pRT_Object = Radtrans(line_species = cp.copy(self.rd.line_species), \
+                            rayleigh_species= cp.copy(self.rd.rayleigh_species), \
+                            continuum_opacities = cp.copy(self.rd.continuum_opacities), \
+                            cloud_species = cp.copy(self.rd.cloud_species), \
+                            mode='c-k', \
+                            wlen_bords_micron = [0.5,28],
+                            do_scat_emis = self.rd.scattering)
+        if self.rd.AMR:
+            p = self.rd._setup_pres()
+        else:
+            p = self.rd.p_global
+        pRT_Object.setup_opa_structure(p)
+        tdict = {}
+        for name in ret_names:
+            teffs = []
+            samples = sample_dict[name]
+            parameters_read = param_dict[name]
+            rands = np.random.randint(0,samples.shape[0],nsample)
+            duse = self.data[self.rd.plot_kwargs["take_PTs_from"]]
+            for rint in rands:
+                samp = samples[rint,:-1]
+                params = self.build_param_dict(samp,parameters_read)
+                wlen,model = duse.model_generating_function(pRT_Object,
+                                                            params,
+                                                            False,
+                                                            self.rd.AMR)
+                tfit = teff_calc(wlen,model,params["D_pl"],params["R_pl"])
+                teffs.append(tfit)
+            tdict[name] = np.array(teffs)
+            np.save(self.output_dir + "evaluate_" + name + "/sampled_teff",np.array(teffs))
+        return tdict
+
+
 #############################################################
 # Plotting functions
 #############################################################
@@ -881,6 +978,8 @@ class Retrieval:
         samples_use = cp.copy(sample_dict[self.retrieval_name])
         parameters_read = cp.copy(parameter_dict[self.retrieval_name])
         i_p = 0
+
+        # This might actually be redundant...
         for pp in self.parameters:
             if self.parameters[pp].is_free_parameter:
                 for i_s in range(len(parameters_read)):
@@ -893,6 +992,9 @@ class Retrieval:
         # Get best-fit index
         logL = samples_use[:,-1]
         best_fit_index = np.argmax(logL)
+
+        # Print outputs
+        # TODO add verbosity
         for pp in self.parameters:
             if self.parameters[pp].is_free_parameter:
                 for i_s in range(len(parameters_read)):
