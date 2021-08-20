@@ -1249,11 +1249,11 @@ class Radtrans(_read_opacities.ReadOpacities):
                 (rad/distance)**2
                 self.H_star_0 = self.stellar_intensity/4.
                 if geometry == 'planetary_ave':
-                    self.H_star_0 / 4.
+                    self.H_star_0 = self.H_star_0 / 4.
                 elif geometry == 'dayside_ave':
-                    self.H_star_0 / 2.
+                    self.H_star_0 = self.H_star_0 / 2.
                 elif geometry == 'non-isotropic':
-                    self.H_star_0 * mu_star
+                    self.H_star_0 = self.H_star_0 * mu_star
 
             except TypeError  as e:
                 str='********************************'+\
@@ -1714,7 +1714,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                                                           self.mu_star)
         '''
         print('SPEC STAR!')
-        self.flux, __, __, __, __, __, __, __, self.H_star = fs.feautrier_pt_it(self.border_freqs,
+        self.flux, __, __, __, __, __, __, __, self.H_star, self.abs_S = fs.feautrier_pt_it(self.border_freqs,
                                                           self.total_tau[:, :, 0, :],
                                                           np.zeros_like(self.temp),
                                                           self.mu,
@@ -1734,7 +1734,7 @@ class Radtrans(_read_opacities.ReadOpacities):
 
 
         print('SPEC PLANET!')
-        self.flux, __, self.J_bol, __, self.eddington_F, self.eddington_Psi, self.kappa_J, self.kappa_H, _ = \
+        self.flux, __, self.J_bol, __, self.eddington_F, self.eddington_Psi, self.kappa_J, self.kappa_H, __, __ = \
                         fs.feautrier_pt_it(self.border_freqs,
                                            self.total_tau[:, :, 0, :],
                                            self.temp,

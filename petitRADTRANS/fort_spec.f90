@@ -2494,6 +2494,7 @@ subroutine feautrier_PT_it(border_freqs, &
      kappa_J, &
      kappa_H, &
      H_star, &
+     abs_S, &
      freq_len_p_1, &
      struc_len, &
      N_mu, &
@@ -2521,7 +2522,7 @@ subroutine feautrier_PT_it(border_freqs, &
   DOUBLE PRECISION, INTENT(OUT)   :: contr_em(struc_len,freq_len_p_1-1)
   DOUBLE PRECISION, INTENT(OUT)   :: J_bol(struc_len), H_bol(struc_len), &
           eddington_F(struc_len), eddington_Psi, kappa_J(struc_len), kappa_H(struc_len), &
-          H_star(freq_len_p_1-1,struc_len)
+          H_star(freq_len_p_1-1,struc_len), abs_S(struc_len)
   CHARACTER*20, intent(in)        :: geom
 
   ! Internal
@@ -2549,8 +2550,10 @@ subroutine feautrier_PT_it(border_freqs, &
   DOUBLE PRECISION                :: kappa_J_a(struc_len), kappa_H_a(struc_len), &
                                      kappa_tot_g_approx_scat(N_g,freq_len_p_1-1,struc_len)
   DOUBLE PRECISION                :: H_star_calc(N_g,freq_len_p_1-1,struc_len), &
-                                     H_star_scat(N_g,freq_len_p_1-1,struc_len)
+                                     H_star_scat(N_g,freq_len_p_1-1,struc_len), &
+                                     J_star_scat(N_g,freq_len_p_1-1,struc_len)
   LOGICAL                         :: planetary_ave, dayside_ave
+  DOUBLE PRECISION                :: abs_S_nu(struc_len)
 
   ! ALI
   DOUBLE PRECISION                :: lambda_loc(N_g,freq_len_p_1-1,struc_len)
@@ -2600,6 +2603,7 @@ subroutine feautrier_PT_it(border_freqs, &
   kappa_J_a = 0d0
   kappa_H_a = 0d0
 
+  J_star_scat = 0d0
 
   source_planet_scat_n = 0d0
   source_planet_scat_n1 = 0d0
@@ -3003,27 +3007,27 @@ subroutine feautrier_PT_it(border_freqs, &
     kappa_J = kappa_J / J_bol
     kappa_H = kappa_H / H_bol
   else
+      J_star_scat = J_planet_scat
       H_star = 0d0
+      abs_S = 0d0
       do i = 1, freq_len_p_1-1
-         !abs_S_nu = 0d0
+         abs_S_nu = 0d0
          do j = 1, N_g
             H_star(i,:) = H_star(i,:)+(H_star_calc(j,i,:)-H_star_scat(j,i,:))*w_gauss_ck(j)
 
-            !if (dayside_ave .OR. planetary_ave) then
-            !   do i_mu = 1, N_mu
-            !      abs_S_nu(:) = abs_S_nu(:)+0.5d0*w_gauss_ck(j)*HIT_kappa_tot_g_approx(j,i,:)*I_star_calc(j,i_mu,:,i)* &
-            !           w_gauss_mu(i_mu)
-            !      jstar_for_zbrent(j,i,:) = jstar_for_zbrent(j,i,:) + 0.5d0*I_star_calc(j,i_mu,:,i)*w_gauss_mu(i_mu)
-            !   end do
-            !   !! ADD SCATT!
-            !   abs_S_nu(:) = abs_S_nu(:) + J_star_scat(j,i,:)*HIT_kappa_tot_g_approx(j,i,:)*w_gauss_ck(j)
-            !   jstar_for_zbrent(j,i,:) = jstar_for_zbrent(j,i,:) + J_star_scat(j,i,:)
-            !else
-            !   abs_S_nu(:) = abs_S_nu(:)+(J_star_scat(j,i,:)+abs(H_star_calc(j,i,:))/mu_star)* &
-            !        HIT_kappa_tot_g_approx(j,i,:)*w_gauss_ck(j)
-            !end if
+            if (dayside_ave .OR. planetary_ave) then
+               do i_mu = 1, N_mu
+                  abs_S_nu(:) = abs_S_nu(:)+0.5d0*w_gauss_ck(j)*kappa_tot_g_approx(j,i,:)*I_star_calc(j,i_mu,:,i)* &
+                       w_gauss_mu(i_mu)
+               end do
+               !! ADD SCATT!
+               abs_S_nu(:) = abs_S_nu(:) + J_star_scat(j,i,:)*kappa_tot_g_approx(j,i,:)*w_gauss_ck(j)
+            else
+               abs_S_nu(:) = abs_S_nu(:)+(J_star_scat(j,i,:)+abs(H_star_calc(j,i,:))/mu_star)* &
+                    kappa_tot_g_approx(j,i,:)*w_gauss_ck(j)
+            end if
          end do
-         !abs_S = abs_S + abs_S_nu*(HIT_border_freqs(i)-HIT_border_freqs(i+1))
+         abs_S = abs_S + abs_S_nu*(border_freqs(i)-border_freqs(i+1))
       end do
   end if
 
