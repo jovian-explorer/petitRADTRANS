@@ -484,7 +484,16 @@ Contributed atom and ion opacities, high resolution mode
      - `Kurucz <http://kurucz.harvard.edu>`_, :math:`\gamma_{\rm nat+VdW},\sigma_{\rm therm}`
      - :math:`10^{-6}`-:math:`10^{3}`, 80-4000
      - `K. Molaverdikhani <karan@mpia.de>`_
-
+   * - VO_ExoMol_McKemmish
+     - VO_ExoMol_McKemmish
+     - `McKemmish et al. (2016) <https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw1969>`_
+     - :math:`10^{-6}`-:math:`10^{3}`, 80-4000
+     - `S. de Regt <regt@strw.leidenuniv.nl>`_
+   * - VO_ExoMol_Specific_Transitions
+     - VO_ExoMol_Specific_Transitions
+     - Most accurate transitions from `McKemmish et al. (2016) <https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw1969>`_
+     - :math:`10^{-6}`-:math:`10^{3}`, 80-4000
+     - `S. de Regt <regt@strw.leidenuniv.nl>`_
        
 Cloud opacities
 _______________

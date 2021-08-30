@@ -45,17 +45,12 @@ installed at any point after the pRT installation:
 
 The high resolution (:math:`\lambda/\Delta\lambda=10^6`) opacity data
 (about 240 GB if you want to get all species) can be
-accessed and downloaded `via Dropbox here`_. To
+accessed and downloaded `via Keeper here`_. To
 install them, create a folder called "line_by_line" in the
 "input_data/opacities/lines" folder. Then put the folder of the absorber
 species you downloaded in there.
 
-.. important::
-   **Dropbox temporarily bans pRT links sometimes due to bandwidth
-   overuse.** If you cannot access our files, please contact us `here
-   <mailto:molliere@mpia.de>`_. We are working on a better solution.
-
-.. _`via Dropbox here`: https://www.dropbox.com/sh/w7sa20v8qp19b4d/AABKF0GsjghsYLJMUJXDgrHma?dl=0
+.. _`via Keeper here`: https://keeper.mpdl.mpg.de/d/e627411309ba4597a343/
 
 Installation via pip install
 ____________________________
