@@ -503,6 +503,7 @@ class Radtrans(_read_opacities.ReadOpacities):
 
     def interpolate_species_opa(self, temp):
         # Interpolate line opacities to given temperature structure.
+
         self.temp = temp
         if len(self.line_species) > 0:
             for i_spec in range(len(self.line_species)):
@@ -1583,7 +1584,6 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         '''
 
-        # Function to calc flux, called from outside
         self.interpolate_species_opa(temp)
 
         return_opas = {}
@@ -1596,6 +1596,51 @@ class Radtrans(_read_opacities.ReadOpacities):
                 resh_wgauss, axis = 0)
 
         return nc.c/self.freq, return_opas
+
+    def plot_opas(self,
+                  species,
+                  temperature,
+                  pressure_bar,
+                  mass_fraction = None,
+                  CO = 0.55,
+                  FeH = 0.,
+                  **kwargs):
+
+        temp = np.array(temperature)
+        pressure_bar = np.array(pressure_bar)
+
+        temp = temp.reshape(1)
+        pressure_bar = pressure_bar.reshape(1)
+
+        self.setup_opa_structure(pressure_bar)
+
+        wlen_cm, opas = self.get_opa(temp)
+        wlen_micron = wlen_cm/1e-4
+
+        import pylab as plt
+
+        plt_weights = {}
+        if mass_fraction == None:
+            for spec in species:
+                plt_weights[spec] = 1.
+        elif mass_fraction == 'eq':
+            from .poor_mans_nonequ_chem import interpol_abundances
+            ab = interpol_abundances(CO * np.ones_like(temp),
+                                     FeH * np.ones_like(temp),
+                                     temp,
+                                     pressure_bar)
+            #print('ab', ab)
+            for spec in species:
+                plt_weights[spec] = ab[spec.split('_')[0]]
+        else:
+            for spec in species:
+                plt_weights[spec] = mass_fraction[spec]
+
+        for spec in species:
+            plt.plot(wlen_micron,
+                     plt_weights[spec] * opas[spec],
+                     label = spec,
+                     **kwargs)
 
     def calc_tau_cloud(self,gravity):
         ''' Method to calculate the optical depth of the clouds as function of
