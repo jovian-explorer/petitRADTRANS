@@ -11,7 +11,9 @@ from petitRADTRANS.ccf.utils import calculate_uncertainty
 
 # from petitRADTRANS import petitradtrans_config
 
+#from pathlib import Path  # TODO remove this!
 
+#planet_models_directory = os.path.abspath(Path.home()) + os.path.sep + 'Downloads' + os.path.sep + 'tmp' #os.path.abspath(os.path.dirname(__file__) + os.path.sep + 'planet_models')
 planet_models_directory = os.path.abspath(os.path.dirname(__file__) + os.path.sep + 'planet_models')
 
 
@@ -516,13 +518,18 @@ class Planet:
         filename = cls._get_filename(name)
 
         if not os.path.exists(filename):
-            filename_vot = filename.rsplit('.')[0] + '.vot'  # search for votable
+            filename_vot = filename.rsplit('.', 1)[0] + '.vot'  # search for votable
 
             if not os.path.exists(filename_vot):
                 print(f"file '{filename_vot}' not found, downloading...")
                 cls.download_from_nasa_exoplanet_archive(name)
 
-            return cls.from_votable_file(filename_vot)
+            # Save into HDF5 and remove the VO table
+            new_planet = cls.from_votable_file(filename_vot)
+            new_planet.save()
+            os.remove(filename_vot)
+
+            return new_planet
         else:
             return cls.load(name, filename)
 
@@ -615,12 +622,12 @@ class Planet:
             key = key.replace('_tranmid', '_transit_midpoint_time')
 
             if not skip_unit_conversion:
-                value *= nc.snc.day
+                value *= nc.snc.hour
         elif '_trandur' in key:
             key = key.replace('_trandur', '_transit_duration')
 
             if not skip_unit_conversion:
-                value *= nc.snc.day
+                value *= nc.snc.hour
         elif '_spectype' in key:
             key = key.replace('_spectype', '_spectral_type')
         elif '_rotp' in key:
@@ -843,86 +850,47 @@ class Planet:
         return surface_gravity, errors[1], -errors[0]
 
 
-class Planet_:
-    def __init__(self, name, radius, gravity, star_effective_temperature, star_radius, orbital_distance,
+class SimplePlanet(Planet):
+    def __init__(self, name, radius, surface_gravity, star_effective_temperature, star_radius, orbit_semi_major_axis,
                  reference_pressure=0.01, bond_albedo=0, equilibrium_temperature=None, mass=None):
         """
 
         Args:
             name: name of the planet
             radius: (cm) radius of the planet
-            gravity: (cm.s-2) gravity of the planet
+            surface_gravity: (cm.s-2) gravity of the planet
             star_effective_temperature: (K) surface effective temperature of the star
             star_radius: (cm) mean radius of the star
-            orbital_distance: (cm) distance between the planet and the star
+            orbit_semi_major_axis: (cm) distance between the planet and the star
             reference_pressure: (bar) reference pressure for the radius and the gravity of the planet
             bond_albedo: bond albedo of the planet
         """
-        self.name = name
-        self.radius = radius
-        self.gravity = gravity
-        self.star_temperature = star_effective_temperature
-        self.star_radius = star_radius
-        self.orbital_distance = orbital_distance
-
-        self.reference_pressure = reference_pressure
-        self.bond_albedo = bond_albedo
+        super().__init__(
+            name=name,
+            mass=mass,
+            radius=radius,
+            surface_gravity=surface_gravity,
+            orbit_semi_major_axis=orbit_semi_major_axis,
+            reference_pressure=reference_pressure,
+            equilibrium_temperature=equilibrium_temperature,
+            bond_albedo=bond_albedo,
+            star_radius=star_radius,
+            star_effective_temperature=star_effective_temperature
+        )
 
         if equilibrium_temperature is None:
-            self.equilibrium_temperature = self.calculate_planetary_equilibrium_temperature()
+            self.equilibrium_temperature = self.calculate_planetary_equilibrium_temperature()[0]
         else:
             self.equilibrium_temperature = equilibrium_temperature
 
         if mass is None:
-            self.mass = self.surface_gravity2mass(self.gravity, self.radius)
+            self.mass = self.surface_gravity2mass(self.surface_gravity, self.radius)
         else:
             self.mass = mass
 
-    def calculate_planetary_equilibrium_temperature(self):
-        """
-        Calculate the equilibrium temperature of a planet.
-        """
-        return self.star_temperature * np.sqrt(self.star_radius / (2 * self.orbital_distance)) \
-            * (1 - self.bond_albedo) ** (1 / 4)
-
-    def save(self):
-        with open(self.get_filename(self.name), 'wb') as f:
-            pickle.dump(self, f)
-
-    @classmethod
-    def load(cls, file):
-        with open(file, 'rb') as f:
-            return pickle.load(f)
-
     @staticmethod
-    def get_filename(name):
-        return planet_models_directory + os.path.sep + 'planet_' + name + '.pkl'
-
-    @staticmethod
-    def mass2surface_gravity(mass, radius):
-        """
-        Convert the mass of a planet to its surface gravity.
-        Args:
-            mass: (g) mass of the planet
-            radius: (cm) radius of the planet
-
-        Returns:
-            (cm.s-2) the surface gravity of the planet
-        """
-        return nc.G * mass / radius ** 2.
-
-    @staticmethod
-    def surface_gravity2mass(gravity, radius):
-        """
-        Convert the mass of a planet to its surface gravity.
-        Args:
-            gravity: (cm.s-2) surface gravity of the planet
-            radius: (cm) radius of the planet
-
-        Returns:
-            (g) the mass of the planet
-        """
-        return gravity * radius ** 2. / nc.G
+    def surface_gravity2mass(surface_gravity, radius):
+        return surface_gravity * radius ** 2 / nc.G
 
 
 class SpectralModel:
@@ -1145,9 +1113,6 @@ class SpectralModel:
             print(f"Generating model '{model.filename}'...")
 
             # Initialize species
-            if include_species == ['all']:
-                include_species = [species_name.split('_', 1)[0] for species_name in cls.default_line_species]
-
             if line_species_list == 'default':
                 line_species_list = cls.default_line_species
 
@@ -1156,6 +1121,9 @@ class SpectralModel:
 
             if continuum_opacities == 'default':
                 continuum_opacities = cls.default_continuum_opacities
+
+            if include_species == ['all']:
+                include_species = [species_name.split('_', 1)[0] for species_name in line_species_list]
 
             # Generate the model
             return cls._generate(
@@ -1218,7 +1186,7 @@ class SpectralModel:
             )
 
         # A Planet needs to be generated and saved first
-        model.planet_model_file = Planet.get_filename(model.planet_name)
+        model.planet_model_file = Planet._get_filename(model.planet_name)  # TODO _get_filename should not be protected
         planet = Planet.load(model.planet_name, model.planet_model_file)
 
         model.temperature = model.init_temperature(
@@ -1270,7 +1238,6 @@ class SpectralModel:
             with open(atmosphere_filename, 'rb') as f:
                 atmosphere = pickle.load(f)
         else:
-            print(atmosphere_filename)
             atmosphere = SpectralModel.init_atmosphere(
                 pressures, wlen_bords_micron, line_species_list, rayleigh_species, continuum_opacities,
                 lbl_opacity_sampling, do_scat_emis
@@ -1316,81 +1283,55 @@ class ParametersDict(dict):
                f"P_cloud = {self['p_cloud']}"
 
 
-def load_dat(file, **kwargs):
+def _get_generic_planet_name(radius, surface_gravity, equilibrium_temperature):
+    return f"generic_{radius / nc.r_jup:.2f}Rjup_logg{np.log10(surface_gravity):.2f}_teq{equilibrium_temperature:.2f}K"
+
+
+def generate_model_grid(models, pressures,
+                        line_species_list='default', rayleigh_species='default', continuum_opacities='default',
+                        model_suffix='', atmosphere=None, rewrite=False, save=False):
     """
-    Load a data file.
+    Get a grid of models, generate it if needed.
+    Models are generated using petitRADTRANS in its line-by-line mode. Clouds are modelled as a gray deck.
+    Output will be organized hierarchically as follows: model string > included species
 
     Args:
-        file: data file
-        **kwargs: keywords arguments for numpy.loadtxt()
+        models: dictionary of models
+        pressures: (bar) 1D-array containing the pressure grid of the models
+        line_species_list: list containing all the line species to include in the models
+        rayleigh_species: list containing all the rayleigh species to include in the models
+        continuum_opacities: list containing all the continua to include in the models
+        model_suffix: suffix of the model
+        atmosphere: pre-loaded Radtrans object
+        rewrite: if True, rewrite all the models, even if they already exists
+        save: if True, save the models once generated
 
     Returns:
-        data_dict: a dictionary containing the data
+        models: a dictionary containing all the requested models
     """
-    with open(file, 'r') as f:
-        header = f.readline()
-        unit_line = f.readline()
+    i = 0
 
-    header_keys = header.rsplit('!')[0].split('#')[-1].split()
-    units = unit_line.split('#')[-1].split()
+    for model in models:
+        for species in models[model]:
+            i += 1
+            print(f"Model {i}/{len(models) * len(models[model])}...")
 
-    data = np.loadtxt(file, **kwargs)
-    data_dict = {}
+            models[model][species] = SpectralModel.generate_from(
+                model=models[model][species],
+                pressures=pressures,
+                include_species=species,
+                line_species_list=line_species_list,
+                rayleigh_species=rayleigh_species,
+                continuum_opacities=continuum_opacities,
+                model_suffix=model_suffix,
+                atmosphere=atmosphere,
+                rewrite=rewrite
+            )
 
-    for i, key in enumerate(header_keys):
-        data_dict[key] = data[:, i]
+            if save:
+                models[model][species].save()
 
-    data_dict['units'] = units
-
-    return data_dict
-
-
-def load_wavelength_settings(file):
-    """
-    Load an instrument settings file into a handy dictionary.
-    The dictionary will be organized hierarchically as follows: band > setting > order.
-
-    Args:
-        file: file containing the settings
-
-    Returns:
-        settings: the settings in a dictionary
-    """
-    data = load_dat(file, dtype=str)
-
-    # Check wavelengths units
-    wavelength_conversion_coefficient = 1
-
-    for i, key in enumerate(data):
-        if key == 'starting_wavelength':
-            if data['units'][i] == 'nm':
-                wavelength_conversion_coefficient = 1e-3
-            elif data['units'][i] == 'um':
-                wavelength_conversion_coefficient = 1
-            else:
-                raise ValueError(f"Wavelengths units must be 'nm' or 'um', not in '{data['units'][i]}'")
-
-            break
-
-    settings = {}
-
-    for i, instrument_setting in enumerate(data['instrument_setting']):
-        band = instrument_setting[0]
-        setting = instrument_setting[1:]
-        order = data['order'][i]
-
-        if band not in settings:
-            settings[band] = {}
-
-        if setting not in settings[band]:
-            settings[band][setting] = {}
-
-        settings[band][setting][order] = np.array([
-            data['starting_wavelength'][i],
-            data['ending_wavelength'][i]
-        ], dtype=float) * wavelength_conversion_coefficient
-
-    return settings
+    return models
 
 
 def get_model_grid(planet_name, lbl_opacity_sampling, do_scat_emis, parameter_dicts, species_list, pressures,
@@ -1455,53 +1396,6 @@ def get_model_grid(planet_name, lbl_opacity_sampling, do_scat_emis, parameter_di
 
             if save:
                 models[parameter_dict.to_str()][species].save()
-
-    return models
-
-
-def generate_model_grid(models, pressures,
-                        line_species_list='default', rayleigh_species='default', continuum_opacities='default',
-                        model_suffix='', atmosphere=None, rewrite=False, save=False):
-    """
-    Get a grid of models, generate it if needed.
-    Models are generated using petitRADTRANS in its line-by-line mode. Clouds are modelled as a gray deck.
-    Output will be organized hierarchically as follows: model string > included species
-
-    Args:
-        models: dictionary of models
-        pressures: (bar) 1D-array containing the pressure grid of the models
-        line_species_list: list containing all the line species to include in the models
-        rayleigh_species: list containing all the rayleigh species to include in the models
-        continuum_opacities: list containing all the continua to include in the models
-        model_suffix: suffix of the model
-        atmosphere: pre-loaded Radtrans object
-        rewrite: if True, rewrite all the models, even if they already exists
-        save: if True, save the models once generated
-
-    Returns:
-        models: a dictionary containing all the requested models
-    """
-    i = 0
-
-    for model in models:
-        for species in models[model]:
-            i += 1
-            print(f"Model {i}/{len(models) * len(models[model])}...")
-
-            models[model][species] = SpectralModel.generate_from(
-                model=models[model][species],
-                pressures=pressures,
-                include_species=species,
-                line_species_list=line_species_list,
-                rayleigh_species=rayleigh_species,
-                continuum_opacities=continuum_opacities,
-                model_suffix=model_suffix,
-                atmosphere=atmosphere,
-                rewrite=rewrite
-            )
-
-            if save:
-                models[model][species].save()
 
     return models
 
@@ -1583,3 +1477,18 @@ def load_model_grid(models):
             models[model][species] = models[model][species].load(models[model][species].filename)
 
     return models
+
+
+def make_generic_planet(radius, surface_gravity, equilibrium_temperature,
+                        star_effective_temperature=5500, star_radius=nc.r_sun, orbit_semi_major_axis=nc.AU):
+    name = _get_generic_planet_name(radius, surface_gravity, equilibrium_temperature)
+
+    return SimplePlanet(
+        name,
+        radius,
+        surface_gravity,
+        star_effective_temperature,
+        star_radius,
+        orbit_semi_major_axis,
+        equilibrium_temperature=equilibrium_temperature
+    )
