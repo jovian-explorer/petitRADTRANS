@@ -592,8 +592,11 @@ class Retrieval:
                                         spectrum_model, \
                                         self.plotting)
         #print(log_likelihood)
+        if log_likelihood + log_prior < -9.9e99:
+            log_likelihood = -np.inf
         if self.ultranest and np.isinf(log_likelihood+log_prior):
             return -1e99
+
         return log_likelihood + log_prior
 
     def get_samples(self, output_dir = None, ret_names = []):
