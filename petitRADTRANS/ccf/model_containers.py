@@ -11,9 +11,7 @@ from petitRADTRANS.ccf.utils import calculate_uncertainty
 
 # from petitRADTRANS import petitradtrans_config
 
-#from pathlib import Path  # TODO remove this!
-
-#planet_models_directory = os.path.abspath(Path.home()) + os.path.sep + 'Downloads' + os.path.sep + 'tmp' #os.path.abspath(os.path.dirname(__file__) + os.path.sep + 'planet_models')
+# planet_models_directory = os.path.abspath(Path.home()) + os.path.sep + 'Downloads' + os.path.sep + 'tmp' #os.path.abspath(os.path.dirname(__file__) + os.path.sep + 'planet_models')
 planet_models_directory = os.path.abspath(os.path.dirname(__file__) + os.path.sep + 'planet_models')
 
 
@@ -542,7 +540,12 @@ class Planet:
 
         with h5py.File(filename, 'r') as f:
             for key in f:
-                new_planet.__dict__[key] = f[key][()]
+                if isinstance(f[key][()], bytes):
+                    value = str(f[key][()], 'utf-8')
+                else:
+                    value = f[key][()]
+
+                new_planet.__dict__[key] = value
 
                 if 'units' in f[key].attrs:
                     if key in new_planet.units:
@@ -977,8 +980,9 @@ class SpectralModel:
 
     def get_name(self):
         name = 'spectral_model_'
-        name += f'{self.planet_name}_Tint{self.t_int}K_Z{self.metallicity}_co{self.co_ratio}_pc{self.p_cloud}bar_' \
-                f'{self.wavelength_boundaries[0]}-{self.wavelength_boundaries[1]}um_ds{self.lbl_opacity_sampling}'
+        name += f"{self.planet_name.replace(' ', '_')}_" \
+                f"Tint{self.t_int}K_Z{self.metallicity}_co{self.co_ratio}_pc{self.p_cloud}bar_" \
+                f"{self.wavelength_boundaries[0]}-{self.wavelength_boundaries[1]}um_ds{self.lbl_opacity_sampling}"
 
         if self.do_scat_emis:
             name += '_scat'

@@ -151,7 +151,8 @@ def generate_phoenix_star_spectrum_file(star_spectrum_file, star_effective_tempe
 def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power, pixel_sampling,
                     species_list, velocity_range,
                     observing_time=1., transit_duration=None,
-                    star_snr_reference_apparent_magnitude=None, star_apparent_magnitude=None):
+                    star_snr_reference_apparent_magnitude=None, star_apparent_magnitude=None,
+                    mock_observation_number=1):
     if transit_duration is None:
         transit_duration = 0.5 * observing_time
 
@@ -199,7 +200,8 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                         transit_duration=transit_duration,
                         instrument_resolving_power=instrument_resolving_power,
                         pixel_sampling=pixel_sampling,
-                        instrument_wavelength_range=wrange * 1e-4
+                        instrument_wavelength_range=wrange * 1e-4,
+                        number=mock_observation_number
                     )
 
                 for species in species_list:
@@ -220,6 +222,7 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                     snr, velocity, cross_correlation, log_l, log_l_ccf = ccf_analysis(
                         wlen_out, observed_spectrum, single_rebinned
                     )
+                    print(band, setting, order, detector, species)
 
                     # Add the CCF of each order and each detector to retrieve the CCF of one setting
                     f = interp1d(velocity, cross_correlation)
@@ -244,16 +247,21 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                             else:
                                 raise ValueError(str(error_msg))
 
-
             for species in species_list:
                 if species == 'all':
                     continue
 
-                snr, mu, std = calculate_ccf_snr(x[species], add[species])
+                snr = np.zeros(mock_observation_number)
+                mu = np.zeros(mock_observation_number)
+                std = np.zeros(mock_observation_number)
+
+                for j in range(mock_observation_number):
+                    snr[j], mu[j], std[j] = calculate_ccf_snr(x[species], add[species][j, :])
+
                 results[band][setting][species] = {
                     'S/N': snr,
                     'velocity': x[species],
-                    'CCF': (add[species] - mu) / std,
+                    'CCF': (np.transpose(add[species]) - mu) / std,
                     'LogL': log_l_ccf_all_orders[species]
                 }
 
@@ -356,7 +364,8 @@ def get_tsm_snr_pcloud(band, wavelength_boundaries, star_distances, p_clouds, mo
                        exposure_time, telescope_mirror_radius, telescope_throughput,
                        instrument_resolving_power, pixel_sampling,
                        noise_correction_coefficient=1.0, scale_factor=1.0, star_snr=None,
-                       star_apparent_magnitude=None, star_snr_reference_apparent_magnitude=None):
+                       star_apparent_magnitude=None, star_snr_reference_apparent_magnitude=None,
+                       mock_observation_number=1):
     settings = {band: settings[band]}
 
     if star_apparent_magnitude is not None:
@@ -373,13 +382,17 @@ def get_tsm_snr_pcloud(band, wavelength_boundaries, star_distances, p_clouds, mo
     tsm = np.zeros_like(tsm_variable)
 
     snrs = {}
+    snrs_error = {}
+    results = {}
 
     for setting in settings[band]:
         snrs[setting] = {}
+        snrs_error[setting] = {}
 
         for species in species_list:
             if species != 'all':
                 snrs[setting][species] = np.zeros((np.size(tsm_variable), np.size(p_clouds)))
+                snrs_error[setting][species] = np.zeros((np.size(tsm_variable), np.size(p_clouds)))
 
     j_band_boundaries = np.array([1.07, 1.4]) * 1e-4  # cm, used in TSM calculation
 
@@ -420,7 +433,7 @@ def get_tsm_snr_pcloud(band, wavelength_boundaries, star_distances, p_clouds, mo
                 band: star_snr[band]
             }
 
-        results = {}
+        results[tsm_var] = {}
 
         for j, pc in enumerate(p_clouds):
             target_model = ParametersDict(t_int, metallicity, co_ratio, pc).to_str()
@@ -442,7 +455,8 @@ def get_tsm_snr_pcloud(band, wavelength_boundaries, star_distances, p_clouds, mo
                         observing_time=exposure_time,
                         transit_duration=planet_transit_duration,
                         star_snr_reference_apparent_magnitude=star_snr_reference_apparent_magnitude,
-                        star_apparent_magnitude=star_mag
+                        star_apparent_magnitude=star_mag,
+                        mock_observation_number=mock_observation_number
                     )
 
                     model_found = True
@@ -452,11 +466,14 @@ def get_tsm_snr_pcloud(band, wavelength_boundaries, star_distances, p_clouds, mo
                 for setting in settings[band]:
                     for species in species_list:
                         if species != 'all':
-                            snrs[setting][species][i, j] = results[target_model][band][setting][species]['S/N']
+                            # Assume that the distribution of S/N is gaussian ("mostly" accurate)
+                            mu, std = norm.fit(results[target_model][band][setting][species]['S/N'])
+                            snrs[setting][species][i, j] = mu
+                            snrs_error[setting][species][i, j] = std
             else:
                 raise KeyError(f"model '{target_model}' was not found in the models dictionary")
 
-    return snrs, tsm
+    return snrs, snrs_error, tsm, results
 
 
 def load_dat(file, **kwargs):

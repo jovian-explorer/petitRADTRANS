@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 
 This is a temporary document.
 
+## [0.2.0] - 2021-09-09
+### Added
+- Option to make multiple mock observations with the same set of parameters.
+- Output of CCF S/N error and of the CCF analysis results in function `get_tsm_snr_pcloud` .
+
+### Changed
+- CCF S/N is now based on the distribution (assumed to be gaussian) of multiple mock observations rather than one.
+
+### Fixed
+- `Planet` name incorrectly generated.
+- `Planet` name loaded from HDF5 file as byte instead of str.
+
+
 ## [0.1.0] - 2021-09-07
 ### Added
 - This file.

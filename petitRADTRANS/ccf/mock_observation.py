@@ -64,11 +64,13 @@ def convolve_rebin(input_wavelengths, input_flux,
 
 
 def generate_mock_observation(wavelengths, flux, snr_per_res_element, observing_time, transit_duration,
-                              instrument_resolving_power, pixel_sampling, instrument_wavelength_range):
+                              instrument_resolving_power, pixel_sampling, instrument_wavelength_range,
+                              number=1):
     """
     Generate a mock observation from a modelled transmission spectrum.
     The noise of the transmission spectrum is estimated assuming that to retrieve the planetary spectrum, the flux of
     the star with the planet transiting in front of it was subtracted to the flux of the star alone.
+    It is possible to generate multiple mock observations with the same setting, but a different random noise.
 
     Args:
         wavelengths: (cm) the wavelengths of the model
@@ -79,6 +81,7 @@ def generate_mock_observation(wavelengths, flux, snr_per_res_element, observing_
         instrument_resolving_power: the instrument resolving power
         pixel_sampling: the pixel sampling of the instrument
         instrument_wavelength_range: (cm) size-2 array containing the min and max wavelengths of the instrument
+        number: number of mock observations to generate
 
     Returns:
         observed_spectrum: the modelled spectrum rebinned, altered, and with a random white noise from the instrument
@@ -118,10 +121,13 @@ def generate_mock_observation(wavelengths, flux, snr_per_res_element, observing_
             (1 - full_rebinned) * observing_time * (observing_time - full_rebinned * transit_duration)
             / (transit_duration * (observing_time - transit_duration))
         )
-    observed_spectrum = full_rebinned + np.random.normal(
+
+    rng = np.random.default_rng()
+
+    observed_spectrum = full_rebinned + rng.normal(
         loc=0.,
         scale=noise_per_pixel,
-        size=len(full_rebinned)
+        size=(number, np.size(full_rebinned))
     )
 
     return observed_spectrum, full_lsf_ed, wavelengths_out, full_rebinned, snr_per_res_element

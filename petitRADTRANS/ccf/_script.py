@@ -27,14 +27,14 @@ def main():
     # star_apparent_magnitude_v = 12.095
     star_apparent_magnitude_j = 10.663
     # star_apparent_magnitude_j = 10
-    star_apparent_magnitudes = [star_apparent_magnitude_j]# np.linspace(4, 16, 7)
+    star_apparent_magnitudes = [star_apparent_magnitude_j]  # np.linspace(4, 16, 7)
 
     # Models to be tested
     t_int = [50]
-    metallicity = [1, np.log10(300)]#[1.5, 2, 2.5]#[0, np.log10(3), 1]
+    metallicity = [1, np.log10(300)]
     co_ratio = [0.55]
-    p_cloud = [1e2]#[1e2, 1e1, 1e0, 1e-1, 1e-2, 1e-3, 1e-4]
-    species_list = ['all', 'H2O', 'CO', 'CO2', 'H2S', 'NH3', 'PH3', 'HCN', 'CH4', 'Na', 'K']
+    p_cloud = [1e2]  # [1e2, 1e1, 1e0, 1e-1, 1e-2, 1e-3, 1e-4]
+    species_list = ['all', 'H2O', 'CO', 'CO2', 'H2S', 'NH3', 'PH3', 'HCN', 'CH4']
 
     line_species_list = [
         'CH4_main_iso',
@@ -121,14 +121,16 @@ def main():
             models[wlen_mode] = load_model_grid(models[wlen_mode])
 
     snrs = {}
+    snrs_error = {}
     tsm = {}
 
     for meta in metallicity:
         snrs[meta] = {}
+        snrs_error[meta] = {}
         tsm[meta] = {}
 
         for band in wlen_modes:
-            snrs[meta][band], tsm[meta][band] = get_tsm_snr_pcloud(
+            snrs[meta][band], snrs_error[meta][band], tsm[meta][band], results = get_tsm_snr_pcloud(
                 band=band,
                 wavelength_boundaries=wlen_modes[band] * 1e-4,
                 star_distances=distances,
@@ -150,7 +152,8 @@ def main():
                 scale_factor=1.0,
                 star_snr=star_snr,
                 star_apparent_magnitude=star_apparent_magnitudes,
-                star_snr_reference_apparent_magnitude=star_apparent_magnitude_j
+                star_snr_reference_apparent_magnitude=star_apparent_magnitude_j,
+                mock_observation_number=100
             )
 
     for meta in metallicity:
@@ -168,14 +171,15 @@ def main():
             continue
 
         plt.figure(figsize=(16, 9))
-        plot_snr_histogram(
+        plot_snr_settings_bars(
             species, snrs,
             model_labels=[rf"Z/H = {10 ** metallicity[0]:.1f} $\times$ solar",
                           rf"Z/H = {10 ** metallicity[1]:.1f} $\times$ solar"],
             planet_name=planet_name,
-            threshold=5
+            threshold=5,
+            y_err=snrs_error
         )
-        os.path.isfile('./')
+
         plt.savefig(f"./figures/{planet_name.replace(' ', '_')}/{species}_detection.png")
 
     plot_tsm_pcloud_snr(
@@ -189,9 +193,9 @@ def main():
     )
 
 
-def main_TOI():
+def main_ltt():
     # Base parameters
-    planet_name = 'TOI-269 b'
+    planet_name = 'LTT 3780 c'
     lbl_opacity_sampling = 1
     do_scat_emis = False
     model_suffix = ''
@@ -204,19 +208,23 @@ def main_TOI():
         'M': np.array([3.25, 5.5])
     }
 
+    # Load planet
+    planet = Planet.get(planet_name)
+
+    # Parameters
     pressures = np.logspace(-10, 2, 130)
     distances = [213.982 * nc.pc]  # np.logspace(1, 3, 7) * nc.c * 3600 * 24 * 365.25
     # star_apparent_magnitude_v = 12.095
-    star_apparent_magnitude_j = 10.909
+    star_apparent_magnitude_j = planet.system_apparent_magnitude_j
     # star_apparent_magnitude_j = 10
-    star_apparent_magnitudes = [star_apparent_magnitude_j]# np.linspace(4, 16, 7)
+    star_apparent_magnitudes = [star_apparent_magnitude_j]
 
     # Models to be tested
     t_int = [50]
-    metallicity = [0, 2]#[1.5, 2, 2.5]#[0, np.log10(3), 1]
+    metallicity = [1, 2]
     co_ratio = [0.55]
-    p_cloud = [1e2]#[1e2, 1e1, 1e0, 1e-1, 1e-2, 1e-3, 1e-4]
-    species_list = ['all', 'H2O']
+    p_cloud = [1e2]
+    species_list = ['all', 'H2O', 'CO', 'CO2', 'H2S', 'NH3', 'PH3', 'HCN', 'CH4']
 
     line_species_list = [
         'CH4_main_iso',
@@ -233,10 +241,10 @@ def main_TOI():
 
     # Observation parameters
     # Actually matter (used to get the CRIRES SNR data from the ETC website)
-    exposure_time = 6 * 3600  # 4 * 3600
+    exposure_time = 4 * 3600
     integration_time = 60
     airmass = 1.2
-    velocity_range = [-1750, 1750]
+    velocity_range = [-1400, 1400]
     instrument_resolving_power = 8e4
     # Old (don't do anything anymore)
     telescope_mirror_radius = 8.2e2 / 2  # cm
@@ -245,9 +253,6 @@ def main_TOI():
 
     # Load settings
     settings = load_wavelength_settings(module_dir + '/crires/wavelength_settings.dat')
-
-    # Load planet
-    planet = Planet.get(planet_name)
 
     # Load signal to noise ratios
     star_snr = get_crires_snr_data(settings, star_apparent_magnitude_j,  # TODO apparent mag is really annoying
@@ -303,14 +308,16 @@ def main_TOI():
             models[wlen_mode] = load_model_grid(models[wlen_mode])
 
     snrs = {}
+    snrs_error = {}
     tsm = {}
 
     for meta in metallicity:
         snrs[meta] = {}
+        snrs_error[meta] = {}
         tsm[meta] = {}
 
         for band in wlen_modes:
-            snrs[meta][band], tsm[meta][band] = get_tsm_snr_pcloud(
+            snrs[meta][band], snrs_error[meta][band], tsm[meta][band], results = get_tsm_snr_pcloud(
                 band=band,
                 wavelength_boundaries=wlen_modes[band] * 1e-4,
                 star_distances=distances,
@@ -320,7 +327,7 @@ def main_TOI():
                 settings=settings,
                 planet=planet,
                 t_int=t_int[0],
-                metallicity=metallicity[0],
+                metallicity=meta,
                 co_ratio=co_ratio[0],
                 velocity_range=velocity_range,
                 exposure_time=exposure_time,
@@ -334,6 +341,280 @@ def main_TOI():
                 star_apparent_magnitude=star_apparent_magnitudes,
                 star_snr_reference_apparent_magnitude=star_apparent_magnitude_j
             )
+
+    for meta in metallicity:
+        print(f'\n [Z/H] = {10 ** meta}:')
+
+        for species in species_list:
+            if species == 'all':
+                continue
+
+            best_snr, best_band, best_setting = find_best_setting(species, snrs[meta])
+            print(f"Species '{species}', best setting: {best_band}{best_setting} (CCF SNR: {best_snr})")
+
+    for species in species_list:
+        if species == 'all':
+            continue
+
+        plt.figure(figsize=(16, 9))
+        plot_snr_settings_bars(
+            species, snrs,
+            model_labels=[rf"Z/H = {10 ** metallicity[0]:.1f} $\times$ solar",
+                          rf"Z/H = {10 ** metallicity[1]:.1f} $\times$ solar"],
+            planet_name=planet_name,
+            threshold=5
+        )
+
+        plt.savefig(f"./figures/{planet_name.replace(' ', '_')}/{species}_detection.png")
+
+    plot_tsm_pcloud_snr(
+        p_cloud, tsm, snrs,
+        metallicity=metallicity[2],
+        band='J',
+        setting=list(settings.keys())[0],
+        species=species_list[1],
+        planet_name=planet_name,
+        exposure_time=exposure_time
+    )
+
+
+def main_toi():
+    # Base parameters
+    planet_name = 'TOI-269 b'
+    lbl_opacity_sampling = 1
+    do_scat_emis = False
+    model_suffix = ''
+    wlen_modes = {
+        'Y': np.array([0.92, 1.15]),
+        'J': np.array([1.07, 1.4]),
+        'H': np.array([1.4, 1.88]),
+        'K': np.array([1.88, 2.55]),
+        'L': np.array([2.7, 4.25]),
+        'M': np.array([3.25, 5.5])
+    }
+
+    # Load planet
+    planet = Planet.get(planet_name)
+
+    pressures = np.logspace(-10, 2, 130)
+    distances = [213.982 * nc.pc]  # np.logspace(1, 3, 7) * nc.c * 3600 * 24 * 365.25
+    # star_apparent_magnitude_v = 12.095
+    star_apparent_magnitude_j = planet.system_apparent_magnitude_j
+    # star_apparent_magnitude_j = 10
+    star_apparent_magnitudes = [star_apparent_magnitude_j]
+
+    # Models to be tested
+    t_int = [50]
+    metallicity = [0, 2]
+    co_ratio = [0.55]
+    p_cloud = [1e2]
+    species_list = ['all', 'H2O', 'CO', 'CO2', 'H2S', 'NH3', 'PH3', 'HCN', 'CH4']
+
+    line_species_list = [
+        'CH4_main_iso',
+        'CO_all_iso',
+        'CO2_main_iso',
+        'H2O_main_iso',
+        'H2S_main_iso',
+        'HCN_main_iso',
+        'K',
+        'Na_allard',
+        'NH3_main_iso',
+        'PH3_main_iso'
+    ]
+
+    # Observation parameters
+    # Actually matter (used to get the CRIRES SNR data from the ETC website)
+    exposure_time = 6 * 3600  # 4 * 3600
+    integration_time = 60
+    airmass = 1.2
+    velocity_range = [-1400, 1400]
+    instrument_resolving_power = 8e4
+    # Old (don't do anything anymore)
+    telescope_mirror_radius = 8.2e2 / 2  # cm
+    telescope_throughput = 0.1
+    pixel_sampling = 3
+
+    # Load settings
+    settings = load_wavelength_settings(module_dir + '/crires/wavelength_settings.dat')
+
+    # Periapsis and Apoapsis
+    planet_apo = copy.copy(planet)
+    planet_peri = copy.copy(planet)
+
+    planet_apo.name = planet.name + '_apoapsis'
+    planet_peri.name = planet.name + '_periapsis'
+
+    planet_apo.orbit_semi_major_axis = planet.orbit_semi_major_axis * (1 + planet.orbital_eccentricity)
+    planet_peri.orbit_semi_major_axis = planet.orbit_semi_major_axis * (1 - planet.orbital_eccentricity)
+
+    planet_apo.equilibrium_temperature, \
+        planet_apo.equilibrium_temperature_error_upper, \
+        planet_apo.equilibrium_temperature_error_lower = planet_apo.calculate_planetary_equilibrium_temperature()
+
+    planet_peri.equilibrium_temperature, \
+        planet_peri.equilibrium_temperature_error_upper, \
+        planet_peri.equilibrium_temperature_error_lower = planet_peri.calculate_planetary_equilibrium_temperature()
+
+    planet_peri.save()
+    planet_apo.save()
+
+    planets = [planet_peri, planet]
+
+    for i in range(len(planets)):
+        planets[i].transit_duration = 1 * planets[i].transit_duration
+
+    # Load signal to noise ratios
+    star_snr = get_crires_snr_data(settings, star_apparent_magnitude_j,  # TODO apparent mag is really annoying
+                                   planet.star_effective_temperature, exposure_time,
+                                   integration_time, airmass,  # TODO add FLI and seeing
+                                   rewrite=False, star_apparent_magnitude_band='J')
+
+    # Generate parameter dictionaries
+    parameter_dicts = get_parameter_dicts(
+        t_int, metallicity, co_ratio, p_cloud
+    )
+
+    # Load/generate relevant models
+    models = {}
+
+    for wlen_mode in wlen_modes:
+        print(f"Band {wlen_mode}...")
+
+        atmosphere = None
+
+        for planet in planets:
+            planet_key = f"T_eq {planet.equilibrium_temperature}"
+
+            if planet_key not in models:
+                models[planet_key] = {}
+
+            # Initialize grid
+            models[planet_key][wlen_mode], all_models_exist = init_model_grid(
+                planet.name, lbl_opacity_sampling, do_scat_emis, parameter_dicts, species_list,
+                wavelength_boundaries=wlen_modes[wlen_mode],
+                model_suffix=model_suffix
+            )
+
+            if not all_models_exist:
+                if atmosphere is None:
+                    # Load or generate atmosphere
+                    atmosphere, atmosphere_filename = SpectralModel.get_atmosphere_model(
+                        wlen_bords_micron=wlen_modes[wlen_mode],
+                        pressures=pressures,
+                        line_species_list=line_species_list,
+                        rayleigh_species=SpectralModel.default_rayleigh_species,
+                        continuum_opacities=SpectralModel.default_continuum_opacities,
+                        lbl_opacity_sampling=lbl_opacity_sampling,
+                        do_scat_emis=do_scat_emis,
+                        model_suffix=model_suffix
+                    )
+
+                # Load or generate models
+                models[planet_key][wlen_mode] = generate_model_grid(
+                    models=models[planet_key][wlen_mode],
+                    pressures=pressures,
+                    line_species_list=line_species_list,
+                    rayleigh_species='default',
+                    continuum_opacities='default',
+                    model_suffix=model_suffix,
+                    atmosphere=atmosphere,
+                    rewrite=False,
+                    save=True
+                )
+            else:
+                # Load existing models
+                models[planet_key][wlen_mode] = load_model_grid(models[planet_key][wlen_mode])
+
+    snrs = {}
+    snrs_error = {}
+    tsm = {}
+
+    for planet in planets:
+        t_eq = planet.equilibrium_temperature
+        snrs[t_eq] = {}
+        snrs_error[t_eq] = {}
+        tsm[t_eq] = {}
+
+        for meta in metallicity:
+            snrs[t_eq][meta] = {}
+            snrs_error[t_eq][meta] = {}
+            tsm[t_eq][meta] = {}
+
+            for band in wlen_modes:
+                snrs[t_eq][meta][band], snrs_error[t_eq][meta], tsm[t_eq][meta][band], results = \
+                    get_tsm_snr_pcloud(
+                        band=band,
+                        wavelength_boundaries=wlen_modes[band] * 1e-4,
+                        star_distances=distances,
+                        p_clouds=p_cloud,
+                        models=models[f'T_eq {t_eq}'],
+                        species_list=species_list,
+                        settings=settings,
+                        planet=planet,
+                        t_int=t_int[0],
+                        metallicity=meta,
+                        co_ratio=co_ratio[0],
+                        velocity_range=velocity_range,
+                        exposure_time=exposure_time,
+                        telescope_mirror_radius=telescope_mirror_radius,
+                        telescope_throughput=telescope_throughput,
+                        instrument_resolving_power=instrument_resolving_power,
+                        pixel_sampling=pixel_sampling,
+                        noise_correction_coefficient=1.0,
+                        scale_factor=1.0,
+                        star_snr=star_snr,
+                        star_apparent_magnitude=star_apparent_magnitudes,
+                        star_snr_reference_apparent_magnitude=star_apparent_magnitude_j,
+                        mock_observation_number=100
+                )
+
+    for planet in planets:
+        t_eq = planet.equilibrium_temperature
+
+        for meta in metallicity:
+            print(f'\n T_eq = {t_eq}, [Z/H] = {10 ** meta}:')
+
+            for species in species_list:
+                if species == 'all':
+                    continue
+
+                best_snr, best_band, best_setting = find_best_setting(species, snrs[t_eq][meta])
+                print(f"Species '{species}', best setting: {best_band}{best_setting} (CCF SNR: {best_snr})")
+
+    for i in range(len(planets)):
+        for species in species_list:
+            if species == 'all':
+                continue
+
+            plt.figure(figsize=(16, 9))
+            plot_snr_settings_bars(
+                species, snrs[planets[i].equilibrium_temperature],
+                model_labels=[rf"Z/H = {10 ** metallicity[0]:.1f} $\times$ solar",
+                              rf"Z/H = {10 ** metallicity[1]:.1f} $\times$ solar"],
+                planet_name=planets[i].name,
+                threshold=5,
+                y_err=2
+            )
+
+            plt.savefig(f"./figures/{planet_name.replace(' ', '_')}/{species}_detection_"
+                        f"Teq{planets[i].equilibrium_temperature}K_tobs{exposure_time/3600}h.png")
+
+    for i in range(len(planets)):
+        for species in species_list:
+            if species == 'all':
+                continue
+
+            plt.figure(figsize=(16, 9))
+            plot_snr_settings_bars_from_gaussian(
+                species, snrs[planets[i].equilibrium_temperature],
+                planet_name=planets[i].name,
+                threshold=5
+            )
+
+            plt.savefig(f"./figures/{planet_name.replace(' ', '_')}/{species}_detection_"
+                        f"Teq{planets[i].equilibrium_temperature}K_tobs{exposure_time/3600}h_"
+                        f"{len(snrs[planets[i].equilibrium_temperature])}takes.png")
 
     plot_tsm_pcloud_snr(
         p_cloud, tsm, snrs,
@@ -352,12 +633,12 @@ def main_teff():
     do_scat_emis = False
     model_suffix = ''
     wlen_modes = {
-        #'Y': np.array([0.92, 1.15]),
-        #'J': np.array([1.07, 1.4]),
-        #'H': np.array([1.4, 1.88]),
+        'Y': np.array([0.92, 1.15]),
+        'J': np.array([1.07, 1.4]),
+        'H': np.array([1.4, 1.88]),
         'K': np.array([1.88, 2.55]),
-        #'L': np.array([2.7, 4.25]),
-        #'M': np.array([3.25, 5.5])
+        'L': np.array([2.7, 4.25]),
+        'M': np.array([3.25, 5.5])
     }
 
     pressures = np.logspace(-10, 2, 130)
@@ -370,10 +651,10 @@ def main_teff():
     # Models to be tested
     equilibrium_temperatures = [800, 1200, 1600, 2000]
     t_int = [200]
-    metallicity = [1]#[0, np.log10(3), 1]
+    metallicity = [1]
     co_ratio = [0.55]
-    p_cloud = [1e2]#[1e2, 1e1, 1e0, 1e-1, 1e-2, 1e-3, 1e-4]
-    surface_gravities = [1000] #np.logspace(2, 5, 4)
+    p_cloud = [1e2]
+    surface_gravities = [1000]
     species_list = ['all', 'H2O', 'CO']
 
     # Observation parameters
@@ -476,41 +757,45 @@ def main_teff():
                 models[planet_key][wlen_mode] = load_model_grid(models[planet_key][wlen_mode])
 
     snrs = {}
+    snrs_error = {}
     tsm = {}
 
     for planet in planets:
         t_eq = planet.equilibrium_temperature
         snrs[t_eq] = {}
+        snrs_error[t_eq] = {}
         tsm[t_eq] = {}
 
         for meta in metallicity:
             snrs[t_eq][meta] = {}
+            snrs_error[t_eq][meta] = {}
             tsm[t_eq][meta] = {}
 
             for band in wlen_modes:
-                snrs[t_eq][meta][band], tsm[t_eq][meta][band] = get_tsm_snr_pcloud(
-                    band=band,
-                    wavelength_boundaries=wlen_modes[band] * 1e-4,
-                    star_distances=distances,
-                    p_clouds=p_cloud,
-                    models=models[f'T_eq {t_eq}, logg 3.0'],
-                    species_list=species_list,
-                    settings=settings,
-                    planet=planet,
-                    t_int=t_int[0],
-                    metallicity=meta,
-                    co_ratio=co_ratio[0],
-                    velocity_range=velocity_range,
-                    exposure_time=exposure_time,
-                    telescope_mirror_radius=telescope_mirror_radius,
-                    telescope_throughput=telescope_throughput,
-                    instrument_resolving_power=instrument_resolving_power,
-                    pixel_sampling=pixel_sampling,
-                    noise_correction_coefficient=1.0,
-                    scale_factor=1.0,
-                    star_snr=star_snr,
-                    star_apparent_magnitude=star_apparent_magnitudes,
-                    star_snr_reference_apparent_magnitude=star_apparent_magnitude_j
+                snrs[t_eq][meta][band], snrs_error[t_eq][meta], tsm[t_eq][meta][band], results = \
+                    get_tsm_snr_pcloud(
+                        band=band,
+                        wavelength_boundaries=wlen_modes[band] * 1e-4,
+                        star_distances=distances,
+                        p_clouds=p_cloud,
+                        models=models[f'T_eq {t_eq}, logg 3.0'],
+                        species_list=species_list,
+                        settings=settings,
+                        planet=planet,
+                        t_int=t_int[0],
+                        metallicity=meta,
+                        co_ratio=co_ratio[0],
+                        velocity_range=velocity_range,
+                        exposure_time=exposure_time,
+                        telescope_mirror_radius=telescope_mirror_radius,
+                        telescope_throughput=telescope_throughput,
+                        instrument_resolving_power=instrument_resolving_power,
+                        pixel_sampling=pixel_sampling,
+                        noise_correction_coefficient=1.0,
+                        scale_factor=1.0,
+                        star_snr=star_snr,
+                        star_apparent_magnitude=star_apparent_magnitudes,
+                        star_snr_reference_apparent_magnitude=star_apparent_magnitude_j
                 )
 
     # TODO fix TSM (it depends only on magnitude)
@@ -544,6 +829,151 @@ def main_teff():
                    exposure_time, x_label='Equilibrium temperature (K)')
 
 
+def test():
+    # Base parameters
+    planet_name = 'WASP-39 b'
+    lbl_opacity_sampling = 1
+    do_scat_emis = False
+    model_suffix = ''
+    wlen_modes = {
+        'K': np.array([1.88, 2.55])
+    }
+
+    pressures = np.logspace(-10, 2, 130)
+    distances = [213.982 * nc.pc]  # np.logspace(1, 3, 7) * nc.c * 3600 * 24 * 365.25
+    # star_apparent_magnitude_v = 12.095
+    star_apparent_magnitude_j = 10.663
+    # star_apparent_magnitude_j = 10
+    star_apparent_magnitudes = [star_apparent_magnitude_j]
+
+    # Models to be tested
+    t_int = [50]
+    metallicity = [1]
+    co_ratio = [0.55]
+    p_cloud = [1e2]
+    species_list = ['all', 'H2O']
+
+    line_species_list = [
+        'CH4_main_iso',
+        'CO_all_iso',
+        'CO2_main_iso',
+        'H2O_main_iso',
+        'H2S_main_iso',
+        'HCN_main_iso',
+        'K',
+        'Na_allard',
+        'NH3_main_iso',
+        'PH3_main_iso'
+    ]
+
+    # Observation parameters
+    # Actually matter (used to get the CRIRES SNR data from the ETC website)
+    exposure_time = 6 * 3600  # 4 * 3600
+    integration_time = 60
+    airmass = 1.2
+    velocity_range = [-1400, 1400]
+    instrument_resolving_power = 8e4
+    # Old (don't do anything anymore)
+    telescope_mirror_radius = 8.2e2 / 2  # cm
+    telescope_throughput = 0.1
+    pixel_sampling = 3
+
+    # Load settings
+    settings = load_wavelength_settings(module_dir + '/crires/wavelength_settings.dat')
+
+    # Load planet
+    planet = Planet.get(planet_name)
+
+    # Load signal to noise ratios
+    star_snr = get_crires_snr_data(settings, star_apparent_magnitude_j,  # TODO apparent mag is really annoying
+                                   planet.star_effective_temperature, exposure_time,
+                                   integration_time, airmass,  # TODO add FLI and seeing
+                                   rewrite=False, star_apparent_magnitude_band='J')
+
+    # Generate parameter dictionaries
+    parameter_dicts = get_parameter_dicts(
+        t_int, metallicity, co_ratio, p_cloud
+    )
+
+    # Load/generate relevant models
+    models = {}
+
+    for wlen_mode in wlen_modes:
+        print(f"Band {wlen_mode}...")
+
+        # Initialize grid
+        models[wlen_mode], all_models_exist = init_model_grid(
+            planet_name, lbl_opacity_sampling, do_scat_emis, parameter_dicts, species_list,
+            wavelength_boundaries=wlen_modes[wlen_mode],
+            model_suffix=model_suffix
+        )
+
+        if not all_models_exist:
+            # Load or generate atmosphere
+            atmosphere, atmosphere_filename = SpectralModel.get_atmosphere_model(
+                wlen_bords_micron=wlen_modes[wlen_mode],
+                pressures=pressures,
+                line_species_list=SpectralModel.default_line_species,
+                rayleigh_species=SpectralModel.default_rayleigh_species,
+                continuum_opacities=SpectralModel.default_continuum_opacities,
+                lbl_opacity_sampling=lbl_opacity_sampling,
+                do_scat_emis=do_scat_emis,
+                model_suffix=model_suffix
+            )
+
+            # Load or generate models
+            models[wlen_mode] = generate_model_grid(
+                models=models[wlen_mode],
+                pressures=pressures,
+                line_species_list=line_species_list,
+                rayleigh_species='default',
+                continuum_opacities='default',
+                model_suffix=model_suffix,
+                atmosphere=atmosphere,
+                rewrite=False,
+                save=True
+            )
+        else:
+            # Load existing models
+            models[wlen_mode] = load_model_grid(models[wlen_mode])
+
+    snrs = {}
+    snrs_error = {}
+    tsm = {}
+
+    for meta in metallicity:
+        snrs[meta] = {}
+        snrs_error[meta] = {}
+        tsm[meta] = {}
+
+        for band in wlen_modes:
+            snrs[meta][band], snrs_error[meta][band], tsm[meta][band], results = get_tsm_snr_pcloud(
+                band=band,
+                wavelength_boundaries=wlen_modes[band] * 1e-4,
+                star_distances=distances,
+                p_clouds=p_cloud,
+                models=models,
+                species_list=species_list,
+                settings=settings,
+                planet=planet,
+                t_int=t_int[0],
+                metallicity=meta,
+                co_ratio=co_ratio[0],
+                velocity_range=velocity_range,
+                exposure_time=exposure_time,
+                telescope_mirror_radius=telescope_mirror_radius,
+                telescope_throughput=telescope_throughput,
+                instrument_resolving_power=instrument_resolving_power,
+                pixel_sampling=pixel_sampling,
+                noise_correction_coefficient=1.0,
+                scale_factor=1.0,
+                star_snr=star_snr,
+                star_apparent_magnitude=star_apparent_magnitudes,
+                star_snr_reference_apparent_magnitude=star_apparent_magnitude_j,
+                mock_observation_number=100
+            )
+
+
 def find_best_setting(species, snrs):
     best_snr = - np.inf
     best_band = None
@@ -561,9 +991,8 @@ def find_best_setting(species, snrs):
     return best_snr, best_band, best_setting
 
 
-def plot_snr_histogram(species, snrs, model_labels=None, planet_name=None, threshold=None):
+def plot_snr_settings_bars(species, snrs, model_labels=None, planet_name=None, threshold=None, y_err=None, capsize=2):
     tick_label = []
-    i = 0
 
     width = 0.8 / len(snrs)
 
@@ -574,6 +1003,7 @@ def plot_snr_histogram(species, snrs, model_labels=None, planet_name=None, thres
     for j, model in enumerate(snrs):
         i = 0
         snr = []
+        y_err_ = []
         x = []
 
         for band in snrs[model]:
@@ -585,12 +1015,18 @@ def plot_snr_histogram(species, snrs, model_labels=None, planet_name=None, thres
                 x.append(i + j * width)
                 snr.append(snrs[model][band][setting][species][0, 0])
 
+                if isinstance(y_err, dict):
+                    y_err_.append(y_err[model][band][setting][species][0, 0])
+                else:
+                    y_err_.append(y_err)
+
         if model_labels is None:
             model_label = model
         else:
             model_label = model_labels[j]
 
-        plt.bar(x, snr, width=width, align='edge', tick_label=tick_label, label=model_label)
+        plt.bar(x, snr, width=width, align='edge', tick_label=tick_label, label=model_label,
+                yerr=y_err_, capsize=capsize)
 
     if planet_name is None:
         title = ''
@@ -598,12 +1034,91 @@ def plot_snr_histogram(species, snrs, model_labels=None, planet_name=None, thres
         title = planet_name + ', '
 
     if threshold:
-        plt.plot([0, i + 1], [threshold, threshold], color='k', ls='--')
+        xmin, xmax = plt.xlim()
+        plt.plot([xmin, xmax], [threshold, threshold], color='k', ls='--')
 
     plt.title(f"{title}{species} detection")
     plt.xticks(rotation=90)
     plt.ylabel(f"CCF S/N")
     plt.legend()
+
+
+def plot_snr_settings_bars_from_gaussian(species, snrs, planet_name=None, threshold=None):
+    tick_label = []
+
+    width = 0.8
+
+    for i, band in enumerate(snrs[list(snrs.keys())[0]]):
+        for setting in snrs[list(snrs.keys())[0]][band]:
+            tick_label.append(f"{band}{setting}")
+
+    mu = []
+    std = []
+
+    for band in snrs[0]:
+        for setting in snrs[0][band]:
+            snr = []
+
+            for model in snrs:
+                snr.append(snrs[model][band][setting][species][0, 0])
+
+            mu.append(0)
+            std.append(0)
+            mu[-1], std[-1] = norm.fit(snr)
+
+    i = 0
+    x = []
+
+    for band in snrs[0]:
+        i += 1
+
+        for setting in snrs[0][band]:
+            i += 1
+            x.append(i * width)
+
+    plt.bar(x, mu, width=width, align='center', tick_label=tick_label,
+            yerr=std, capsize=2)
+
+    if planet_name is None:
+        title = ''
+    else:
+        title = planet_name + ', '
+
+    if threshold:
+        plt.plot([0, (i + 1) * width], [threshold, threshold], color='k', ls='--')
+
+    plt.title(f"{title}{species} detection")
+    plt.xticks(rotation=90)
+    plt.ylabel(f"CCF S/N")
+    plt.legend()
+
+
+def plot_snr_distribution(species, snrs, band, setting, planet_name=None, ax=None):
+    snr = []
+
+    for model in snrs:
+        snr.append(snrs[model][band][setting][species][0, 0])
+
+    ax.hist(snr, density=True)
+
+    if planet_name is None:
+        title = ''
+    else:
+        title = planet_name + ', '
+
+    mu, std = norm.fit(snr)
+    xmin, xmax = ax.get_xlim()
+    x = np.linspace(xmin, xmax, 100)
+    p = norm.pdf(x, mu, std)
+    ax.plot(x, p, 'k')
+
+    plt.setp(
+        ax,
+        xlabel='CCF S/N',
+        label='Density',
+        title=f"{title}{species} detection distribution ({len(snrs)} takes, mu={mu:.2f} std={std:.2f})"
+              f", setting {band}{setting}"
+    )
 
 
 def plot_spectrum(star_snr, model, instrument_resolving_power, pixel_sampling):
@@ -717,7 +1232,7 @@ def plot_tsm_x_snr(x, tsm, snrs, band, setting, species, planet_name='', exposur
 
     plt.colorbar(label='CCF S/N')
 
-    #plt.gca().invert_xaxis()
+    # plt.gca().invert_xaxis()
     plt.xlabel(x_label)
     plt.ylabel('TSM')
     plt.title(
