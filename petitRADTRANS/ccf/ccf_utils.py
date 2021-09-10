@@ -222,7 +222,6 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                     snr, velocity, cross_correlation, log_l, log_l_ccf = ccf_analysis(
                         wlen_out, observed_spectrum, single_rebinned
                     )
-                    print(band, setting, order, detector, species)
 
                     # Add the CCF of each order and each detector to retrieve the CCF of one setting
                     f = interp1d(velocity, cross_correlation)

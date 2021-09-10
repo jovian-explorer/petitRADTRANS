@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 
 This is a temporary document.
 
+## [0.3.0] - 2021-09-10
+### Added
+- Option to make models with isothermal or custom temperature profiles.
+- Option to make models with custom mass fractions.
+
+### Changed
+- Code clean-up.
+
+### Fixed
+- Some species names not handled correctly when initializing mass fractions in objects `SpectralModel`.
+
 ## [0.2.0] - 2021-09-09
 ### Added
 - Option to make multiple mock observations with the same set of parameters.

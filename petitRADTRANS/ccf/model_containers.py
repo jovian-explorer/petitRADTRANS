@@ -451,7 +451,7 @@ class Planet:
         return equilibrium_temperature, errors[1], -errors[0]
 
     def get_filename(self):
-        return self._get_filename(self.name)
+        return self.generate_filename(self.name)
 
     def save(self, filename=None):
         if filename is None:
@@ -513,7 +513,7 @@ class Planet:
 
     @classmethod
     def get(cls, name):
-        filename = cls._get_filename(name)
+        filename = cls.generate_filename(name)
 
         if not os.path.exists(filename):
             filename_vot = filename.rsplit('.', 1)[0] + '.vot'  # search for votable
@@ -774,7 +774,7 @@ class Planet:
         return value, key
 
     @staticmethod
-    def _get_filename(name):
+    def generate_filename(name):
         return f"{planet_models_directory}{os.path.sep}planet_{name.replace(' ', '_')}.h5"
 
     @staticmethod
@@ -783,7 +783,7 @@ class Planet:
         result_set = service.search(f"select * from ps where pl_name = '{name}'")
 
         astro_table = result_set.to_table()
-        filename = Planet._get_filename(name).rsplit('.', 1)[0] + '.vot'
+        filename = Planet.generate_filename(name).rsplit('.', 1)[0] + '.vot'
 
         astro_table.write(filename, format='votable')
 
@@ -1021,14 +1021,19 @@ class SpectralModel:
         mass_fractions = {}
 
         for key in abundances:
+            if ',acetylene' in key:  # C2H2 special case
+                key.replace(',acetylene', '')
+
             found = False
 
             for line_species_name in atmosphere.line_species:
-                if key + '_' in line_species_name:
+                line_species = line_species_name.split('_', 1)[0]
+
+                if key == line_species:
                     if key not in include_species:
                         mass_fractions[line_species_name] = np.zeros_like(temperature)
                     else:
-                        mass_fractions[line_species_name] = abundances[line_species_name.split('_', 1)[0]]
+                        mass_fractions[line_species_name] = abundances[line_species]
 
                     found = True
 
@@ -1039,7 +1044,7 @@ class SpectralModel:
 
         return mass_fractions
 
-    def init_temperature(self, planet: Planet, atmosphere: Radtrans):
+    def init_temperature_guillot(self, planet: Planet, atmosphere: Radtrans):
         kappa_ir = self.kappa_ir_z0 * 10 ** self.metallicity
         pressures = atmosphere.press * 1e-6  # cgs to bar
 
@@ -1097,7 +1102,8 @@ class SpectralModel:
     @classmethod
     def generate_from(cls, model, pressures,
                       line_species_list='default', rayleigh_species='default', continuum_opacities='default',
-                      include_species=None, model_suffix='', atmosphere=None, rewrite=False):
+                      include_species=None, model_suffix='',
+                      atmosphere=None, temperature_profile=None, mass_fractions=None, rewrite=False):
         if not hasattr(include_species, '__iter__') or isinstance(include_species, str):
             include_species = [include_species]
         elif include_species is None:
@@ -1132,7 +1138,7 @@ class SpectralModel:
             # Generate the model
             return cls._generate(
                 model, pressures, line_species_list, rayleigh_species, continuum_opacities, include_species,
-                model_suffix, atmosphere
+                model_suffix, atmosphere, temperature_profile, mass_fractions
             )
 
     @classmethod
@@ -1178,7 +1184,7 @@ class SpectralModel:
 
     @staticmethod
     def _generate(model, pressures, line_species_list, rayleigh_species, continuum_opacities, include_species,
-                  model_suffix, atmosphere=None):
+                  model_suffix, atmosphere=None, temperature_profile=None, mass_fractions=None):
         if atmosphere is None:
             atmosphere, model.atmosphere_file = model.get_atmosphere_model(
                 model.wavelength_boundaries, pressures, line_species_list, rayleigh_species, continuum_opacities,
@@ -1190,19 +1196,40 @@ class SpectralModel:
             )
 
         # A Planet needs to be generated and saved first
-        model.planet_model_file = Planet._get_filename(model.planet_name)  # TODO _get_filename should not be protected
+        model.planet_model_file = Planet.generate_filename(model.planet_name)
         planet = Planet.load(model.planet_name, model.planet_model_file)
 
-        model.temperature = model.init_temperature(
-            planet=planet,
-            atmosphere=atmosphere
-        )
+        if temperature_profile is None:
+            model.temperature = model.init_temperature_guillot(
+                planet=planet,
+                atmosphere=atmosphere
+            )
+        elif isinstance(temperature_profile, (float, int)):
+            model.temperature = np.ones_like(atmosphere.press) * temperature_profile
+        elif np.size(temperature_profile) == np.size(atmosphere.press):
+            model.temperature = np.asarray(temperature_profile)
+        else:
+            raise ValueError(f"could not initialize temperature profile using input {temperature_profile}; "
+                             f"possible inputs are None, float, int, "
+                             f"or a 1-D array of the same size of argument 'pressures' ({np.size(atmosphere.press)})")
 
+        # Generate mass fractions from equilibrium chemistry first to have all the keys
+        # TODO generate the mass fractions dict without calling equilibrium chemistry
         model.mass_fractions = model.init_mass_fractions(
             atmosphere=atmosphere,
             temperature=model.temperature,
             include_species=include_species
         )
+
+        if isinstance(mass_fractions, dict):
+            for key in mass_fractions:
+                if key in model.mass_fractions:
+                    model.mass_fractions[key] = mass_fractions[key]
+                else:
+                    raise KeyError(f"key '{key}' not in line species list or "
+                                   f"standard petitRADTRANS mass fractions dict")
+        elif mass_fractions is not None:  # if None, just keep the equilibrium chemistry mass fractions
+            raise ValueError(f"mass fractions must be in a dict, but the input was of type '{type(mass_fractions)}'")
 
         model.wavelengths, model.transit_radius = model.calculate_transmission_spectrum(
             atmosphere=atmosphere,
@@ -1293,7 +1320,8 @@ def _get_generic_planet_name(radius, surface_gravity, equilibrium_temperature):
 
 def generate_model_grid(models, pressures,
                         line_species_list='default', rayleigh_species='default', continuum_opacities='default',
-                        model_suffix='', atmosphere=None, rewrite=False, save=False):
+                        model_suffix='', atmosphere=None, temperature_profile=None, mass_fractions=None,
+                        rewrite=False, save=False):
     """
     Get a grid of models, generate it if needed.
     Models are generated using petitRADTRANS in its line-by-line mode. Clouds are modelled as a gray deck.
@@ -1307,6 +1335,10 @@ def generate_model_grid(models, pressures,
         continuum_opacities: list containing all the continua to include in the models
         model_suffix: suffix of the model
         atmosphere: pre-loaded Radtrans object
+        temperature_profile: if None, a Guillot temperature profile is generated, if int or float, an isothermal
+            temperature profile is generated, if 1-D array of the same size of pressures, the temperature profile is
+            directly used
+        mass_fractions: if None, equilibrium chemistry is used, if dict, the values from the dict are used
         rewrite: if True, rewrite all the models, even if they already exists
         save: if True, save the models once generated
 
@@ -1329,6 +1361,8 @@ def generate_model_grid(models, pressures,
                 continuum_opacities=continuum_opacities,
                 model_suffix=model_suffix,
                 atmosphere=atmosphere,
+                temperature_profile=temperature_profile,
+                mass_fractions=mass_fractions,
                 rewrite=rewrite
             )
 
