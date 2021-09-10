@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 
 This is a temporary document.
 
+## [0.4.0] - 2021-09-10
+### Changed
+- Chemical table is now read in an HDF5 file, increasing loading speed.
+- `poor_mans_nonequ_chem` module structure reorganized.
+
 ## [0.3.0] - 2021-09-10
 ### Added
 - Option to make models with isothermal or custom temperature profiles.
