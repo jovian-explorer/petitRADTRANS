@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 
 This is a temporary document.
 
+## [0.5.0] - 2021-09-13
+### Changed
+- SNR cutoff is now applied by masking instead of removing.
+- SNR <= 1 are now masked, instead of SNR <= 0.
+- Median is used instead of mean to remove the large scale trends of the spectra.
+- When multiple observed spectra are used, the large scale trends are calculated for each one separately instead of using one correction for all spectra.
+- Code clean-up.
+
+### Fixed
+- Handling of C2H2 in `SpectralModel`.
+
 ## [0.4.0] - 2021-09-10
 ### Changed
 - Chemical table is now read in an HDF5 file, increasing loading speed.

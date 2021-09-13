@@ -244,7 +244,7 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                                       f"ignoring setting {band}{setting}-{order}-{detector}; "
                                       f"consider reducing velocity range if this happen too often.")
                             else:
-                                raise ValueError(str(error_msg))
+                                raise
 
             for species in species_list:
                 if species == 'all':

@@ -91,11 +91,12 @@ def generate_mock_observation(wavelengths, flux, snr_per_res_element, observing_
     """
     if transit_duration <= 0:
         # There is no transit, so no signal from the planet
-        raise ValueError(f"the planet is not transiting (transit duration = {transit_duration})")
+        raise ValueError(f"the planet is not transiting (transit duration = {transit_duration} s)")
     elif transit_duration >= observing_time:
         # It is not possible to extract the planet signal if the signal of the star alone is not taken
         raise ValueError(f"impossible to retrieve the planet transit depth "
-                         f"if transit duration is greater then observing time ({transit_duration} >= {observing_time})")
+                         f"if transit duration is greater than observing time "
+                         f"({transit_duration} >= {observing_time} s)")
 
     # Start from the nominal model, and re-bin using the instrument LSF
     full_lsf_ed, wavelengths_out, full_rebinned = convolve_rebin(
@@ -108,12 +109,7 @@ def generate_mock_observation(wavelengths, flux, snr_per_res_element, observing_
 
     # Remove 0 SNR  # TODO better way to handle 0 SNR?
     if np.size(snr_per_res_element) > 1:
-        wh = np.where(snr_per_res_element[1:-1] != 0)
-
-        snr_per_res_element = snr_per_res_element[1:-1][wh]
-        full_rebinned = full_rebinned[wh]
-        wavelengths_out = wavelengths_out[wh]
-        full_lsf_ed = full_lsf_ed[wh]
+        snr_per_res_element = np.ma.masked_less_equal(snr_per_res_element, 1)
 
     # Add noise to the model
     noise_per_pixel = 1 / snr_per_res_element \

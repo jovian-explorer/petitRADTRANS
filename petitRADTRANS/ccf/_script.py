@@ -868,7 +868,7 @@ def main_tiso():
     p_cloud = [1e2]
     species_list = ['all', 'H2O']
     mass_fractions = {  # species not included here will be initialized with equilibrium chemistry
-        'HCN': np.ones_like(pressures) * 1e-7,
+        'HCN_main_iso': np.ones_like(pressures) * 1e-7,
         'C2H2,acetylene': np.ones_like(pressures) * 1e-8
     }
 
@@ -990,7 +990,7 @@ def main_tiso():
             tsm[t_eq][meta] = {}
 
             for band in wlen_modes:
-                snrs[t_eq][meta][band], snrs_error[t_eq][meta], tsm[t_eq][meta][band], results = \
+                snrs[t_eq][meta][band], snrs_error[t_eq][meta][band], tsm[t_eq][meta][band], results = \
                     get_tsm_snr_pcloud(
                         band=band,
                         wavelength_boundaries=wlen_modes[band] * 1e-4,
@@ -1098,9 +1098,12 @@ def test():
 
     # Load settings
     settings = load_wavelength_settings(module_dir + '/crires/wavelength_settings.dat')
+    settings = {'K': {'2148': settings['K']['2148']}}
 
     # Load planet
     planet = Planet.get(planet_name)
+    exposure_time = 1000 * 3600
+    planet.transit_duration = 500 * 3600
 
     # Load signal to noise ratios
     star_snr = get_crires_snr_data(settings, star_apparent_magnitude_j,  # TODO apparent mag is really annoying
@@ -1155,41 +1158,72 @@ def test():
             # Load existing models
             models[wlen_mode] = load_model_grid(models[wlen_mode])
 
-    snrs = {}
-    snrs_error = {}
-    tsm = {}
+    snrs, snrs_error, tsm, results = get_tsm_snr_pcloud(
+        band='K',
+        wavelength_boundaries=wlen_modes['K'] * 1e-4,
+        star_distances=distances,
+        p_clouds=p_cloud,
+        models=models,
+        species_list=species_list,
+        settings=settings,
+        planet=planet,
+        t_int=t_int[0],
+        metallicity=metallicity[0],
+        co_ratio=co_ratio[0],
+        velocity_range=velocity_range,
+        exposure_time=exposure_time,
+        telescope_mirror_radius=telescope_mirror_radius,
+        telescope_throughput=telescope_throughput,
+        instrument_resolving_power=instrument_resolving_power,
+        pixel_sampling=pixel_sampling,
+        noise_correction_coefficient=1.0,
+        scale_factor=1.0,
+        star_snr=star_snr,
+        star_apparent_magnitude=star_apparent_magnitudes,
+        star_snr_reference_apparent_magnitude=star_apparent_magnitude_j,
+        mock_observation_number=10
+    )
 
-    for meta in metallicity:
-        snrs[meta] = {}
-        snrs_error[meta] = {}
-        tsm[meta] = {}
+    snrs_ = {}
 
-        for band in wlen_modes:
-            snrs[meta][band], snrs_error[meta][band], tsm[meta][band], results = get_tsm_snr_pcloud(
-                band=band,
-                wavelength_boundaries=wlen_modes[band] * 1e-4,
-                star_distances=distances,
-                p_clouds=p_cloud,
-                models=models,
-                species_list=species_list,
-                settings=settings,
-                planet=planet,
-                t_int=t_int[0],
-                metallicity=meta,
-                co_ratio=co_ratio[0],
-                velocity_range=velocity_range,
-                exposure_time=exposure_time,
-                telescope_mirror_radius=telescope_mirror_radius,
-                telescope_throughput=telescope_throughput,
-                instrument_resolving_power=instrument_resolving_power,
-                pixel_sampling=pixel_sampling,
-                noise_correction_coefficient=1.0,
-                scale_factor=1.0,
-                star_snr=star_snr,
-                star_apparent_magnitude=star_apparent_magnitudes,
-                star_snr_reference_apparent_magnitude=star_apparent_magnitude_j,
-                mock_observation_number=100
-            )
+    for i in range(10):
+        print(i)
+        snrs_[i], snrs_error_, tsm_, results_ = get_tsm_snr_pcloud(
+            band='K',
+            wavelength_boundaries=wlen_modes['K'] * 1e-4,
+            star_distances=distances,
+            p_clouds=p_cloud,
+            models=models,
+            species_list=species_list,
+            settings=settings,
+            planet=planet,
+            t_int=t_int[0],
+            metallicity=metallicity[0],
+            co_ratio=co_ratio[0],
+            velocity_range=velocity_range,
+            exposure_time=exposure_time,
+            telescope_mirror_radius=telescope_mirror_radius,
+            telescope_throughput=telescope_throughput,
+            instrument_resolving_power=instrument_resolving_power,
+            pixel_sampling=pixel_sampling,
+            noise_correction_coefficient=1.0,
+            scale_factor=1.0,
+            star_snr=star_snr,
+            star_apparent_magnitude=star_apparent_magnitudes,
+            star_snr_reference_apparent_magnitude=star_apparent_magnitude_j,
+            mock_observation_number=1
+        )
+
+    snr = []
+
+    for i in snrs_:
+        snr.append(snrs_[i]['2148']['H2O'][0, 0])
+
+    b, x, ax = plt.hist(snr, density=True)
+    import scipy.stats
+    plt.plot(x, scipy.stats.norm.pdf(x, snrs['2148']['H2O'][0, 0], snrs_error['2148']['H2O'][0, 0]))
+    plt.xlabel('CCF S/N')
+    plt.title('WASP-39 b, H2O detection, 100x1 (blue) vs 1x100 (orange) obs')
 
 
 def find_best_setting(species, snrs):

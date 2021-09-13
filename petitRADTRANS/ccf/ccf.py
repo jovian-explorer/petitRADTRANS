@@ -108,24 +108,25 @@ def remove_large_scale_trends(freq, flux, ran=2 * 0.0015 * 1e-4):  # TODO better
 
     wavelength_range = np.arange(np.min(freq) - 2. * ran, np.max(freq) + 2. * ran, ran)
 
-    vals = np.zeros_like(wavelength_range[:-1]) * np.nan
+    vals = np.zeros((np.size(flux, axis=0), np.size(wavelength_range[:-1]))) * np.nan
 
-    for i in range(1, len(wavelength_range) - 2):
+    for i in range(1, np.size(wavelength_range) - 2):
         wh = np.where(
                 np.logical_and(freq >= wavelength_range[i], freq < wavelength_range[i + 1])
-            )
+            )[0]
 
         if np.size(wh) > 0:
-            vals[i] = np.mean(flux[:, wh])
+            vals[:, i] = np.median(flux[:, wh], axis=1)
         else:
-            vals[i] = vals[i - 1]
+            vals[:, i] = vals[:, i - 1]
 
-    vals[0], vals[-1] = vals[1], vals[-2]  # expand
+    vals[:, 0], vals[:, -1] = vals[:, 1], vals[:, -2]  # expand
 
     # Remove leading and tailing NaNs
-    wh = np.where(np.logical_not(np.isnan(vals)))[0]
-    vals[:wh[0]] = vals[wh[0]]
-    vals[wh[-1]:] = vals[wh[-1]]
+    for i in range(np.size(flux, axis=0)):
+        wh = np.where(np.logical_not(np.isnan(vals[i, :])))[0]
+        vals[i, :wh[0]] = vals[i, wh[0]]
+        vals[i, wh[-1]:] = vals[i, wh[-1]]
 
     # Interpolate means and divide to the flux
     taut_val = interp1d((wavelength_range[1:] + wavelength_range[:-1]) / 2., vals)

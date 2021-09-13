@@ -1021,13 +1021,13 @@ class SpectralModel:
         mass_fractions = {}
 
         for key in abundances:
-            if ',acetylene' in key:  # C2H2 special case
-                key.replace(',acetylene', '')
-
             found = False
 
             for line_species_name in atmosphere.line_species:
                 line_species = line_species_name.split('_', 1)[0]
+
+                if line_species == 'C2H2':   # C2H2 special case
+                    line_species += ',acetylene'
 
                 if key == line_species:
                     if key not in include_species:
