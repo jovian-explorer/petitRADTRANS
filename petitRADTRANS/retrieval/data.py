@@ -267,6 +267,11 @@ class Data:
         self.distance = distance
         return self.distance
 
+    def update_bins(self,wlens):
+        self.wlen_bins = np.zeros_like(wlens)
+        self.wlen_bins[:-1] = np.diff(wlens)
+        self.wlen_bins[-1] = self.wlen_bins[-2]
+
     def scale_to_distance(self, new_dist):
         """
         Updates the distance variable in the data class.
