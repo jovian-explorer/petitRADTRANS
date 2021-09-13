@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 
 This is a temporary document.
 
+## [0.5.1] - 2021-09-13
+### Changed
+- Mock observed spectra now use the median of the noise.
+
+### Fixed
+- Crashes due to empty mock observed spectra.
+
 ## [0.5.0] - 2021-09-13
 ### Changed
 - SNR cutoff is now applied by masking instead of removing.

@@ -187,8 +187,18 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                         10 ** ((star_snr_reference_apparent_magnitude - star_apparent_magnitude) / 5)
 
                 if np.all(snr_per_res_element <= 0):
-                    print(f"Setting '{band}{setting}' order {order}: signal-to-noise ratio is 0, skipping...")
+                    print(f"Setting '{band}{setting}' order {order} detector {detector}: "
+                          f"signal-to-noise ratio is 0, skipping...")
                     continue
+
+                # Cutoff to SNR
+                if np.size(snr_per_res_element) > 1:
+                    snr_per_res_element = np.ma.masked_less_equal(snr_per_res_element, 1)
+
+                    if np.all(snr_per_res_element.mask):
+                        print(f"Setting '{band}{setting}' order {order} detector {detector}: "
+                              f"signal-to-noise ratio is masked, skipping...")
+                        continue
 
                 # Observed spectrum
                 observed_spectrum, full_lsf_ed, wlen_out, full_model_rebinned, snr_obs = \
@@ -226,7 +236,7 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                     # Add the CCF of each order and each detector to retrieve the CCF of one setting
                     f = interp1d(velocity, cross_correlation)
 
-                    if i == 0:
+                    if species not in x:
                         x[species] = np.arange(
                             velocity_range[0], velocity_range[1], np.mean(np.diff(velocity)) / 3.
                         )
@@ -254,14 +264,23 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                 mu = np.zeros(mock_observation_number)
                 std = np.zeros(mock_observation_number)
 
-                for j in range(mock_observation_number):
-                    snr[j], mu[j], std[j] = calculate_ccf_snr(x[species], add[species][j, :])
+                if species in x:
+                    for j in range(mock_observation_number):
+                        snr[j], mu[j], std[j] = calculate_ccf_snr(x[species], add[species][j, :])
+
+                    vel = x[species]
+                    ccf = (np.transpose(add[species]) - mu) / std
+                    log_l = log_l_ccf_all_orders[species]
+                else:
+                    vel = None
+                    ccf = None
+                    log_l = None
 
                 results[band][setting][species] = {
                     'S/N': snr,
-                    'velocity': x[species],
-                    'CCF': (np.transpose(add[species]) - mu) / std,
-                    'LogL': log_l_ccf_all_orders[species]
+                    'velocity': vel,
+                    'CCF': ccf,
+                    'LogL': log_l
                 }
 
     return results

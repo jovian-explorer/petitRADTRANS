@@ -107,10 +107,6 @@ def generate_mock_observation(wavelengths, flux, snr_per_res_element, observing_
         instrument_wavelength_range=np.array(instrument_wavelength_range)
     )
 
-    # Remove 0 SNR  # TODO better way to handle 0 SNR?
-    if np.size(snr_per_res_element) > 1:
-        snr_per_res_element = np.ma.masked_less_equal(snr_per_res_element, 1)
-
     # Add noise to the model
     noise_per_pixel = 1 / snr_per_res_element \
         * np.sqrt(
@@ -122,7 +118,7 @@ def generate_mock_observation(wavelengths, flux, snr_per_res_element, observing_
 
     observed_spectrum = full_rebinned + rng.normal(
         loc=0.,
-        scale=noise_per_pixel,
+        scale=np.ma.median(noise_per_pixel),
         size=(number, np.size(full_rebinned))
     )
 

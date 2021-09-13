@@ -133,7 +133,6 @@ def remove_large_scale_trends(freq, flux, ran=2 * 0.0015 * 1e-4):  # TODO better
     flux_transform = flux / taut_val(freq) - 1.
 
     # Remove last remaining NaNs (there should be none)
-    wh = np.where(np.isnan(flux_transform))
-    flux_transform[wh] = 0.
+    flux_transform = np.ma.masked_where(np.isnan(flux_transform), flux_transform)
 
     return flux_transform
