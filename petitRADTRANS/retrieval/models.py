@@ -154,7 +154,7 @@ def emission_model_diseq(pRT_object,
     if "sigma_lnorm" in parameters.keys():
         sigma_lnorm = parameters['sigma_lnorm'].value
     elif "b_hans" in parameters.keys():
-        b_hans = parameters['sigma_lnorm'].value
+        b_hans = parameters['b_hans'].value
         distribution = "hansen"
 
     pRT_object.calc_flux(temperatures,
@@ -165,7 +165,8 @@ def emission_model_diseq(pRT_object,
                          fsed=parameters['fsed'].value,
                          Kzz=kzz_use,
                          sigma_lnorm=sigma_lnorm,
-                        dist = distribution)
+                         b_hans=b_hans,
+                         dist=distribution)
     # Getting the model into correct units (W/m2/micron)
     wlen_model = nc.c / pRT_object.freq / 1e-4
     wlen = nc.c / pRT_object.freq

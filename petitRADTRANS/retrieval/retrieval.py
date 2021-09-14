@@ -1064,7 +1064,8 @@ class Retrieval:
 
         # Plotting
         self.plot_spectra(samples_use, parameters_read)
-        self.plot_sampled(samples_use, parameters_read)
+        if self.evaluate_sample_spectra:
+            self.plot_sampled(samples_use, parameters_read)
         self.plot_PT(sample_dict, parameters_read)
         self.plot_corner(sample_dict, parameter_dict, parameters_read)
         print("Done!")
