@@ -44,6 +44,7 @@ class RetrievalConfig:
                  run_mode="retrieval",
                  AMR=False,
                  scattering=False,
+                 distribution="lognormal",
                  pressures=None,
                  write_out_spec_sample=False):
 
@@ -63,6 +64,7 @@ class RetrievalConfig:
             self.p_global = np.logspace(-6, 3, 100)
 
         self.scattering = scattering
+        self.distribution = distribution
         self.parameters = {}  #: Dictionary of the parameters passed to the model generating function
         self.data = {}  #: Dictionary of the datasets used in the retrieval.
         self.instruments = []
