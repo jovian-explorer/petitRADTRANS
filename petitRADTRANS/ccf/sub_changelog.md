@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 
 This is a temporary document.
 
+## [0.6.0] - 2021-09-14
+### Added
+- Option to calculate emission and eclipse depth spectra in `SpectralModel`.
+
+### Changed
+- Code clean-up.
+
+### Fixed
+- Crash due to too large input velocity range.
+
+
 ## [0.5.1] - 2021-09-13
 ### Changed
 - Mock observed spectra now use the median of the noise.

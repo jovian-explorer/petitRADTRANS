@@ -115,6 +115,7 @@ def main():
                 continuum_opacities='default',
                 model_suffix=model_suffix,
                 atmosphere=atmosphere,
+                calculate_transmission_spectrum=True,
                 rewrite=False,
                 save=True
             )
@@ -302,6 +303,7 @@ def main_ltt():
                 continuum_opacities='default',
                 model_suffix=model_suffix,
                 atmosphere=atmosphere,
+                calculate_transmission_spectrum=True,
                 rewrite=False,
                 save=True
             )
@@ -526,6 +528,7 @@ def main_toi():
                     continuum_opacities='default',
                     model_suffix=model_suffix,
                     atmosphere=atmosphere,
+                    calculate_transmission_spectrum=True,
                     rewrite=False,
                     save=True
                 )
@@ -588,8 +591,10 @@ def main_toi():
                 continue
 
             snr = {
-                f"{planets[i + 2].transit_duration / planet_1.transit_duration} transits": snrs[planet_key1][metallicity[0]],
-                f"{planets[i].transit_duration / planet_1.transit_duration} transits": snrs[planet_key2][metallicity[0]],
+                f"{planets[i + 2].transit_duration / planet_1.transit_duration} "
+                f"transits": snrs[planet_key1][metallicity[0]],
+                f"{planets[i].transit_duration / planet_1.transit_duration} "
+                f"transits": snrs[planet_key2][metallicity[0]],
             }
 
             plt.figure(figsize=(16, 9))
@@ -755,6 +760,7 @@ def main_teff():
                     continuum_opacities='default',
                     model_suffix=model_suffix,
                     atmosphere=atmosphere,
+                    calculate_transmission_spectrum=True,
                     rewrite=False,
                     save=True
                 )
@@ -967,6 +973,7 @@ def main_tiso():
                     atmosphere=atmosphere,
                     temperature_profile=planet.equilibrium_temperature,
                     mass_fractions=mass_fractions,
+                    calculate_transmission_spectrum=True,
                     rewrite=False,
                     save=True
                 )
@@ -1057,11 +1064,10 @@ def test():
         'K': np.array([1.88, 2.55])
     }
 
+    planet = Planet.get(planet_name)
     pressures = np.logspace(-10, 2, 130)
-    distances = [213.982 * nc.pc]  # np.logspace(1, 3, 7) * nc.c * 3600 * 24 * 365.25
-    # star_apparent_magnitude_v = 12.095
-    star_apparent_magnitude_j = 10.663
-    # star_apparent_magnitude_j = 10
+    distances = [213.982 * nc.pc]
+    star_apparent_magnitude_j = planet.system_apparent_magnitude_j
     star_apparent_magnitudes = [star_apparent_magnitude_j]
 
     # Models to be tested
@@ -1101,7 +1107,6 @@ def test():
     settings = {'K': {'2148': settings['K']['2148']}}
 
     # Load planet
-    planet = Planet.get(planet_name)
     exposure_time = 1000 * 3600
     planet.transit_duration = 500 * 3600
 
@@ -1151,6 +1156,7 @@ def test():
                 continuum_opacities='default',
                 model_suffix=model_suffix,
                 atmosphere=atmosphere,
+                calculate_transmission_spectrum=True,
                 rewrite=False,
                 save=True
             )
@@ -1224,6 +1230,142 @@ def test():
     plt.plot(x, scipy.stats.norm.pdf(x, snrs['2148']['H2O'][0, 0], snrs_error['2148']['H2O'][0, 0]))
     plt.xlabel('CCF S/N')
     plt.title('WASP-39 b, H2O detection, 100x1 (blue) vs 1x100 (orange) obs')
+
+
+def test_emission():
+    # Base parameters
+    planet_name = 'WASP-39 b'
+    lbl_opacity_sampling = 1
+    do_scat_emis = False
+    model_suffix = ''
+    wlen_modes = {
+        'K': np.array([1.88, 2.55])
+    }
+
+    planet = Planet.get(planet_name)
+    pressures = np.logspace(-10, 2, 130)
+    distances = [213.982 * nc.pc]
+    star_apparent_magnitude_j = planet.system_apparent_magnitude_j
+    star_apparent_magnitudes = [star_apparent_magnitude_j]
+
+    # Models to be tested
+    t_int = [50]
+    metallicity = [1]
+    co_ratio = [0.55]
+    p_cloud = [1e2]
+    species_list = ['all', 'H2O']
+
+    line_species_list = [
+        'CH4_main_iso',
+        'CO_all_iso',
+        'CO2_main_iso',
+        'H2O_main_iso',
+        'H2S_main_iso',
+        'HCN_main_iso',
+        'K',
+        'Na_allard',
+        'NH3_main_iso',
+        'PH3_main_iso'
+    ]
+
+    # Observation parameters
+    # Actually matter (used to get the CRIRES SNR data from the ETC website)
+    exposure_time = 6 * 3600  # 4 * 3600
+    integration_time = 60
+    airmass = 1.2
+    velocity_range = [-1400, 1400]
+    instrument_resolving_power = 8e4
+    # Old (don't do anything anymore)
+    telescope_mirror_radius = 8.2e2 / 2  # cm
+    telescope_throughput = 0.1
+    pixel_sampling = 3
+
+    # Load settings
+    settings = load_wavelength_settings(module_dir + '/crires/wavelength_settings.dat')
+    settings = {'K': {'2148': settings['K']['2148']}}
+
+    # Load planet
+    exposure_time = 1000 * 3600
+    planet.transit_duration = 500 * 3600
+
+    # Load signal to noise ratios
+    star_snr = get_crires_snr_data(settings, star_apparent_magnitude_j,  # TODO apparent mag is really annoying
+                                   planet.star_effective_temperature, exposure_time,
+                                   integration_time, airmass,  # TODO add FLI and seeing
+                                   rewrite=False, star_apparent_magnitude_band='J')
+
+    # Generate parameter dictionaries
+    parameter_dicts = get_parameter_dicts(
+        t_int, metallicity, co_ratio, p_cloud
+    )
+
+    # Load/generate relevant models
+    models = {}
+
+    for wlen_mode in wlen_modes:
+        print(f"Band {wlen_mode}...")
+
+        # Initialize grid
+        models[wlen_mode], all_models_exist = init_model_grid(
+            planet_name, lbl_opacity_sampling, do_scat_emis, parameter_dicts, species_list,
+            wavelength_boundaries=wlen_modes[wlen_mode],
+            model_suffix=model_suffix
+        )
+
+        if not all_models_exist:
+            # Load or generate atmosphere
+            atmosphere, atmosphere_filename = SpectralModel.get_atmosphere_model(
+                wlen_bords_micron=wlen_modes[wlen_mode],
+                pressures=pressures,
+                line_species_list=SpectralModel.default_line_species,
+                rayleigh_species=SpectralModel.default_rayleigh_species,
+                continuum_opacities=SpectralModel.default_continuum_opacities,
+                lbl_opacity_sampling=lbl_opacity_sampling,
+                do_scat_emis=do_scat_emis,
+                model_suffix=model_suffix
+            )
+
+            # Load or generate models
+            models[wlen_mode] = generate_model_grid(
+                models=models[wlen_mode],
+                pressures=pressures,
+                line_species_list=line_species_list,
+                rayleigh_species='default',
+                continuum_opacities='default',
+                model_suffix=model_suffix,
+                atmosphere=atmosphere,
+                calculate_transmission_spectrum=False,
+                calculate_eclipse_depth=True,
+                rewrite=True,
+                save=True
+            )
+
+    snrs, snrs_error, tsm, results = get_tsm_snr_pcloud(
+        band='K',
+        wavelength_boundaries=wlen_modes['K'] * 1e-4,
+        star_distances=distances,
+        p_clouds=p_cloud,
+        models=models,
+        species_list=species_list,
+        settings=settings,
+        planet=planet,
+        t_int=t_int[0],
+        metallicity=metallicity[0],
+        co_ratio=co_ratio[0],
+        velocity_range=velocity_range,
+        exposure_time=exposure_time,
+        telescope_mirror_radius=telescope_mirror_radius,
+        telescope_throughput=telescope_throughput,
+        instrument_resolving_power=instrument_resolving_power,
+        pixel_sampling=pixel_sampling,
+        noise_correction_coefficient=1.0,
+        scale_factor=1.0,
+        star_snr=star_snr,
+        star_apparent_magnitude=star_apparent_magnitudes,
+        star_snr_reference_apparent_magnitude=star_apparent_magnitude_j,
+        mock_observation_number=10,
+        mode='eclipse'
+    )
 
 
 def find_best_setting(species, snrs):

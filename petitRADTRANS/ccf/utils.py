@@ -1,4 +1,8 @@
+import os
+
 import numpy as np
+
+module_dir = os.path.dirname(__file__)  # TODO find a cleaner way to do this?
 
 
 def class_init_args2class_args(string):

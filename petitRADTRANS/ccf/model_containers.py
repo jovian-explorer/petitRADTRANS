@@ -1,13 +1,15 @@
-import numpy as np
-import pickle
 import os
-import pyvo
-import h5py
-from astropy.table.table import Table
+import pickle
 
-from petitRADTRANS import nat_cst as nc
+import h5py
+import numpy as np
+import pyvo
+from astropy.table.table import Table
+from petitRADTRANS.fort_rebin import fort_rebin as fr
+
 from petitRADTRANS import Radtrans
-from petitRADTRANS.ccf.utils import calculate_uncertainty
+from petitRADTRANS import nat_cst as nc
+from petitRADTRANS.ccf.utils import calculate_uncertainty, module_dir
 
 # from petitRADTRANS import petitradtrans_config
 
@@ -920,8 +922,9 @@ class SpectralModel:
 
     def __init__(self, planet_name, wavelength_boundaries, lbl_opacity_sampling, do_scat_emis,
                  t_int, metallicity, co_ratio, p_cloud, kappa_ir_z0=0.01, gamma=0.4, p_quench_c=None, haze_factor=1,
-                 atmosphere_file=None, wavelengths=None, transit_radius=None, temperature=None,
-                 mass_fractions=None, planet_model_file=None, model_suffix='', filename=None):
+                 atmosphere_file=None, wavelengths=None, transit_radius=None, eclipse_depth=None,
+                 spectral_radiosity=None, star_spectral_radiosity=None,
+                 temperature=None, mass_fractions=None, planet_model_file=None, model_suffix='', filename=None):
         self.planet_name = planet_name
         self.wavelength_boundaries = wavelength_boundaries
         self.lbl_opacity_sampling = lbl_opacity_sampling
@@ -943,6 +946,9 @@ class SpectralModel:
 
         self.wavelengths = wavelengths
         self.transit_radius = transit_radius
+        self.eclipse_depth = eclipse_depth
+        self.spectral_radiosity = spectral_radiosity
+        self.star_spectral_radiosity = star_spectral_radiosity
 
         self.name_suffix = model_suffix
 
@@ -953,6 +959,44 @@ class SpectralModel:
 
         if filename is None:
             self.filename = self.get_filename()
+
+    def calculate_eclipse_depth(self, atmosphere: Radtrans, planet: Planet):
+        star_radiosity_filename = self.get_star_radiosity_filename(planet.star_effective_temperature, path=module_dir)
+
+        if not os.path.isfile(star_radiosity_filename):
+            self.generate_phoenix_star_spectrum_file(star_radiosity_filename, planet.star_effective_temperature)
+
+        data = np.loadtxt(star_radiosity_filename)
+        star_wavelength = data[:, 0] * 1e6  # m to um
+        star_radiosity = data[:, 1] * 1e8 * np.pi  # erg.s-1.cm-2.sr-1/A to erg.s-1.cm-2/cm
+
+        print('Calculating eclipse depth...')
+        # TODO fix stellar flux calculated multiple time if do_scat_emis is True
+        wavelengths, planet_radiosity = self.calculate_emission_spectrum(atmosphere, planet)
+        star_radiosity = fr.rebin_spectrum(star_wavelength, star_radiosity, wavelengths)
+
+        eclipse_depth = (planet_radiosity * planet.radius ** 2) / (star_radiosity * planet.star_radius ** 2)
+
+        return wavelengths, eclipse_depth, planet_radiosity
+
+    def calculate_emission_spectrum(self, atmosphere: Radtrans, planet: Planet):
+        print('Calculating emission spectrum...')
+
+        atmosphere.calc_flux(
+            self.temperature,
+            self.mass_fractions,
+            planet.surface_gravity,
+            self.mass_fractions['MMW'],
+            Tstar=planet.star_effective_temperature,
+            Rstar=planet.star_radius / nc.r_sun,
+            semimajoraxis=planet.orbit_semi_major_axis / nc.AU,
+            Pcloud=self.p_cloud
+        )
+
+        flux = self.radiosity_erg_hz2radiosity_erg_cm(atmosphere.flux, atmosphere.freq)
+        wavelengths = nc.c / atmosphere.freq * 1e4  # m to um
+
+        return wavelengths, flux
 
     def calculate_transmission_spectrum(self, atmosphere: Radtrans, planet: Planet):
         print('Calculating transmission spectrum...')
@@ -969,9 +1013,27 @@ class SpectralModel:
         )
 
         transit_radius = (atmosphere.transm_rad / planet.star_radius) ** 2
-        wavelengths = nc.c / atmosphere.freq / 1e-4
+        wavelengths = nc.c / atmosphere.freq * 1e4  # m to um
 
         return wavelengths, transit_radius
+
+    @staticmethod
+    def generate_phoenix_star_spectrum_file(star_spectrum_file, star_effective_temperature):
+        stellar_spectral_radiance = nc.get_PHOENIX_spec(star_effective_temperature)
+
+        # Convert the spectrum to units accepted by the ETC website
+        # Don't take the first wavelength to avoid spike in convolution
+        wavelength_stellar = \
+            stellar_spectral_radiance[1:, 0]  # in cm
+        stellar_spectral_radiance = SpectralModel.radiosity_erg_hz2radiosity_erg_cm(
+            stellar_spectral_radiance[1:, 1],
+            nc.c / wavelength_stellar
+        )
+
+        wavelength_stellar *= 1e-2  # cm to m
+        stellar_spectral_radiance *= 1e-8 / np.pi  # erg.s-1.cm-2/cm to erg.s-1.cm-2.sr-1/A
+
+        np.savetxt(star_spectrum_file, np.transpose((wavelength_stellar, stellar_spectral_radiance)))
 
     def get_filename(self):
         name = self.get_name()
@@ -993,6 +1055,10 @@ class SpectralModel:
             name += f'_{self.name_suffix}'
 
         return name
+
+    @staticmethod
+    def get_star_radiosity_filename(star_effective_temperature, path='.'):
+        return f'{path}/crires/star_spectrum_{star_effective_temperature}K.dat'
 
     def init_mass_fractions(self, atmosphere, temperature, include_species):
         from petitRADTRANS.poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm  # import is here because it's long!
@@ -1067,7 +1133,9 @@ class SpectralModel:
     def get(cls, planet_name, wavelength_boundaries, lbl_opacity_sampling, pressures, do_scat_emis, t_int,
             metallicity, co_ratio, p_cloud, kappa_ir_z0=0.01, gamma=0.4, p_quench_c=None, haze_factor=1,
             line_species_list='default', rayleigh_species='default', continuum_opacities='default',
-            include_species='all', model_suffix='', atmosphere=None, rewrite=True):
+            include_species='all', model_suffix='', atmosphere=None, calculate_transmission_spectrum=False,
+            calculate_emission_spectrum=False, calculate_eclipse_depth=False,
+            rewrite=True):
         # Initialize model
         model = cls.species_init(
             include_species=include_species,
@@ -1096,6 +1164,9 @@ class SpectralModel:
             include_species=include_species,
             model_suffix=model_suffix,
             atmosphere=atmosphere,
+            calculate_transmission_spectrum=calculate_transmission_spectrum,
+            calculate_emission_spectrum=calculate_emission_spectrum,
+            calculate_eclipse_depth=calculate_eclipse_depth,
             rewrite=rewrite
         )
 
@@ -1103,7 +1174,10 @@ class SpectralModel:
     def generate_from(cls, model, pressures,
                       line_species_list='default', rayleigh_species='default', continuum_opacities='default',
                       include_species=None, model_suffix='',
-                      atmosphere=None, temperature_profile=None, mass_fractions=None, rewrite=False):
+                      atmosphere=None, temperature_profile=None, mass_fractions=None,
+                      calculate_transmission_spectrum=False, calculate_emission_spectrum=False,
+                      calculate_eclipse_depth=False,
+                      rewrite=False):
         if not hasattr(include_species, '__iter__') or isinstance(include_species, str):
             include_species = [include_species]
         elif include_species is None:
@@ -1138,8 +1212,31 @@ class SpectralModel:
             # Generate the model
             return cls._generate(
                 model, pressures, line_species_list, rayleigh_species, continuum_opacities, include_species,
-                model_suffix, atmosphere, temperature_profile, mass_fractions
+                model_suffix, atmosphere, temperature_profile, mass_fractions, calculate_transmission_spectrum,
+                calculate_emission_spectrum, calculate_eclipse_depth
             )
+
+    @staticmethod
+    def radiosity_erg_hz2radiosity_erg_cm(radiosity_erg_hz, frequency):
+        """
+        Convert a radiosity from erg.s-1.cm-2.sr-1/Hz to erg.s-1.cm-2.sr-1/cm at a given frequency.
+        Steps:
+            [cm] = c[cm.s-1] / [Hz]
+            => d[cm]/d[Hz] = d(c / [Hz])/d[Hz]
+            => d[cm]/d[Hz] = c / [Hz]**2
+            => d[Hz]/d[cm] = [Hz]**2 / c
+            integral of flux must be conserved: radiosity_erg_cm * d[cm] = radiosity_erg_hz * d[Hz]
+            radiosity_erg_cm = radiosity_erg_hz * d[Hz]/d[cm]
+            => radiosity_erg_cm = radiosity_erg_hz * frequency**2 / c
+
+        Args:
+            radiosity_erg_hz: (erg.s-1.cm-2.sr-1/Hz)
+            frequency: (Hz)
+
+        Returns:
+            (erg.s-1.cm-2.sr-1/cm) the radiosity in converted units
+        """
+        return radiosity_erg_hz * frequency ** 2 / nc.c
 
     @classmethod
     def species_init(cls, include_species, planet_name, wavelength_boundaries, lbl_opacity_sampling, do_scat_emis,
@@ -1184,7 +1281,9 @@ class SpectralModel:
 
     @staticmethod
     def _generate(model, pressures, line_species_list, rayleigh_species, continuum_opacities, include_species,
-                  model_suffix, atmosphere=None, temperature_profile=None, mass_fractions=None):
+                  model_suffix, atmosphere=None, temperature_profile=None, mass_fractions=None,
+                  calculate_transmission_spectrum=False, calculate_emission_spectrum=False,
+                  calculate_eclipse_depth=False):
         if atmosphere is None:
             atmosphere, model.atmosphere_file = model.get_atmosphere_model(
                 model.wavelength_boundaries, pressures, line_species_list, rayleigh_species, continuum_opacities,
@@ -1231,10 +1330,27 @@ class SpectralModel:
         elif mass_fractions is not None:  # if None, just keep the equilibrium chemistry mass fractions
             raise ValueError(f"mass fractions must be in a dict, but the input was of type '{type(mass_fractions)}'")
 
-        model.wavelengths, model.transit_radius = model.calculate_transmission_spectrum(
-            atmosphere=atmosphere,
-            planet=planet
-        )
+        if not calculate_transmission_spectrum and not calculate_emission_spectrum and not calculate_eclipse_depth:
+            print(f"No spectrum will be calculated")
+
+            return model
+
+        if calculate_transmission_spectrum:
+            model.wavelengths, model.transit_radius = model.calculate_transmission_spectrum(
+                atmosphere=atmosphere,
+                planet=planet
+            )
+
+        if calculate_emission_spectrum and not calculate_eclipse_depth:
+            model.wavelengths, model.spectral_radiosity = model.calculate_emission_spectrum(
+                atmosphere=atmosphere,
+                planet=planet
+            )
+        elif calculate_eclipse_depth:
+            model.wavelengths, model.eclipse_depth, model.spectral_radiosity = model.calculate_eclipse_depth(
+                atmosphere=atmosphere,
+                planet=planet
+            )
 
         return model
 
@@ -1321,6 +1437,8 @@ def _get_generic_planet_name(radius, surface_gravity, equilibrium_temperature):
 def generate_model_grid(models, pressures,
                         line_species_list='default', rayleigh_species='default', continuum_opacities='default',
                         model_suffix='', atmosphere=None, temperature_profile=None, mass_fractions=None,
+                        calculate_transmission_spectrum=False, calculate_emission_spectrum=False,
+                        calculate_eclipse_depth=False,
                         rewrite=False, save=False):
     """
     Get a grid of models, generate it if needed.
@@ -1339,6 +1457,9 @@ def generate_model_grid(models, pressures,
             temperature profile is generated, if 1-D array of the same size of pressures, the temperature profile is
             directly used
         mass_fractions: if None, equilibrium chemistry is used, if dict, the values from the dict are used
+        calculate_transmission_spectrum: if True, calculate the transmission spectrum of the model
+        calculate_emission_spectrum: if True, calculate the emission spectrum of the model
+        calculate_eclipse_depth: if True, calculate the eclipse depth, and the emission spectrum, of the model
         rewrite: if True, rewrite all the models, even if they already exists
         save: if True, save the models once generated
 
@@ -1363,6 +1484,9 @@ def generate_model_grid(models, pressures,
                 atmosphere=atmosphere,
                 temperature_profile=temperature_profile,
                 mass_fractions=mass_fractions,
+                calculate_transmission_spectrum=calculate_transmission_spectrum,
+                calculate_emission_spectrum=calculate_emission_spectrum,
+                calculate_eclipse_depth=calculate_eclipse_depth,
                 rewrite=rewrite
             )
 
@@ -1374,7 +1498,10 @@ def generate_model_grid(models, pressures,
 
 def get_model_grid(planet_name, lbl_opacity_sampling, do_scat_emis, parameter_dicts, species_list, pressures,
                    wavelength_boundaries, line_species_list='default', rayleigh_species='default',
-                   continuum_opacities='default', model_suffix='', atmosphere=None, rewrite=False, save=False):
+                   continuum_opacities='default', model_suffix='', atmosphere=None,
+                   calculate_transmission_spectrum=False, calculate_emission_spectrum=False,
+                   calculate_eclipse_depth=False,
+                   rewrite=False, save=False):
     """
     Get a grid of models, generate it if needed.
     Models are generated using petitRADTRANS in its line-by-line mode. Clouds are modelled as a gray deck.
@@ -1393,6 +1520,9 @@ def get_model_grid(planet_name, lbl_opacity_sampling, do_scat_emis, parameter_di
         continuum_opacities: list containing all the continua to include in the models
         model_suffix: suffix of the model
         atmosphere: pre-loaded Radtrans object
+        calculate_transmission_spectrum: if True, calculate the transmission spectrum of the model
+        calculate_emission_spectrum: if True, calculate the emission spectrum of the model
+        calculate_eclipse_depth: if True, calculate the eclipse depth, and the emission spectrum, of the model
         rewrite: if True, rewrite all the models, even if they already exists
         save: if True, save the models once generated
 
@@ -1429,6 +1559,9 @@ def get_model_grid(planet_name, lbl_opacity_sampling, do_scat_emis, parameter_di
                 continuum_opacities=continuum_opacities,
                 model_suffix=model_suffix,
                 atmosphere=atmosphere,
+                calculate_transmission_spectrum=calculate_transmission_spectrum,
+                calculate_emission_spectrum=calculate_emission_spectrum,
+                calculate_eclipse_depth=calculate_eclipse_depth,
                 rewrite=rewrite
             )
 

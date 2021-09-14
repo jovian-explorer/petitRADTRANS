@@ -19,7 +19,7 @@ def calculate_star_snr(wavelengths, star_effective_temperature, star_radius, sta
     ))
     wavelength_stellar = wavelength_stellar[wh]
 
-    stellar_spectral_radiance = radiosity_erg_hz2radiosity_erg_cm(
+    stellar_spectral_radiance = SpectralModel.radiosity_erg_hz2radiosity_erg_cm(
         stellar_spectral_radiance[wh, 1],
         nc.c / wavelength_stellar  # in Hz
     )
@@ -37,7 +37,7 @@ def calculate_star_snr(wavelengths, star_effective_temperature, star_radius, sta
 def calculate_star_radiosity(wavelength_boundaries, star_effective_temperature, star_radius, star_distance):
     stellar_spectral_radiance = nc.get_PHOENIX_spec(star_effective_temperature)
     wavelength_stellar = stellar_spectral_radiance[:, 0]  # in cm
-    stellar_spectral_radiance = radiosity_erg_hz2radiosity_erg_cm(
+    stellar_spectral_radiance = SpectralModel.radiosity_erg_hz2radiosity_erg_cm(
         stellar_spectral_radiance[:, 1],
         nc.c / wavelength_stellar
     )
@@ -132,29 +132,24 @@ def calculate_tsm_derivatives(tsm, planet_radius, planet_mass, planet_equilibriu
     ])  # scale factor is already included in tsm
 
 
-def generate_phoenix_star_spectrum_file(star_spectrum_file, star_effective_temperature):
-    stellar_spectral_radiance = nc.get_PHOENIX_spec(star_effective_temperature)
-
-    # Convert the spectrum to units accepted by the ETC website, don't take the first wavelength to avoid spike in conv.
-    wavelength_stellar = stellar_spectral_radiance[1:, 0]  # in cm
-    stellar_spectral_radiance = radiosity_erg_hz2radiosity_erg_cm(
-        stellar_spectral_radiance[1:, 1],
-        nc.c / wavelength_stellar
-    )
-
-    wavelength_stellar *= 1e-2  # cm to m
-    stellar_spectral_radiance *= 1e-8 / np.pi  # erg.s-1.cm-2.sr-1/cm to erg.s-1.cm-2/A
-
-    np.savetxt(star_spectrum_file, np.transpose((wavelength_stellar, stellar_spectral_radiance)))
-
-
 def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power, pixel_sampling,
                     species_list, velocity_range,
                     observing_time=1., transit_duration=None,
                     star_snr_reference_apparent_magnitude=None, star_apparent_magnitude=None,
-                    mock_observation_number=1):
+                    mock_observation_number=1, mode='transit'):
     if transit_duration is None:
         transit_duration = 0.5 * observing_time
+
+    flux = {}
+
+    if mode == 'transit':
+        for species in species_list:
+            flux[species] = models[species].transit_radius
+    elif mode == 'eclipse':
+        for species in species_list:
+            flux[species] = models[species].eclipse_depth
+    else:
+        raise ValueError(f"acceptable mode flags are 'transit' or 'eclipse'")
 
     results = {band: {}}
     snr_per_res_element = star_snr[band]
@@ -204,7 +199,7 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                 observed_spectrum, full_lsf_ed, wlen_out, full_model_rebinned, snr_obs = \
                     generate_mock_observation(
                         wavelengths=models['all'].wavelengths * 1e-4,
-                        flux=models['all'].transit_radius,
+                        flux=flux['all'],
                         snr_per_res_element=snr_per_res_element,
                         observing_time=observing_time,
                         transit_duration=transit_duration,
@@ -222,7 +217,7 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                     single_lsf_ed, single_out, single_rebinned = \
                         convolve_rebin(
                             models[species].wavelengths * 1e-4,
-                            models[species].transit_radius,
+                            flux[species],
                             instrument_resolving_power,
                             pixel_sampling,
                             wlen_out
@@ -236,25 +231,25 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                     # Add the CCF of each order and each detector to retrieve the CCF of one setting
                     f = interp1d(velocity, cross_correlation)
 
-                    if species not in x:
-                        x[species] = np.arange(
-                            velocity_range[0], velocity_range[1], np.mean(np.diff(velocity)) / 3.
-                        )
-                        add[species] = f(x[species])  # upsample the CCF
-                        log_l_ccf_all_orders[species] = log_l_ccf
-                    else:
-                        try:
+                    try:
+                        if species not in x:
+                            x[species] = np.arange(
+                                velocity_range[0], velocity_range[1], np.mean(np.diff(velocity)) / 3.
+                            )
+                            add[species] = f(x[species])  # upsample the CCF
+                            log_l_ccf_all_orders[species] = log_l_ccf
+                        else:
                             add[species] += f(x[species])
                             log_l_ccf_all_orders[species] += log_l_ccf
-                        except ValueError as error_msg:
-                            if str(error_msg) == 'A value in x_new is below the interpolation range.':
-                                print(f"Got error message: '{error_msg}', probable cause below:")
-                                print(f"    Velocity range ({np.min(velocity_range)} -- {np.max(velocity_range[1])}) "
-                                      f"was larger than the output velocity range ({velocity[0]} -- {velocity[1]}), "
-                                      f"ignoring setting {band}{setting}-{order}-{detector}; "
-                                      f"consider reducing velocity range if this happen too often.")
-                            else:
-                                raise
+                    except ValueError as error_msg:
+                        if str(error_msg) == 'A value in x_new is below the interpolation range.':
+                            print(f"Got error message: '{error_msg}', probable cause below:")
+                            print(f"    Velocity range ({np.min(velocity_range)} -- {np.max(velocity_range[1])}) "
+                                  f"was larger than the output velocity range ({velocity[0]} -- {velocity[1]}), "
+                                  f"ignoring setting {band}{setting}-{order}-{detector}; "
+                                  f"consider reducing velocity range if this happen too often.")
+                        else:
+                            raise
 
             for species in species_list:
                 if species == 'all':
@@ -289,7 +284,7 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
 def get_crires_snr_data(settings, star_apparent_magnitude, star_effective_temperature, exposure_time, integration_time,
                         airmass, star_apparent_magnitude_band='V', star_spectrum_file=None, rewrite=False):
     if star_spectrum_file is None:
-        star_spectrum_file = f'{module_dir}/crires/star_spectrum_{star_effective_temperature}K.dat'
+        star_spectrum_file = SpectralModel.get_star_radiosity_filename(star_effective_temperature, path=module_dir)
 
     snr_data = {}
 
@@ -321,7 +316,7 @@ def get_crires_snr_data(settings, star_apparent_magnitude, star_effective_temper
                 if not os.path.exists(star_spectrum_file):
                     print(f"file '{star_spectrum_file}' does not exist, generating...")
 
-                    generate_phoenix_star_spectrum_file(star_spectrum_file, star_effective_temperature)
+                    SpectralModel.generate_phoenix_star_spectrum_file(star_spectrum_file, star_effective_temperature)
 
                 json_data = download_snr_data(
                     request_file_name='etc-form.json',
@@ -383,7 +378,7 @@ def get_tsm_snr_pcloud(band, wavelength_boundaries, star_distances, p_clouds, mo
                        instrument_resolving_power, pixel_sampling,
                        noise_correction_coefficient=1.0, scale_factor=1.0, star_snr=None,
                        star_apparent_magnitude=None, star_snr_reference_apparent_magnitude=None,
-                       mock_observation_number=1):
+                       mock_observation_number=1, mode='transit'):
     settings = {band: settings[band]}
 
     if star_apparent_magnitude is not None:
@@ -474,7 +469,8 @@ def get_tsm_snr_pcloud(band, wavelength_boundaries, star_distances, p_clouds, mo
                         transit_duration=planet_transit_duration,
                         star_snr_reference_apparent_magnitude=star_snr_reference_apparent_magnitude,
                         star_apparent_magnitude=star_mag,
-                        mock_observation_number=mock_observation_number
+                        mock_observation_number=mock_observation_number,
+                        mode=mode
                     )
 
                     model_found = True

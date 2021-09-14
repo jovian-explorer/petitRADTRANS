@@ -2,11 +2,8 @@ from scipy.interpolate import interp1d
 from scipy.signal import correlate
 from scipy.stats import norm
 
-import os
 import numpy as np
 import petitRADTRANS.nat_cst as nc
-
-module_dir = os.path.dirname(__file__)  # TODO find a cleaner way to do this?
 
 
 def ccf_analysis(wavelengths, observed_spectrum, modelled_spectrum, velocity_range=2000.):
