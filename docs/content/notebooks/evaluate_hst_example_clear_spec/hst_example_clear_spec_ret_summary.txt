@@ -1,0 +1,48 @@
+hst_example_clear_spec
+2021-06-22, 22:48:21
+
+
+Fixed Parameters
+    Rstar = 45277050000.0
+
+Free Parameters, Prior^-1(0), Prior^-1(1)
+    log_g = 2.0, 5.5
+    R_pl = 0.2, 0.4
+    Temperature = 300.0, 2300.0
+    log_Pcloud = -6.0, 2.0
+    CH4 = -6.0, -0.0
+    H2O_Exomol = -6.0, -0.0
+    CO2 = -6.0, -0.0
+    CO_all_iso_HITEMP = -6.0, -0.0
+
+Data
+HST
+    /Users/molliere/Documents/Project_Docs/petitRADTRANS/petitRADTRANS/retrieval/examples/transmission/hst_example_clear_spec.txt
+    Model Function = retrieval_model_spec_iso
+    data resolution = 60
+    model resolution = 120
+
+Multinest Outputs
+  marginal likelihood:
+    log Z = -5.7 +- 0.0
+    ln Z = -13.0 +- 0.1
+  Statistical Fit Parameters
+    log_g          2.67 +- 0.12
+    R_pl           1586914943 +- 79283427
+    Temperature    665 +- 175
+    log_Pcloud     0.2 +- 1.3
+    CH4            -1.87 +- 0.85
+    H2O_Exomol     -1.9 +- 1.0
+    CO2            -3.5 +- 1.8
+    CO_all_iso_HITEMP-3.4 +- 1.8
+
+Best Fit Parameters
+    Rstar = 45277050000.000
+    log_g = 2.688
+    R_pl = 0.237
+    Temperature = 693.360
+    log_Pcloud = 1.174
+    CH4 = -2.632
+    H2O_Exomol = -2.335
+    CO2 = -4.322
+    CO_all_iso_HITEMP = -2.200

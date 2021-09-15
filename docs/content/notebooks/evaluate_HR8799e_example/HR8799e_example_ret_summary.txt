@@ -1,0 +1,86 @@
+HR8799e_example
+2021-06-22, 22:50:46
+
+
+Fixed Parameters
+    D_pl = 1.2741534147215e+20
+
+Free Parameters, Prior^-1(0), Prior^-1(1)
+    log_g = 2.0, 5.5
+    R_pl = 4893770908.843, 13982199091.157
+    T_int = 300.0, 2300.0
+    T3 = 0.0, 1.0
+    T2 = 0.0, 1.0
+    T1 = 0.0, 1.0
+    alpha = 1.0, 2.0
+    log_delta = 0.0, 1.0
+    log_pquench = -6.0, 3.0
+    Fe/H = -1.5, 1.5
+    C/O = 0.1, 1.6
+    sigma_lnorm = 1.05, 3.0
+    log_kzz = 5.0, 13.0
+    fsed = 1.0, 11.0
+    log_X_cb_Fe(c) = -3.5, 1.0
+    log_X_cb_MgSiO3(c) = -3.5, 1.0
+
+Data
+GRAVITY
+    /Users/molliere/Documents/Project_Docs/petitRADTRANS/petitRADTRANS/retrieval/examples/emission/HR8799e_Spectra.fits
+    Model Function = emission_model_diseq
+Keck/NIRC2.Ks
+    /Users/molliere/Documents/Project_Docs/petitRADTRANS/petitRADTRANS/retrieval/examples/emission/hr8799e_photometry.txt
+    Model Function = emission_model_diseq
+    data resolution = 5
+    model resolution = 40
+    photometric width = 1.8434--2.4686 um
+    Photometric transform function = spectrum_to_flux
+Paranal/NACO.Lp
+    /Users/molliere/Documents/Project_Docs/petitRADTRANS/petitRADTRANS/retrieval/examples/emission/hr8799e_photometry.txt
+    Model Function = emission_model_diseq
+    data resolution = 4
+    model resolution = 40
+    photometric width = 3.23--4.4835 um
+    Photometric transform function = spectrum_to_flux
+Paranal/NACO.NB405
+    /Users/molliere/Documents/Project_Docs/petitRADTRANS/petitRADTRANS/retrieval/examples/emission/hr8799e_photometry.txt
+    Model Function = emission_model_diseq
+    data resolution = 28
+    model resolution = 40
+    photometric width = 3.7867--4.3323 um
+    Photometric transform function = spectrum_to_flux
+Paranal/SPHERE.IRDIS_B_J
+    /Users/molliere/Documents/Project_Docs/petitRADTRANS/petitRADTRANS/retrieval/examples/emission/hr8799e_photometry.txt
+    Model Function = emission_model_diseq
+    data resolution = 3
+    model resolution = 40
+    photometric width = 1.0269--1.5467 um
+    Photometric transform function = spectrum_to_flux
+Paranal/SPHERE.IRDIS_D_H23_2
+    /Users/molliere/Documents/Project_Docs/petitRADTRANS/petitRADTRANS/retrieval/examples/emission/hr8799e_photometry.txt
+    Model Function = emission_model_diseq
+    data resolution = 14
+    model resolution = 40
+    photometric width = 1.4601--1.7315 um
+    Photometric transform function = spectrum_to_flux
+Paranal/SPHERE.IRDIS_D_H23_3
+    /Users/molliere/Documents/Project_Docs/petitRADTRANS/petitRADTRANS/retrieval/examples/emission/hr8799e_photometry.txt
+    Model Function = emission_model_diseq
+    data resolution = 9
+    model resolution = 40
+    photometric width = 1.5057--1.8522 um
+    Photometric transform function = spectrum_to_flux
+Paranal/SPHERE.IRDIS_D_K12_1
+    /Users/molliere/Documents/Project_Docs/petitRADTRANS/petitRADTRANS/retrieval/examples/emission/hr8799e_photometry.txt
+    Model Function = emission_model_diseq
+    data resolution = 12
+    model resolution = 40
+    photometric width = 1.9228--2.3079 um
+    Photometric transform function = spectrum_to_flux
+Paranal/SPHERE.IRDIS_D_K12_2
+    /Users/molliere/Documents/Project_Docs/petitRADTRANS/petitRADTRANS/retrieval/examples/emission/hr8799e_photometry.txt
+    Model Function = emission_model_diseq
+    data resolution = 11
+    model resolution = 40
+    photometric width = 2.0444--2.4591 um
+    Photometric transform function = spectrum_to_flux
+
