@@ -2468,7 +2468,7 @@ end subroutine feautrier_rad_trans
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-subroutine feautrier_PT_it(border_freqs, &
+subroutine feautrier_pt_it(border_freqs, &
      tau_approx_scat, &
      temp, &
      mu, &
@@ -3031,7 +3031,7 @@ subroutine feautrier_PT_it(border_freqs, &
       end do
   end if
 
-end subroutine feautrier_PT_it
+end subroutine feautrier_pt_it
 
 
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
