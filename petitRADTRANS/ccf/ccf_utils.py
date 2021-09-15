@@ -1,6 +1,8 @@
 """
 Useful functions for pre/post-processing CCF analysis.
 """
+import numpy as np
+
 from petitRADTRANS.ccf.ccf import *
 from petitRADTRANS.ccf.etc_cli_module import *
 from petitRADTRANS.ccf.mock_observation import *
@@ -236,11 +238,11 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                             x[species] = np.arange(
                                 velocity_range[0], velocity_range[1], np.mean(np.diff(velocity)) / 3.
                             )
-                            add[species] = f(x[species])  # upsample the CCF
                             log_l_ccf_all_orders[species] = log_l_ccf
+                            add[species] = f(x[species])  # upsample the CCF
                         else:
-                            add[species] += f(x[species])
                             log_l_ccf_all_orders[species] += log_l_ccf
+                            add[species] += f(x[species])
                     except ValueError as error_msg:
                         if str(error_msg) == 'A value in x_new is below the interpolation range.':
                             print(f"Got error message: '{error_msg}', probable cause below:")
@@ -248,6 +250,8 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                                   f"was larger than the output velocity range ({velocity[0]} -- {velocity[1]}), "
                                   f"ignoring setting {band}{setting}-{order}-{detector}; "
                                   f"consider reducing velocity range if this happen too often.")
+                            if species not in add:
+                                add[species] = np.zeros((mock_observation_number, np.size(x[species])))
                         else:
                             raise
 

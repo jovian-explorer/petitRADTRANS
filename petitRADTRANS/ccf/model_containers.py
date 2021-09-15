@@ -1060,8 +1060,14 @@ class SpectralModel:
     def get_star_radiosity_filename(star_effective_temperature, path='.'):
         return f'{path}/crires/star_spectrum_{star_effective_temperature}K.dat'
 
-    def init_mass_fractions(self, atmosphere, temperature, include_species):
+    def init_mass_fractions(self, atmosphere, temperature, include_species, mass_fractions=None):
         from petitRADTRANS.poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm  # import is here because it's long!
+
+        if mass_fractions is None:
+            mass_fractions = {}
+        elif not isinstance(mass_fractions, dict):
+            raise ValueError(
+                f"mass fractions must be in a dict, but the input was of type '{type(mass_fractions)}'")
 
         pressures = atmosphere.press * 1e-6  # cgs to bar
 
@@ -1083,8 +1089,14 @@ class SpectralModel:
             Pquench_carbon=self.p_quench_c
         )
 
+        # Check mass_fractions keys
+        for key in mass_fractions:
+            if key not in atmosphere.line_species and key not in abundances:
+                raise KeyError(f"key '{key}' not in line species list or "
+                               f"standard petitRADTRANS mass fractions dict")
+
         # Get the right keys for the mass fractions dictionary
-        mass_fractions = {}
+        mass_fractions_dict = {}
 
         for key in abundances:
             found = False
@@ -1097,18 +1109,22 @@ class SpectralModel:
 
                 if key == line_species:
                     if key not in include_species:
-                        mass_fractions[line_species_name] = np.zeros_like(temperature)
+                        mass_fractions_dict[line_species_name] = np.zeros_like(temperature)
+                    elif line_species_name in mass_fractions:
+                        mass_fractions_dict[line_species_name] = mass_fractions[line_species_name]
+                    elif key in mass_fractions:
+                        mass_fractions_dict[key] = mass_fractions[key]
                     else:
-                        mass_fractions[line_species_name] = abundances[line_species]
+                        mass_fractions_dict[line_species_name] = abundances[line_species]
 
                     found = True
 
                     break
 
             if not found:
-                mass_fractions[key] = abundances[key]
+                mass_fractions_dict[key] = abundances[key]
 
-        return mass_fractions
+        return mass_fractions_dict
 
     def init_temperature_guillot(self, planet: Planet, atmosphere: Radtrans):
         kappa_ir = self.kappa_ir_z0 * 10 ** self.metallicity
@@ -1317,18 +1333,9 @@ class SpectralModel:
         model.mass_fractions = model.init_mass_fractions(
             atmosphere=atmosphere,
             temperature=model.temperature,
-            include_species=include_species
+            include_species=include_species,
+            mass_fractions=mass_fractions
         )
-
-        if isinstance(mass_fractions, dict):
-            for key in mass_fractions:
-                if key in model.mass_fractions:
-                    model.mass_fractions[key] = mass_fractions[key]
-                else:
-                    raise KeyError(f"key '{key}' not in line species list or "
-                                   f"standard petitRADTRANS mass fractions dict")
-        elif mass_fractions is not None:  # if None, just keep the equilibrium chemistry mass fractions
-            raise ValueError(f"mass fractions must be in a dict, but the input was of type '{type(mass_fractions)}'")
 
         if not calculate_transmission_spectrum and not calculate_emission_spectrum and not calculate_eclipse_depth:
             print(f"No spectrum will be calculated")

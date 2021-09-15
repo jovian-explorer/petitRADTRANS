@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 
 This is a temporary document.
 
+## [0.6.1] - 2021-09-15
+### Fixed
+- Argument `include_species` when generating `SpectralModel` ignored when passing argument `mass_fraction`.
+- Crash when all the detectors of an order have signal-to-noise ratios lower than 1.
+
 ## [0.6.0] - 2021-09-14
 ### Added
 - Option to calculate emission and eclipse depth spectra in `SpectralModel`.
