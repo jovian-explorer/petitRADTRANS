@@ -79,7 +79,7 @@ def emission_model_diseq(pRT_object,
             Computed emission spectrum [W/m2/micron]
     """
 
-    pglobal_check(pRT_object.press,
+    pglobal_check(pRT_object.press/1e6,
                     parameters['pressure_simple'].value,
                     parameters['pressure_scaling'].value)
     #for key, val in parameters.items():
@@ -221,7 +221,7 @@ def guillot_free_emission(pRT_object, \
     #for key, val in parameters.items():
     #    print(key,val.value)
 
-    pglobal_check(pRT_object.press,
+    pglobal_check(pRT_object.press/1e6,
                   parameters['pressure_simple'].value,
                   parameters['pressure_scaling'].value)
     if AMR:
