@@ -138,9 +138,13 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                     species_list, velocity_range,
                     observing_time=1., transit_duration=None,
                     star_snr_reference_apparent_magnitude=None, star_apparent_magnitude=None,
-                    mock_observation_number=1, mode='transit'):
+                    mock_observation_number=1, mode='transit', transit_number=1):
     if transit_duration is None:
         transit_duration = 0.5 * observing_time
+
+    if transit_number > mock_observation_number:
+        raise ValueError(f"number of transit ({transit_number}) "
+                         f"must be lower than number of mock observations ({mock_observation_number})")
 
     flux = {}
 
@@ -258,6 +262,14 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
             for species in species_list:
                 if species == 'all':
                     continue
+
+                for j in range(mock_observation_number):
+                    if j + transit_number >= mock_observation_number:
+                        j_ = j - mock_observation_number + transit_number
+                        add[species][j, :] = np.sum(add[species][j:mock_observation_number, :], axis=0) + np.sum(
+                            add[species][0:j_, :], axis=0)
+                    else:
+                        add[species][j, :] = np.sum(add[species][j:j + transit_number, :], axis=0)
 
                 snr = np.zeros(mock_observation_number)
                 mu = np.zeros(mock_observation_number)
@@ -382,7 +394,7 @@ def get_tsm_snr_pcloud(band, wavelength_boundaries, star_distances, p_clouds, mo
                        instrument_resolving_power, pixel_sampling,
                        noise_correction_coefficient=1.0, scale_factor=1.0, star_snr=None,
                        star_apparent_magnitude=None, star_snr_reference_apparent_magnitude=None,
-                       mock_observation_number=1, mode='transit'):
+                       mock_observation_number=1, mode='transit', transit_number=1):
     settings = {band: settings[band]}
 
     if star_apparent_magnitude is not None:
@@ -474,7 +486,8 @@ def get_tsm_snr_pcloud(band, wavelength_boundaries, star_distances, p_clouds, mo
                         star_snr_reference_apparent_magnitude=star_snr_reference_apparent_magnitude,
                         star_apparent_magnitude=star_mag,
                         mock_observation_number=mock_observation_number,
-                        mode=mode
+                        mode=mode,
+                        transit_number=transit_number
                     )
 
                     model_found = True

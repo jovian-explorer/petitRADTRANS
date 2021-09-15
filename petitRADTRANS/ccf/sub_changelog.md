@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 
 This is a temporary document.
 
+## [0.7.0] - 2021-09-15
+### Added
+- CCF analysis of multiple transits.
+
 ## [0.6.1] - 2021-09-15
 ### Fixed
 - Argument `include_species` when generating `SpectralModel` ignored when passing argument `mass_fraction`.
