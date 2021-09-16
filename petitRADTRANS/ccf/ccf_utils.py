@@ -167,7 +167,7 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
 
         x = {}
         add = {}
-        log_l_ccf_all_orders = {}
+        log_l_ccf_all_detectors = {}
 
         for i, order in enumerate(settings[band][setting]):
             if isinstance(star_snr[band], dict):
@@ -212,7 +212,7 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                         instrument_resolving_power=instrument_resolving_power,
                         pixel_sampling=pixel_sampling,
                         instrument_wavelength_range=wrange * 1e-4,
-                        number=mock_observation_number
+                        number=mock_observation_number * transit_number
                     )
 
                 for species in species_list:
@@ -230,9 +230,19 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                         )
 
                     # CCF analysis
-                    snr, velocity, cross_correlation, log_l, log_l_ccf = ccf_analysis(
+                    snr_tmp, velocity, cross_correlation, log_l_tmp, log_l_ccf = ccf_analysis(
                         wlen_out, observed_spectrum, single_rebinned
                     )
+
+                    # Reshape and sum outputs for multiple transits
+                    if transit_number > 1:
+                        cross_correlation = np.reshape(
+                            cross_correlation,
+                            (transit_number, mock_observation_number, np.size(velocity))
+                        )
+                        cross_correlation = np.sum(cross_correlation, axis=0)
+                        log_l_ccf = np.reshape(log_l_ccf, (transit_number, mock_observation_number))
+                        log_l_ccf = np.sum(log_l_ccf, axis=0)
 
                     # Add the CCF of each order and each detector to retrieve the CCF of one setting
                     f = interp1d(velocity, cross_correlation)
@@ -242,10 +252,10 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                             x[species] = np.arange(
                                 velocity_range[0], velocity_range[1], np.mean(np.diff(velocity)) / 3.
                             )
-                            log_l_ccf_all_orders[species] = log_l_ccf
+                            log_l_ccf_all_detectors[species] = log_l_ccf
                             add[species] = f(x[species])  # upsample the CCF
                         else:
-                            log_l_ccf_all_orders[species] += log_l_ccf
+                            log_l_ccf_all_detectors[species] += log_l_ccf
                             add[species] += f(x[species])
                     except ValueError as error_msg:
                         if str(error_msg) == 'A value in x_new is below the interpolation range.':
@@ -263,14 +273,6 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                 if species == 'all':
                     continue
 
-                for j in range(mock_observation_number):
-                    if j + transit_number >= mock_observation_number:
-                        j_ = j - mock_observation_number + transit_number
-                        add[species][j, :] = np.sum(add[species][j:mock_observation_number, :], axis=0) + np.sum(
-                            add[species][0:j_, :], axis=0)
-                    else:
-                        add[species][j, :] = np.sum(add[species][j:j + transit_number, :], axis=0)
-
                 snr = np.zeros(mock_observation_number)
                 mu = np.zeros(mock_observation_number)
                 std = np.zeros(mock_observation_number)
@@ -281,7 +283,7 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
 
                     vel = x[species]
                     ccf = (np.transpose(add[species]) - mu) / std
-                    log_l = log_l_ccf_all_orders[species]
+                    log_l = log_l_ccf_all_detectors[species]
                 else:
                     vel = None
                     ccf = None

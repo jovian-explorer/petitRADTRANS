@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 
 This is a temporary document.
 
+## [0.7.1] - 2021-09-16
+### Changed
+- Better CCF analysis of multiple transits calculations.
+
 ## [0.7.0] - 2021-09-15
 ### Added
 - CCF analysis of multiple transits.
