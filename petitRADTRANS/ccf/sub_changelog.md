@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 
 This is a temporary document.
 
+## [0.8.0] - 2021-09-16
+### Added
+- Option to select interesting regions for species.
+
+### Changed
+- Code clean-up.
+
 ## [0.7.2] - 2021-09-16
 ### Removed
 - Useless limitation on number of transits.

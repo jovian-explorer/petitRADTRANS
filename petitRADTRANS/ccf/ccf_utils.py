@@ -1,8 +1,6 @@
 """
 Useful functions for pre/post-processing CCF analysis.
 """
-import numpy as np
-
 from petitRADTRANS.ccf.ccf import *
 from petitRADTRANS.ccf.etc_cli_module import *
 from petitRADTRANS.ccf.mock_observation import *
@@ -138,7 +136,7 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                     species_list, velocity_range,
                     observing_time=1., transit_duration=None,
                     star_snr_reference_apparent_magnitude=None, star_apparent_magnitude=None,
-                    mock_observation_number=1, mode='transit', transit_number=1):
+                    mock_observation_number=1, mode='transit', transit_number=1, regions_species=None):
     if transit_duration is None:
         transit_duration = 0.5 * observing_time
 
@@ -214,6 +212,24 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
                 for species in species_list:
                     if species == 'all':
                         continue  # the all case corresponds to the observed spectrum
+
+                    if regions_species is not None:
+                        if species in regions_species:
+                            skip_detector = True
+
+                            # Search for an interesting region
+                            for ranges in regions_species[species]:
+                                wh = np.where(np.logical_and(wrange > ranges[0], wrange < ranges[1]))
+
+                                if np.size(wrange[wh]) != 0:
+                                    skip_detector = False
+
+                                    break
+
+                            if skip_detector:  # no interesting region found, skipping
+                                continue
+                        else:
+                            print(f"Species '{species}' not in regions species")
 
                     # Re-bin model spectrum with one species
                     single_lsf_ed, single_out, single_rebinned = \
@@ -392,7 +408,7 @@ def get_tsm_snr_pcloud(band, wavelength_boundaries, star_distances, p_clouds, mo
                        instrument_resolving_power, pixel_sampling,
                        noise_correction_coefficient=1.0, scale_factor=1.0, star_snr=None,
                        star_apparent_magnitude=None, star_snr_reference_apparent_magnitude=None,
-                       mock_observation_number=1, mode='transit', transit_number=1):
+                       mock_observation_number=1, mode='transit', transit_number=1, regions_species=None):
     settings = {band: settings[band]}
 
     if star_apparent_magnitude is not None:
@@ -485,7 +501,8 @@ def get_tsm_snr_pcloud(band, wavelength_boundaries, star_distances, p_clouds, mo
                         star_apparent_magnitude=star_mag,
                         mock_observation_number=mock_observation_number,
                         mode=mode,
-                        transit_number=transit_number
+                        transit_number=transit_number,
+                        regions_species=regions_species
                     )
 
                     model_found = True
