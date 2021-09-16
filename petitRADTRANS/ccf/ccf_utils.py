@@ -142,10 +142,6 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
     if transit_duration is None:
         transit_duration = 0.5 * observing_time
 
-    if transit_number > mock_observation_number:
-        raise ValueError(f"number of transit ({transit_number}) "
-                         f"must be lower than number of mock observations ({mock_observation_number})")
-
     flux = {}
 
     if mode == 'transit':
