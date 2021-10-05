@@ -187,7 +187,7 @@ class Retrieval:
                                 resume)
             return
         if const_efficiency_mode and sampling_efficiency > 0.1:
-            logging.warning("Sampling efficiency should be ~ 0.5 if you're using constant efficiency mode!")
+            logging.warning("Sampling efficiency should be ~ 0.05 if you're using constant efficiency mode!")
         prefix = self.output_dir + 'out_PMN/'+self.retrieval_name+'_'
 
         if len(self.output_dir + 'out_PMN/') > 100:
@@ -399,6 +399,8 @@ class Retrieval:
                     out = value.value
                     if self.parameters[key].corner_transform is not None:
                         out = self.parameters[key].corner_transform(out)
+                    if out is None:
+                        continue
                     fmt = '%.3f' % out
                     summary.write("    " +key + " = " + fmt + '\n')
 
@@ -595,7 +597,7 @@ class Retrieval:
         if log_likelihood + log_prior < -9e99:
             return -1e99
         if np.abs(log_likelihood + log_prior) < 1e-99:
-            return 1e-99
+            return -1e-99
         if self.ultranest and np.isinf(log_likelihood+log_prior):
             return -1e99
 
@@ -728,6 +730,9 @@ class Retrieval:
                             do_scat_emis = self.rd.scattering)
         if self.rd.AMR:
             p = self.rd._setup_pres()
+            self.best_fit_params["pressure_scaling"] = self.parameters["pressure_scaling"]
+            self.best_fit_params["pressure_width"] = self.parameters["pressure_width"]
+            self.best_fit_params["pressure_simple"] = self.parameters["pressure_simple"]
         else:
             p = self.rd.p_global
         bf_prt.setup_opa_structure(p)
@@ -869,8 +874,8 @@ class Retrieval:
                         params[self.parameters[pp].name] = \
                             Parameter(pp,False,value=sample[i_p])
                         i_p += 1
-        else:
-            params[pp] = Parameter(pp,False,value=self.parameters[pp].value)
+            else:
+                params[pp] = Parameter(pp,False,value=self.parameters[pp].value)
         return params
 
     def sample_teff(self,sample_dict,param_dict,ret_names = None,nsample = None,resolution=40):
