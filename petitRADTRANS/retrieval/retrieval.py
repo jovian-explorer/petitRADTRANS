@@ -641,8 +641,12 @@ class Retrieval:
                             self.plotting
                         )
 
-        if log_likelihood + log_prior < -9.9e99:
-            log_likelihood = -np.inf
+        if log_likelihood + log_prior < -9e99:
+            return -1e99
+
+        if np.abs(log_likelihood + log_prior) < 1e-99:
+            return 1e-99
+
         if self.ultranest and np.isinf(log_likelihood + log_prior):
             return -1e99
 

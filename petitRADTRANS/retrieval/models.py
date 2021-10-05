@@ -82,10 +82,10 @@ def emission_model_diseq(pRT_object,
         spectrum_model : np.array
             Computed emission spectrum [W/m2/micron]
     """
-
     pglobal_check(pRT_object.press * 1e-6,
                   parameters['pressure_simple'].value,
                   parameters['pressure_scaling'].value)
+
     # for key, val in parameters.items():
     #    print(key,val.value)
 
