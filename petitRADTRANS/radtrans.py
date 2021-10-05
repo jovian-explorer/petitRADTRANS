@@ -1714,7 +1714,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                                                           self.mu_star)
         '''
         print('SPEC STAR!')
-        self.flux, __, __, __, __, __, __, __, self.H_star, self.abs_S = fs.feautrier_pt_it(self.border_freqs,
+        self.flux, __, __, __, __, __, __, __, self.H_star, self.abs_S, self.stellar_surf_heat_flux = \
+                                       fs.feautrier_pt_it(self.border_freqs,
                                                           self.total_tau[:, :, 0, :],
                                                           np.zeros_like(self.temp),
                                                           self.mu,
@@ -1734,7 +1735,8 @@ class Radtrans(_read_opacities.ReadOpacities):
 
 
         print('SPEC PLANET!')
-        self.flux, __, self.J_bol, __, self.eddington_F, self.eddington_Psi, self.kappa_J, self.kappa_H, __, __ = \
+        self.flux, __, self.J_bol, __, self.eddington_F, self.eddington_Psi, self.kappa_J, self.kappa_H, __, __, \
+                   self.planet_surf_heat_flux = \
                         fs.feautrier_pt_it(self.border_freqs,
                                            self.total_tau[:, :, 0, :],
                                            self.temp,

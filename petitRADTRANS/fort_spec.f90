@@ -2495,6 +2495,7 @@ subroutine feautrier_pt_it(border_freqs, &
      kappa_H, &
      H_star, &
      abs_S, &
+     radiative_surface_heating, &
      freq_len_p_1, &
      struc_len, &
      N_mu, &
@@ -2522,7 +2523,7 @@ subroutine feautrier_pt_it(border_freqs, &
   DOUBLE PRECISION, INTENT(OUT)   :: contr_em(struc_len,freq_len_p_1-1)
   DOUBLE PRECISION, INTENT(OUT)   :: J_bol(struc_len), H_bol(struc_len), &
           eddington_F(struc_len), eddington_Psi, kappa_J(struc_len), kappa_H(struc_len), &
-          H_star(freq_len_p_1-1,struc_len), abs_S(struc_len)
+          H_star(freq_len_p_1-1,struc_len), abs_S(struc_len), radiative_surface_heating
   CHARACTER*20, intent(in)        :: geom
 
   ! Internal
@@ -2574,6 +2575,9 @@ subroutine feautrier_pt_it(border_freqs, &
   ! PAUL NEW
   ! Variables for surface scattering
   DOUBLE PRECISION                :: I_plus_surface(N_mu, N_g, freq_len_p_1-1)
+
+  ! Variables for surcafe temperature boundary condition
+  DOUBLE PRECISION                :: F_down_surf
 
   if (do_scat_emis) then
      do i = 1, N_g
@@ -2663,6 +2667,8 @@ subroutine feautrier_pt_it(border_freqs, &
 
   do i_iter_scat = 1, iter_scat
 
+    radiative_surface_heating = 0d0
+
     if (planet_mode) then
         K_bol = 0d0
         kappa_J = 0d0
@@ -2682,6 +2688,8 @@ subroutine feautrier_pt_it(border_freqs, &
     I_GCM = 0d0
 
     do i = 1, freq_len_p_1-1
+
+       F_down_surf = 0d0
 
        flux(i) = 0d0
 
@@ -2709,8 +2717,6 @@ subroutine feautrier_pt_it(border_freqs, &
 
 
           do j = 1, N_mu
-
-
 
              ! Own boundary treatment
              f1 = mu(j)/(tau_approx_scat(l,i,1+1)-tau_approx_scat(l,i,1))
@@ -2810,7 +2816,7 @@ subroutine feautrier_pt_it(border_freqs, &
                     * 2d0 * SUM(I_star_calc(l,:, struc_len, i) * mu * w_gauss_mu)
              else
                !I_minus = I_minus + surf_refl(i) *J_star_ini(l,i,struc_len)  !to be checked! ! OLD PRE 091220
-               I_minus = I_minus + surf_refl(i) *J_star_ini(l,i,struc_len) * 4d0 * mu_star
+               I_minus = I_minus + surf_refl(i) * J_star_ini(l,i,struc_len) * 4d0 * mu_star
              end if
 
              !sum to get I_J
@@ -2852,6 +2858,17 @@ subroutine feautrier_pt_it(border_freqs, &
              ! END TEST PAUL SCAT
 
           end do
+
+          ! Calculate downward streaming flux for surface boundary condition in temp_iter
+          F_down_surf = F_down_surf + ABS(2d0 * pi * SUM(I_plus_surface(:, l, i) * mu * w_gauss_mu) * w_gauss_ck(l))
+          if  (trim(adjustl(geom)) .NE. 'non-isotropic') then
+               F_down_surf = F_down_surf + &
+                       ABS(2d0 * pi * SUM(I_star_calc(l, :, struc_len, i) * mu * w_gauss_mu) * w_gauss_ck(l))
+          else
+              ! H_star_calc(:,i,:) = H_star_0(i)*exp(-tau_approx_scat(:,i,:)/mu_star)
+              ! J_star_ini(:,i,:) = abs(H_star_calc(:,i,:))/mu_star
+               F_down_surf = F_down_surf + ABS(J_star_ini(l,i,struc_len) * 4d0 * pi * mu_star * w_gauss_ck(l))
+          end if
 
           J_bol_g = 0d0
           if (planet_mode) then
@@ -2914,6 +2931,9 @@ subroutine feautrier_pt_it(border_freqs, &
 
        kappa_J = kappa_J + kappa_J_a * (border_freqs(i)-border_freqs(i+1))
        kappa_H = kappa_H + kappa_H_a * (border_freqs(i)-border_freqs(i+1))
+
+       radiative_surface_heating = radiative_surface_heating + &
+               (1d0 - surf_refl(i)) * F_down_surf * (border_freqs(i)-border_freqs(i+1))
 
     end do
 
