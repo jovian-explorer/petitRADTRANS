@@ -97,7 +97,7 @@ class Retrieval:
         self.best_fit_params = {}
         self.posterior_sample_specs = {}
         self.plotting = test_plotting
-        self.PT_plot_mode = test_plotting
+        self.PT_plot_mode = False
         self.evaluate_sample_spectra = sample_spec
 
         # Pymultinest stuff
