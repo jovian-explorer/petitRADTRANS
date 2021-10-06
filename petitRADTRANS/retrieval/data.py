@@ -335,7 +335,7 @@ class Data:
         f_err = self.flux_error * self.scale_factor
         log_l = 0.0
         if self.covariance is not None:
-            log_l += -1 * np.dot(diff, np.dot(self.inv_cov, diff)) / 2.
+            log_l += -1 * np.dot(diff, np.dot(self.inv_cov * (self.scale_factor ** 2.), diff)) / 2.
         else:
             log_l += -1 * np.sum((diff / f_err) ** 2.) / 2.
         if plotting:
