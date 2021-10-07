@@ -930,12 +930,10 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
                     done += 1
     #total_inds = np.array(sorted(total_inds,reverse=False))
     # Stack the low res and high res grids, sort it, and take the unique values
-    print(press_small.shape,press_plus_index[total_inds].shape)
     press_out = np.vstack((press_small,press_plus_index[total_inds]))
     press_out = np.sort(press_out, axis = 0)
     p_out,ind = np.unique(press_out[:,0],return_index = True)
     shape = int((press.shape[0]/scaling) + P_clouds.shape[0]*width*(scaling - 1))
-    print(press_out.shape,p_out.shape,shape)
     if p_out.shape[0] != shape:
         print("AMR returned incorrect shape: {p_out.shape[0]} instead of {shape}!")
     return p_out,  press_out[ind, 1].astype('int')
