@@ -90,10 +90,10 @@ def emission_model_diseq(pRT_object,
     #    print(key,val.value)
 
     # Priors for these parameters are implemented here, as they depend on each other
-    t3 = ((3. / 4. * parameters['T_int'].value ** 4. * (0.1 + 2. / 3.)) ** 0.25) * (1 - parameters['t3'].value)
-    t2 = t3 * (1.0 - parameters['T2'].value)
-    t1 = t2 * (1.0 - parameters['T1'].value)
-    delta = ((10 ** (-3.0 + 5.0 * parameters['log_delta'].value)) * 1e6) ** (-parameters['alpha'].value)
+    t3 = parameters['T3'].value
+    t2 = parameters['T2'].value
+    t1 = parameters['T1'].value
+    delta = 10 ** parameters['log_delta'].value
 
     # Make the P-T profile
     temp_arr = np.array([t1, t2, t3])
@@ -123,6 +123,7 @@ def emission_model_diseq(pRT_object,
 
     # Only include the high resolution pressure array near the cloud base.
     pressures = p_use
+
     if AMR:
         temperatures = temperatures[small_index]
         pressures = PGLOBAL[small_index]
@@ -938,14 +939,15 @@ def fixed_length_amr(P_clouds, press, scaling=10, width=3):
                     done += 1
     # total_inds = np.array(sorted(total_inds,reverse=False))
     # Stack the low res and high res grids, sort it, and take the unique values
-    try:
-        press_out = np.vstack((press_small, press_plus_index[total_inds]))
-    except:
-        print("amr returned incorrect length")
-        return PGLOBAL, np.array([0])
+
+    press_out = np.vstack((press_small, press_plus_index[total_inds]))
     press_out = np.sort(press_out, axis=0)
     p_out, ind = np.unique(press_out[:, 0], return_index=True)
-    return p_out, press_out[ind, 1].astype('int')
+    shape = int((press.shape[0]/scaling) + P_clouds.shape[0]*width*(scaling - 1))
+
+    if p_out.shape[0] != shape:
+        print("AMR returned incorrect shape: {p_out.shape[0]} instead of {shape}!")
+    return p_out,  press_out[ind, 1].astype('int')
 
 
 def get_abundances(pressures, temperatures, line_species, cloud_species, parameters, AMR=False):
