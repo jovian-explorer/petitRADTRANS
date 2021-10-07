@@ -1,3 +1,6 @@
+import sys
+import os
+import time
 import copy as cp
 import os
 import sys
@@ -82,6 +85,7 @@ def emission_model_diseq(pRT_object,
         spectrum_model : np.array
             Computed emission spectrum [W/m2/micron]
     """
+    start = time.time()
     pglobal_check(pRT_object.press * 1e-6,
                   parameters['pressure_simple'].value,
                   parameters['pressure_scaling'].value)
@@ -181,6 +185,8 @@ def emission_model_diseq(pRT_object,
     spectrum_model = surf_to_meas(f_lambda,
                                   r_pl,
                                   parameters['D_pl'].value)  # print(wlen_model,spectrum_model)
+    end = time.time()
+    print(end-start)
     return wlen_model, spectrum_model
 
 

@@ -137,7 +137,8 @@ class Retrieval:
             log_z_convergence=0.5,
             step_sampler=False,
             warmstart_max_tau=0.5,
-            resume=True):
+            resume=True,
+            max_iter=0):
         """
         Run mode for the class. Uses pynultinest to sample parameter space
         and produce standard PMN outputs.
@@ -191,7 +192,8 @@ class Retrieval:
                                 log_z_convergence,
                                 step_sampler,
                                 warmstart_max_tau,
-                                resume)
+                                resume,
+                                max_iter)
             return
         if const_efficiency_mode and sampling_efficiency > 0.1:
             logging.warning("Sampling efficiency should be ~ 0.05 if you're using constant efficiency mode!")
@@ -224,10 +226,11 @@ class Retrieval:
                 n_live_points=n_live_points,
                 evidence_tolerance=log_z_convergence,  # default value is 0.5
                 sampling_efficiency=sampling_efficiency,  # default value is 0.8
-                n_iter_before_update=10,  # default value is 100
+                n_iter_before_update=50,  # default value is 100
                 outputfiles_basename=prefix,
                 verbose=True,
-                resume=resume
+                resume=resume,
+                max_iter=max_iter
             )
 
         # Analyze the output data
@@ -264,7 +267,8 @@ class Retrieval:
                        log_z_convergence=0.5,
                        step_sampler=True,
                        warmstart_max_tau=0.5,
-                       resume=True):
+                       resume=True,
+                       max_iter=0):
         """
         Run mode for the class. Uses ultranest to sample parameter space
         and produce standard outputs.
@@ -298,12 +302,16 @@ class Retrieval:
                     free_parameter_names.append(self.parameters[pp].name)
                     n_params += 1
 
+            if max_iter is 0:
+                max_iter = None
+
             sampler = un.ReactiveNestedSampler(free_parameter_names,
                                                self.log_likelihood,
                                                self.prior_ultranest,
                                                log_dir=self.output_dir + "out_" + self.retrieval_name,
                                                warmstart_max_tau=warmstart_max_tau,
-                                               resume=resume)
+                                               resume=resume,
+                                               max_iter=max_iter)
             if step_sampler:
                 try:
                     import ultranest.stepsampler
@@ -991,13 +999,13 @@ class Retrieval:
         for spec in self.rd.line_species:
             species.append(spec + "_R_" + str(resolution))
 
-        pRT_Object = Radtrans(line_species = cp.copy(self.rd.line_species), \
-                            rayleigh_species= cp.copy(self.rd.rayleigh_species), \
-                            continuum_opacities = cp.copy(self.rd.continuum_opacities), \
-                            cloud_species = cp.copy(self.rd.cloud_species), \
-                            mode='c-k', \
-                            wlen_bords_micron = [0.5,28],
-                            do_scat_emis = self.rd.scattering)
+        pRT_Object = Radtrans(line_species = cp.copy(self.rd.line_species),
+                              rayleigh_species= cp.copy(self.rd.rayleigh_species),
+                              continuum_opacities = cp.copy(self.rd.continuum_opacities),
+                              cloud_species = cp.copy(self.rd.cloud_species),
+                              mode='c-k',
+                              wlen_bords_micron = [0.5,28],
+                              do_scat_emis = self.rd.scattering)
         if self.rd.AMR:
             p = self.rd._setup_pres()
         else:
@@ -1027,7 +1035,7 @@ class Retrieval:
 #############################################################
 # Plotting functions
 #############################################################
-    def plot_all(self, output_dir = None, ret_names = []):
+    def plot_all(self, output_dir = None, ret_names=None):
         """
         Produces plots for the best fit spectrum, a sample of 100 output spectra,
         the best fit PT profile and a corner plot for parameters specified in the
@@ -1450,6 +1458,7 @@ class Retrieval:
                 i_p += 1
 
         temps = []
+
         for i_s in range(len(samples_use)):
             pressures, t = self.log_likelihood(samples_use[i_s, :-1], 0, 0)
             temps.append(t)
