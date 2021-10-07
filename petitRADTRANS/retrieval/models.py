@@ -88,10 +88,10 @@ def emission_model_diseq(pRT_object,
     #    print(key,val.value)
 
     # Priors for these parameters are implemented here, as they depend on each other
-    T3 = parameters['T3'].value#((3./4.*parameters['T_int'].value**4.*(0.1+2./3.))**0.25)*(1-parameters['T3'].value)
-    T2 = parameters['T2'].value#T3*(1.0-parameters['T2'].value)
-    T1 = parameters['T1'].value#T2*(1.0-parameters['T1'].value)
-    delta = 10**(parameters['log_delta'].value) #(10**(-3.0+5.0*parameters['log_delta'].value))*1e6)**(-parameters['alpha'].value)
+    T3 = ((3./4.*parameters['T_int'].value**4.*(0.1+2./3.))**0.25)*(1-parameters['T3'].value)
+    T2 = T3*(1.0-parameters['T2'].value)
+    T1 = T2*(1.0-parameters['T1'].value)
+    delta = ((10**(-3.0+5.0*parameters['log_delta'].value))*1e6)**(-parameters['alpha'].value)
 
     # Make the P-T profile
     temp_arr = np.array([T1,T2,T3])
