@@ -143,7 +143,8 @@ class Retrieval:
             log_z_convergence = 0.5,
             step_sampler = False,
             warmstart_max_tau=0.5,
-            resume = True):
+            resume = True,
+            max_iter = 0):
         """
         Run mode for the class. Uses pynultinest to sample parameter space
         and produce standard PMN outputs.
@@ -184,7 +185,8 @@ class Retrieval:
                                 log_z_convergence,
                                 step_sampler,
                                 warmstart_max_tau,
-                                resume)
+                                resume,
+                                max_iter)
             return
         if const_efficiency_mode and sampling_efficiency > 0.1:
             logging.warning("Sampling efficiency should be ~ 0.05 if you're using constant efficiency mode!")
@@ -215,7 +217,8 @@ class Retrieval:
                             const_efficiency_mode = const_efficiency_mode,
                             evidence_tolerance = log_z_convergence,
                             n_live_points = n_live_points,
-                            n_iter_before_update = 10)
+                            n_iter_before_update = 50,
+                            max_iter = max_iter)
         self.analyzer = pymultinest.Analyzer(n_params = n_params,
                                              outputfiles_basename = prefix)
         s = self.analyzer.get_stats()
@@ -244,7 +247,8 @@ class Retrieval:
                        log_z_convergence = 0.5,
                        step_sampler = True,
                        warmstart_max_tau=0.5,
-                       resume = True):
+                       resume = True,
+                       max_iter = 0):
         """
         Run mode for the class. Uses ultranest to sample parameter space
         and produce standard outputs.
@@ -278,13 +282,15 @@ class Retrieval:
                     free_parameter_names.append(self.parameters[pp].name)
                     n_params += 1
 
-
+            if max_iter is 0:
+                max_iter = None
             sampler = un.ReactiveNestedSampler(free_parameter_names,
                                                self.log_likelihood,
                                                self.prior_ultranest,
                                                log_dir=self.output_dir + "out_" + self.retrieval_name,
                                                warmstart_max_tau=warmstart_max_tau,
-                                               resume=resume)
+                                               resume=resume,
+                                               max_iters = max_iter)
             if step_sampler:
                 try:
                     import ultranest.stepsampler
