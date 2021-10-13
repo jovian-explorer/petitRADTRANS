@@ -435,7 +435,7 @@ class Planet:
         """
         equilibrium_temperature = \
             self.star_effective_temperature * np.sqrt(self.star_radius / (2 * self.orbit_semi_major_axis)) \
-            * (1 - self.bond_albedo) ** (1 / 4)
+            * (1 - self.bond_albedo) ** 0.25
 
         partial_derivatives = np.array([
             equilibrium_temperature / self.star_effective_temperature,  # dt_eq/dt_eff

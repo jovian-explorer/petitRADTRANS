@@ -8,9 +8,14 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 ### Added
 - Configuration module.
 - Test suit.
+- Version module.
 
 ### Changed
 - Package structure.
+- Code clean-up.
+
+### Removed
+- Useless make files.
 
 ---
 No changelog before version 2.4.0.

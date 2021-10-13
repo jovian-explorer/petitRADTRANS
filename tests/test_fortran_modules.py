@@ -16,3 +16,5 @@ def test_rebin_spectrum():
     )
 
     assert np.allclose(output_flux, np.array([-0.26055379, -0.60538758, -0.47629003, -1.54747344,  0.3938092]))
+
+

@@ -13,9 +13,9 @@ def _get_petitradtrans_config_directory():
     import os
     from pathlib import Path
 
-    config_directory = str(Path.home()) + os.path.sep + '.petitradtrans'
+    config_directory = os.path.join(str(Path.home()), '.petitradtrans')
 
-    if not os.path.isdir(str(Path.home()) + os.path.sep + '.petitradtrans'):
+    if not os.path.isdir(config_directory):
         os.mkdir(config_directory)
 
     return config_directory
@@ -49,8 +49,8 @@ def _make_petitradtrans_config_file():
 
     # Default path to the input data and to the outputs
     config['Paths'] = {
-        'pRT_input_data_path': str(Path.home()) + os.path.sep + 'petitRADTRANS' + os.path.sep + 'input_data',
-        'pRT_outputs_path': str(Path.home()) + os.path.sep + 'petitRADTRANS' + os.path.sep + 'outputs',
+        'pRT_input_data_path': os.path.join(str(Path.home()), 'petitRADTRANS', 'input_data'),
+        'pRT_outputs_path': os.path.join(str(Path.home()), 'petitRADTRANS', 'outputs')
     }
 
     with open(petitradtrans_config_file, 'w') as configfile:

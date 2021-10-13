@@ -3,6 +3,8 @@ from __future__ import print_function
 import os
 import sys
 
+from petitRADTRANS.config import petitradtrans_config
+
 # Link to the libs folders on Windows
 extra_dll_dir = os.path.join(os.path.dirname(__file__), '.libs')
 
@@ -12,6 +14,3 @@ if sys.platform == 'win32' and os.path.isdir(extra_dll_dir):
     else:
         os.environ.setdefault('PATH', '')
         os.environ['PATH'] += os.pathsep + extra_dll_dir
-
-from petitRADTRANS.config import petitradtrans_config
-from petitRADTRANS.radtrans import Radtrans
