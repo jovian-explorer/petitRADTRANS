@@ -25,7 +25,7 @@ observation_files['NIRISS SOSS'] = 'NIRISS_SOSS.dat'
 observation_files['NIRSpec G395M'] = 'NIRSpec_G395M.dat'
 observation_files['MIRI LRS'] = 'MIRI_LRS.dat'
 
-# For testing purposes only
+# For tests purposes only
 plotting = False
 if plotting:
     import pylab as plt

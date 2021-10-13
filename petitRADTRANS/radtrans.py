@@ -1,18 +1,21 @@
 from __future__ import division, print_function
 
-from . import fort_input as fi
-from . import fort_spec as fs
-from . import fort_rebin as fr
+from .fort_input import fort_input as fi
+from .fort_spec import fort_spec as fs
+from .fort_rebin import fort_rebin as fr
 from . import nat_cst as nc
 from . import pyth_input as pyi
 from . import _read_opacities
+from petitRADTRANS import petitradtrans_config
 
 import numpy as np
 import copy as cp
-import os,glob
-import sys,pdb
+import os
+import glob
+import sys
 from scipy import interpolate
 import h5py
+
 
 class Radtrans(_read_opacities.ReadOpacities):
     """ Class defining objects for carrying out spectral calculations for a
@@ -97,14 +100,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                      test_ck_shuffle_comp = False, do_scat_emis = False, \
                      lbl_opacity_sampling = None):
 
-        self.path = os.environ.get("pRT_input_data_path")
-        if self.path == None:
-            print('Path to input data not specified!')
-            print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
-            print('    import os')
-            print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
-            print('before creating a Radtrans object or loading the nat_cst module.')
-            sys.exit(1)
+        self.path = petitradtrans_config['Paths']['prt_input_data_path']
 
         self.wlen_bords_micron = wlen_bords_micron
 
@@ -119,6 +115,8 @@ class Radtrans(_read_opacities.ReadOpacities):
         # Line species present? If yes: define wavelength array
         if len(line_species) > 0:
             self.line_absorbers_present = True
+        else:
+            self.line_absorbers_present = False
 
         ##### ADD TO SOURCE AND COMMENT PROPERLY LATER!
         self.test_ck_shuffle_comp = test_ck_shuffle_comp
@@ -693,12 +691,11 @@ class Radtrans(_read_opacities.ReadOpacities):
                 self.r_g[:,i_spec] = a_hans[self.cloud_species[i_spec]]
 
         if radius is not None or a_hans is not None:
-            if dist is "lognormal":
+            if dist == "lognormal":
                 cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
                 py_calc_cloud_opas(rho,self.rho_cloud_particles, \
                                     self.cloud_mass_fracs,self.r_g,sigma_lnorm, \
                                     self.cloud_rad_bins,self.cloud_radii, \
-                                    self.cloud_lambdas, \
                                     self.cloud_specs_abs_opa, \
                                     self.cloud_specs_scat_opa, \
                                     self.cloud_aniso)
@@ -707,7 +704,6 @@ class Radtrans(_read_opacities.ReadOpacities):
                 fs.calc_hansen_opas(rho,self.rho_cloud_particles, \
                                     self.cloud_mass_fracs,self.r_g,self.b_hans, \
                                     self.cloud_rad_bins,self.cloud_radii, \
-                                    self.cloud_lambdas, \
                                     self.cloud_specs_abs_opa, \
                                     self.cloud_specs_scat_opa, \
                                     self.cloud_aniso)
@@ -719,10 +715,9 @@ class Radtrans(_read_opacities.ReadOpacities):
                     fseds[i_spec] = fsed[self.cloud_species[i_spec]]
                 except:
                     fseds[i_spec] = fsed
-            if dist is "lognormal":
+            if dist == "lognormal":
                 self.r_g = fs.get_rg_n(gravity,rho,self.rho_cloud_particles, \
                                         self.temp,mmw,fseds, \
-                                        self.cloud_mass_fracs, \
                                         sigma_lnorm,Kzz)
 
                 cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
@@ -730,7 +725,6 @@ class Radtrans(_read_opacities.ReadOpacities):
                                         self.cloud_mass_fracs, \
                                         self.r_g,sigma_lnorm, \
                                         self.cloud_rad_bins,self.cloud_radii, \
-                                        self.cloud_lambdas, \
                                         self.cloud_specs_abs_opa, \
                                         self.cloud_specs_scat_opa, \
                                         self.cloud_aniso)
@@ -738,14 +732,12 @@ class Radtrans(_read_opacities.ReadOpacities):
             else:
                 self.r_g = fs.get_rg_n_hansen(gravity,rho,self.rho_cloud_particles, \
                         self.temp,mmw,fseds, \
-                        self.cloud_mass_fracs, \
                         self.b_hans,Kzz)
                 cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
                 fs.calc_hansen_opas(rho,self.rho_cloud_particles, \
                                         self.cloud_mass_fracs, \
                                         self.r_g,self.b_hans, \
                                         self.cloud_rad_bins,self.cloud_radii, \
-                                        self.cloud_lambdas, \
                                         self.cloud_specs_abs_opa, \
                                         self.cloud_specs_scat_opa, \
                                         self.cloud_aniso)
@@ -854,7 +846,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                         self.do_scat_emis, self.hack_cloud_total_scat_aniso)
 
                     if ((not block1) and (not block3)) and (not block4):
-                        print("Cloud only (for testing purposes...)!")
+                        print("Cloud only (for tests purposes...)!")
                         self.total_tau[:,:,:1,:], self.photon_destruction_prob = \
                           total_tau_cloud[:,:,:1,:], photon_destruction_prob_cloud
 
@@ -1643,7 +1635,6 @@ def py_calc_cloud_opas(rho,
                     sigma_n,
                     cloud_rad_bins,
                     cloud_radii,
-                    cloud_lambdas,
                     cloud_specs_abs_opa,
                     cloud_specs_scat_opa,
                     cloud_aniso):

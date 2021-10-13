@@ -1,6 +1,6 @@
 from __future__ import division, print_function
 
-from . import fort_input as fi
+from .fort_input import fort_input as fi
 from . import nat_cst as nc
 from . import pyth_input as pyi
 
@@ -8,8 +8,8 @@ import numpy as np
 import glob, h5py
 import copy as cp
 
-class ReadOpacities:
 
+class ReadOpacities:
     def read_line_opacities(self, index, arr_min, arr_max):
         # Reads in the line opacities for spectral calculation
 
@@ -176,8 +176,7 @@ class ReadOpacities:
                         1, \
                         len_TP, \
                         self.mode, \
-                        arr_min, \
-                        arr_max, \
+                        arr_min,
                         self.custom_grid[self.line_species[i_spec]], \
                         custom_file_names)
 

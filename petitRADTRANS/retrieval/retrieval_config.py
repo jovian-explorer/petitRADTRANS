@@ -6,6 +6,7 @@ os.environ["OMP_NUM_THREADS"] = "1"
 import numpy as np
 from .data import Data
 from .parameter import Parameter
+from config.configuration import petitradtrans_config
 
 
 class RetrievalConfig:
@@ -153,20 +154,13 @@ class RetrievalConfig:
 
         self.parameters[name] = Parameter(name, free, value,
                                           transform_prior_cube_coordinate = transform_prior_cube_coordinate)
+
     def list_available_line_species(self):
         """
         List the currently installed opacity tables that are available for species that contribute to the line opacity.
         """
 
-        prt_path = os.environ.get("pRT_input_data_path")
-        if prt_path is None:
-            print('Path to input data not specified!')
-            print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
-            print('    import os')
-            print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
-            print('before creating a Radtrans object or loading the nat_cst module.')
-            logging.error("pRT_input_data_path variable not set")
-            sys.exit(1)
+        prt_path = petitradtrans_config['Paths']['pRT_input_data_path']
 
         files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/corr_k/")]
         files = set([f.split('_R_')[0] for f in files])
@@ -184,15 +178,7 @@ class RetrievalConfig:
         List the currently installed opacity tables that are available for cloud species.
         """
 
-        prt_path = os.environ.get("pRT_input_data_path")
-        if prt_path is None:
-            print('Path to input data not specified!')
-            print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
-            print('    import os')
-            print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
-            print('before creating a Radtrans object or loading the nat_cst module.')
-            logging.error("pRT_input_data_path variable not set")
-            sys.exit(1)
+        prt_path = petitradtrans_config['Paths']['pRT_input_data_path']
 
         files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/continuum/clouds/")]
         files = set(files)
@@ -204,20 +190,13 @@ class RetrievalConfig:
         List the currently installed opacity tables that are available for CIA species.
         """
 
-        prt_path = os.environ.get("pRT_input_data_path")
-        if prt_path is None:
-            print('Path to input data not specified!')
-            print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
-            print('    import os')
-            print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
-            print('before creating a Radtrans object or loading the nat_cst module.')
-            logging.error("pRT_input_data_path variable not set")
-            sys.exit(1)
+        prt_path = petitradtrans_config['Paths']['pRT_input_data_path']
 
         files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/continuum/cia/")]
         files = set(files)
         for f in files: print(f)
         return files
+
     def set_line_species(self,linelist,free=False,abund_lim=(-6.0,6.0)):
         """
         Set RadTrans.line_species
@@ -245,6 +224,7 @@ class RetrievalConfig:
                 self.parameters[spec] = Parameter(spec,True,\
                                     transform_prior_cube_coordinate = \
                                     lambda x : abund_lim[0]+abund_lim[1]*x)
+
     def set_rayleigh_species(self,linelist):
         """
         Set the list of species that contribute to the rayleigh scattering in the pRT object.
@@ -488,5 +468,5 @@ class RetrievalConfig:
                                     photometric_transformation_function = transform,
                                     external_pRT_reference=external_pRT_reference,
                                     opacity_mode=opacity_mode)
-            self.data[name].flux = flux
+            self.data[name].calculate_star_radiosity = flux
             self.data[name].flux_error = err

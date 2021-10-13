@@ -54,21 +54,21 @@ def plot_data(fig,ax,data,resolution = None, scaling = 1.0):
             resolution_data = np.mean(data.wlen[1:]/np.diff(data.wlen))
             ratio = resolution_data / resolution
             if int(ratio) > 1:
-                flux,edges,_ = binned_statistic(data.wlen,data.flux,'mean',data.wlen.shape[0]/ratio)
+                flux,edges,_ = binned_statistic(data.wlen, data.calculate_star_radiosity, 'mean', data.wlen.shape[0] / ratio)
                 error,_,_ = binned_statistic(data.wlen,data.flux_error,\
                                             'mean',data.wlen.shape[0]/ratio)/np.sqrt(ratio)
                 wlen = np.array([(edges[i]+edges[i+1])/2.0 for i in range(edges.shape[0]-1)])
             else:
                 wlen = data.wlen
                 error = data.flux_error
-                flux = data.flux
+                flux = data.calculate_star_radiosity
         except:
             wlen = data.wlen
             error = data.flux_error
-            flux = data.flux
+            flux = data.calculate_star_radiosity
     else:
         wlen = np.mean(data.width_photometry)
-        flux = data.flux
+        flux = data.calculate_star_radiosity
         error = data.flux_error
         wlen_bins = data.wlen_bins
     marker = 'o'

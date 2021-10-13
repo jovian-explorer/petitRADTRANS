@@ -155,7 +155,7 @@ def emission_model_diseq(pRT_object,
     # Getting the model into correct units (W/m2/micron)
     wlen_model = nc.c/pRT_object.freq/1e-4
     wlen = nc.c/pRT_object.freq
-    f_lambda = pRT_object.flux*nc.c/wlen**2.
+    f_lambda = pRT_object.calculate_star_radiosity * nc.c / wlen ** 2.
     # convert to flux per m^2 (from flux per cm^2) cancels with step below
     #f_lambda = f_lambda * 1e4
     # convert to flux per micron (from flux per cm) cancels with step above
@@ -294,7 +294,7 @@ def guillot_free_emission(pRT_object, \
 
     wlen_model = nc.c/pRT_object.freq/1e-4
     wlen = nc.c/pRT_object.freq
-    f_lambda = pRT_object.flux*nc.c/wlen**2.
+    f_lambda = pRT_object.calculate_star_radiosity * nc.c / wlen ** 2.
     # convert to flux per m^2 (from flux per cm^2) cancels with step below
     #f_lambda = f_lambda * 1e4
     # convert to flux per micron (from flux per cm) cancels with step above

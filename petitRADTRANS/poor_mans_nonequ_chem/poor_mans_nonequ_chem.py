@@ -6,7 +6,7 @@ Created on Mon May 29 14:44:35 2017
 import numpy as np
 import h5py
 import os
-from .chem_fortran_util.chem_fortran_util import chem_fortran_util as cfu
+from .chem_fortran_util import chem_fortran_util as cfu
 import copy as cp
 from petitRADTRANS import petitradtrans_config
 

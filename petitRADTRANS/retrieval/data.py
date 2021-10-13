@@ -6,6 +6,7 @@ from scipy.ndimage.filters import gaussian_filter
 import petitRADTRANS.nat_cst as nc
 from .rebin_give_width import rebin_give_width
 
+
 class Data:
     """
     This class stores the spectral data to be retrieved from a single instrument or observation.
@@ -48,11 +49,12 @@ class Data:
         external_pRT_instance : object
             An existing RadTrans object. Leave as none unless you're sure of what you're doing.
         model_generating_function : method
-            A function, typically defined in run_definition.py that returns the model wavelength and spectrum (emission or transmission).
+            A function, typically defined in run_definition.py that returns the model wavelength and spectrum (emission
+            or transmission).
             This is the function that contains the physics of the model, and calls pRT in order to compute the spectrum.
         wlen_range_micron : tuple,list
-            Set the wavelength range of the pRT object. Defaults to a range +/-5% greater than that of the data. Must at least be
-            equal to the range of the data.
+            Set the wavelength range of the pRT object. Defaults to a range +/-5% greater than that of the data. Must at
+             least be equal to the range of the data.
         scale : bool
             Turn on or off scaling the data by a constant factor. Set to True if scaling the data during the retrieval.
         wlen_bins : numpy.ndarray

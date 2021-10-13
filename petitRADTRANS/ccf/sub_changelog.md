@@ -40,7 +40,6 @@ This is a temporary document.
 ### Fixed
 - Crash due to too large input velocity range.
 
-
 ## [0.5.1] - 2021-09-13
 ### Changed
 - Mock observed spectra now use the median of the noise.
@@ -86,7 +85,6 @@ This is a temporary document.
 ### Fixed
 - `Planet` name incorrectly generated.
 - `Planet` name loaded from HDF5 file as byte instead of str.
-
 
 ## [0.1.0] - 2021-09-07
 ### Added

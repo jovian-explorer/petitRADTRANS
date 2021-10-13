@@ -1112,8 +1112,6 @@ class SpectralModel:
                         mass_fractions_dict[line_species_name] = np.zeros_like(temperature)
                     elif line_species_name in mass_fractions:
                         mass_fractions_dict[line_species_name] = mass_fractions[line_species_name]
-                    elif key in mass_fractions:
-                        mass_fractions_dict[key] = mass_fractions[key]
                     else:
                         mass_fractions_dict[line_species_name] = abundances[line_species]
 
@@ -1122,7 +1120,10 @@ class SpectralModel:
                     break
 
             if not found:
-                mass_fractions_dict[key] = abundances[key]
+                if key in mass_fractions:
+                    mass_fractions_dict[key] = mass_fractions[key]
+                else:
+                    mass_fractions_dict[key] = abundances[key]
 
         return mass_fractions_dict
 

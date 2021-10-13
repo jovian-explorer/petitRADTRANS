@@ -49,6 +49,8 @@ def retrieval_model_plain(rt_object, temperature_parameters, log_g, log_P0, \
 
     abundances = {}
     metal_sum = 0.
+
+    # Abundances are the same in the whole pressure grid
     for name in ab_metals.keys():
         abundances[name] = np.ones_like(press)*1e1**ab_metals[name]
         metal_sum += 1e1**ab_metals[name]
@@ -61,4 +63,4 @@ def retrieval_model_plain(rt_object, temperature_parameters, log_g, log_P0, \
         
     rt_object.calc_flux(temp, abundances, gravity, MMW)
         
-    return nc.c/rt_object.freq, rt_object.flux
+    return nc.c/rt_object.freq, rt_object.calculate_star_radiosity
