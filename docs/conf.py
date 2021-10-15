@@ -14,8 +14,11 @@
 #
 import os
 import sys
+
+from petitRADTRANS.version import version
+
 sys.path.insert(0, os.path.abspath('../'))
-autodoc_mock_imports = ['petitRADTRANS', 'numpy', 'scipy', 'glob', \
+autodoc_mock_imports = ['petitRADTRANS', 'numpy', 'scipy', 'glob',
                         'os', 'sys', 'pdb', 'h5py']
 
 # -- Project information -----------------------------------------------------
@@ -24,10 +27,10 @@ project = 'petitRADTRANS'
 copyright = u'2019-2020, Paul Molli\u00E8re'
 author = u'Paul Molli\u00E8re'
 
-# The short X.Y version
-version = '2.3'
 # The full version, including alpha/beta/rc tags
-release = '2.3.0'
+release = version
+# The short X.Y version
+version = version.rsplit('.', 1)[0]
 
 
 # -- General configuration ---------------------------------------------------
@@ -46,9 +49,9 @@ extensions = [
 ]
 autoapi_type = 'python'
 autoapi_dirs = ['../petitRADTRANS']
-exclude_patterns = ['_build', '**.ipynb_checkpoints']
+# exclude_patterns = ['_build', '**.ipynb_checkpoints']
 
-#pdf_documents = [('index', u'rst2pdf', u'pRTdoc', u'Molliere'),]
+# pdf_documents = [('index', u'rst2pdf', u'pRTdoc', u'Molliere'),]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -139,7 +142,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'petitRADTRANS.tex', 'petitRADTRANS Documentation',
-      u'Paul Molli\u00E8re', 'manual'),
+     u'Paul Molli\u00E8re', 'manual'),
 ]
 
 

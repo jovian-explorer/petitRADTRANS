@@ -1,63 +1,39 @@
 """
 Test the radtrans module.
+Essentially go through a simplified version of the tutorial, and compare the results with previous ones.
+C.f. (https://petitradtrans.readthedocs.io/en/latest/content/notebooks/getting_started.html).
+
+Do not change the parameters used to generate the comparison files, including input_data files, when running the tests.
 """
-import os
 import numpy as np
+
 from .context import petitRADTRANS
+from .utils import reference_filenames, pressures, temperature_isothermal, mass_fractions, mean_molar_mass, \
+    temperature_guillot_2010_parameters, planetary_parameters, spectrum_parameters
+
+relative_tolerance = 1e-6  # relative tolerance when comparing with older results
 
 
-def init_parameters(pressures):
-    # Initialize temperature and mass fractions
-    temperature = 1200. * np.ones_like(pressures)
-
-    mass_fractions = {
-        'H2': 0.74 * np.ones_like(temperature),
-        'He': 0.24 * np.ones_like(temperature),
-        'H2O_HITEMP': 0.001 * np.ones_like(temperature),
-        'CO_all_iso_HITEMP': 0.1 * np.ones_like(temperature)
-    }
-
-    mean_molar_mass = 2.33 * np.ones_like(temperature)  # (g.cm-3)
-
-    # Initialize planetary parameters
-    planet_reference_pressure = 0.01  # bar
-    planet_radius = 1.838 * petitRADTRANS.nat_cst.r_jup_mean  # (cm) radius at reference pressure
-    planet_surface_gravity = 1e1 ** 2.45  # (cm.s-2) gravity at reference pressure
-
-    return temperature, mass_fractions, mean_molar_mass, \
-        planet_reference_pressure, planet_radius, planet_surface_gravity
-
-
-def main_radtrans_init_with_correlated_k():
-    # Preparing a radiative transfer object
-    pressures = np.logspace(-6, 2, 27)
-    atmosphere = radtrans_init_correlated_k(pressures)
-
-    # Calculating a transmission spectrum
-    temperature, mass_fractions, mean_molar_mass, planet_reference_pressure, planet_radius, planet_surface_gravity = \
-        init_parameters(pressures)
-
-    atmosphere.calc_transm(
-        temp=temperature,
-        abunds=mass_fractions,
-        gravity=planet_surface_gravity,
-        mmw=mean_molar_mass,
-        R_pl=planet_radius,
-        P0_bar=planet_reference_pressure
+# Initializations
+def init_guillot_2010_temperature_profile():
+    temperature_guillot = petitRADTRANS.nat_cst.guillot_global(
+        pressure=pressures,
+        kappa_ir=temperature_guillot_2010_parameters['kappa_ir'],
+        gamma=temperature_guillot_2010_parameters['gamma'],
+        grav=planetary_parameters['surface_gravity'],
+        t_int=temperature_guillot_2010_parameters['intrinsic_temperature'],
+        t_equ=temperature_guillot_2010_parameters['equilibrium_temperature']
     )
 
-    return atmosphere
+    return temperature_guillot
 
 
-def radtrans_init_correlated_k(pressures):
+def init_radtrans_correlated_k():
     atmosphere = petitRADTRANS.radtrans.Radtrans(
-        line_species=[
-            'H2O_HITEMP',
-            'CO_all_iso_HITEMP'
-        ],
-        rayleigh_species=['H2', 'He'],
-        continuum_opacities=['H2-H2', 'H2-He'],
-        wlen_bords_micron=[4.3, 5.0],
+        line_species=spectrum_parameters['line_species_correlated_k'],
+        rayleigh_species=spectrum_parameters['rayleigh_species'],
+        continuum_opacities=spectrum_parameters['continuum_opacities'],
+        wlen_bords_micron=spectrum_parameters['wavelength_range_correlated_k'],
         mode='c-k'
     )
 
@@ -66,27 +42,173 @@ def radtrans_init_correlated_k(pressures):
     return atmosphere
 
 
-def test_radtrans_init_with_correlated_k():
-    """
-    Go through a simplified version of the tutorial.
-    C.f. (https://petitradtrans.readthedocs.io/en/latest/content/notebooks/getting_started.html).
-    """
-    atmosphere = main_radtrans_init_with_correlated_k()
+def init_radtrans_line_by_line():
+    atmosphere = petitRADTRANS.radtrans.Radtrans(
+        line_species=spectrum_parameters['line_species_line_by_line'],
+        rayleigh_species=spectrum_parameters['rayleigh_species'],
+        continuum_opacities=spectrum_parameters['continuum_opacities'],
+        wlen_bords_micron=spectrum_parameters['wavelength_range_line_by_line'],
+        mode='lbl'
+    )
+
+    atmosphere.setup_opa_structure(pressures)
+
+    return atmosphere
+
+
+atmosphere_ck = init_radtrans_correlated_k()
+atmosphere_lbl = init_radtrans_line_by_line()
+temperature_iso = temperature_isothermal * np.ones_like(pressures)
+temperature_guillot_2010 = init_guillot_2010_temperature_profile()
+
+
+# Tests
+def test_guillot_2010_temperature_profile():
+    # Load expected results
+    reference_data = np.load(reference_filenames['guillot_2010'])
+    print(f"Comparing generated transmission spectrum to result from petitRADTRANS-{reference_data['prt_version']}...")
+    temperature_ref = reference_data['temperature']
+    pressure_ref = reference_data['pressure']
+
+    # Check if temperature is as expected
+    assert np.allclose(
+        pressures,
+        pressure_ref,
+        rtol=relative_tolerance,
+        atol=0
+    )
+
+    assert np.allclose(
+        temperature_guillot_2010,
+        temperature_ref,
+        rtol=relative_tolerance,
+        atol=0
+    )
+
+
+def test_correlated_k_emission_spectrum():
+    # Calculate an emission spectrum
+    atmosphere_ck.calc_flux(
+        temp=temperature_guillot_2010,
+        abunds=mass_fractions,
+        gravity=planetary_parameters['surface_gravity'],
+        mmw=mean_molar_mass,
+    )
 
     # Load expected results
-    reference_data = np.loadtxt(os.path.join(
-        os.path.dirname(__file__), 'data', 'radtrans_spectrum_correlated_k_ref.dat')
-    )
-    wavelength_ref = reference_data[:, 0]
-    transit_radius_ref = reference_data[:, 1]
+    reference_data = np.load(reference_filenames['correlated_k_emission'])
+    print(f"Comparing generated emission spectrum to result from petitRADTRANS-{reference_data['prt_version']}...")
+    wavelength_ref = reference_data['wavelength']
+    spectral_radiosity_ref = reference_data['spectral_radiosity']
 
     # Check if spectrum is as expected
     assert np.allclose(
-        petitRADTRANS.nat_cst.c / atmosphere.freq * 1e4,
-        wavelength_ref
+        petitRADTRANS.nat_cst.c / atmosphere_ck.freq * 1e4,
+        wavelength_ref,
+        rtol=relative_tolerance,
+        atol=0
     )
 
     assert np.allclose(
-        atmosphere.transm_rad / petitRADTRANS.nat_cst.r_jup_mean,
-        transit_radius_ref
+        atmosphere_ck.flux,
+        spectral_radiosity_ref,
+        rtol=relative_tolerance,
+        atol=0
+    )
+
+
+def test_correlated_k_transmission_spectrum():
+    # Calculate a transmission spectrum
+    atmosphere_ck.calc_transm(
+        temp=temperature_iso,
+        abunds=mass_fractions,
+        gravity=planetary_parameters['surface_gravity'],
+        mmw=mean_molar_mass,
+        R_pl=planetary_parameters['radius'] * petitRADTRANS.nat_cst.r_jup_mean,
+        P0_bar=planetary_parameters['reference_pressure']
+    )
+
+    # Load expected results
+    reference_data = np.load(reference_filenames['correlated_k_transmission'])
+    print(f"Comparing generated transmission spectrum to result from petitRADTRANS-{reference_data['prt_version']}...")
+    wavelength_ref = reference_data['wavelength']
+    transit_radius_ref = reference_data['transit_radius']
+
+    # Check if spectrum is as expected
+    assert np.allclose(
+        petitRADTRANS.nat_cst.c / atmosphere_ck.freq * 1e4,  # Hz to um
+        wavelength_ref,
+        rtol=relative_tolerance,
+        atol=0
+    )
+
+    assert np.allclose(
+        atmosphere_ck.transm_rad / petitRADTRANS.nat_cst.r_jup_mean,
+        transit_radius_ref,
+        rtol=relative_tolerance,
+        atol=0
+    )
+
+
+def test_line_by_line_emission_spectrum():
+    # Calculate an emission spectrum
+    atmosphere_lbl.calc_flux(
+        temp=temperature_guillot_2010,
+        abunds=mass_fractions,
+        gravity=planetary_parameters['surface_gravity'],
+        mmw=mean_molar_mass,
+    )
+
+    # Load expected results
+    reference_data = np.load(reference_filenames['line_by_line_emission'])
+    print(f"Comparing generated transmission spectrum to result from petitRADTRANS-{reference_data['prt_version']}...")
+    wavelength_ref = reference_data['wavelength']
+    spectral_radiosity_ref = reference_data['spectral_radiosity']
+
+    # Check if spectrum is as expected
+    assert np.allclose(
+        petitRADTRANS.nat_cst.c / atmosphere_lbl.freq * 1e4,
+        wavelength_ref,
+        rtol=relative_tolerance,
+        atol=0
+    )
+
+    assert np.allclose(
+        atmosphere_lbl.flux,
+        spectral_radiosity_ref,
+        rtol=relative_tolerance,
+        atol=0
+    )
+
+
+def test_line_by_line_transmission_spectrum():
+    # Calculate a transmission spectrum
+    atmosphere_lbl.calc_transm(
+        temp=temperature_iso,
+        abunds=mass_fractions,
+        gravity=planetary_parameters['surface_gravity'],
+        mmw=mean_molar_mass,
+        R_pl=planetary_parameters['radius'] * petitRADTRANS.nat_cst.r_jup_mean,
+        P0_bar=planetary_parameters['reference_pressure']
+    )
+
+    # Load expected results
+    reference_data = np.load(reference_filenames['line_by_line_transmission'])
+    print(f"Comparing generated transmission spectrum to result from petitRADTRANS-{reference_data['prt_version']}...")
+    wavelength_ref = reference_data['wavelength']
+    transit_radius_ref = reference_data['transit_radius']
+
+    # Check if spectrum is as expected
+    assert np.allclose(
+        petitRADTRANS.nat_cst.c / atmosphere_lbl.freq * 1e4,  # Hz to um
+        wavelength_ref,
+        rtol=relative_tolerance,
+        atol=0
+    )
+
+    assert np.allclose(
+        atmosphere_lbl.transm_rad / petitRADTRANS.nat_cst.r_jup_mean,
+        transit_radius_ref,
+        rtol=relative_tolerance,
+        atol=0
     )
