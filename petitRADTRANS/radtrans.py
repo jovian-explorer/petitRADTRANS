@@ -92,7 +92,6 @@ class Radtrans(_read_opacities.ReadOpacities):
             this may save time! The user should verify whether this leads to
             solutions which are identical to the rebinned results of the fiducial
             :math:`10^6` resolution. If not, this parameter must not be used.
-
     """
 
     def __init__(self, line_species=None, rayleigh_species=None, cloud_species=None,
@@ -482,6 +481,27 @@ class Radtrans(_read_opacities.ReadOpacities):
         #############################
         #############################
 
+    def _check_cloud_effect(self, mass_mixing_ratios):
+        """
+        Check if the clouds have any effect, i.e. if the MMR is greater than 0.
+
+        Args:
+            mass_mixing_ratios: atmospheric mass mixing ratios
+
+        Returns:
+
+        """
+        add_cloud_opacity = False
+
+        if int(len(self.cloud_species)) > 0:
+            for i_spec in range(len(self.cloud_species)):
+                if np.any(mass_mixing_ratios[self.cloud_species[i_spec]] > 0):
+                    add_cloud_opacity = True  # add cloud opacity only if there are actually clouds
+
+                    break
+
+        return add_cloud_opacity
+
     @staticmethod
     def calc_borders(x):
         # Return bin borders for midpoints.
@@ -513,6 +533,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.continuum_opa_scat_emis = np.zeros((self.freq_len, p_len), dtype='d', order='F')
         self.contr_em = np.zeros((p_len, self.freq_len), dtype='d', order='F')
         self.contr_tr = np.zeros((p_len, self.freq_len), dtype='d', order='F')
+
         if len(self.line_species) > 0:
             self.line_struc_kappas = np.zeros((self.g_len, self.freq_len, len(self.line_species), p_len), dtype='d',
                                               order='F')
@@ -587,8 +608,10 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         self.scat = False
         self.mmw = mmw
+
         for i_spec in range(len(self.line_species)):
             self.line_abundances[:, i_spec] = abundances[self.line_species[i_spec]]
+
         self.continuum_opa = np.zeros_like(self.continuum_opa)
         self.continuum_opa_scat = np.zeros_like(self.continuum_opa_scat)
         self.continuum_opa_scat_emis = np.zeros_like(self.continuum_opa_scat_emis)
@@ -642,7 +665,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             self.continuum_opa = self.continuum_opa + self.gray_opacity
 
         # Add cloud opacity here, will modify self.continuum_opa
-        if int(len(self.cloud_species)) > 0:
+        if self._check_cloud_effect(abundances):  # add cloud opacity only if there is actually clouds
             self.scat = True
             self.calc_cloud_opacity(abundances, mmw, gravity,
                                     sigma_lnorm, fsed, Kzz, radius,
@@ -717,9 +740,10 @@ class Radtrans(_read_opacities.ReadOpacities):
         # Function to calculate cloud opacities
         # for defined atmospheric structure.
         rho = self.press / nc.kB / self.temp * mmw * nc.amu
-        for i_spec in range(int(len(self.cloud_species))):
-            self.cloud_mass_fracs[:, i_spec] = \
-                abundances[self.cloud_species[i_spec]]
+
+        for i_spec in range(len(self.cloud_species)):
+            self.cloud_mass_fracs[:, i_spec] = abundances[self.cloud_species[i_spec]]
+
             if radius is not None:
                 self.r_g[:, i_spec] = radius[self.cloud_species[i_spec]]
             elif a_hans is not None:
@@ -744,11 +768,14 @@ class Radtrans(_read_opacities.ReadOpacities):
                                         self.cloud_aniso)
         else:
             fseds = np.zeros(len(self.cloud_species))
-            for i_spec in range(int(len(self.cloud_species))):
-                try:
-                    fseds[i_spec] = fsed[self.cloud_species[i_spec]]
-                except KeyError:  # TODO check if KeyError is expected here
+
+            if not hasattr(fsed, '__iter__'):
+                for i_spec in range(len(self.cloud_species)):
                     fseds[i_spec] = fsed
+            elif isinstance(fsed, dict):
+                for i_spec in range(len(self.cloud_species)):
+                    fseds[i_spec] = fsed[self.cloud_species[i_spec]]
+
             if dist == "lognormal":
                 self.r_g = fs.get_rg_n(gravity, rho, self.rho_cloud_particles,
                                        self.temp, mmw, fseds,
@@ -1185,7 +1212,11 @@ class Radtrans(_read_opacities.ReadOpacities):
                          dist=dist, a_hans=a_hans)
         self.calc_opt_depth(gravity)
         self.calc_RT(contribution)
-        self.calc_tau_cloud(gravity)
+
+        if self._check_cloud_effect(abunds):
+            self.calc_tau_cloud(gravity)
+        else:
+            self.tau_cloud = None
 
         if ((self.mode == 'lbl') or self.test_ck_shuffle_comp) \
                 and (int(len(self.line_species)) > 1):
@@ -1548,14 +1579,9 @@ class Radtrans(_read_opacities.ReadOpacities):
                     Surface gravity in cgs. Vertically constant for emission
                     spectra.
         """
-
-        if len(self.cloud_species) > 0:
-            opacity_shape = (1, self.freq_len, 1, len(self.press))
-            cloud_opacity = self.cloud_total_opa_retrieval_check.reshape(opacity_shape)
-            self.tau_cloud = fs.calc_tau_g_tot_ck(gravity, self.press, cloud_opacity)
-
-        else:
-            self.tau_cloud = None
+        opacity_shape = (1, self.freq_len, 1, len(self.press))
+        cloud_opacity = self.cloud_total_opa_retrieval_check.reshape(opacity_shape)
+        self.tau_cloud = fs.calc_tau_g_tot_ck(gravity, self.press, cloud_opacity)
 
     def write_out_rebin(self, resolution, path='', species=None, masses=None):
         import exo_k as xk
