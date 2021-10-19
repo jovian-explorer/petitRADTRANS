@@ -16,11 +16,11 @@
 
 module constants_block
   implicit none
-  DOUBLE PRECISION,parameter      :: AU = 1.49597871d13, R_sun = 6.955d10, R_jup=6.9911d9
-  DOUBLE PRECISION,parameter      :: pi = 3.14159265359d0, sig=5.670372622593201d-5, c_l=2.99792458d10
-  DOUBLE PRECISION,parameter      :: G = 6.674d-8, M_jup = 1.89813d30, deg = Pi/1.8d2
-  DOUBLE PRECISION,parameter      :: kB=1.3806488d-16, hplanck=6.62606957d-27, amu = 1.66053892d-24
-  DOUBLE PRECISION,parameter      :: sneep_ubachs_n = 25.47d18, L0 = 2.68676d19
+  double precision,parameter      :: AU = 1.49597871d13, R_sun = 6.955d10, R_jup=6.9911d9
+  double precision,parameter      :: pi = 3.14159265359d0, sig=5.670372622593201d-5, c_l=2.99792458d10
+  double precision,parameter      :: G = 6.674d-8, M_jup = 1.89813d30, deg = Pi/1.8d2
+  double precision,parameter      :: kB=1.3806488d-16, hplanck=6.62606957d-27, amu = 1.66053892d-24
+  double precision,parameter      :: sneep_ubachs_n = 25.47d18, L0 = 2.68676d19
 end module constants_block
 
 
@@ -40,13 +40,13 @@ module fort_spec
           implicit none
 
           ! I/O
-          INTEGER, intent(in)                          :: struc_len, freq_len, g_len, N_species
-          DOUBLE PRECISION, intent(in)                 :: total_kappa(g_len,freq_len,N_species,struc_len)
-          DOUBLE PRECISION, intent(in)                 :: gravity, press(struc_len)
-          DOUBLE PRECISION, intent(out)                :: tau(g_len,freq_len,N_species,struc_len)
+          integer, intent(in)                          :: struc_len, freq_len, g_len, N_species
+          double precision, intent(in)                 :: total_kappa(g_len,freq_len,N_species,struc_len)
+          double precision, intent(in)                 :: gravity, press(struc_len)
+          double precision, intent(out)                :: tau(g_len,freq_len,N_species,struc_len)
           ! internal
           integer                                      :: i_struc, i_freq, i_g, i_spec
-          DOUBLE PRECISION                             :: del_tau_lower_ord, &
+          double precision                             :: del_tau_lower_ord, &
                gamma_second(g_len,freq_len,N_species), f_second, kappa_i(g_len,freq_len,N_species), &
                kappa_im(g_len,freq_len,N_species), kappa_ip(g_len,freq_len,N_species)
           LOGICAL                                      :: second_order
@@ -122,20 +122,20 @@ module fort_spec
           implicit none
 
           ! I/O
-          INTEGER, parameter                           :: N_species = 1
-          INTEGER, intent(in)                          :: struc_len, freq_len, g_len
-          DOUBLE PRECISION, intent(in)                 :: total_kappa_in(g_len,freq_len,N_species,struc_len)
-          DOUBLE PRECISION, intent(in)                 :: gravity, press(struc_len)
+          integer, parameter                           :: N_species = 1
+          integer, intent(in)                          :: struc_len, freq_len, g_len
+          double precision, intent(in)                 :: total_kappa_in(g_len,freq_len,N_species,struc_len)
+          double precision, intent(in)                 :: gravity, press(struc_len)
           LOGICAL, intent(in)                          :: do_scat_emis
-          DOUBLE PRECISION, intent(in)                 :: continuum_opa_scat_emis(freq_len,struc_len)
-          DOUBLE PRECISION, intent(out)                :: tau(g_len,freq_len,N_species,struc_len), &
+          double precision, intent(in)                 :: continuum_opa_scat_emis(freq_len,struc_len)
+          double precision, intent(out)                :: tau(g_len,freq_len,N_species,struc_len), &
                photon_destruction_prob(g_len,freq_len,struc_len)
           ! internal
           integer                                      :: i_struc, i_freq, i_g, i_spec
-          DOUBLE PRECISION                             :: del_tau_lower_ord, &
+          double precision                             :: del_tau_lower_ord, &
                gamma_second(g_len,freq_len,N_species), f_second, kappa_i(g_len,freq_len,N_species), &
                kappa_im(g_len,freq_len,N_species), kappa_ip(g_len,freq_len,N_species)
-          DOUBLE PRECISION                             :: total_kappa(g_len,freq_len,N_species,struc_len)
+          double precision                             :: total_kappa(g_len,freq_len,N_species,struc_len)
           LOGICAL                                      :: second_order
           !~~~~~~~~~~~~~
 
@@ -225,7 +225,7 @@ module fort_spec
           double precision, intent(in)  :: border_freqs(freq_len_p_1)
           double precision, intent(in)  :: temp(struc_len), w_gauss(g_len)
           LOGICAL, intent(in)           :: do_scat_emis
-          DOUBLE PRECISION, intent(in)  :: continuum_opa_scat_emis(freq_len,struc_len)
+          double precision, intent(in)  :: continuum_opa_scat_emis(freq_len,struc_len)
           double precision, intent(out) :: kappa_rosse(struc_len)
 
           double precision              :: total_kappa_use(g_len, freq_len, struc_len)
@@ -264,7 +264,7 @@ module fort_spec
           double precision, intent(in)  :: border_freqs(freq_len_p_1)
           double precision, intent(in)  :: temp(struc_len), w_gauss(g_len)
           LOGICAL, intent(in)           :: do_scat_emis
-          DOUBLE PRECISION, intent(in)  :: continuum_opa_scat_emis(freq_len,struc_len)
+          double precision, intent(in)  :: continuum_opa_scat_emis(freq_len,struc_len)
           double precision, intent(out) :: kappa_planck(struc_len)
 
           double precision              :: total_kappa_use(g_len, freq_len, struc_len)
@@ -301,23 +301,23 @@ module fort_spec
           implicit none
 
           ! I/O
-          INTEGER, intent(in)                         :: freq_len, struc_len,g_len, N_species
-          DOUBLE PRECISION, intent(in)                :: freq(freq_len)
-          DOUBLE PRECISION, intent(in)                :: temp(struc_len) !, press(struc_len)
-          DOUBLE PRECISION, intent(in)                :: tau(g_len,freq_len,N_species,struc_len)
+          integer, intent(in)                         :: freq_len, struc_len,g_len, N_species
+          double precision, intent(in)                :: freq(freq_len)
+          double precision, intent(in)                :: temp(struc_len) !, press(struc_len)
+          double precision, intent(in)                :: tau(g_len,freq_len,N_species,struc_len)
 
-          INTEGER, intent(in)                         :: N_mu
-          DOUBLE PRECISION, intent(in)                :: mu(N_mu) !, gravity
-          DOUBLE PRECISION, intent(in)                :: w_gauss_mu(N_mu)
-          DOUBLE PRECISION, intent(in)                :: w_gauss(g_len)
+          integer, intent(in)                         :: N_mu
+          double precision, intent(in)                :: mu(N_mu) !, gravity
+          double precision, intent(in)                :: w_gauss_mu(N_mu)
+          double precision, intent(in)                :: w_gauss(g_len)
           LOGICAL, intent(in)                         :: contribution
-          DOUBLE PRECISION, intent(out)               :: flux(freq_len)
-          DOUBLE PRECISION, intent(out)               :: contr_em(struc_len,freq_len)
+          double precision, intent(out)               :: flux(freq_len)
+          double precision, intent(out)               :: contr_em(struc_len,freq_len)
 
           ! Internal
-          INTEGER                                     :: i_mu,i_freq,i_str,i_spec
-          DOUBLE PRECISION                            :: r(struc_len)
-          DOUBLE PRECISION                            :: transm_mu(g_len,freq_len,N_species,struc_len), &
+          integer                                     :: i_mu,i_freq,i_str,i_spec
+          double precision                            :: r(struc_len)
+          double precision                            :: transm_mu(g_len,freq_len,N_species,struc_len), &
                mean_transm(freq_len,N_species,struc_len), transm_all(freq_len,struc_len), &
                transm_all_loc(struc_len), flux_mu(freq_len)
 
@@ -400,9 +400,9 @@ module fort_spec
 
           use constants_block
           implicit none
-          INTEGER                         :: struc_len
-          DOUBLE PRECISION                :: T(struc_len),B_nu(struc_len), nu
-          DOUBLE PRECISION                :: buffer
+          integer                         :: struc_len
+          double precision                :: T(struc_len),B_nu(struc_len), nu
+          double precision                :: buffer
 
           !~~~~~~~~~~~~~
 
@@ -426,25 +426,25 @@ module fort_spec
           implicit none
 
           ! I/O
-          INTEGER, intent(in)                         :: freq_len, struc_len, g_len, N_species
-          DOUBLE PRECISION, intent(in)                :: P0_bar, R_pl
-          DOUBLE PRECISION, intent(in)                :: temp(struc_len), press(struc_len), mmw(struc_len)
-          DOUBLE PRECISION, intent(in)                :: total_kappa_in(g_len,freq_len,N_species,struc_len)
+          integer, intent(in)                         :: freq_len, struc_len, g_len, N_species
+          double precision, intent(in)                :: P0_bar, R_pl
+          double precision, intent(in)                :: temp(struc_len), press(struc_len), mmw(struc_len)
+          double precision, intent(in)                :: total_kappa_in(g_len,freq_len,N_species,struc_len)
 
-          DOUBLE PRECISION, intent(in)                :: gravity
-          DOUBLE PRECISION, intent(in)                :: w_gauss(g_len), continuum_opa_scat(freq_len,struc_len)
+          double precision, intent(in)                :: gravity
+          double precision, intent(in)                :: w_gauss(g_len), continuum_opa_scat(freq_len,struc_len)
           LOGICAL, intent(in)                         :: scat !, contribution
           LOGICAL, intent(in)                         :: var_grav
 
-          DOUBLE PRECISION, intent(out)               :: transm(freq_len) !, contr_tr(struc_len,freq_len)
+          double precision, intent(out)               :: transm(freq_len) !, contr_tr(struc_len,freq_len)
 
           ! Internal
-          DOUBLE PRECISION                            :: P0_cgs, rho(struc_len), radius(struc_len), &
+          double precision                            :: P0_cgs, rho(struc_len), radius(struc_len), &
                 total_kappa(g_len,freq_len,N_species,struc_len)
-          INTEGER                                     :: i_str, i_freq, i_g, i_spec, j_str
+          integer                                     :: i_str, i_freq, i_g, i_spec, j_str
           LOGICAL                                     :: rad_neg
-          DOUBLE PRECISION                            :: alpha_t2(g_len,freq_len,N_species,struc_len-1)
-          DOUBLE PRECISION                            :: t_graze(g_len,freq_len,N_species,struc_len), s_1, s_2, &
+          double precision                            :: alpha_t2(g_len,freq_len,N_species,struc_len-1)
+          double precision                            :: t_graze(g_len,freq_len,N_species,struc_len), s_1, s_2, &
                t_graze_wlen_int(struc_len,freq_len), &
                alpha_t2_scat(freq_len,struc_len-1), t_graze_scat(freq_len,struc_len)
 
@@ -580,17 +580,17 @@ module fort_spec
 
           implicit none
           ! I/O
-          INTEGER, intent(in)                         :: struc_len
-          DOUBLE PRECISION, intent(in)                :: P0_cgs
-          DOUBLE PRECISION, intent(in)                :: press(struc_len), &
+          integer, intent(in)                         :: struc_len
+          double precision, intent(in)                :: P0_cgs
+          double precision, intent(in)                :: press(struc_len), &
                rho(struc_len)
-          DOUBLE PRECISION, intent(in)                :: gravity, R_pl
+          double precision, intent(in)                :: gravity, R_pl
           LOGICAL, intent(in)                         :: var_grav
-          DOUBLE PRECISION, intent(out)               :: radius(struc_len)
+          double precision, intent(out)               :: radius(struc_len)
 
           ! Internal
-          INTEGER                                     :: i_str
-          DOUBLE PRECISION                            :: R0, inv_rho(struc_len)
+          integer                                     :: i_str
+          double precision                            :: R0, inv_rho(struc_len)
 
           inv_rho = 1d0/rho
 
@@ -697,17 +697,17 @@ module fort_spec
           implicit none
 
           ! I/O
-          INTEGER, intent(in)                         :: freq_len, struc_len
+          integer, intent(in)                         :: freq_len, struc_len
           CHARACTER(len=20), intent(in)                    :: spec
-          DOUBLE PRECISION, intent(in)                :: lambda_angstroem(freq_len), abund(struc_len), &
+          double precision, intent(in)                :: lambda_angstroem(freq_len), abund(struc_len), &
                MMW(struc_len), temp(struc_len), press(struc_len)
-          DOUBLE PRECISION, intent(out)               :: rayleigh_kappa(freq_len,struc_len)
+          double precision, intent(out)               :: rayleigh_kappa(freq_len,struc_len)
 
           ! Internal
-          INTEGER                                     :: i_str, i_freq
-          DOUBLE PRECISION                            :: lambda_cm(freq_len), &
+          integer                                     :: i_str, i_freq
+          double precision                            :: lambda_cm(freq_len), &
                lamb_inv(freq_len), alpha_pol, lamb_inv_use
-          DOUBLE PRECISION                            :: a0, a1, a2, a3, a4, a5, &
+          double precision                            :: a0, a1, a2, a3, a4, a5, &
                a6, a7, luv, lir, l(freq_len), &
                d(struc_len), T(struc_len), retVal, retValMin, retValMax, mass_h2o, &
                nm1, fk, scale, mass_co2, &
@@ -1011,23 +1011,23 @@ module fort_spec
           implicit none
 
           ! I/O
-          INTEGER, intent(in)                         :: freq_len, struc_len, g_len, N_species
-          DOUBLE PRECISION, intent(in)                :: P0_bar, R_pl
-          DOUBLE PRECISION, intent(in)                :: temp(struc_len), press(struc_len), mmw(struc_len)
-          DOUBLE PRECISION, intent(in)                :: total_kappa(g_len,freq_len,N_species,struc_len)
+          integer, intent(in)                         :: freq_len, struc_len, g_len, N_species
+          double precision, intent(in)                :: P0_bar, R_pl
+          double precision, intent(in)                :: temp(struc_len), press(struc_len), mmw(struc_len)
+          double precision, intent(in)                :: total_kappa(g_len,freq_len,N_species,struc_len)
 
-          DOUBLE PRECISION, intent(in)                :: gravity
-          DOUBLE PRECISION, intent(in)                :: w_gauss(g_len), continuum_opa_scat(freq_len,struc_len)
+          double precision, intent(in)                :: gravity
+          double precision, intent(in)                :: w_gauss(g_len), continuum_opa_scat(freq_len,struc_len)
           LOGICAL, intent(in)                         :: scat
-          DOUBLE PRECISION, intent(in)                :: transm_in(freq_len)
+          double precision, intent(in)                :: transm_in(freq_len)
           LOGICAL, intent(in)                         :: var_grav
-          DOUBLE PRECISION, intent(out)               :: contr_tr(struc_len,freq_len)
+          double precision, intent(out)               :: contr_tr(struc_len,freq_len)
 
           ! Internal
-          DOUBLE PRECISION                            :: P0_cgs, rho(struc_len), radius(struc_len)
-          INTEGER                                     :: i_str, i_freq,  i_spec, j_str, i_leave_str
-          DOUBLE PRECISION                            :: alpha_t2(g_len,freq_len,N_species,struc_len-1)
-          DOUBLE PRECISION                            :: t_graze(g_len,freq_len,N_species,struc_len), s_1, s_2, &
+          double precision                            :: P0_cgs, rho(struc_len), radius(struc_len)
+          integer                                     :: i_str, i_freq,  i_spec, j_str, i_leave_str
+          double precision                            :: alpha_t2(g_len,freq_len,N_species,struc_len-1)
+          double precision                            :: t_graze(g_len,freq_len,N_species,struc_len), s_1, s_2, &
                t_graze_wlen_int(struc_len,freq_len), alpha_t2_scat(freq_len,struc_len-1), &
                t_graze_scat(freq_len,struc_len), total_kappa_use(g_len,freq_len,N_species,struc_len), &
                continuum_opa_scat_use(freq_len,struc_len), transm(freq_len)
@@ -1139,8 +1139,8 @@ module fort_spec
 
            implicit none
            ! I/O
-           DOUBLE PRECISION :: r, a, b, k
-           DOUBLE PRECISION :: hansen_size_dndr
+           double precision :: r, a, b, k
+           double precision :: hansen_size_dndr
 
            hansen_size_dndr = (((1d0-(3d0*b))*k*r**((1d0-(3d0*b))/(b-1d0)) * &
                           exp(-1d0*r/(a*b)))/b) -((k*r**((1d0-(3d0*b))/(b))*exp(-1d0*r/(a*b)))/(a*b))
@@ -1156,23 +1156,23 @@ module fort_spec
           implicit none
 
           ! I/O
-          INTEGER, intent(in) :: struc_len, N_cloud_spec, N_cloud_rad_bins, N_cloud_lambda_bins
-          DOUBLE PRECISION, intent(in) :: rho(struc_len), rho_p(N_cloud_spec)
-          DOUBLE PRECISION, intent(in) :: cloud_mass_fracs(struc_len,N_cloud_spec),r_g(struc_len,N_cloud_spec)
-          DOUBLE PRECISION, intent(in) :: sigma_n
-          DOUBLE PRECISION, intent(in) :: cloud_rad_bins(N_cloud_rad_bins+1), cloud_radii(N_cloud_rad_bins)
-          DOUBLE PRECISION, intent(in) :: cloud_specs_abs_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
+          integer, intent(in) :: struc_len, N_cloud_spec, N_cloud_rad_bins, N_cloud_lambda_bins
+          double precision, intent(in) :: rho(struc_len), rho_p(N_cloud_spec)
+          double precision, intent(in) :: cloud_mass_fracs(struc_len,N_cloud_spec),r_g(struc_len,N_cloud_spec)
+          double precision, intent(in) :: sigma_n
+          double precision, intent(in) :: cloud_rad_bins(N_cloud_rad_bins+1), cloud_radii(N_cloud_rad_bins)
+          double precision, intent(in) :: cloud_specs_abs_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
                cloud_specs_scat_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
                cloud_aniso(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec)
 
-          DOUBLE PRECISION, intent(out) :: cloud_abs_opa_TOT(N_cloud_lambda_bins,struc_len), &
+          double precision, intent(out) :: cloud_abs_opa_TOT(N_cloud_lambda_bins,struc_len), &
                cloud_scat_opa_TOT(N_cloud_lambda_bins,struc_len), &
                cloud_red_fac_aniso_TOT(N_cloud_lambda_bins,struc_len)
 
 
           ! internal
-          INTEGER :: i_struc, i_spec, i_lamb
-          DOUBLE PRECISION :: N, dndr(N_cloud_rad_bins), integrand_abs(N_cloud_rad_bins), &
+          integer :: i_struc, i_spec, i_lamb
+          double precision :: N, dndr(N_cloud_rad_bins), integrand_abs(N_cloud_rad_bins), &
                integrand_scat(N_cloud_rad_bins), add_abs, add_scat, integrand_aniso(N_cloud_rad_bins), add_aniso
 
           !~~~~~~~~~~~~~~~~
@@ -1231,106 +1231,111 @@ module fort_spec
 
         end subroutine calc_cloud_opas
 
-        !!$ Subroutine to calculate cloud opacities
+
         subroutine calc_hansen_opas(rho,rho_p,cloud_mass_fracs,a_h,b_h,cloud_rad_bins, &
            cloud_radii,cloud_specs_abs_opa,cloud_specs_scat_opa,cloud_aniso, &
            cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT, &
            struc_len,N_cloud_spec,N_cloud_rad_bins, N_cloud_lambda_bins)
+            ! """
+            ! Subroutine to calculate cloud opacities.
+            ! """
+            use constants_block
+            implicit none
 
-          use constants_block
-          implicit none
+            integer, intent(in) :: struc_len, N_cloud_spec, N_cloud_rad_bins, N_cloud_lambda_bins
+            double precision, intent(in) :: rho(struc_len), rho_p(N_cloud_spec)
+            double precision, intent(in) :: cloud_mass_fracs(struc_len,N_cloud_spec), &
+                a_h(struc_len,N_cloud_spec), b_h(struc_len,N_cloud_spec)
+            double precision, intent(in) :: cloud_rad_bins(N_cloud_rad_bins+1), cloud_radii(N_cloud_rad_bins)
+            double precision, intent(in) :: cloud_specs_abs_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
+                cloud_specs_scat_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
+                cloud_aniso(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec)
+            double precision, intent(out) :: cloud_abs_opa_TOT(N_cloud_lambda_bins,struc_len), &
+                cloud_scat_opa_TOT(N_cloud_lambda_bins,struc_len), &
+                cloud_red_fac_aniso_TOT(N_cloud_lambda_bins,struc_len)
 
-          ! I/O
-          INTEGER, intent(in) :: struc_len, N_cloud_spec, N_cloud_rad_bins, N_cloud_lambda_bins
-          DOUBLE PRECISION, intent(in) :: rho(struc_len), rho_p(N_cloud_spec)
-          DOUBLE PRECISION, intent(in) :: cloud_mass_fracs(struc_len,N_cloud_spec), &
-               a_h(struc_len,N_cloud_spec), b_h(struc_len,N_cloud_spec)
-          DOUBLE PRECISION, intent(in) :: cloud_rad_bins(N_cloud_rad_bins+1), cloud_radii(N_cloud_rad_bins)
-          DOUBLE PRECISION, intent(in) :: cloud_specs_abs_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
-               cloud_specs_scat_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
-               cloud_aniso(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec)
+            integer :: i_struc, i_spec, i_lamb, i_cloud
+            double precision :: N, dndr(N_cloud_rad_bins), integrand_abs(N_cloud_rad_bins), mass_to_vol, &
+                integrand_scat(N_cloud_rad_bins), add_abs, add_scat, integrand_aniso(N_cloud_rad_bins), add_aniso, &
+                dndr_scale
 
-          DOUBLE PRECISION, intent(out) :: cloud_abs_opa_TOT(N_cloud_lambda_bins,struc_len), &
-               cloud_scat_opa_TOT(N_cloud_lambda_bins,struc_len), &
-               cloud_red_fac_aniso_TOT(N_cloud_lambda_bins,struc_len)
+            cloud_abs_opa_TOT = 0d0
+            cloud_scat_opa_TOT = 0d0
+            cloud_red_fac_aniso_TOT = 0d0
 
+            do i_struc = 1, struc_len
+                do i_spec = 1, N_cloud_spec
+                    do i_lamb = 1, N_cloud_lambda_bins
+                        mass_to_vol = 0.75d0 * cloud_mass_fracs(i_struc, i_spec) * rho(i_struc) / pi / rho_p(i_spec)
 
-          ! internal
-          INTEGER :: i_struc, i_spec, i_lamb, i_cloud
-          DOUBLE PRECISION :: N, dndr(N_cloud_rad_bins), integrand_abs(N_cloud_rad_bins), mass_to_vol, &
-               integrand_scat(N_cloud_rad_bins), add_abs, add_scat, integrand_aniso(N_cloud_rad_bins), add_aniso, &
-               dndr_scale
+                        N = mass_to_vol / (&
+                            a_h(i_struc, i_spec) ** 3d0 * (b_h(i_struc,i_spec) -1d0) &
+                            * (2d0 * b_h(i_struc,i_spec) - 1d0) &
+                        )
+                        dndr_scale = &
+                            log(N) + log(a_h(i_struc, i_spec) * b_h(i_struc, i_spec)) &
+                                * ((2d0 * (b_h(i_struc, i_spec)) - 1d0) / b_h(i_struc, i_spec)) &
+                                - log(gamma((1d0 - 2d0 * b_h(i_struc, i_spec)) / b_h(i_struc, i_spec)))
 
-          !~~~~~~~~~~~~~~~~
+                        do i_cloud = 1, N_cloud_rad_bins
+                            dndr(i_cloud) = dndr_scale + hansen_size_nr(&
+                                cloud_radii(i_cloud), &
+                                a_h(i_struc,i_spec), &
+                                b_h(i_struc,i_spec) &
+                            )
+                        end do
 
-          cloud_abs_opa_TOT = 0d0
-          cloud_scat_opa_TOT = 0d0
-          cloud_red_fac_aniso_TOT = 0d0
+                        dndr = exp(dndr)
 
-          do i_struc = 1, struc_len
-             do i_spec = 1, N_cloud_spec
+                        integrand_abs = 0.75d0 * pi * cloud_radii ** 3d0 * rho_p(i_spec) * dndr &
+                            * cloud_specs_abs_opa(:,i_lamb,i_spec)
+                        integrand_scat = 0.75d0 * pi * cloud_radii ** 3d0 * rho_p(i_spec) * dndr &
+                            * cloud_specs_scat_opa(:,i_lamb,i_spec)
+                        integrand_aniso = integrand_scat * (1d0 - cloud_aniso(:, i_lamb, i_spec))
 
-                   do i_lamb = 1, N_cloud_lambda_bins
+                        add_abs = sum(&
+                            integrand_abs &
+                            * (cloud_rad_bins(2:N_cloud_rad_bins + 1) - cloud_rad_bins(1:N_cloud_rad_bins)) &
+                        )
+                        cloud_abs_opa_TOT(i_lamb,i_struc) = cloud_abs_opa_TOT(i_lamb, i_struc) + add_abs
 
-                      mass_to_vol= 3d0*cloud_mass_fracs(i_struc,i_spec)*rho(i_struc)/4d0/pi/rho_p(i_spec)
+                        add_scat = sum(&
+                            integrand_scat &
+                            * (cloud_rad_bins(2:N_cloud_rad_bins + 1) - cloud_rad_bins(1:N_cloud_rad_bins)) &
+                        )
+                        cloud_scat_opa_TOT(i_lamb, i_struc) = cloud_scat_opa_TOT(i_lamb, i_struc) + add_scat
 
-                      N = mass_to_vol/((a_h(i_struc,i_spec)**3d0) *(b_h(i_struc,i_spec) -1d0)*&
-                                       ((2d0*b_h(i_struc,i_spec)) -1d0))
-                      dndr_scale = N * (a_h(i_struc,i_spec)*b_h(i_struc,i_spec))**((2d0*(b_h(i_struc,i_spec))&
-                                         - 1d0)/(b_h(i_struc,i_spec))) /gamma((1d0-(2d0*(b_h(i_struc,i_spec))))/&
-                                         (b_h(i_struc,i_spec)))
-                      do i_cloud = 1, N_cloud_rad_bins
-                         dndr(i_cloud) =  dndr_scale * hansen_size_nr(cloud_radii(i_cloud),a_h(i_struc,i_spec),&
-                                                                      b_h(i_struc,i_spec))
-                      end do
-                      integrand_abs = 4d0*pi/3d0*cloud_radii**3d0*rho_p(i_spec)*dndr* &
-                           cloud_specs_abs_opa(:,i_lamb,i_spec)
-                      integrand_scat = 4d0*pi/3d0*cloud_radii**3d0*rho_p(i_spec)*dndr* &
-                           cloud_specs_scat_opa(:,i_lamb,i_spec)
-                      integrand_aniso = integrand_scat*(1d0-cloud_aniso(:,i_lamb,i_spec))
+                        add_aniso = sum(&
+                            integrand_aniso &
+                            * (cloud_rad_bins(2:N_cloud_rad_bins+1) - cloud_rad_bins(1:N_cloud_rad_bins)) &
+                        )
+                        cloud_red_fac_aniso_TOT(i_lamb, i_struc) = &
+                            cloud_red_fac_aniso_TOT(i_lamb, i_struc) + add_aniso
+                    end do
+                end do
 
-                      add_abs = sum(integrand_abs*(cloud_rad_bins(2:N_cloud_rad_bins+1)- &
-                           cloud_rad_bins(1:N_cloud_rad_bins)))
-                      cloud_abs_opa_TOT(i_lamb,i_struc) = cloud_abs_opa_TOT(i_lamb,i_struc) + &
-                           add_abs
+                do i_lamb = 1, N_cloud_lambda_bins
+                    if (cloud_scat_opa_TOT(i_lamb,i_struc) > 1d-200) then
+                        cloud_red_fac_aniso_TOT(i_lamb, i_struc) = &
+                            cloud_red_fac_aniso_TOT(i_lamb, i_struc) / cloud_scat_opa_TOT(i_lamb, i_struc)
+                    else
+                        cloud_red_fac_aniso_TOT(i_lamb, i_struc) = 0d0
+                    end if
+                end do
 
-                      add_scat = sum(integrand_scat*(cloud_rad_bins(2:N_cloud_rad_bins+1)- &
-                           cloud_rad_bins(1:N_cloud_rad_bins)))
-                      cloud_scat_opa_TOT(i_lamb,i_struc) = cloud_scat_opa_TOT(i_lamb,i_struc) + &
-                           add_scat
-
-                      add_aniso = sum(integrand_aniso*(cloud_rad_bins(2:N_cloud_rad_bins+1)- &
-                           cloud_rad_bins(1:N_cloud_rad_bins)))
-                      cloud_red_fac_aniso_TOT(i_lamb,i_struc) = cloud_red_fac_aniso_TOT(i_lamb,i_struc) + &
-                           add_aniso
-
-                   end do
-
-             end do
-
-             do i_lamb = 1, N_cloud_lambda_bins
-                if (cloud_scat_opa_TOT(i_lamb,i_struc) > 1d-200) then
-                   cloud_red_fac_aniso_TOT(i_lamb,i_struc) = cloud_red_fac_aniso_TOT(i_lamb,i_struc)/ &
-                             cloud_scat_opa_TOT(i_lamb,i_struc)
-                else
-                   cloud_red_fac_aniso_TOT(i_lamb,i_struc) = 0d0
-                end if
-             end do
-
-             cloud_abs_opa_TOT(:,i_struc) = cloud_abs_opa_TOT(:,i_struc)/rho(i_struc)
-             cloud_scat_opa_TOT(:,i_struc) = cloud_scat_opa_TOT(:,i_struc)/rho(i_struc)
-
-          end do
+                cloud_abs_opa_TOT(:, i_struc) = cloud_abs_opa_TOT(:, i_struc) / rho(i_struc)
+                cloud_scat_opa_TOT(:, i_struc) = cloud_scat_opa_TOT(:, i_struc) / rho(i_struc)
+            end do
 
             contains
                 function hansen_size_nr(r,a,b)
-                   implicit none
-                   ! I/O
-                   DOUBLE PRECISION :: r, a, b
-                   DOUBLE PRECISION :: hansen_size_nr
-                   hansen_size_nr = (r**((1-(3d0*b))/b)) * exp((-1d0*r)/(a*b))
-                end function hansen_size_nr
+                    implicit none
 
+                    double precision :: r, a, b
+                    double precision :: hansen_size_nr
+
+                    hansen_size_nr = log(r) * (1d0 - 3d0 * b) / b - 1d0 * r / (a * b)
+                end function hansen_size_nr
         end subroutine calc_hansen_opas
         !!$ #########################################################################
         !!$ #########################################################################
@@ -1347,22 +1352,22 @@ module fort_spec
           use constants_block
           implicit none
           ! I/O
-          INTEGER, intent(in)           :: N_cloud_lambda_bins,struc_len,HIT_coarse_borders
-          DOUBLE PRECISION, intent(in)  :: cloud_abs_opa_TOT(N_cloud_lambda_bins,struc_len), &
+          integer, intent(in)           :: N_cloud_lambda_bins,struc_len,HIT_coarse_borders
+          double precision, intent(in)  :: cloud_abs_opa_TOT(N_cloud_lambda_bins,struc_len), &
                cloud_scat_opa_TOT(N_cloud_lambda_bins,struc_len), &
                cloud_red_fac_aniso_TOT(N_cloud_lambda_bins,struc_len), cloud_lambdas(N_cloud_lambda_bins), &
                HIT_border_freqs(HIT_coarse_borders)
-          DOUBLE PRECISION, intent(out) :: HIT_kappa_tot_g_approx(HIT_coarse_borders-1,struc_len), &
+          double precision, intent(out) :: HIT_kappa_tot_g_approx(HIT_coarse_borders-1,struc_len), &
                HIT_kappa_tot_g_approx_scat(HIT_coarse_borders-1,struc_len), &
                red_fac_aniso_final(HIT_coarse_borders-1,struc_len), &
                HIT_kappa_tot_g_approx_scat_unred(HIT_coarse_borders-1,struc_len)
 
           ! internal
-          DOUBLE PRECISION :: kappa_integ(struc_len), kappa_scat_integ(struc_len), red_fac_aniso_integ(struc_len), &
+          double precision :: kappa_integ(struc_len), kappa_scat_integ(struc_len), red_fac_aniso_integ(struc_len), &
                kappa_tot_integ(HIT_coarse_borders-1,struc_len), kappa_tot_scat_integ(HIT_coarse_borders-1,struc_len)
-          INTEGER          :: HIT_i_lamb
-          DOUBLE PRECISION :: HIT_border_lamb(HIT_coarse_borders)
-          INTEGER          :: intp_index_small_min, intp_index_small_max, &
+          integer          :: HIT_i_lamb
+          double precision :: HIT_border_lamb(HIT_coarse_borders)
+          integer          :: intp_index_small_min, intp_index_small_max, &
                new_small_ind
 
           HIT_kappa_tot_g_approx = 0d0
@@ -1379,11 +1384,11 @@ module fort_spec
           do HIT_i_lamb = 1, HIT_coarse_borders-1
 
              intp_index_small_min = MIN(MAX(INT((log10(HIT_border_lamb(HIT_i_lamb))-log10(cloud_lambdas(1))) / &
-                  log10(cloud_lambdas(N_cloud_lambda_bins)/cloud_lambdas(1))*DBLE(N_cloud_lambda_bins-1) &
+                  log10(cloud_lambdas(N_cloud_lambda_bins)/cloud_lambdas(1))*dble(N_cloud_lambda_bins-1) &
                   +1d0),1),N_cloud_lambda_bins-1)
 
              intp_index_small_max = MIN(MAX(INT((log10(HIT_border_lamb(HIT_i_lamb+1))-log10(cloud_lambdas(1))) / &
-                  log10(cloud_lambdas(N_cloud_lambda_bins)/cloud_lambdas(1))*DBLE(N_cloud_lambda_bins-1) &
+                  log10(cloud_lambdas(N_cloud_lambda_bins)/cloud_lambdas(1))*dble(N_cloud_lambda_bins-1) &
                   +1d0),1),N_cloud_lambda_bins-1)
 
              kappa_integ = 0d0
@@ -1490,10 +1495,10 @@ module fort_spec
 
         subroutine integ_kaps(intp_ind,N_cloud_lambda_bins,struc_len,kappa,lambda,l_bord1,l_bord2,kappa_integ)
           implicit none
-          INTEGER, intent(in) :: intp_ind,N_cloud_lambda_bins,struc_len
-          DOUBLE PRECISION, intent(in) :: lambda(N_cloud_lambda_bins), kappa(N_cloud_lambda_bins,struc_len)
-          DOUBLE PRECISION, intent(in) :: l_bord1,l_bord2
-          DOUBLE PRECISION, intent(out) :: kappa_integ(struc_len)
+          integer, intent(in) :: intp_ind,N_cloud_lambda_bins,struc_len
+          double precision, intent(in) :: lambda(N_cloud_lambda_bins), kappa(N_cloud_lambda_bins,struc_len)
+          double precision, intent(in) :: l_bord1,l_bord2
+          double precision, intent(out) :: kappa_integ(struc_len)
 
           ! This subroutine calculates the integral of a linearly interpolated function kappa.
 
@@ -1515,18 +1520,18 @@ module fort_spec
           use constants_block
           implicit none
           ! I/O
-          INTEGER, intent(in)  :: struc_len, N_cloud_spec
-          DOUBLE PRECISION, intent(in) :: gravity, rho(struc_len), rho_p(N_cloud_spec), temp(struc_len), &
+          integer, intent(in)  :: struc_len, N_cloud_spec
+          double precision, intent(in) :: gravity, rho(struc_len), rho_p(N_cloud_spec), temp(struc_len), &
                MMW(struc_len), frain(N_cloud_spec), &
                sigma_n, Kzz(struc_len)
-          DOUBLE PRECISION, intent(out) :: r_g(struc_len,N_cloud_spec)
+          double precision, intent(out) :: r_g(struc_len,N_cloud_spec)
           ! Internal
-          INTEGER, parameter :: N_fit = 100
-          INTEGER          :: i_str, i_spec, i_rad
-          DOUBLE PRECISION :: w_star(struc_len), H(struc_len)
-          DOUBLE PRECISION :: r_w(struc_len,N_cloud_spec), alpha(struc_len,N_cloud_spec)
-          DOUBLE PRECISION :: rad(N_fit), vel(N_fit), f_fill(N_cloud_spec)
-          DOUBLE PRECISION :: a, b
+          integer, parameter :: N_fit = 100
+          integer          :: i_str, i_spec, i_rad
+          double precision :: w_star(struc_len), H(struc_len)
+          double precision :: r_w(struc_len,N_cloud_spec), alpha(struc_len,N_cloud_spec)
+          double precision :: rad(N_fit), vel(N_fit), f_fill(N_cloud_spec)
+          double precision :: a, b
 
           H = kB*temp/(MMW*amu*gravity)
           w_star = Kzz/H
@@ -1542,7 +1547,7 @@ module fort_spec
                       do i_rad = 1, N_fit
                          rad(i_rad) = r_w(i_str,i_spec)/max(sigma_n,1.0001d0) + &
                               (r_w(i_str,i_spec)-r_w(i_str,i_spec)/max(sigma_n,1.0001d0))* &
-                              DBLE(i_rad-1)/DBLE(N_fit-1)
+                              dble(i_rad-1)/dble(N_fit-1)
                          call turbulent_settling_speed(rad(i_rad),gravity,rho(i_str),rho_p(i_spec),temp(i_str), &
                               MMW(i_str),vel(i_rad))
                       end do
@@ -1550,7 +1555,7 @@ module fort_spec
                       do i_rad = 1, N_fit
                          rad(i_rad) = r_w(i_str,i_spec) + (r_w(i_str,i_spec)*max(sigma_n,1.0001d0)- &
                               r_w(i_str,i_spec))* &
-                              DBLE(i_rad-1)/DBLE(N_fit-1)
+                              dble(i_rad-1)/dble(N_fit-1)
                          call turbulent_settling_speed(rad(i_rad),gravity,rho(i_str),rho_p(i_spec),temp(i_str), &
                               MMW(i_str),vel(i_rad))
                       end do
@@ -1574,79 +1579,102 @@ module fort_spec
 
         subroutine get_rg_n_hansen(gravity,rho,rho_p,temp,MMW,frain, &
            b_h,Kzz,a_h,struc_len,N_cloud_spec)
+            use constants_block
+            
+            implicit none
 
-        use constants_block
-        implicit none
-        ! I/O
-        INTEGER, intent(in)  :: struc_len, N_cloud_spec
-        DOUBLE PRECISION, intent(in) :: gravity, rho(struc_len), rho_p(N_cloud_spec), temp(struc_len), &
-             MMW(struc_len), frain(N_cloud_spec), &
-             b_h(struc_len,N_cloud_spec), Kzz(struc_len)
-        DOUBLE PRECISION, intent(out) :: a_h(struc_len,N_cloud_spec)
+            integer, intent(in)  :: struc_len, N_cloud_spec
+            double precision, intent(in) :: gravity, rho(struc_len), rho_p(N_cloud_spec), temp(struc_len), &
+                 MMW(struc_len), frain(N_cloud_spec), &
+                 b_h(struc_len,N_cloud_spec), Kzz(struc_len)
+            double precision, intent(out) :: a_h(struc_len,N_cloud_spec)
+            
+            integer, parameter :: N_fit = 100
+            integer          :: i_str, i_spec, i_rad
+            double precision :: w_star(struc_len), H(struc_len)
+            double precision :: r_w(struc_len,N_cloud_spec), alpha(struc_len,N_cloud_spec)
+            double precision :: rad(N_fit), vel(N_fit), f_fill(N_cloud_spec)
+            double precision :: a, b
+    
+            H = kB * temp / (MMW * amu * gravity)
+            w_star = Kzz / H
+            f_fill = 1d0
+    
+            do i_str = 1, struc_len
+                do i_spec = 1, N_cloud_spec
+                    r_w(i_str,i_spec) = bisect_particle_rad(&
+                        1d-16,&
+                        1d2, &
+                        gravity, &
+                        rho(i_str), &
+                        rho_p(i_spec), &
+                        temp(i_str), &
+                        MMW(i_str), &
+                        w_star(i_str) &
+                    )
 
-        ! Internal
-        INTEGER, parameter :: N_fit = 100
-        INTEGER          :: i_str, i_spec, i_rad
-        DOUBLE PRECISION :: w_star(struc_len), H(struc_len)
-        DOUBLE PRECISION :: r_w(struc_len,N_cloud_spec), alpha(struc_len,N_cloud_spec)
-        DOUBLE PRECISION :: rad(N_fit), vel(N_fit), f_fill(N_cloud_spec)
-        DOUBLE PRECISION :: a, b
-
-        H = kB*temp/(MMW*amu*gravity)
-        w_star = Kzz/H
-        f_fill = 1d0
-
-        do i_str = 1, struc_len
-           do i_spec = 1, N_cloud_spec
-              r_w(i_str,i_spec) = bisect_particle_rad(1d-16,1d2,gravity,rho(i_str), &
-                   rho_p(i_spec),temp(i_str),MMW(i_str),w_star(i_str))
-              if (r_w(i_str,i_spec) > 1d-16) then
-                 if (frain(i_spec) > 1d0) then
-                    do i_rad = 1, N_fit
-                       rad(i_rad) = r_w(i_str,i_spec)*b_h(i_str,i_spec) + &
-                            (r_w(i_str,i_spec)-r_w(i_str,i_spec)*b_h(i_str,i_spec))* &
-                            DBLE(i_rad-1)/DBLE(N_fit-1)
-                       call turbulent_settling_speed(rad(i_rad),gravity,rho(i_str),rho_p(i_spec),temp(i_str), &
-                            MMW(i_str),vel(i_rad))
-                    end do
-                 else
-                    do i_rad = 1, N_fit
-                       rad(i_rad) = r_w(i_str,i_spec) + (r_w(i_str,i_spec)/b_h(i_str,i_spec)- &
-                            r_w(i_str,i_spec))* &
-                            DBLE(i_rad-1)/DBLE(N_fit-1)
-                       call turbulent_settling_speed(rad(i_rad),gravity,rho(i_str),rho_p(i_spec),temp(i_str), &
-                            MMW(i_str),vel(i_rad))
-                    end do
-                 end if
-
-                 call fit_linear(log(rad), log(vel/w_star(i_str)), N_fit, a, b)
-
-                 alpha(i_str,i_spec) = b
-                 r_w(i_str,i_spec) = exp(-a/b)
-                 a_h(i_str,i_spec) = &
-                    ((b_h(i_str,i_spec)**(-1d0*alpha(i_str,i_spec))*(r_w(i_str,i_spec)**alpha(i_str,i_spec)*&
-                    frain(i_spec))*((b_h(i_str,i_spec)**3d0)*(b_h(i_str,i_spec)**alpha(i_str,i_spec))-&
-                    b_h(i_str,i_spec)+1d0)*gamma(1+ (1d0/b_h(i_str,i_spec))))/&
-                    (((b_h(i_str,i_spec)*alpha(i_str,i_spec))+ (2d0*b_h(i_str,i_spec)) + 1d0)*&
-                    gamma(alpha(i_str,i_spec) + 1d0 + (1d0/b_h(i_str,i_spec)))))**(1d0/alpha(i_str,i_spec))
-              else
-                 a_h(i_str,i_spec) = 1d-17
-                 alpha(i_str,i_spec) = 1d0
-              end if
-           end do
-
-        end do
-
+                    if (r_w(i_str,i_spec) > 1d-16) then
+                        if (frain(i_spec) > 1d0) then
+                            do i_rad = 1, N_fit
+                                rad(i_rad) = &
+                                    r_w(i_str,i_spec) * b_h(i_str,i_spec) &
+                                    + (r_w(i_str,i_spec) &
+                                    - r_w(i_str,i_spec) * b_h(i_str,i_spec)) * dble(i_rad - 1) / dble(N_fit - 1)
+                                
+                                call turbulent_settling_speed(&
+                                    rad(i_rad), &
+                                    gravity, &
+                                    rho(i_str), &
+                                    rho_p(i_spec), &
+                                    temp(i_str), &
+                                    MMW(i_str), &
+                                    vel(i_rad) &
+                                )
+                            end do
+                        else
+                            do i_rad = 1, N_fit
+                                rad(i_rad) = r_w(i_str,i_spec) &
+                                    + (r_w(i_str,i_spec) / b_h(i_str,i_spec) - r_w(i_str,i_spec)) &
+                                    * dble(i_rad - 1) / dble(N_fit - 1)
+                                
+                                call turbulent_settling_speed(&
+                                    rad(i_rad), &
+                                    gravity, &
+                                    rho(i_str), &
+                                    rho_p(i_spec), &
+                                    temp(i_str), &
+                                    MMW(i_str), &
+                                    vel(i_rad) &
+                                )
+                            end do
+                        end if
+                        
+                        call fit_linear(log(rad), log(vel/w_star(i_str)), N_fit, a, b)
+                        
+                        alpha(i_str,i_spec) = b
+                        r_w(i_str,i_spec) = exp(-a/b)
+                        a_h(i_str,i_spec) = &
+                            ((b_h(i_str,i_spec)**(-1d0*alpha(i_str,i_spec))*(r_w(i_str,i_spec)**alpha(i_str,i_spec)*&
+                            frain(i_spec))*((b_h(i_str,i_spec)**3d0)*(b_h(i_str,i_spec)**alpha(i_str,i_spec))-&
+                            b_h(i_str,i_spec)+1d0)*gamma(1+ (1d0/b_h(i_str,i_spec))))/&
+                            (((b_h(i_str,i_spec)*alpha(i_str,i_spec))+ (2d0*b_h(i_str,i_spec)) + 1d0)*&
+                            gamma(alpha(i_str,i_spec) + 1d0 + (1d0/b_h(i_str,i_spec)))))**(1d0/alpha(i_str,i_spec))
+                    else
+                        a_h(i_str,i_spec) = 1d-17
+                        alpha(i_str,i_spec) = 1d0
+                    end if
+                end do
+            end do
         end subroutine get_rg_n_hansen
 
         subroutine turbulent_settling_speed(x,gravity,rho,rho_p,temp,MMW,turbulent_settling_speed_ret)
 
           use constants_block
           implicit none
-          DOUBLE PRECISION    :: turbulent_settling_speed_ret
-          DOUBLE PRECISION    :: x,gravity,rho,rho_p,temp,MMW
-          DOUBLE PRECISION, parameter :: d = 2.827d-8, epsilon = 59.7*kB
-          DOUBLE PRECISION    :: N_Knudsen, psi, eta, CdNreSq, Nre, Cd, v_settling_visc
+          double precision    :: turbulent_settling_speed_ret
+          double precision    :: x,gravity,rho,rho_p,temp,MMW
+          double precision, parameter :: d = 2.827d-8, epsilon = 59.7*kB
+          double precision    :: N_Knudsen, psi, eta, CdNreSq, Nre, Cd, v_settling_visc
 
 
           N_Knudsen = MMW*amu/(pi*rho*d**2d0*x)
@@ -1680,11 +1708,11 @@ module fort_spec
         function bisect_particle_rad(x1,x2,gravity,rho,rho_p,temp,MMW,w_star)
 
           implicit none
-          INTEGER, parameter :: ITMAX = 1000
-          DOUBLE PRECISION :: gravity,rho,rho_p,temp,MMW,w_star
-          DOUBLE PRECISION :: bisect_particle_rad,x1,x2
-          INTEGER :: iter
-          DOUBLE PRECISION :: a,b,c,fa,fb,fc,del
+          integer, parameter :: ITMAX = 1000
+          double precision :: gravity,rho,rho_p,temp,MMW,w_star
+          double precision :: bisect_particle_rad,x1,x2
+          integer :: iter
+          double precision :: a,b,c,fa,fb,fc,del
 
           a=x1
           b=x2
@@ -1747,9 +1775,9 @@ module fort_spec
         SUBROUTINE fit_linear(x, y, ndata, a, b)
 
           implicit none
-          INTEGER :: ndata
-          DOUBLE PRECISION :: x(ndata), y(ndata)
-          DOUBLE PRECISION :: a, b
+          integer :: ndata
+          double precision :: x(ndata), y(ndata)
+          double precision :: a, b
 
           b = (sum(x)*sum(y)/dble(ndata) - sum(x*y))/ &
                (sum(x)**2d0/dble(ndata) - sum(x**2d0))
@@ -1770,26 +1798,26 @@ module fort_spec
 
           implicit none
 
-          INTEGER, INTENT(IN)          :: nsample, g_len, freq_len, N_species, struc_len
-          DOUBLE PRECISION, INTENT(IN) :: line_struc_kappas(g_len, freq_len, &
+          integer, INTENT(IN)          :: nsample, g_len, freq_len, N_species, struc_len
+          double precision, INTENT(IN) :: line_struc_kappas(g_len, freq_len, &
                N_species, struc_len), g_gauss(g_len), weights(g_len)
-          DOUBLE PRECISION, INTENT(OUT) :: line_struc_kappas_out(g_len, freq_len, &
+          double precision, INTENT(OUT) :: line_struc_kappas_out(g_len, freq_len, &
                struc_len)
           ! Internal
-        !!$    INTEGER          :: i_freq, i_spec, i_struc, inds_avail(48), &
-          INTEGER          :: i_freq, i_spec, i_struc, inds_avail(32), &
-        !!$  INTEGER          :: i_freq, i_spec, i_struc, inds_avail(16), &
+        !!$    integer          :: i_freq, i_spec, i_struc, inds_avail(48), &
+          integer          :: i_freq, i_spec, i_struc, inds_avail(32), &
+        !!$  integer          :: i_freq, i_spec, i_struc, inds_avail(16), &
                ind_use(nsample), i_samp, intpint(g_len), i_g
-        !  DOUBLE PRECISION :: r_index(nsample,freq_len, &
+        !  double precision :: r_index(nsample,freq_len, &
           !       N_species, struc_len), weights_use(g_len), g_sample(nsample)
-          DOUBLE PRECISION :: r_index(nsample), weights_use(g_len), g_sample(nsample)
-          DOUBLE PRECISION :: sampled_opa_weights(nsample, 2, freq_len, struc_len), &
+          double precision :: r_index(nsample), weights_use(g_len), g_sample(nsample)
+          double precision :: sampled_opa_weights(nsample, 2, freq_len, struc_len), &
                cum_sum, k_min(freq_len, struc_len), k_max(freq_len, struc_len), &
                g_final(nsample+2), k_final(nsample+2)
 
-        !  DOUBLE PRECISION :: time_test, t1, t2, t0
-          DOUBLE PRECISION :: threshold(freq_len, struc_len)
-          INTEGER          :: take_spec(freq_len, struc_len), take_spec_ind(freq_len, struc_len) !, &
+        !  double precision :: time_test, t1, t2, t0
+          double precision :: threshold(freq_len, struc_len)
+          integer          :: take_spec(freq_len, struc_len), take_spec_ind(freq_len, struc_len) !, &
                                 !     not_one, equal_two
 
 
@@ -2001,10 +2029,10 @@ module fort_spec
 
           implicit none
 
-          INTEGER            :: binbordlen, arrlen, intpint(arrlen)
-          DOUBLE PRECISION   :: binbord(binbordlen),arr(arrlen)
-          INTEGER            :: i_arr
-          INTEGER            :: pivot, k0, km
+          integer            :: binbordlen, arrlen, intpint(arrlen)
+          double precision   :: binbord(binbordlen),arr(arrlen)
+          integer            :: i_arr
+          integer            :: pivot, k0, km
 
           ! carry out a binary search for the interpolation bin borders
           do i_arr = 1, arrlen
@@ -2070,63 +2098,63 @@ module fort_spec
           implicit none
 
           ! I/O
-          INTEGER, INTENT(IN)             :: freq_len_p_1, struc_len, N_mu, N_g
-          DOUBLE PRECISION, INTENT(IN)    :: mu_star
-          DOUBLE PRECISION, INTENT(IN)    :: surf_refl(freq_len_p_1-1),surf_emi(freq_len_p_1-1) !ELALEI
-          DOUBLE PRECISION, INTENT(IN)    :: I_star_0(freq_len_p_1-1) !ELALEI
-          DOUBLE PRECISION, INTENT(IN)    :: border_freqs(freq_len_p_1)
-          DOUBLE PRECISION, INTENT(IN)    :: tau_approx_scat(N_g,freq_len_p_1-1,struc_len)
-          DOUBLE PRECISION, INTENT(IN)    :: temp(struc_len)
-          DOUBLE PRECISION, INTENT(IN)    :: mu(N_mu)
-          DOUBLE PRECISION, INTENT(IN)    :: w_gauss_mu(N_mu), w_gauss_ck(N_g)
-          DOUBLE PRECISION, INTENT(IN)    :: photon_destruct_in(N_g,freq_len_p_1-1,struc_len)
+          integer, INTENT(IN)             :: freq_len_p_1, struc_len, N_mu, N_g
+          double precision, INTENT(IN)    :: mu_star
+          double precision, INTENT(IN)    :: surf_refl(freq_len_p_1-1),surf_emi(freq_len_p_1-1) !ELALEI
+          double precision, INTENT(IN)    :: I_star_0(freq_len_p_1-1) !ELALEI
+          double precision, INTENT(IN)    :: border_freqs(freq_len_p_1)
+          double precision, INTENT(IN)    :: tau_approx_scat(N_g,freq_len_p_1-1,struc_len)
+          double precision, INTENT(IN)    :: temp(struc_len)
+          double precision, INTENT(IN)    :: mu(N_mu)
+          double precision, INTENT(IN)    :: w_gauss_mu(N_mu), w_gauss_ck(N_g)
+          double precision, INTENT(IN)    :: photon_destruct_in(N_g,freq_len_p_1-1,struc_len)
           LOGICAL, INTENT(IN)             :: contribution
-          DOUBLE PRECISION, INTENT(OUT)   :: flux(freq_len_p_1-1)
-          DOUBLE PRECISION, INTENT(OUT)   :: contr_em(struc_len,freq_len_p_1-1)
+          double precision, INTENT(OUT)   :: flux(freq_len_p_1-1)
+          double precision, INTENT(OUT)   :: contr_em(struc_len,freq_len_p_1-1)
           CHARACTER(len=20), intent(in)        :: geom
 
           ! Internal
-          INTEGER                         :: j,i,k,l
-          DOUBLE PRECISION                :: I_J(struc_len,N_mu), I_H(struc_len,N_mu)
-          DOUBLE PRECISION                :: source(N_g,freq_len_p_1-1,struc_len), &
+          integer                         :: j,i,k,l
+          double precision                :: I_J(struc_len,N_mu), I_H(struc_len,N_mu)
+          double precision                :: source(N_g,freq_len_p_1-1,struc_len), &
                J_planet_scat(N_g,freq_len_p_1-1,struc_len), &
                photon_destruct(N_g,freq_len_p_1-1,struc_len), &
                source_planet_scat_n(N_g,freq_len_p_1-1,struc_len), &
                source_planet_scat_n1(N_g,freq_len_p_1-1,struc_len), &
                source_planet_scat_n2(N_g,freq_len_p_1-1,struc_len), &
                source_planet_scat_n3(N_g,freq_len_p_1-1,struc_len)
-           DOUBLE PRECISION                :: J_star_ini(N_g,freq_len_p_1-1,struc_len)
-           DOUBLE PRECISION                :: I_star_calc(N_g,N_mu,struc_len,freq_len_p_1-1)
-           DOUBLE PRECISION                :: flux_old(freq_len_p_1-1), conv_val
+           double precision                :: J_star_ini(N_g,freq_len_p_1-1,struc_len)
+           double precision                :: I_star_calc(N_g,N_mu,struc_len,freq_len_p_1-1)
+           double precision                :: flux_old(freq_len_p_1-1), conv_val
           ! tridag variables
-          DOUBLE PRECISION                :: a(struc_len),b(struc_len),c(struc_len),r(struc_len), &
+          double precision                :: a(struc_len),b(struc_len),c(struc_len),r(struc_len), &
                planck(struc_len)
-          DOUBLE PRECISION                :: f1,f2,f3, deriv1, deriv2, I_plus, I_minus
+          double precision                :: f1,f2,f3, deriv1, deriv2, I_plus, I_minus
 
           ! quantities for P-T structure iteration
-          DOUBLE PRECISION                :: J_bol(struc_len)
-          DOUBLE PRECISION                :: J_bol_a(struc_len)
-          DOUBLE PRECISION                :: J_bol_g(struc_len)
+          double precision                :: J_bol(struc_len)
+          double precision                :: J_bol_a(struc_len)
+          double precision                :: J_bol_g(struc_len)
 
           ! ALI
-          DOUBLE PRECISION                :: lambda_loc(N_g,freq_len_p_1-1,struc_len)
+          double precision                :: lambda_loc(N_g,freq_len_p_1-1,struc_len)
 
           ! control
-          DOUBLE PRECISION                :: inv_del_tau_min
-          INTEGER                         :: iter_scat, i_iter_scat
+          double precision                :: inv_del_tau_min
+          integer                         :: iter_scat, i_iter_scat
 
           ! GCM spec calc
           LOGICAL                         :: GCM_read
-          DOUBLE PRECISION                :: I_GCM(N_mu,freq_len_p_1-1)
+          double precision                :: I_GCM(N_mu,freq_len_p_1-1)
 
           ! Variables for the contribution function calculation
-          INTEGER :: i_mu, i_str, i_freq
-          DOUBLE PRECISION :: transm_mu(N_g,freq_len_p_1-1,struc_len), &
+          integer :: i_mu, i_str, i_freq
+          double precision :: transm_mu(N_g,freq_len_p_1-1,struc_len), &
                              transm_all(freq_len_p_1-1,struc_len), transm_all_loc(struc_len)
 
           ! PAUL NEW
           ! Variables for surface scattering
-          DOUBLE PRECISION                :: I_plus_surface(N_mu, N_g, freq_len_p_1-1)
+          double precision                :: I_plus_surface(N_mu, N_g, freq_len_p_1-1)
 
 
           I_plus_surface = 0d0
@@ -2468,15 +2496,15 @@ module fort_spec
              N_g,freq_len_p_1,struc_len)
 
           implicit none
-          INTEGER :: struc_len, freq_len_p_1, N_g, i, i_ng, i_freq
-          DOUBLE PRECISION :: tn(struc_len), tn1(struc_len), tn2(struc_len), &
+          integer :: struc_len, freq_len_p_1, N_g, i, i_ng, i_freq
+          double precision :: tn(struc_len), tn1(struc_len), tn2(struc_len), &
                tn3(struc_len), temp_buff(struc_len), &
                source_n(N_g,freq_len_p_1-1,struc_len), source_n1(N_g,freq_len_p_1-1,struc_len), &
                source_n2(N_g,freq_len_p_1-1,struc_len), source_n3(N_g,freq_len_p_1-1,struc_len), &
                source(N_g,freq_len_p_1-1,struc_len), source_buff(N_g,freq_len_p_1-1,struc_len)
-          DOUBLE PRECISION :: Q1(struc_len), Q2(struc_len), Q3(struc_len)
-          DOUBLE PRECISION :: A1, A2, B1, B2, C1, C2
-          DOUBLE PRECISION :: a, b
+          double precision :: Q1(struc_len), Q2(struc_len), Q3(struc_len)
+          double precision :: A1, A2, B1, B2, C1, C2
+          double precision :: a, b
 
           do i_freq = 1, freq_len_p_1-1
              do i_ng = 1, N_g
@@ -2754,9 +2782,9 @@ module fort_spec
 
           use constants_block
           implicit none
-          INTEGER                         :: PT_length
-          DOUBLE PRECISION                :: T(PT_length),B_nu(PT_length)
-          DOUBLE PRECISION                ::  nu1, nu2, nu3, nu4, nu5, nu_large, nu_small, &
+          integer                         :: PT_length
+          double precision                :: T(PT_length),B_nu(PT_length)
+          double precision                ::  nu1, nu2, nu3, nu4, nu5, nu_large, nu_small, &
                nul, nur, diff_nu
 
           !~~~~~~~~~~~~~
@@ -2766,9 +2794,9 @@ module fort_spec
           nu_large = max(nul,nur)
           nu_small = min(nul,nur)
           nu1 = nu_small
-          nu2 = nu_small+DBLE(1)*(nu_large-nu_small)/4d0
-          nu3 = nu_small+DBLE(2)*(nu_large-nu_small)/4d0
-          nu4 = nu_small+DBLE(3)*(nu_large-nu_small)/4d0
+          nu2 = nu_small+dble(1)*(nu_large-nu_small)/4d0
+          nu3 = nu_small+dble(2)*(nu_large-nu_small)/4d0
+          nu4 = nu_small+dble(3)*(nu_large-nu_small)/4d0
           nu5 = nu_large
           diff_nu = nu2-nu1
           B_nu = B_nu + 1d0/90d0*( &
@@ -2791,12 +2819,12 @@ module fort_spec
 
           use constants_block
           implicit none
-          INTEGER                         :: HIT_N_g,HIT_coarse_borders
-          DOUBLE PRECISION                :: HIT_border_freqs(HIT_coarse_borders)
-          DOUBLE PRECISION                :: HIT_kappa_tot_g_approx(HIT_N_g,HIT_coarse_borders-1)
-          DOUBLE PRECISION                :: temp, kappa_rosse, w_gauss(HIT_N_g), B_nu_dT(HIT_coarse_borders-1), &
+          integer                         :: HIT_N_g,HIT_coarse_borders
+          double precision                :: HIT_border_freqs(HIT_coarse_borders)
+          double precision                :: HIT_kappa_tot_g_approx(HIT_N_g,HIT_coarse_borders-1)
+          double precision                :: temp, kappa_rosse, w_gauss(HIT_N_g), B_nu_dT(HIT_coarse_borders-1), &
                numerator
-          INTEGER                         :: i
+          integer                         :: i
 
           !~~~~~~~~~~~~~
 
@@ -2828,10 +2856,10 @@ module fort_spec
 
           use constants_block
           implicit none
-          INTEGER                         :: freq_len
-          DOUBLE PRECISION                :: T,B_nu_dT(freq_len-1),nu(freq_len)
-          DOUBLE PRECISION                :: buffer(freq_len-1),nu_use(freq_len-1)
-          INTEGER                         :: i
+          integer                         :: freq_len
+          double precision                :: T,B_nu_dT(freq_len-1),nu(freq_len)
+          double precision                :: buffer(freq_len-1),nu_use(freq_len-1)
+          integer                         :: i
 
           !~~~~~~~~~~~~~
 
@@ -2855,13 +2883,13 @@ module fort_spec
 
           use constants_block
           implicit none
-          INTEGER                         :: HIT_N_g,HIT_coarse_borders
-          DOUBLE PRECISION                :: HIT_border_freqs(HIT_coarse_borders)
-          DOUBLE PRECISION                :: HIT_kappa_tot_g_approx(HIT_N_g,HIT_coarse_borders-1)
-          DOUBLE PRECISION                :: temp, kappa_planck, w_gauss(HIT_N_g), B_nu(HIT_coarse_borders-1), &
+          integer                         :: HIT_N_g,HIT_coarse_borders
+          double precision                :: HIT_border_freqs(HIT_coarse_borders)
+          double precision                :: HIT_kappa_tot_g_approx(HIT_N_g,HIT_coarse_borders-1)
+          double precision                :: temp, kappa_planck, w_gauss(HIT_N_g), B_nu(HIT_coarse_borders-1), &
                norm
 
-          INTEGER                         :: i
+          integer                         :: i
 
           call star_planck(HIT_coarse_borders,temp,HIT_border_freqs,B_nu)
 
@@ -2889,10 +2917,10 @@ module fort_spec
 
           use constants_block
           implicit none
-          INTEGER                         :: freq_len
-          DOUBLE PRECISION                :: T,B_nu(freq_len-1), nu(freq_len)
-          INTEGER                         :: i
-          DOUBLE PRECISION                :: diff_nu, nu1, nu2, nu3, nu4, nu5, nu_large, nu_small
+          integer                         :: freq_len
+          double precision                :: T,B_nu(freq_len-1), nu(freq_len)
+          integer                         :: i
+          double precision                :: diff_nu, nu1, nu2, nu3, nu4, nu5, nu_large, nu_small
 
           !~~~~~~~~~~~~~
 
@@ -2903,9 +2931,9 @@ module fort_spec
              nu_large = max(nu(i),nu(i+1))
              nu_small = min(nu(i),nu(i+1))
              nu1 = nu_small
-             nu2 = nu_small+DBLE(1)*(nu_large-nu_small)/4d0
-             nu3 = nu_small+DBLE(2)*(nu_large-nu_small)/4d0
-             nu4 = nu_small+DBLE(3)*(nu_large-nu_small)/4d0
+             nu2 = nu_small+dble(1)*(nu_large-nu_small)/4d0
+             nu3 = nu_small+dble(2)*(nu_large-nu_small)/4d0
+             nu4 = nu_small+dble(3)*(nu_large-nu_small)/4d0
              nu5 = nu_large
              diff_nu = nu2-nu1
              B_nu(i) = B_nu(i) + 1d0/90d0*( &

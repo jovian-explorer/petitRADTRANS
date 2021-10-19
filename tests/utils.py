@@ -32,6 +32,8 @@ reference_filenames = {
         'radtrans_correlated_k_transmission_cloud_calculated_radius_ref',
     'correlated_k_emission':
         'radtrans_correlated_k_emission_ref',
+    'correlated_k_emission_cloud_hansen_radius':
+        'radtrans_correlated_k_emission_cloud_hansen_radius_ref',
     'line_by_line_transmission':
         'radtrans_line_by_line_transmission_ref',
     'line_by_line_emission':
@@ -98,7 +100,8 @@ def create_test_radtrans_config_file(filename):
                     'mass_fraction': 5e-7,
                     'radius': 5e-5,  # (cm)
                     'f_sed': 2,
-                    'sigma_log_normal': 1.05
+                    'sigma_log_normal': 1.05,
+                    'b_hansen': 0.01
                 },
             }
         },
@@ -277,6 +280,30 @@ def create_radtrans_correlated_k_emission_spectrum_ref(plot_figure=False):
     )
 
 
+def create_radtrans_correlated_k_emission_spectrum_cloud_hansen_radius_ref(plot_figure=False):
+    from .test_radtrans_correlated_k import atmosphere_ck
+
+    mass_fractions = copy.deepcopy(radtrans_parameters['mass_fractions'][()])
+    mass_fractions['Mg2SiO4(c)'] = \
+        radtrans_parameters['cloud_parameters'][()]['cloud_species']['Mg2SiO4(c)_cd']['mass_fraction']
+
+    atmosphere_ck.calc_flux(
+        temp=radtrans_parameters['temperature_isothermal'] * np.ones_like(radtrans_parameters['pressures']),
+        abunds=mass_fractions,
+        gravity=radtrans_parameters['planetary_parameters'][()]['surface_gravity'],
+        mmw=radtrans_parameters['mean_molar_mass'],
+        Kzz=radtrans_parameters['planetary_parameters'][()]['eddy_diffusion_coefficient'],
+        fsed=radtrans_parameters['cloud_parameters'][()]['cloud_species']['Mg2SiO4(c)_cd']['f_sed'],
+        b_hans=radtrans_parameters['cloud_parameters'][()]['cloud_species']['Mg2SiO4(c)_cd']['b_hansen'],
+        dist='hansen'
+    )
+
+    __save_emission_spectrum(
+        reference_filenames['correlated_k_emission_cloud_hansen_radius'], atmosphere_ck, plot_figure,
+        'Correlated-k emission spectrum, with non-gray cloud using Hansen radius'
+    )
+
+
 def create_radtrans_correlated_k_transmission_spectrum_ref(plot_figure=False):
     from .test_radtrans_correlated_k import atmosphere_ck
 
@@ -398,7 +425,7 @@ def create_radtrans_correlated_k_transmission_spectrum_cloud_calculated_radius_r
 
     __save_transmission_spectrum(
         reference_filenames['correlated_k_transmission_cloud_calculated_radius'], atmosphere_ck, plot_figure,
-        'Correlated-k transmission spectrum, with non-gray cloud using fixed radius'
+        'Correlated-k transmission spectrum, with non-gray cloud using calculated radius'
     )
 
 

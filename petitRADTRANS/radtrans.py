@@ -1198,7 +1198,6 @@ class Radtrans(_read_opacities.ReadOpacities):
                 if type(b_hans) is float:
                     self.b_hans = np.array(np.tile(b_hans * np.ones_like(self.press), (len(self.cloud_species), 1)),
                                            dtype='d', order='F').T
-                    print(self.b_hans.shape)
             except ValueError:  # TODO check if ValueError is expected here (and if the code works as intended)
                 print("You must provide a value for the Hansen distribution width, b_hans!")
                 self.b_hans = None
