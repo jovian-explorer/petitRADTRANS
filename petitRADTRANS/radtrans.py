@@ -313,8 +313,8 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         #  Default surface albedo and emissivity -- will be used only if
         #  the surface scattering is turned on.
-        self.reflectance = 0 * np.ones_like(self.freq)
-        self.emissivity = 1 * np.ones_like(self.freq)
+        self.reflectance = 0. * np.ones_like(self.freq)
+        self.emissivity = 1. * np.ones_like(self.freq)
 
         # Read in the angle (mu) grid for the emission spectral calculations.
         buffer = np.genfromtxt(self.path+'/opa_input_files/mu_points.dat')
@@ -1226,7 +1226,7 @@ class Radtrans(_read_opacities.ReadOpacities):
 
             spec,rad = nc.get_PHOENIX_spec_rad(Tstar)
             if not Rstar == None:
-                 print('Using Rstar value input by user.')
+                 #print('Using Rstar value input by user.')
                  rad = Rstar
 
 
@@ -1647,15 +1647,15 @@ class Radtrans(_read_opacities.ReadOpacities):
                     int(resolution)) + '.h5')
                 os.system('rm temp.h5')
 
-    def PT_it(self,temp,abunds,gravity,mmw,sigma_lnorm = None, \
-                      fsed = None, Kzz = None, radius = None, \
-                      contribution=False, \
-                      gray_opacity = None, Pcloud = None, \
-                      kappa_zero = None, \
-                      gamma_scat = None, \
-                      add_cloud_scat_as_abs = None,\
-                      Tstar = None, Rstar=None, semimajoraxis = None,\
-                      geometry = 'dayside_ave',theta_star=0, \
+    def PT_it_rad_trans(self,temp,abunds,gravity,mmw,sigma_lnorm = None,
+                      fsed = None, Kzz = None, radius = None,
+                      contribution=False,
+                      gray_opacity = None, Pcloud = None,
+                      kappa_zero = None,
+                      gamma_scat = None,
+                      add_cloud_scat_as_abs = None,
+                      Tstar = None, Rstar=None, semimajoraxis = None,
+                      geometry = 'dayside_ave',theta_star=0,
                       hack_cloud_photospheric_tau = None,
                       dist= "lognormal", a_hans = None, b_hans = None):
 
@@ -1697,23 +1697,8 @@ class Radtrans(_read_opacities.ReadOpacities):
 
 
         # Spec (1)
+        #print(self.reflectance)
 
-        '''
-        self.flux, self.contr_em = fs.feautrier_rad_trans(self.border_freqs, \
-                                                          self.total_tau[:, :, 0, :], \
-                                                          self.temp, \
-                                                          self.mu, \
-                                                          self.w_gauss_mu, \
-                                                          self.w_gauss, \
-                                                          self.photon_destruction_prob, \
-                                                          contribution, \
-                                                          self.reflectance, \
-                                                          self.emissivity, \
-                                                          self.stellar_intensity, \
-                                                          self.geometry, \
-                                                          self.mu_star)
-        '''
-        print('SPEC STAR!')
         self.flux, __, __, __, __, __, __, __, self.H_star, self.abs_S, self.stellar_surf_heat_flux = \
                                        fs.feautrier_pt_it(self.border_freqs,
                                                           self.total_tau[:, :, 0, :],
@@ -1734,7 +1719,6 @@ class Radtrans(_read_opacities.ReadOpacities):
                                                           self.continuum_opa_scat_emis)
 
 
-        print('SPEC PLANET!')
         self.flux, __, self.J_bol, __, self.eddington_F, self.eddington_Psi, self.kappa_J, self.kappa_H, __, __, \
                    self.planet_surf_heat_flux = \
                         fs.feautrier_pt_it(self.border_freqs,
@@ -1764,3 +1748,120 @@ class Radtrans(_read_opacities.ReadOpacities):
             fs.calc_kappa_rosseland(self.line_struc_kappas[:, :, 0, :], self.temp, \
                                     self.w_gauss, self.border_freqs, \
                                     False, self.continuum_opa_scat_emis)
+
+    def PT_it(self, n_iter, temp_start, mass_fractions, gammas, gravity, mmw,
+              T_int, Tstar, Rstar, semimajoraxis,
+              geometry, theta_star=0,
+              sigma_lnorm = None,
+              fsed = None, Kzz = None, radius = None,
+              gray_opacity = None, Pcloud = None,
+              kappa_zero = None,
+              gamma_scat = None,
+              add_cloud_scat_as_abs = None,
+              hack_cloud_photospheric_tau = None,
+              dist= "lognormal", a_hans = None, b_hans = None,
+              save_iter = False):
+
+
+        contribution = False
+        constant_abundances = False
+        if isinstance(mass_fractions, dict):
+            abunds_use = mass_fractions
+            gammas_use = gammas
+            constant_abundances = True
+        else:
+            abunds_use = mass_fractions(temp_start, self.press*1e-6)
+            gammas_use = gammas(temp_start, self.press*1e-6)
+
+        temp = temp_start
+
+        # Iteration setup
+        do_conv = True
+        convergence_test = False
+        convective = np.zeros_like(self.press) > 1.
+        start_conv = False
+        eddington_approx = False
+        # This is with the new mean_last = False treatment.
+        # Meaning 30 % of old 70 % of new solution.
+        # Old treatment was 90 % of old, 10 % of new
+        mean_last = False
+
+        temps_iter = []
+        t_surfs_iter = []
+
+        # First RT step:
+        self.PT_it_rad_trans(temp, abunds_use, gravity, mmw, sigma_lnorm,
+                        fsed, Kzz, radius, contribution,
+                        gray_opacity, Pcloud,
+                        kappa_zero,
+                        gamma_scat,
+                        add_cloud_scat_as_abs,
+                        Tstar, Rstar, semimajoraxis,
+                        geometry, theta_star,
+                        hack_cloud_photospheric_tau,
+                        dist, a_hans, b_hans)
+
+        t_surf = temp[-1]
+
+        ########################
+        # Do the iteration
+        ########################
+
+        for i in range(n_iter):
+
+            i_iter = i
+
+            print(i_iter, t_surf)
+
+            if constant_abundances:
+                abunds_use = mass_fractions
+                gammas_use = gammas
+            else:
+                abunds_use = mass_fractions(temp, self.press * 1e-6)
+                gammas_use = gammas(temp, self.press * 1e-6)
+
+            self.PT_it_rad_trans(temp, abunds_use, gravity, mmw, sigma_lnorm,
+                                 fsed, Kzz, radius, contribution,
+                                 gray_opacity, Pcloud,
+                                 kappa_zero,
+                                 gamma_scat,
+                                 add_cloud_scat_as_abs,
+                                 Tstar, Rstar, semimajoraxis,
+                                 geometry, theta_star,
+                                 hack_cloud_photospheric_tau,
+                                 dist, a_hans, b_hans)
+
+            kappa_H_take = self.kappa_H
+            kappa_H_take[-1] = kappa_H_take[-2]
+
+            temp, convective, t_surf = fs.temp_iter(self.press,
+                                                 temp,
+                                                 T_int,
+                                                 gravity,
+                                                 kappa_H_take,
+                                                 self.kappa_J,
+                                                 self.eddington_F,
+                                                 self.eddington_Psi,
+                                                 self.H_star,
+                                                 self.abs_S,
+                                                 gammas_use,
+                                                 do_conv,
+                                                 i_iter + 1,
+                                                 self.kappa_planck,
+                                                 self.J_bol,
+                                                 convective,
+                                                 convergence_test,
+                                                 start_conv,
+                                                 eddington_approx,
+                                                 mean_last,
+                                                 self.border_freqs,
+                                                 self.emissivity,
+                                                 self.stellar_surf_heat_flux,
+                                                 self.planet_surf_heat_flux)
+
+            if save_iter:
+                temps_iter.append(temp)
+                t_surfs_iter.append(t_surf)
+
+        return temp, convective, t_surf, temps_iter, t_surfs_iter
+
