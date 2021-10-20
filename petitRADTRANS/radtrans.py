@@ -546,7 +546,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                         sigma_lnorm = None, fsed = None, Kzz = None, \
                         radius = None, \
                         add_cloud_scat_as_abs = None,
-                        dist = "lognormal", a_hans = None):
+                        dist = "lognormal", a_hans = None,
+                        give_opacity = None):
         # Combine total line opacities,
         # according to mass fractions (abundances),
         # also add continuum opacities, i.e. clouds, CIA...
@@ -636,6 +637,9 @@ class Radtrans(_read_opacities.ReadOpacities):
             if self.do_scat_emis:
                 self.continuum_opa_scat_emis += \
                   add_term
+        # Opacity input from outside?
+        if (give_opacity != None):
+            self.continuum_opa += give_opacity(nc.c/self.freq/1e-4, self.press*1e-6)
 
         # Interpolate line opacities, combine with continuum oacities
         self.line_struc_kappas = fi.mix_opas_ck(self.line_abundances, \
@@ -1657,7 +1661,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                       Tstar = None, Rstar=None, semimajoraxis = None,
                       geometry = 'dayside_ave',theta_star=0,
                       hack_cloud_photospheric_tau = None,
-                      dist= "lognormal", a_hans = None, b_hans = None):
+                      dist= "lognormal", a_hans = None, b_hans = None,
+                      give_opacity = None):
 
         self.hack_cloud_photospheric_tau = hack_cloud_photospheric_tau
         self.Pcloud = Pcloud
@@ -1690,7 +1695,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.interpolate_species_opa(temp)
         self.mix_opa_tot(abunds,mmw,gravity,sigma_lnorm,fsed,Kzz,radius, \
                              add_cloud_scat_as_abs = add_cloud_scat_as_abs,
-                             dist = dist, a_hans = a_hans)
+                             dist = dist, a_hans = a_hans, give_opacity = give_opacity)
         self.calc_opt_depth(gravity)
         #self.calc_RT(contribution)
         self.calc_tau_cloud(gravity)
@@ -1760,7 +1765,8 @@ class Radtrans(_read_opacities.ReadOpacities):
               add_cloud_scat_as_abs = None,
               hack_cloud_photospheric_tau = None,
               dist= "lognormal", a_hans = None, b_hans = None,
-              save_iter = False):
+              save_iter = False,
+              give_opacity = None):
 
 
         contribution = False
@@ -1799,7 +1805,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                         Tstar, Rstar, semimajoraxis,
                         geometry, theta_star,
                         hack_cloud_photospheric_tau,
-                        dist, a_hans, b_hans)
+                        dist, a_hans, b_hans,
+                        give_opacity)
 
         t_surf = temp[-1]
 
@@ -1829,7 +1836,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                                  Tstar, Rstar, semimajoraxis,
                                  geometry, theta_star,
                                  hack_cloud_photospheric_tau,
-                                 dist, a_hans, b_hans)
+                                 dist, a_hans, b_hans,
+                                 give_opacity)
 
             kappa_H_take = self.kappa_H
             kappa_H_take[-1] = kappa_H_take[-2]
