@@ -1346,7 +1346,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     constant as a function of pressure, during the transmission
                     radius calculation.
         """
-
+        self.hack_cloud_photospheric_tau = None  # TODO move that into init to make transmission with scattering work
         self.Pcloud = Pcloud
         self.gray_opacity = gray_opacity
         self.interpolate_species_opa(temp)

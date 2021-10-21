@@ -49,7 +49,7 @@ module fort_spec
           double precision                             :: del_tau_lower_ord, &
                gamma_second(g_len,freq_len,N_species), f_second, kappa_i(g_len,freq_len,N_species), &
                kappa_im(g_len,freq_len,N_species), kappa_ip(g_len,freq_len,N_species)
-          LOGICAL                                      :: second_order
+          logical                                      :: second_order
           !~~~~~~~~~~~~~
 
           tau = 0d0
@@ -126,7 +126,7 @@ module fort_spec
           integer, intent(in)                          :: struc_len, freq_len, g_len
           double precision, intent(in)                 :: total_kappa_in(g_len,freq_len,N_species,struc_len)
           double precision, intent(in)                 :: gravity, press(struc_len)
-          LOGICAL, intent(in)                          :: do_scat_emis
+          logical, intent(in)                          :: do_scat_emis
           double precision, intent(in)                 :: continuum_opa_scat_emis(freq_len,struc_len)
           double precision, intent(out)                :: tau(g_len,freq_len,N_species,struc_len), &
                photon_destruction_prob(g_len,freq_len,struc_len)
@@ -136,7 +136,7 @@ module fort_spec
                gamma_second(g_len,freq_len,N_species), f_second, kappa_i(g_len,freq_len,N_species), &
                kappa_im(g_len,freq_len,N_species), kappa_ip(g_len,freq_len,N_species)
           double precision                             :: total_kappa(g_len,freq_len,N_species,struc_len)
-          LOGICAL                                      :: second_order
+          logical                                      :: second_order
           !~~~~~~~~~~~~~
 
           tau = 0d0
@@ -224,7 +224,7 @@ module fort_spec
           double precision, intent(in)  :: total_kappa(g_len, freq_len, struc_len)
           double precision, intent(in)  :: border_freqs(freq_len_p_1)
           double precision, intent(in)  :: temp(struc_len), w_gauss(g_len)
-          LOGICAL, intent(in)           :: do_scat_emis
+          logical, intent(in)           :: do_scat_emis
           double precision, intent(in)  :: continuum_opa_scat_emis(freq_len,struc_len)
           double precision, intent(out) :: kappa_rosse(struc_len)
 
@@ -263,7 +263,7 @@ module fort_spec
           double precision, intent(in)  :: total_kappa(g_len, freq_len, struc_len)
           double precision, intent(in)  :: border_freqs(freq_len_p_1)
           double precision, intent(in)  :: temp(struc_len), w_gauss(g_len)
-          LOGICAL, intent(in)           :: do_scat_emis
+          logical, intent(in)           :: do_scat_emis
           double precision, intent(in)  :: continuum_opa_scat_emis(freq_len,struc_len)
           double precision, intent(out) :: kappa_planck(struc_len)
 
@@ -310,7 +310,7 @@ module fort_spec
           double precision, intent(in)                :: mu(N_mu) !, gravity
           double precision, intent(in)                :: w_gauss_mu(N_mu)
           double precision, intent(in)                :: w_gauss(g_len)
-          LOGICAL, intent(in)                         :: contribution
+          logical, intent(in)                         :: contribution
           double precision, intent(out)               :: flux(freq_len)
           double precision, intent(out)               :: contr_em(struc_len,freq_len)
 
@@ -383,7 +383,7 @@ module fort_spec
 
           if (contribution) then
              do i_freq = 1, freq_len
-                contr_em(:,i_freq) = contr_em(:,i_freq)/SUM(contr_em(:,i_freq))
+                contr_em(:,i_freq) = contr_em(:,i_freq)/sum(contr_em(:,i_freq))
              end do
           end if
 
@@ -433,8 +433,8 @@ module fort_spec
 
           double precision, intent(in)                :: gravity
           double precision, intent(in)                :: w_gauss(g_len), continuum_opa_scat(freq_len,struc_len)
-          LOGICAL, intent(in)                         :: scat !, contribution
-          LOGICAL, intent(in)                         :: var_grav
+          logical, intent(in)                         :: scat !, contribution
+          logical, intent(in)                         :: var_grav
 
           double precision, intent(out)               :: transm(freq_len) !, contr_tr(struc_len,freq_len)
 
@@ -442,7 +442,7 @@ module fort_spec
           double precision                            :: P0_cgs, rho(struc_len), radius(struc_len), &
                 total_kappa(g_len,freq_len,N_species,struc_len)
           integer                                     :: i_str, i_freq, i_g, i_spec, j_str
-          LOGICAL                                     :: rad_neg
+          logical                                     :: rad_neg
           double precision                            :: alpha_t2(g_len,freq_len,N_species,struc_len-1)
           double precision                            :: t_graze(g_len,freq_len,N_species,struc_len), s_1, s_2, &
                t_graze_wlen_int(struc_len,freq_len), &
@@ -532,8 +532,8 @@ module fort_spec
              do i_spec = 1, N_species
                 do i_freq = 1, freq_len
                    t_graze_wlen_int(i_str,i_freq) = t_graze_wlen_int(i_str,i_freq)* &
-                        SUM(t_graze(:,i_freq,i_spec,i_str)*w_gauss)
-                   if (scat .AND. (i_spec == 1)) then
+                        sum(t_graze(:,i_freq,i_spec,i_str)*w_gauss)
+                   if (scat .and. (i_spec == 1)) then
                       t_graze_wlen_int(i_str,i_freq) = t_graze_wlen_int(i_str,i_freq)* &
                            t_graze_scat(i_freq,i_str)
                    end if
@@ -585,7 +585,7 @@ module fort_spec
           double precision, intent(in)                :: press(struc_len), &
                rho(struc_len)
           double precision, intent(in)                :: gravity, R_pl
-          LOGICAL, intent(in)                         :: var_grav
+          logical, intent(in)                         :: var_grav
           double precision, intent(out)               :: radius(struc_len)
 
           ! Internal
@@ -606,7 +606,7 @@ module fort_spec
              ! Calculate radius with vertically varying gravity, set up such that at P=P0, i.e. R=R_pl
              ! the planet has the predefined scalar gravity value
              do i_str = struc_len-1, 1, -1
-                if ((press(i_str+1) > P0_cgs) .AND. (press(i_str) <= P0_cgs)) then
+                if ((press(i_str+1) > P0_cgs) .and. (press(i_str) <= P0_cgs)) then
                    if (i_str <= struc_len-2) then
                       R0 = radius(i_str+1) - integ_parab(press(i_str),press(i_str+1),press(i_str+2), &
                            inv_rho(i_str),inv_rho(i_str+1),inv_rho(i_str+2),P0_cgs,press(i_str+1))/gravity &
@@ -639,7 +639,7 @@ module fort_spec
 
              ! Calculate radius with vertically constant gravity
              do i_str = struc_len-1, 1, -1
-                if ((press(i_str+1) > P0_cgs) .AND. (press(i_str) <= P0_cgs)) then
+                if ((press(i_str+1) > P0_cgs) .and. (press(i_str) <= P0_cgs)) then
                    if (i_str <= struc_len-2) then
                       R0 = radius(i_str+1) + integ_parab(press(i_str),press(i_str+1),press(i_str+2), &
                            inv_rho(i_str),inv_rho(i_str+1),inv_rho(i_str+2),P0_cgs,press(i_str+1))/gravity
@@ -790,7 +790,7 @@ module fort_spec
                            + a5/((1.1d0/0.589d0)**2d0-luv**2d0) + a6/((1.1d0/0.589d0)**2d0-lir**2d0) + &
                            a7*d(i_str)**2d0)*d(i_str)
 
-                      if ((lambda_cm(i_freq)/1d-4 > 0.2d0) .AND. (lambda_cm(i_freq)/1d-4 < 1.1d0)) then
+                      if ((lambda_cm(i_freq)/1d-4 > 0.2d0) .and. (lambda_cm(i_freq)/1d-4 < 1.1d0)) then
                          nm1 = sqrt((1d0+2d0*retVal)/(1d0-retVal))
                       else if (lambda_cm(i_freq)/1d-4 >= 1.1d0) then
                          nm1 = sqrt((1.+2.*retValMax)/(1.-retValMax))
@@ -996,144 +996,148 @@ module fort_spec
           end if
 
         end subroutine add_rayleigh
-
-        !!$ #########################################################################
-        !!$ #########################################################################
-        !!$ #########################################################################
-        !!$ #########################################################################
-
-        !!$ Subroutine to calculate the contribution function of the transmission spectrum
+        
 
         subroutine calc_transm_spec_contr(total_kappa,temp,press,gravity,mmw,P0_bar,R_pl, &
              w_gauss,transm_in,scat,continuum_opa_scat,var_grav,contr_tr,freq_len,struc_len,g_len,N_species)
-
-          use constants_block
-          implicit none
-
-          ! I/O
-          integer, intent(in)                         :: freq_len, struc_len, g_len, N_species
-          double precision, intent(in)                :: P0_bar, R_pl
-          double precision, intent(in)                :: temp(struc_len), press(struc_len), mmw(struc_len)
-          double precision, intent(in)                :: total_kappa(g_len,freq_len,N_species,struc_len)
-
-          double precision, intent(in)                :: gravity
-          double precision, intent(in)                :: w_gauss(g_len), continuum_opa_scat(freq_len,struc_len)
-          LOGICAL, intent(in)                         :: scat
-          double precision, intent(in)                :: transm_in(freq_len)
-          LOGICAL, intent(in)                         :: var_grav
-          double precision, intent(out)               :: contr_tr(struc_len,freq_len)
-
-          ! Internal
-          double precision                            :: P0_cgs, rho(struc_len), radius(struc_len)
-          integer                                     :: i_str, i_freq,  i_spec, j_str, i_leave_str
-          double precision                            :: alpha_t2(g_len,freq_len,N_species,struc_len-1)
-          double precision                            :: t_graze(g_len,freq_len,N_species,struc_len), s_1, s_2, &
+            ! """
+            ! Subroutine to calculate the contribution function of the transmission spectrum
+            ! """
+            use constants_block
+            
+            implicit none
+            
+            logical, intent(in)                         :: scat
+            logical, intent(in)                         :: var_grav
+            integer, intent(in)                         :: freq_len, struc_len, g_len, N_species
+            double precision, intent(in)                :: P0_bar, R_pl
+            double precision, intent(in)                :: temp(struc_len), press(struc_len), mmw(struc_len)
+            double precision, intent(in)                :: total_kappa(g_len,freq_len,N_species,struc_len)
+            double precision, intent(in)                :: gravity
+            double precision, intent(in)                :: w_gauss(g_len), continuum_opa_scat(freq_len,struc_len)
+            double precision, intent(in)                :: transm_in(freq_len)
+            double precision, intent(out)               :: contr_tr(struc_len,freq_len)
+            
+            integer                                     :: i_str, i_freq,  i_spec, j_str, i_leave_str
+            double precision                            :: P0_cgs, rho(struc_len), radius(struc_len)
+            double precision                            :: alpha_t2(g_len,freq_len,N_species,struc_len-1)
+            double precision                            :: t_graze(g_len,freq_len,N_species,struc_len), s_1, s_2, &
                t_graze_wlen_int(struc_len,freq_len), alpha_t2_scat(freq_len,struc_len-1), &
                t_graze_scat(freq_len,struc_len), total_kappa_use(g_len,freq_len,N_species,struc_len), &
                continuum_opa_scat_use(freq_len,struc_len), transm(freq_len)
-
-          ! Convert reference pressure to cgs
-          P0_cgs = P0_bar*1d6
-          ! Calculate density
-          rho = mmw*amu*press/kB/temp
-          ! Calculate planetary radius (in cm), assuming hydrostatic equilibrium
-          call calc_radius(struc_len,press,gravity,rho,P0_cgs,R_pl,var_grav,radius)
-
-          do i_leave_str = 1, struc_len
-
-             transm = 0d0
-             t_graze = 0d0
-             t_graze_scat = 0d0
-
-             continuum_opa_scat_use = continuum_opa_scat
-             total_kappa_use = total_kappa
-             total_kappa_use(:,:,:,i_leave_str) = 0d0
-             continuum_opa_scat_use(:,i_leave_str) = 0d0
-
-             ! Calc. mean free paths across grazing distances
-             do i_str = 1, struc_len-1
-                alpha_t2(:,:,:,i_str) = &
-                    (total_kappa_use(:,:,:,i_str)*rho(i_str)+total_kappa_use(:,:,:,i_str+1)*rho(i_str+1))
-             end do
-             if (scat) then
+            
+            ! Convert reference pressure to cgs
+            P0_cgs = P0_bar * 1d6
+            
+            ! Calculate density
+            rho = mmw * amu * press / kB / temp
+            
+            ! Calculate planetary radius (in cm), assuming hydrostatic equilibrium
+            call calc_radius(struc_len, press, gravity, rho, P0_cgs, R_pl, var_grav, radius)
+            
+            do i_leave_str = 1, struc_len
+                transm = 0d0
+                t_graze = 0d0
+                t_graze_scat = 0d0
+                
+                continuum_opa_scat_use = continuum_opa_scat
+                total_kappa_use = total_kappa
+                total_kappa_use(:, :, :, i_leave_str) = 0d0
+                continuum_opa_scat_use(:, i_leave_str) = 0d0
+                
+                ! Calc. mean free paths across grazing distances
                 do i_str = 1, struc_len-1
-                   alpha_t2_scat(:,i_str) = (continuum_opa_scat_use(:,i_str)*rho(i_str)+ &
-                        continuum_opa_scat_use(:,i_str+1)*rho(i_str+1))
+                    alpha_t2(:, :, :, i_str) = &
+                        total_kappa_use(:, :, :, i_str) * rho(i_str) &
+                        + total_kappa_use(:, :, :, i_str + 1) * rho(i_str + 1)
                 end do
-             end if
-
-             ! Cacuclate grazing rays optical depths
-             do i_str = 2, struc_len
-                s_1 = sqrt(radius(1)**2d0-radius(i_str)**2d0)
-                do j_str = 1, i_str-1
-                   if (j_str > 1) then
-                      s_1 = s_2
-                   end if
-                   s_2 = sqrt(radius(j_str+1)**2d0-radius(i_str)**2d0)
-                   t_graze(:,:,:,i_str) = t_graze(:,:,:,i_str)+alpha_t2(:,:,:,j_str)*(s_1-s_2)
-                end do
-             end do
-             if (scat) then
+                
+                if (scat) then
+                    do i_str = 1, struc_len - 1
+                        alpha_t2_scat(:,i_str) = continuum_opa_scat_use(:, i_str) * rho(i_str) &
+                            + continuum_opa_scat_use(:, i_str + 1) * rho(i_str + 1)
+                    end do
+                end if
+                
+                ! Cacuclate grazing rays optical depths
                 do i_str = 2, struc_len
-                   s_1 = sqrt(radius(1)**2d0-radius(i_str)**2d0)
-                   do j_str = 1, i_str-1
-                      if (j_str > 1) then
-                         s_1 = s_2
-                      end if
-                      s_2 = sqrt(radius(j_str+1)**2d0-radius(i_str)**2d0)
-                      t_graze_scat(:,i_str) = t_graze_scat(:,i_str)+alpha_t2_scat(:,j_str)*(s_1-s_2)
-                   end do
+                    s_1 = sqrt(radius(1) ** 2d0 - radius(i_str) ** 2d0)
+                    
+                    do j_str = 1, i_str-1
+                        if (j_str > 1) then
+                            s_1 = s_2
+                        end if
+                       
+                        s_2 = sqrt(radius(j_str + 1) ** 2d0 - radius(i_str) ** 2d0)
+                        t_graze(:, :, :, i_str) = t_graze(:, :, :, i_str) + alpha_t2(:, :, :, j_str) * (s_1 - s_2)
+                    end do
                 end do
-             end if
-
-             ! Calculate transmissions, update tau array to store these
-             t_graze = exp(-t_graze)
-             if (scat) then
-                t_graze_scat = exp(-t_graze_scat)
-             end if
-
-             t_graze_wlen_int = 1d0
-             ! Wlen (in g-space) integrate transmissions
-             do i_str = 2, struc_len ! i_str=1 t_grazes are 1 anyways
-                do i_spec = 1, N_species
-                   do i_freq = 1, freq_len
-                      t_graze_wlen_int(i_str,i_freq) = t_graze_wlen_int(i_str,i_freq)* &
-                           SUM(t_graze(:,i_freq,i_spec,i_str)*w_gauss)
-                      if (scat .AND. (i_spec == 1)) then
-                         t_graze_wlen_int(i_str,i_freq) = t_graze_wlen_int(i_str,i_freq)* &
-                              t_graze_scat(i_freq,i_str)
-                      end if
-                   end do
+                
+                if (scat) then
+                    do i_str = 2, struc_len
+                        s_1 = sqrt(radius(1) ** 2d0 - radius(i_str) ** 2d0)
+                       
+                        do j_str = 1, i_str - 1
+                            if (j_str > 1) then
+                                s_1 = s_2
+                            end if
+                        
+                            s_2 = sqrt(radius(j_str + 1) ** 2d0 - radius(i_str) ** 2d0)
+                            t_graze_scat(:, i_str) = t_graze_scat(:, i_str) + alpha_t2_scat(:, j_str) * (s_1 - s_2)
+                        end do
+                    end do
+                end if
+                
+                ! Calculate transmissions, update tau array to store these
+                t_graze = exp(-t_graze)
+                
+                if (scat) then
+                    t_graze_scat = exp(-t_graze_scat)
+                end if
+                
+                t_graze_wlen_int = 1d0
+                
+                ! Wlen (in g-space) integrate transmissions
+                do i_str = 2, struc_len ! i_str=1 t_grazes are 1 anyways
+                    do i_spec = 1, N_species
+                        do i_freq = 1, freq_len
+                            t_graze_wlen_int(i_str,i_freq) = t_graze_wlen_int(i_str,i_freq)&
+                                * sum(t_graze(:, i_freq, i_spec, i_str) * w_gauss)
+                          
+                            if (scat .and. (i_spec == 1)) then
+                                t_graze_wlen_int(i_str,i_freq) = t_graze_wlen_int(i_str, i_freq) &
+                                    * t_graze_scat(i_freq, i_str)
+                            end if
+                        end do
+                    end do
                 end do
-             end do
-
-             ! Get effective area fraction from transmission
-             t_graze_wlen_int = 1d0-t_graze_wlen_int
-
-             ! Caculate planets effectice area (leaving out pi, because we want the radius in the end)
-             do i_freq = 1, freq_len
-                do i_str = 2, struc_len
-                   transm(i_freq) = transm(i_freq)+(t_graze_wlen_int(i_str-1,i_freq)*radius(i_str-1)+ &
-                        t_graze_wlen_int(i_str,i_freq)*radius(i_str))*(radius(i_str-1)-radius(i_str))
+                
+                ! Get effective area fraction from transmission
+                t_graze_wlen_int = 1d0 - t_graze_wlen_int
+                
+                ! Caculate planets effectice area (leaving out pi, because we want the radius in the end)
+                do i_freq = 1, freq_len
+                    do i_str = 2, struc_len
+                        transm(i_freq) = &
+                            transm(i_freq) &
+                            + (&
+                                t_graze_wlen_int(i_str - 1, i_freq) * radius(i_str-1) &
+                                + t_graze_wlen_int(i_str, i_freq) * radius(i_str) &
+                            ) &
+                            * (radius(i_str - 1) - radius(i_str))
+                    end do
                 end do
-             end do
-             ! Get radius
-             transm = transm+radius(struc_len)**2d0
-             contr_tr(i_leave_str,:) = transm_in - transm
 
-             write(*,*) i_leave_str
-
-          end do
-
-          do i_freq = 1, freq_len
-             contr_tr(:,i_freq) = contr_tr(:,i_freq)/SUM(contr_tr(:,i_freq))
-          end do
+                ! Get radius
+                transm = transm+radius(struc_len) ** 2d0
+                contr_tr(i_leave_str, :) = transm_in - transm
+            end do
+            
+            do i_freq = 1, freq_len
+                contr_tr(:, i_freq) = contr_tr(:, i_freq) / sum(contr_tr(:, i_freq))
+            end do
         end subroutine calc_transm_spec_contr
 
-        !!$ #########################################################################
-        !!$ #########################################################################
-        !!$ #########################################################################
-        !!$ #########################################################################
 
         function hansen_size_dndr(r,a,b,k)
 
@@ -1726,7 +1730,7 @@ module fort_spec
           end if
           v_settling_visc = 2d0*x**2d0*(rho_p-rho)*psi*gravity/(9d0*eta)
           turbulent_settling_speed_ret = psi*sqrt(8d0*gravity*x*(rho_p-rho)/(3d0*Cd*rho))
-          if ((Nre < 1d0) .AND. (v_settling_visc < turbulent_settling_speed_ret)) THEN
+          if ((Nre < 1d0) .and. (v_settling_visc < turbulent_settling_speed_ret)) THEN
              turbulent_settling_speed_ret = v_settling_visc
           end if
 
@@ -1998,7 +2002,7 @@ module fort_spec
 
                    sampled_opa_weights(:, 2, i_freq, i_struc) = &
                         sampled_opa_weights(:, 2, i_freq, i_struc) / &
-                        SUM(sampled_opa_weights(:, 2, i_freq, i_struc))
+                        sum(sampled_opa_weights(:, 2, i_freq, i_struc))
 
                    g_sample = 0d0
                    cum_sum = 0d0
@@ -2019,11 +2023,11 @@ module fort_spec
                    k_final(nsample+2) = k_max(i_freq, i_struc)
 
                    call search_intp_ind(g_final, nsample+2, g_gauss, g_len, intpint)
-                   !if ((i_struc == 1) .AND. (i_freq == 1)) then
+                   !if ((i_struc == 1) .and. (i_freq == 1)) then
                    do i_g = 1, g_len
         !!$              write(*,*) g_final(intpint(i_g)), g_gauss(i_g), &
         !!$                   g_final(intpint(i_g)+1), ((g_final(intpint(i_g)) <= &
-        !!$                   g_gauss(i_g)) .AND. &
+        !!$                   g_gauss(i_g)) .and. &
         !!$                   (g_gauss(i_g) <= g_final(intpint(i_g)+1)))
 
                       line_struc_kappas_out(i_g, i_freq, i_struc) = &
@@ -2143,7 +2147,7 @@ module fort_spec
           double precision, INTENT(IN)    :: mu(N_mu)
           double precision, INTENT(IN)    :: w_gauss_mu(N_mu), w_gauss_ck(N_g)
           double precision, INTENT(IN)    :: photon_destruct_in(N_g,freq_len_p_1-1,struc_len)
-          LOGICAL, INTENT(IN)             :: contribution
+          logical, INTENT(IN)             :: contribution
           double precision, INTENT(OUT)   :: flux(freq_len_p_1-1)
           double precision, INTENT(OUT)   :: contr_em(struc_len,freq_len_p_1-1)
           CHARACTER(len=20), intent(in)        :: geom
@@ -2179,7 +2183,7 @@ module fort_spec
           integer                         :: iter_scat, i_iter_scat
 
           ! GCM spec calc
-          LOGICAL                         :: GCM_read
+          logical                         :: GCM_read
           double precision                :: I_GCM(N_mu,freq_len_p_1-1)
 
           ! Variables for the contribution function calculation
@@ -2360,13 +2364,13 @@ module fort_spec
                      I_minus = surf_emi(i)*planck(struc_len) &
                                    !!!!!!!!!!!!!!! SURFACE SCATTERING !!!!!!!!!!!!!!!!
                                    ! ----> of the emitted/scattered atmospheric light
-                                   ! + surf_refl(i) * SUM(I_plus_surface(:, l, i) * w_gauss_mu) ! OLD PRE 091220
-                                   + surf_refl(i) * 2d0 * SUM(I_plus_surface(:, l, i) * mu * w_gauss_mu)
+                                   ! + surf_refl(i) * sum(I_plus_surface(:, l, i) * w_gauss_mu) ! OLD PRE 091220
+                                   + surf_refl(i) * 2d0 * sum(I_plus_surface(:, l, i) * mu * w_gauss_mu)
                                    ! ----> of the direct stellar beam (depends on geometry)
                      if  (trim(adjustl(geom)) /= 'non-isotropic') then
                        I_minus = I_minus + surf_refl(i) &
-                            ! * SUM(I_star_calc(l,:, struc_len, i) * w_gauss_mu) ! OLD PRE 091220
-                            * 2d0 * SUM(I_star_calc(l,:, struc_len, i) * mu * w_gauss_mu)
+                            ! * sum(I_star_calc(l,:, struc_len, i) * w_gauss_mu) ! OLD PRE 091220
+                            * 2d0 * sum(I_star_calc(l,:, struc_len, i) * mu * w_gauss_mu)
                      else
                        !I_minus = I_minus + surf_refl(i) *J_star_ini(l,i,struc_len)  !to be checked! ! OLD PRE 091220
                        I_minus = I_minus + surf_refl(i) *J_star_ini(l,i,struc_len) * 4d0 * mu_star
@@ -2466,7 +2470,7 @@ module fort_spec
             end if
 
             conv_val = MAXVAL(ABS((flux-flux_old)/flux))
-            if ((conv_val < 1d-2) .AND. (i_iter_scat > 9)) then
+            if ((conv_val < 1d-2) .and. (i_iter_scat > 9)) then
                 exit
             end if
 
@@ -2513,7 +2517,7 @@ module fort_spec
             end do
 
             do i_freq = 1, freq_len_p_1-1
-               contr_em(:,i_freq) = contr_em(:,i_freq)/SUM(contr_em(:,i_freq))
+               contr_em(:,i_freq) = contr_em(:,i_freq)/sum(contr_em(:,i_freq))
             end do
 
           end if
@@ -2565,11 +2569,11 @@ module fort_spec
                 C1 = sum(Q1*Q3)
                 C2 = sum(Q2*Q3)
 
-                if ((abs(A1) >= 1d-250) .AND. &
-                     (abs(A2) >=1d-250) .AND. &
-                     (abs(B1) >=1d-250) .AND. &
-                     (abs(B2) >=1d-250) .AND. &
-                     (abs(C1) >=1d-250) .AND. &
+                if ((abs(A1) >= 1d-250) .and. &
+                     (abs(A2) >=1d-250) .and. &
+                     (abs(B1) >=1d-250) .and. &
+                     (abs(B2) >=1d-250) .and. &
+                     (abs(C1) >=1d-250) .and. &
                      (abs(C2) >=1d-250)) THEN
 
                    a = (C1*B2-C2*B1)/(A1*B2-A2*B1)
