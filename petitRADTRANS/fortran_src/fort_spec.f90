@@ -1676,7 +1676,7 @@ module fort_spec
                                         * gamma(x_gamma(i_str, i_spec) + alpha(i_str, i_spec))&
                                     )&
                                 ) ** (1d0 / alpha(i_str, i_spec))
-                        else  ! to avoid overflow, approxiate gamma(x) / gamma(x + a) by x ** -a
+                        else  ! to avoid overflow, approxiate gamma(x) / gamma(x + a) by x ** -a (from Stirling formula)
                             a_h(i_str, i_spec) = &
                                 (&
                                     b_h(i_str, i_spec) ** (-1d0 * alpha(i_str, i_spec)) &

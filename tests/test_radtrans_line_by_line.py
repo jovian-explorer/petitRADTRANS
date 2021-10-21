@@ -17,10 +17,10 @@ relative_tolerance = 1e-6  # relative tolerance when comparing with older result
 # Initializations
 def init_radtrans_line_by_line():
     atmosphere = petitRADTRANS.radtrans.Radtrans(
-        line_species=radtrans_parameters['spectrum_parameters'][()]['line_species_line_by_line'],
-        rayleigh_species=radtrans_parameters['spectrum_parameters'][()]['rayleigh_species'],
-        continuum_opacities=radtrans_parameters['spectrum_parameters'][()]['continuum_opacities'],
-        wlen_bords_micron=radtrans_parameters['spectrum_parameters'][()]['wavelength_range_line_by_line'],
+        line_species=radtrans_parameters['spectrum_parameters']['line_species_line_by_line'],
+        rayleigh_species=radtrans_parameters['spectrum_parameters']['rayleigh_species'],
+        continuum_opacities=radtrans_parameters['spectrum_parameters']['continuum_opacities'],
+        wlen_bords_micron=radtrans_parameters['spectrum_parameters']['wavelength_range_line_by_line'],
         mode='lbl'
     )
 
@@ -36,8 +36,8 @@ def test_line_by_line_emission_spectrum():
     # Calculate an emission spectrum
     atmosphere_lbl.calc_flux(
         temp=temperature_guillot_2010,
-        abunds=radtrans_parameters['mass_fractions'][()],
-        gravity=radtrans_parameters['planetary_parameters'][()]['surface_gravity'],
+        abunds=radtrans_parameters['mass_fractions'],
+        gravity=radtrans_parameters['planetary_parameters']['surface_gravity'],
         mmw=radtrans_parameters['mean_molar_mass'],
     )
 
@@ -56,11 +56,11 @@ def test_line_by_line_transmission_spectrum():
     # Calculate a transmission spectrum
     atmosphere_lbl.calc_transm(
         temp=temperature_isothermal,
-        abunds=radtrans_parameters['mass_fractions'][()],
-        gravity=radtrans_parameters['planetary_parameters'][()]['surface_gravity'],
+        abunds=radtrans_parameters['mass_fractions'],
+        gravity=radtrans_parameters['planetary_parameters']['surface_gravity'],
         mmw=radtrans_parameters['mean_molar_mass'],
-        R_pl=radtrans_parameters['planetary_parameters'][()]['radius'] * petitRADTRANS.nat_cst.r_jup_mean,
-        P0_bar=radtrans_parameters['planetary_parameters'][()]['reference_pressure']
+        R_pl=radtrans_parameters['planetary_parameters']['radius'] * petitRADTRANS.nat_cst.r_jup_mean,
+        P0_bar=radtrans_parameters['planetary_parameters']['reference_pressure']
     )
 
     # Comparison
