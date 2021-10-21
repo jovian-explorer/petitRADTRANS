@@ -16,6 +16,19 @@ if use_compiler_flags:
         "-msse2",
         "-m3dnow"
     ]
+    extra_compile_args_debug = [
+        "-mcmodel=large",
+        "-std=gnu",
+        "-Wall",
+        "-pedantic",
+        "-fimplicit-none",
+        "-fcheck-array-temporaries",
+        "-fbacktrace",
+        "-fcheck=all",
+        "-ffpe-trap=zero,invalid",
+        "-g",
+        "-Og"
+    ]
 else:
     extra_compile_args = None
 

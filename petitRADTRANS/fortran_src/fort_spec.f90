@@ -75,7 +75,7 @@ module fort_spec
                       do i_freq = 1, freq_len
                          do i_g = 1, g_len
                             if (tau(i_g,i_freq,i_spec,i_struc) < tau(i_g,i_freq,i_spec,i_struc-1)) then
-                               if (i_struc == 2) then
+                               if (i_struc <= 2) then
                                   tau(i_g,i_freq,i_spec,i_struc) = &
                                        tau(i_g,i_freq,i_spec,i_struc-1)*1.01d0
                                else
@@ -176,7 +176,7 @@ module fort_spec
                       do i_freq = 1, freq_len
                          do i_g = 1, g_len
                             if (tau(i_g,i_freq,i_spec,i_struc) < tau(i_g,i_freq,i_spec,i_struc-1)) then
-                               if (i_struc == 2) then
+                               if (i_struc <= 2) then
                                   tau(i_g,i_freq,i_spec,i_struc) = &
                                        tau(i_g,i_freq,i_spec,i_struc-1)*1.01d0
                                else
@@ -1590,15 +1590,18 @@ module fort_spec
             double precision, intent(out) :: a_h(struc_len,N_cloud_spec)
             
             integer, parameter :: N_fit = 100
+            doubleprecision, parameter :: x_gamma_max = 170d0  ! gamma(x_gamma_max) >~ huge(0d0)
+
             integer          :: i_str, i_spec, i_rad
             double precision :: w_star(struc_len), H(struc_len)
-            double precision :: r_w(struc_len,N_cloud_spec), alpha(struc_len,N_cloud_spec)
-            double precision :: rad(N_fit), vel(N_fit), f_fill(N_cloud_spec)
+            double precision :: r_w(struc_len,N_cloud_spec), alpha(struc_len, N_cloud_spec), &
+                x_gamma(struc_len, N_cloud_spec)
+            double precision :: rad(N_fit), vel(N_fit)
             double precision :: a, b
     
             H = kB * temp / (MMW * amu * gravity)
             w_star = Kzz / H
-            f_fill = 1d0
+            x_gamma = 1d0 + 1d0 / b_h  ! argument of the gamma function
     
             do i_str = 1, struc_len
                 do i_spec = 1, N_cloud_spec
@@ -1617,9 +1620,9 @@ module fort_spec
                         if (frain(i_spec) > 1d0) then
                             do i_rad = 1, N_fit
                                 rad(i_rad) = &
-                                    r_w(i_str,i_spec) * b_h(i_str,i_spec) &
-                                    + (r_w(i_str,i_spec) &
-                                    - r_w(i_str,i_spec) * b_h(i_str,i_spec)) * dble(i_rad - 1) / dble(N_fit - 1)
+                                    r_w(i_str, i_spec) * b_h(i_str, i_spec) &
+                                    + (r_w(i_str, i_spec) - r_w(i_str, i_spec) * b_h(i_str, i_spec)) &
+                                    * dble(i_rad - 1) / dble(N_fit - 1)
                                 
                                 call turbulent_settling_speed(&
                                     rad(i_rad), &
@@ -1633,7 +1636,8 @@ module fort_spec
                             end do
                         else
                             do i_rad = 1, N_fit
-                                rad(i_rad) = r_w(i_str,i_spec) &
+                                rad(i_rad) = &
+                                    r_w(i_str,i_spec) &
                                     + (r_w(i_str,i_spec) / b_h(i_str,i_spec) - r_w(i_str,i_spec)) &
                                     * dble(i_rad - 1) / dble(N_fit - 1)
                                 
@@ -1649,19 +1653,50 @@ module fort_spec
                             end do
                         end if
                         
-                        call fit_linear(log(rad), log(vel/w_star(i_str)), N_fit, a, b)
+                        call fit_linear(log(rad), log(vel / w_star(i_str)), N_fit, a, b)
                         
-                        alpha(i_str,i_spec) = b
-                        r_w(i_str,i_spec) = exp(-a/b)
-                        a_h(i_str,i_spec) = &
-                            ((b_h(i_str,i_spec)**(-1d0*alpha(i_str,i_spec))*(r_w(i_str,i_spec)**alpha(i_str,i_spec)*&
-                            frain(i_spec))*((b_h(i_str,i_spec)**3d0)*(b_h(i_str,i_spec)**alpha(i_str,i_spec))-&
-                            b_h(i_str,i_spec)+1d0)*gamma(1+ (1d0/b_h(i_str,i_spec))))/&
-                            (((b_h(i_str,i_spec)*alpha(i_str,i_spec))+ (2d0*b_h(i_str,i_spec)) + 1d0)*&
-                            gamma(alpha(i_str,i_spec) + 1d0 + (1d0/b_h(i_str,i_spec)))))**(1d0/alpha(i_str,i_spec))
+                        alpha(i_str, i_spec) = b
+                        r_w(i_str,i_spec) = exp(-a / b)
+
+                        if (x_gamma(i_str, i_spec) + alpha(i_str, i_spec) < x_gamma_max) then
+                            a_h(i_str, i_spec) = &
+                                (&
+                                    b_h(i_str, i_spec) ** (-1d0 * alpha(i_str, i_spec)) &
+                                    * r_w(i_str, i_spec) ** alpha(i_str, i_spec) * frain(i_spec) &
+                                    * (&
+                                        b_h(i_str, i_spec) ** 3d0 &
+                                        * b_h(i_str, i_spec) ** alpha(i_str, i_spec) &
+                                        - b_h(i_str,i_spec) + 1d0 &
+                                    )&
+                                    * gamma(x_gamma(i_str, i_spec)) &
+                                    / (&
+                                        (&
+                                            b_h(i_str,i_spec) * alpha(i_str,i_spec) + 2d0 * b_h(i_str, i_spec) + 1d0 &
+                                        )&
+                                        * gamma(x_gamma(i_str, i_spec) + alpha(i_str, i_spec))&
+                                    )&
+                                ) ** (1d0 / alpha(i_str, i_spec))
+                        else  ! to avoid overflow, approxiate gamma(x) / gamma(x + a) by x ** -a
+                            a_h(i_str, i_spec) = &
+                                (&
+                                    b_h(i_str, i_spec) ** (-1d0 * alpha(i_str, i_spec)) &
+                                    * r_w(i_str, i_spec) ** alpha(i_str, i_spec) * frain(i_spec) &
+                                    * (&
+                                        b_h(i_str, i_spec) ** 3d0 &
+                                        * b_h(i_str, i_spec) ** alpha(i_str, i_spec) &
+                                        - b_h(i_str,i_spec) + 1d0 &
+                                    )&
+                                    * x_gamma(i_str, i_spec) ** (-alpha(i_str, i_spec)) &
+                                    / (&
+                                        (&
+                                            b_h(i_str,i_spec) * alpha(i_str,i_spec) + 2d0 * b_h(i_str, i_spec) + 1d0 &
+                                        )&
+                                    )&
+                                ) ** (1d0 / alpha(i_str, i_spec))
+                        end if
                     else
-                        a_h(i_str,i_spec) = 1d-17
-                        alpha(i_str,i_spec) = 1d0
+                        a_h(i_str, i_spec) = 1d-17
+                        alpha(i_str, i_spec) = 1d0
                     end if
                 end do
             end do

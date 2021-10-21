@@ -33,7 +33,10 @@ module fort_rebin
             if (len_obs < 2) then
                 write(*, *) "rebin.f90 Error: output wavelength array size must be >= 2, but is of size ", &
                     len_obs
-                return 1
+
+                reb_synth_flux = -1d0
+
+                return
             end if
 
             ! Get intp bin bords
@@ -50,7 +53,10 @@ module fort_rebin
                      " a bin width further than output wavelength array on both sides:"
                 write(*, *) "            required interval: ", nu_obs_bin_bords(1), "--", nu_obs_bin_bords(len_obs + 1)
                 write(*, *) "    input_wavelength interval: ", nu_synth(1), "--", nu_synth(len_synth)
-                return 1
+
+                reb_synth_flux = -1d0
+
+                return
             end if
 
             ! Start interpolation
