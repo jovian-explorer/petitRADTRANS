@@ -117,7 +117,7 @@ def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scatteri
     except AssertionError as error_message:
         if test_id < id_max:
             test_id += 1
-            test_correlated_k_emission_spectrum_cloud_calculated_radius_scattering(test_id)
+            test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_planetary_average(test_id)
         else:
             raise AssertionError(
                 f"scattering in petitRADTRANS is known to have an important relative error. "
@@ -163,7 +163,7 @@ def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scatteri
     except AssertionError as error_message:
         if test_id < id_max:
             test_id += 1
-            test_correlated_k_emission_spectrum_cloud_calculated_radius_scattering(test_id)
+            test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_dayside(test_id)
         else:
             raise AssertionError(
                 f"scattering in petitRADTRANS is known to have an important relative error. "
@@ -180,7 +180,7 @@ def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scatteri
     mass_fractions['Mg2SiO4(c)'] = \
         radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['mass_fraction']
 
-    geometry = 'dayside_ave'
+    geometry = 'non-isotropic'
 
     atmosphere_ck_scattering.calc_flux(
         temp=temperature_guillot_2010,
@@ -212,7 +212,7 @@ def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scatteri
     except AssertionError as error_message:
         if test_id < id_max:
             test_id += 1
-            test_correlated_k_emission_spectrum_cloud_calculated_radius_scattering(test_id)
+            test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_non_isotropic(test_id)
         else:
             raise AssertionError(
                 f"scattering in petitRADTRANS is known to have an important relative error. "
