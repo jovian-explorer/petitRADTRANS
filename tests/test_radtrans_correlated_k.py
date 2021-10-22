@@ -35,29 +35,6 @@ atmosphere_ck = init_radtrans_correlated_k()
 
 
 # Tests
-def test_guillot_2010_temperature_profile():
-    # Load expected results
-    reference_data = np.load(reference_filenames['guillot_2010'])
-    print(f"Comparing generated spectrum to result from petitRADTRANS-{reference_data['prt_version']}...")
-    temperature_ref = reference_data['temperature']
-    pressure_ref = reference_data['pressure']
-
-    # Check if temperature is as expected
-    assert np.allclose(
-        radtrans_parameters['pressures'],
-        pressure_ref,
-        rtol=relative_tolerance,
-        atol=0
-    )
-
-    assert np.allclose(
-        temperature_guillot_2010,
-        temperature_ref,
-        rtol=relative_tolerance,
-        atol=0
-    )
-
-
 def test_correlated_k_emission_spectrum():
     # Calculate an emission spectrum
     atmosphere_ck.calc_flux(

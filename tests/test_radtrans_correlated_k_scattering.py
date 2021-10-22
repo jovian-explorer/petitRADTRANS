@@ -80,6 +80,149 @@ def test_correlated_k_emission_spectrum_cloud_calculated_radius_scattering(test_
             )
 
 
+def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_planetary_average(
+        test_id=0, id_max=number_tests_max):
+    mass_fractions = copy.deepcopy(radtrans_parameters['mass_fractions'])
+    mass_fractions['Mg2SiO4(c)'] = \
+        radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['mass_fraction']
+
+    geometry = 'planetary_ave'
+
+    atmosphere_ck_scattering.calc_flux(
+        temp=temperature_guillot_2010,
+        abunds=mass_fractions,
+        gravity=radtrans_parameters['planetary_parameters']['surface_gravity'],
+        mmw=radtrans_parameters['mean_molar_mass'],
+        Kzz=radtrans_parameters['planetary_parameters']['eddy_diffusion_coefficient'],
+        fsed=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['f_sed'],
+        sigma_lnorm=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['sigma_log_normal'],
+        geometry=geometry,
+        Tstar=radtrans_parameters['stellar_parameters']['effective_temperature'],
+        Rstar=radtrans_parameters['stellar_parameters']['radius'] * petitRADTRANS.nat_cst.r_sun,
+        semimajoraxis=radtrans_parameters['planetary_parameters']['orbit_semi_major_axis']
+    )
+
+    # Comparison
+    try:
+        compare_from_reference_file(
+            reference_file=reference_filenames[
+                'correlated_k_emission_cloud_calculated_radius_scattering_planetary_ave'
+            ],
+            comparison_dict={
+                'wavelength': petitRADTRANS.nat_cst.c / atmosphere_ck_scattering.freq * 1e4,
+                'spectral_radiosity': atmosphere_ck_scattering.flux
+            },
+            relative_tolerance=relative_tolerance
+        )
+    except AssertionError as error_message:
+        if test_id < id_max:
+            test_id += 1
+            test_correlated_k_emission_spectrum_cloud_calculated_radius_scattering(test_id)
+        else:
+            raise AssertionError(
+                f"scattering in petitRADTRANS is known to have an important relative error. "
+                f"To take that into account, {id_max} tests were performed, but all failed to reach a relative error"
+                f" <= {relative_tolerance} compared to the results of the previous version.\n"
+                f"Complete error message was: \n" +
+                str(error_message)
+            )
+
+
+def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_dayside(
+        test_id=0, id_max=number_tests_max):
+    mass_fractions = copy.deepcopy(radtrans_parameters['mass_fractions'])
+    mass_fractions['Mg2SiO4(c)'] = \
+        radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['mass_fraction']
+
+    geometry = 'dayside_ave'
+
+    atmosphere_ck_scattering.calc_flux(
+        temp=temperature_guillot_2010,
+        abunds=mass_fractions,
+        gravity=radtrans_parameters['planetary_parameters']['surface_gravity'],
+        mmw=radtrans_parameters['mean_molar_mass'],
+        Kzz=radtrans_parameters['planetary_parameters']['eddy_diffusion_coefficient'],
+        fsed=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['f_sed'],
+        sigma_lnorm=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['sigma_log_normal'],
+        geometry=geometry,
+        Tstar=radtrans_parameters['stellar_parameters']['effective_temperature'],
+        Rstar=radtrans_parameters['stellar_parameters']['radius'] * petitRADTRANS.nat_cst.r_sun,
+        semimajoraxis=radtrans_parameters['planetary_parameters']['orbit_semi_major_axis']
+    )
+
+    # Comparison
+    try:
+        compare_from_reference_file(
+            reference_file=reference_filenames['correlated_k_emission_cloud_calculated_radius_scattering_dayside_ave'],
+            comparison_dict={
+                'wavelength': petitRADTRANS.nat_cst.c / atmosphere_ck_scattering.freq * 1e4,
+                'spectral_radiosity': atmosphere_ck_scattering.flux
+            },
+            relative_tolerance=relative_tolerance
+        )
+    except AssertionError as error_message:
+        if test_id < id_max:
+            test_id += 1
+            test_correlated_k_emission_spectrum_cloud_calculated_radius_scattering(test_id)
+        else:
+            raise AssertionError(
+                f"scattering in petitRADTRANS is known to have an important relative error. "
+                f"To take that into account, {id_max} tests were performed, but all failed to reach a relative error"
+                f" <= {relative_tolerance} compared to the results of the previous version.\n"
+                f"Complete error message was: \n" +
+                str(error_message)
+            )
+
+
+def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_non_isotropic(
+        test_id=0, id_max=number_tests_max):
+    mass_fractions = copy.deepcopy(radtrans_parameters['mass_fractions'])
+    mass_fractions['Mg2SiO4(c)'] = \
+        radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['mass_fraction']
+
+    geometry = 'dayside_ave'
+
+    atmosphere_ck_scattering.calc_flux(
+        temp=temperature_guillot_2010,
+        abunds=mass_fractions,
+        gravity=radtrans_parameters['planetary_parameters']['surface_gravity'],
+        mmw=radtrans_parameters['mean_molar_mass'],
+        Kzz=radtrans_parameters['planetary_parameters']['eddy_diffusion_coefficient'],
+        fsed=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['f_sed'],
+        sigma_lnorm=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['sigma_log_normal'],
+        geometry=geometry,
+        Tstar=radtrans_parameters['stellar_parameters']['effective_temperature'],
+        Rstar=radtrans_parameters['stellar_parameters']['radius'] * petitRADTRANS.nat_cst.r_sun,
+        semimajoraxis=radtrans_parameters['planetary_parameters']['orbit_semi_major_axis'],
+        theta_star=radtrans_parameters['stellar_parameters']['incidence_angle']
+    )
+
+    # Comparison
+    try:
+        compare_from_reference_file(
+            reference_file=reference_filenames[
+                'correlated_k_emission_cloud_calculated_radius_scattering_non-isotropic'
+            ],
+            comparison_dict={
+                'wavelength': petitRADTRANS.nat_cst.c / atmosphere_ck_scattering.freq * 1e4,
+                'spectral_radiosity': atmosphere_ck_scattering.flux
+            },
+            relative_tolerance=relative_tolerance
+        )
+    except AssertionError as error_message:
+        if test_id < id_max:
+            test_id += 1
+            test_correlated_k_emission_spectrum_cloud_calculated_radius_scattering(test_id)
+        else:
+            raise AssertionError(
+                f"scattering in petitRADTRANS is known to have an important relative error. "
+                f"To take that into account, {id_max} tests were performed, but all failed to reach a relative error"
+                f" <= {relative_tolerance} compared to the results of the previous version.\n"
+                f"Complete error message was: \n" +
+                str(error_message)
+            )
+
+
 def test_correlated_k_transmission_spectrum_cloud_calculated_radius_scattering(test_id=0, id_max=number_tests_max):
     mass_fractions = copy.deepcopy(radtrans_parameters['mass_fractions'])
     mass_fractions['Mg2SiO4(c)'] = \

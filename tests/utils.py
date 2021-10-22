@@ -38,14 +38,20 @@ reference_filenames = {
         'radtrans_correlated_k_transmission_contribution_cloud_calculated_radius_ref',
     'correlated_k_emission':
         'radtrans_correlated_k_emission_ref',
-    'correlated_k_emission_cloud_hansen_radius':
-        'radtrans_correlated_k_emission_cloud_hansen_radius_ref',
-    'correlated_k_emission_cloud_calculated_radius_scattering':
-        'radtrans_correlated_k_emission_cloud_calculated_radius_scattering_ref',
     'correlated_k_emission_cloud_calculated_radius':
         'radtrans_correlated_k_emission_cloud_calculated_radius_ref',
+    'correlated_k_emission_cloud_calculated_radius_scattering':
+        'radtrans_correlated_k_emission_cloud_calculated_radius_scattering_ref',
+    'correlated_k_emission_cloud_calculated_radius_scattering_planetary_ave':
+        'radtrans_correlated_k_emission_cloud_calculated_radius_scattering_average_ref',
+    'correlated_k_emission_cloud_calculated_radius_scattering_dayside_ave':
+        'radtrans_correlated_k_emission_cloud_calculated_radius_scattering_dayside_ref',
+    'correlated_k_emission_cloud_calculated_radius_scattering_non-isotropic':
+        'radtrans_correlated_k_emission_cloud_calculated_radius_scattering_non-isotropic_ref',
     'correlated_k_emission_contribution_cloud_calculated_radius':
         'radtrans_correlated_k_emission_contribution_cloud_calculated_radius_ref',
+    'correlated_k_emission_cloud_hansen_radius':
+        'radtrans_correlated_k_emission_cloud_hansen_radius_ref',
     'line_by_line_transmission':
         'radtrans_line_by_line_transmission_ref',
     'line_by_line_emission':
@@ -70,11 +76,14 @@ def create_test_radtrans_config_file(filename):
                           f'wavelength units: um\n'
                           f'pressure units: log10(bar), generate using numpy.logspace\n'
                           f'planet radius units: R_jup\n'
+                          f'star radius units: R_sun\n'
+                          f'angle units: deg\n'
                           f'other units: cgs',
                 'prt_version': f'{version}',
                 'pressures': {
                     'start': -6,
                     'stop': 2,
+                    'stop_thin_atmosphere': 0,
                     'num': 27
                 },
                 'mass_fractions': {
@@ -95,10 +104,17 @@ def create_test_radtrans_config_file(filename):
                     'equilibrium_temperature': 1500  # (K)
                 },
                 'planetary_parameters': {
-                   'reference_pressure': 0.01,  # (bar)
-                   'radius': 1.838,  # (R_jup)
-                   'surface_gravity': 1e1 ** 2.45,  # (cm.s-2)
-                   'eddy_diffusion_coefficient': 10 ** 7.5
+                    'reference_pressure': 0.01,  # (bar)
+                    'radius': 1.838,  # (R_jup)
+                    'surface_gravity': 1e1 ** 2.45,  # (cm.s-2)
+                    'eddy_diffusion_coefficient': 10 ** 7.5,
+                    'orbit_semi_major_axis': 7.5e11,  # (cm)
+                    'surface_reflectance': 0.3
+                },
+                'stellar_parameters': {
+                    'effective_temperature': 5778,  # (K)
+                    'radius': 1.0,  # (R_sun)
+                    'incidence_angle': 30  # (deg)
                 },
                 'spectrum_parameters': {
                     'line_species_correlated_k': [
@@ -146,6 +162,12 @@ def init_radtrans_parameters(recreate_parameter_file=False):
 
     with open(reference_filenames['config_test_radtrans'], 'r') as f:
         parameters = json.load(f)
+
+    parameters['pressures_thin_atmosphere'] = np.logspace(
+        parameters['pressures']['start'],
+        parameters['pressures']['stop_thin_atmosphere'],
+        parameters['pressures']['num']
+    )
 
     parameters['pressures'] = np.logspace(
         parameters['pressures']['start'],
@@ -293,6 +315,7 @@ def compare_from_reference_file(reference_file, comparison_dict, relative_tolera
                 atol=absolute_tolerance
             )
         except AssertionError:
+            # Save data for diagnostic
             if not os.path.isdir(tests_error_directory):
                 os.mkdir(tests_error_directory)
 
@@ -300,14 +323,17 @@ def compare_from_reference_file(reference_file, comparison_dict, relative_tolera
                 tests_error_directory,
                 f"{os.path.basename(reference_file).rsplit('.', 1)[0]}_error_{reference_file_key}"
             )
-            print(f"Saving assertion error data in file '{error_file}'...")
+            print(f"Saving assertion error data in file '{error_file}' for diagnostic...")
 
             np.savez_compressed(
                 error_file,
                 test_result=comparison_dict[reference_file_key],
-                data=reference_data[reference_file_key]
+                data=reference_data[reference_file_key],
+                relative_tolerance=relative_tolerance,
+                absolute_tolerance=absolute_tolerance
             )
 
+            # Raise the AssertionError
             raise
 
 
@@ -401,6 +427,44 @@ def create_radtrans_correlated_k_emission_spectrum_cloud_calculated_radius_ref(p
                      'with non-gray cloud using calculated radius',
         prt_version=version
     )
+
+
+def create_radtrans_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_ref(plot_figure=False):
+    from .test_radtrans_correlated_k_scattering import atmosphere_ck_scattering
+
+    mass_fractions = copy.deepcopy(radtrans_parameters['mass_fractions'])
+    mass_fractions['Mg2SiO4(c)'] = \
+        radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['mass_fraction']
+
+    geometries = [
+        'planetary_ave',
+        'dayside_ave',
+        'non-isotropic'
+    ]
+
+    for geometry in geometries:
+        atmosphere_ck_scattering.calc_flux(
+            temp=temperature_guillot_2010,
+            abunds=mass_fractions,
+            gravity=radtrans_parameters['planetary_parameters']['surface_gravity'],
+            mmw=radtrans_parameters['mean_molar_mass'],
+            Kzz=radtrans_parameters['planetary_parameters']['eddy_diffusion_coefficient'],
+            fsed=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['f_sed'],
+            sigma_lnorm=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['sigma_log_normal'],
+            geometry=geometry,
+            Tstar=radtrans_parameters['stellar_parameters']['effective_temperature'],
+            Rstar=radtrans_parameters['stellar_parameters']['radius'] * petitRADTRANS.nat_cst.r_sun,
+            semimajoraxis=radtrans_parameters['planetary_parameters']['orbit_semi_major_axis'],
+            theta_star=radtrans_parameters['stellar_parameters']['incidence_angle']
+        )
+
+        __save_emission_spectrum(
+            reference_filenames[f'correlated_k_emission_cloud_calculated_radius_scattering_{geometry}'],
+            atmosphere_ck_scattering, plot_figure,
+            f'Correlated-k transmission spectrum, '
+            f'with non-gray cloud using calculated radius and scattering ({geometry})',
+            prt_version=petitRADTRANS.version.version
+        )
 
 
 def create_radtrans_correlated_k_emission_spectrum_cloud_hansen_radius_ref(plot_figure=False):
