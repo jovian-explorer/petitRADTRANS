@@ -313,3 +313,14 @@ def test_correlated_k_transmission_spectrum_cloud_calculated_radius():
         },
         relative_tolerance=relative_tolerance
     )
+
+
+def __test_plot_opacities():
+    atmosphere_ck.plot_opas(
+        species=[
+            'H2O_HITEMP',
+            'CH4'
+        ],
+        temperature=1500,
+        pressure_bar=0.1
+    )
