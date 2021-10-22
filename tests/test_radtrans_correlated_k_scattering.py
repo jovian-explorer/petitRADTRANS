@@ -10,6 +10,7 @@ variations of <~ 1%. To take that into account, an important relative tolerance 
 may be performed in order to rule out "unlucky" results.
 """
 import copy
+
 import numpy as np
 
 from .context import petitRADTRANS

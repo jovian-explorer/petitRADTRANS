@@ -6,6 +6,7 @@ C.f. (https://petitradtrans.readthedocs.io/en/latest/content/notebooks/getting_s
 Do not change the parameters used to generate the comparison files, including input_data files, when running the tests.
 """
 import copy
+
 import numpy as np
 
 from .context import petitRADTRANS

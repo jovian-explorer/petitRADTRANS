@@ -5,8 +5,6 @@ C.f. (https://petitradtrans.readthedocs.io/en/latest/content/notebooks/getting_s
 
 Do not change the parameters used to generate the comparison files, including input_data files, when running the tests.
 """
-import numpy as np
-
 from .context import petitRADTRANS
 from .utils import compare_from_reference_file, \
     reference_filenames, radtrans_parameters, temperature_guillot_2010, temperature_isothermal

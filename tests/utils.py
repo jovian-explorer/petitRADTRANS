@@ -55,7 +55,15 @@ reference_filenames = {
     'line_by_line_transmission':
         'radtrans_line_by_line_transmission_ref',
     'line_by_line_emission':
-        'radtrans_line_by_line_emission_ref'
+        'radtrans_line_by_line_emission_ref',
+    'mass_fractions_atmosphere':
+        'mass_fractions_atmosphere_ref',
+    'mass_fractions_atmosphere_quench':
+        'mass_fractions_atmosphere_quench_ref',
+    'mass_fractions_c_o_ratios':
+        'mass_fractions_c_o_ratios_ref',
+    'mass_fractions_metallicities':
+        'mass_fractions_metallicities_ref'
 }
 
 # Complete filenames
@@ -77,6 +85,7 @@ def create_test_radtrans_config_file(filename):
                           f'pressure units: log10(bar), generate using numpy.logspace\n'
                           f'planet radius units: R_jup\n'
                           f'star radius units: R_sun\n'
+                          f'metallicity units: log10(solar metallicity)\n'
                           f'angle units: deg\n'
                           f'other units: cgs',
                 'prt_version': f'{version}',
@@ -96,12 +105,19 @@ def create_test_radtrans_config_file(filename):
                     'Mg2SiO4(c)': 0.0
                  },
                 'mean_molar_mass': 2.33,  # (g.cm-3)
-                'temperature_isothermal': 1200,  # (K)
+                'chemical_parameters': {
+                    'metallicities': [-1.9, 0.0, 3.0],  # (log_10 solar)
+                    'c_o_ratios': [0.1, 0.55, 1.6],
+                    'pressure': 0.1,  # (bar)
+                    'temperature': 900.0,  # (K)
+                    'pressure_quench_carbon': 1.0  # (bar)
+                },
+                'temperature_isothermal': 1200.0,  # (K)
                 'temperature_guillot_2010_parameters': {
                     'kappa_ir': 0.01,
                     'gamma': 0.4,
-                    'intrinsic_temperature': 200,  # (K)
-                    'equilibrium_temperature': 1500  # (K)
+                    'intrinsic_temperature': 200.0,  # (K)
+                    'equilibrium_temperature': 1500.0  # (K)
                 },
                 'planetary_parameters': {
                     'reference_pressure': 0.01,  # (bar)
@@ -112,18 +128,18 @@ def create_test_radtrans_config_file(filename):
                     'surface_reflectance': 0.3
                 },
                 'stellar_parameters': {
-                    'effective_temperature': 5778,  # (K)
+                    'effective_temperature': 5778.0,  # (K)
                     'radius': 1.0,  # (R_sun)
                     'incidence_angle': 30  # (deg)
                 },
                 'spectrum_parameters': {
                     'line_species_correlated_k': [
-                      'H2O_HITEMP',
-                      'CH4'
+                        'H2O_HITEMP',
+                        'CH4'
                     ],
                     'line_species_line_by_line': [
-                          'H2O_main_iso',
-                          'CO_all_iso'
+                        'H2O_main_iso',
+                        'CO_all_iso'
                     ],
                     'rayleigh_species': ['H2', 'He'],
                     'continuum_opacities': ['H2-H2', 'H2-He'],
@@ -132,14 +148,14 @@ def create_test_radtrans_config_file(filename):
                 },
                 'cloud_parameters': {
                    'kappa_zero': 0.01,
-                   'gamma_scattering': -4,
+                   'gamma_scattering': -4.0,
                    'cloud_pressure': 0.01,
-                   'haze_factor': 10,
+                   'haze_factor': 10.0,
                    'cloud_species': {
                        'Mg2SiO4(c)_cd': {
                            'mass_fraction': 5e-7,
                            'radius': 5e-5,  # (cm)
-                           'f_sed': 2,
+                           'f_sed': 2.0,
                            'sigma_log_normal': 1.05,
                            'b_hansen': 0.01
                        },
