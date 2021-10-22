@@ -14,6 +14,7 @@ from .context import petitRADTRANS
 version = "2.3.2"  # petitRADTRANS.version.version
 
 tests_data_directory = os.path.join(os.path.dirname(__file__), 'data')
+tests_error_directory = os.path.join(os.path.dirname(__file__), 'errors')
 reference_filenames = {
     'config_test_radtrans':
         'config_test_radtrans',
@@ -33,16 +34,18 @@ reference_filenames = {
         'radtrans_correlated_k_transmission_cloud_calculated_radius_ref',
     'correlated_k_transmission_cloud_calculated_radius_scattering':
         'radtrans_correlated_k_transmission_cloud_calculated_radius_scattering_ref',
-    'correlated_k_transmission_contribution_cloud_calculated_radius_scattering':
-        'radtrans_correlated_k_transmission_contribution_cloud_calculated_radius_scattering_ref',
+    'correlated_k_transmission_contribution_cloud_calculated_radius':
+        'radtrans_correlated_k_transmission_contribution_cloud_calculated_radius_ref',
     'correlated_k_emission':
         'radtrans_correlated_k_emission_ref',
     'correlated_k_emission_cloud_hansen_radius':
         'radtrans_correlated_k_emission_cloud_hansen_radius_ref',
     'correlated_k_emission_cloud_calculated_radius_scattering':
         'radtrans_correlated_k_emission_cloud_calculated_radius_scattering_ref',
-    'correlated_k_emission_contribution_cloud_calculated_radius_scattering':
-        'radtrans_correlated_k_emission_contribution_cloud_calculated_radius_scattering_ref',
+    'correlated_k_emission_cloud_calculated_radius':
+        'radtrans_correlated_k_emission_cloud_calculated_radius_ref',
+    'correlated_k_emission_contribution_cloud_calculated_radius':
+        'radtrans_correlated_k_emission_contribution_cloud_calculated_radius_ref',
     'line_by_line_transmission':
         'radtrans_line_by_line_transmission_ref',
     'line_by_line_emission':
@@ -281,16 +284,31 @@ def compare_from_reference_file(reference_file, comparison_dict, relative_tolera
     reference_data = np.load(reference_file)
     print(f"Comparing generated spectrum to result from petitRADTRANS-{reference_data['prt_version']}...")
 
-    if absolute_tolerance > 0:
-        relative_tolerance = 0
-
     for reference_file_key in comparison_dict:
-        assert np.allclose(
-            comparison_dict[reference_file_key],
-            reference_data[reference_file_key],
-            rtol=relative_tolerance,
-            atol=absolute_tolerance
-        )
+        try:
+            assert np.allclose(
+                comparison_dict[reference_file_key],
+                reference_data[reference_file_key],
+                rtol=relative_tolerance,
+                atol=absolute_tolerance
+            )
+        except AssertionError:
+            if not os.path.isdir(tests_error_directory):
+                os.mkdir(tests_error_directory)
+
+            error_file = os.path.join(
+                tests_error_directory,
+                f"{os.path.basename(reference_file).rsplit('.', 1)[0]}_error_{reference_file_key}"
+            )
+            print(f"Saving assertion error data in file '{error_file}'...")
+
+            np.savez_compressed(
+                error_file,
+                test_result=comparison_dict[reference_file_key],
+                data=reference_data[reference_file_key]
+            )
+
+            raise
 
 
 # Initializations
@@ -350,6 +368,41 @@ def create_radtrans_correlated_k_emission_spectrum_ref(plot_figure=False):
     )
 
 
+def create_radtrans_correlated_k_emission_spectrum_cloud_calculated_radius_ref(plot_figure=False):
+    from .test_radtrans_correlated_k import atmosphere_ck
+
+    mass_fractions = copy.deepcopy(radtrans_parameters['mass_fractions'])
+    mass_fractions['Mg2SiO4(c)'] = \
+        radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['mass_fraction']
+
+    atmosphere_ck.calc_flux(
+        temp=temperature_guillot_2010,
+        abunds=mass_fractions,
+        gravity=radtrans_parameters['planetary_parameters']['surface_gravity'],
+        mmw=radtrans_parameters['mean_molar_mass'],
+        Kzz=radtrans_parameters['planetary_parameters']['eddy_diffusion_coefficient'],
+        fsed=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['f_sed'],
+        sigma_lnorm=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['sigma_log_normal'],
+        contribution=True
+    )
+
+    __save_emission_spectrum(
+        reference_filenames['correlated_k_emission_cloud_calculated_radius'], atmosphere_ck, plot_figure,
+        'Correlated-k emission spectrum, with non-gray cloud using Hansen radius',
+        prt_version=petitRADTRANS.version.version
+    )
+
+    __save_contribution_function(
+        reference_filenames['correlated_k_emission_contribution_cloud_calculated_radius'],
+        atmosphere_ck,
+        mode='emission',
+        plot_figure=plot_figure,
+        figure_title='Correlated-k emission contribution function, '
+                     'with non-gray cloud using calculated radius',
+        prt_version=version
+    )
+
+
 def create_radtrans_correlated_k_emission_spectrum_cloud_hansen_radius_ref(plot_figure=False):
     from .test_radtrans_correlated_k import atmosphere_ck
 
@@ -390,8 +443,7 @@ def create_radtrans_correlated_k_emission_spectrum_cloud_calculated_radius_scatt
         Kzz=radtrans_parameters['planetary_parameters']['eddy_diffusion_coefficient'],
         fsed=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['f_sed'],
         sigma_lnorm=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['sigma_log_normal'],
-        add_cloud_scat_as_abs=True,
-        contribution=True
+        add_cloud_scat_as_abs=True
     )
 
     __save_emission_spectrum(
@@ -399,16 +451,6 @@ def create_radtrans_correlated_k_emission_spectrum_cloud_calculated_radius_scatt
         atmosphere_ck_scattering,
         plot_figure,
         'Correlated-k emission spectrum, with non-gray cloud using calculated radius and scattering',
-        prt_version=version
-    )
-
-    __save_contribution_function(
-        reference_filenames['correlated_k_emission_contribution_cloud_calculated_radius_scattering'],
-        atmosphere_ck_scattering,
-        mode='emission',
-        plot_figure=plot_figure,
-        figure_title='Correlated-k emission contribution function, '
-                     'with non-gray cloud using calculated radius and scattering',
         prt_version=version
     )
 
@@ -429,8 +471,7 @@ def create_radtrans_correlated_k_transmission_spectrum_cloud_calculated_radius_s
         P0_bar=radtrans_parameters['planetary_parameters']['reference_pressure'],
         Kzz=radtrans_parameters['planetary_parameters']['eddy_diffusion_coefficient'],
         fsed=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['f_sed'],
-        sigma_lnorm=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['sigma_log_normal'],
-        contribution=True
+        sigma_lnorm=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['sigma_log_normal']
     )
 
     __save_transmission_spectrum(
@@ -438,16 +479,6 @@ def create_radtrans_correlated_k_transmission_spectrum_cloud_calculated_radius_s
         atmosphere_ck_scattering,
         plot_figure,
         'Correlated-k transmission spectrum, with non-gray cloud using calculated radius and scattering',
-        prt_version=version
-    )
-
-    __save_contribution_function(
-        reference_filenames['correlated_k_transmission_contribution_cloud_calculated_radius_scattering'],
-        atmosphere_ck_scattering,
-        mode='transmission',
-        plot_figure=plot_figure,
-        figure_title='Correlated-k transmission contribution function, '
-                     'with non-gray cloud using calculated radius and scattering',
         prt_version=version
     )
 
@@ -568,12 +599,23 @@ def create_radtrans_correlated_k_transmission_spectrum_cloud_calculated_radius_r
         P0_bar=radtrans_parameters['planetary_parameters']['reference_pressure'],
         Kzz=radtrans_parameters['planetary_parameters']['eddy_diffusion_coefficient'],
         fsed=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['f_sed'],
-        sigma_lnorm=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['sigma_log_normal']
+        sigma_lnorm=radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['sigma_log_normal'],
+        contribution=True
     )
 
     __save_transmission_spectrum(
         reference_filenames['correlated_k_transmission_cloud_calculated_radius'], atmosphere_ck, plot_figure,
         'Correlated-k transmission spectrum, with non-gray cloud using calculated radius'
+    )
+
+    __save_contribution_function(
+        reference_filenames['correlated_k_transmission_contribution_cloud_calculated_radius'],
+        atmosphere_ck,
+        mode='transmission',
+        plot_figure=plot_figure,
+        figure_title='Correlated-k transmission contribution function, '
+                     'with non-gray cloud using calculated radius',
+        prt_version=version
     )
 
 
