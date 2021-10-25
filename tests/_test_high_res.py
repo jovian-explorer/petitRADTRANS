@@ -1,5 +1,6 @@
 import numpy as np
-from petitRADTRANS import Radtrans
+from petitRADTRANS.radtrans import Radtrans
+from petitRADTRANS.physics import guillot_global
 
 import os
 os.environ["pRT_input_data_path"] = "/Applications/ownpy/petitRADTRANS/petitRADTRANS/input_data"
@@ -25,7 +26,7 @@ kappa_IR = 0.01
 gamma = 0.4
 T_int = 200.
 T_equ = 1500.
-temperature = nc.guillot_global(pressures, kappa_IR, gamma, gravity, T_int, T_equ)
+temperature = guillot_global(pressures, kappa_IR, gamma, gravity, T_int, T_equ)
 
 abundances = {}
 abundances['H2'] = 0.74 * np.ones_like(temperature)

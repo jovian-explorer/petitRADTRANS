@@ -1,7 +1,9 @@
-import numpy as np
 import pickle
 
-from petitRADTRANS import nat_cst as nc
+import numpy as np
+
+from petitRADTRANS import physics
+
 
 def return_PT_envelopes(samples, \
                         envelope_file, \
@@ -17,22 +19,22 @@ def return_PT_envelopes(samples, \
             temp_params_input = {}
             temp_params_input['log_delta'] = true_values[0]
             temp_params_input['log_gamma'] = true_values[1]
-            temp_params_input['t_int'] = true_values[2]
-            temp_params_input['t_equ'] = true_values[3]
+            temp_params_input['intrinsic_temperature'] = true_values[2]
+            temp_params_input['equilibrium_temperature'] = true_values[3]
             temp_params_input['log_p_trans'] = true_values[4]
             temp_params_input['alpha'] = true_values[5]
 
             # Compute inputinal input P-T profile 
-            p, temp_input = nc.make_press_temp(temp_params_input)
+            p, temp_input = physics.make_press_temp(temp_params_input)
     except:
         temp_params = {}
         temp_params['log_delta'] = -6.
         temp_params['log_gamma'] = np.log10(0.4)
-        temp_params['t_int'] = 750.
-        temp_params['t_equ'] = 0.
+        temp_params['intrinsic_temperature'] = 750.
+        temp_params['equilibrium_temperature'] = 0.
         temp_params['log_p_trans'] = -3.
         temp_params['alpha'] = 0.
-        p, buffer = nc.make_press_temp(temp_params)
+        p, buffer = physics.make_press_temp(temp_params)
 
     if read:
 
@@ -62,11 +64,11 @@ def return_PT_envelopes(samples, \
             temp_params = {}
             temp_params['log_delta'] = params[0]
             temp_params['log_gamma'] = params[1]
-            temp_params['t_int'] = params[2]
-            temp_params['t_equ'] = params[3]
+            temp_params['intrinsic_temperature'] = params[2]
+            temp_params['equilibrium_temperature'] = params[3]
             temp_params['log_p_trans'] = params[4]
             temp_params['alpha'] = params[5]
-            p, temp = nc.make_press_temp(temp_params)
+            p, temp = physics.make_press_temp(temp_params)
 
             if (np.max(temp) < 15000) and (np.min(temp) > 0.):
                 temps[:,i_str] = temp

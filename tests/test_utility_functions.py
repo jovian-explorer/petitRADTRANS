@@ -39,7 +39,7 @@ def test_planck_function():
         10
     )
 
-    planck = petitRADTRANS.nat_cst.b(
+    planck = petitRADTRANS.physics.b(
         radtrans_parameters['stellar_parameters']['effective_temperature'],
         frequencies
     )
@@ -58,7 +58,7 @@ def test_planck_function():
 
 
 def test_stellar_model():
-    stellar_spectrum = petitRADTRANS.nat_cst.get_PHOENIX_spec(
+    stellar_spectrum = petitRADTRANS.phoenix.get_PHOENIX_spec(
         radtrans_parameters['stellar_parameters']['effective_temperature']
     )
 

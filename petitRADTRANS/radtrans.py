@@ -12,6 +12,7 @@ from scipy import interpolate
 from petitRADTRANS.config import petitradtrans_config
 from petitRADTRANS import _read_opacities
 from petitRADTRANS import nat_cst as nc
+from petitRADTRANS import phoenix
 from petitRADTRANS import pyth_input as pyi
 from petitRADTRANS.fort_input import fort_input as fi
 from petitRADTRANS.fort_rebin import fort_rebin as fr
@@ -1245,7 +1246,7 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         if Tstar is not None:
 
-            spec, rad = nc.get_PHOENIX_spec_rad(Tstar)
+            spec, rad = phoenix.get_PHOENIX_spec_rad(Tstar)
             if Rstar is not None:
                 print('Using Rstar value input by user.')
                 rad = Rstar

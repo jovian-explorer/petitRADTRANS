@@ -161,9 +161,9 @@ def __save_transmission_spectrum(filename, atmosphere, plot_figure=False, figure
 
 # Data files generation functions
 def create_guillot_2010_temperature_profile_ref(plot_figure=False):
-    temperature_guillot = petitRADTRANS.nat_cst.guillot_global(
+    temperature_guillot = petitRADTRANS.physics.guillot_global(
         pressure=radtrans_parameters['pressures'],
-        kappa_ir=radtrans_parameters['temperature_guillot_2010_parameters']['kappa_ir'],
+        kappa_ir=radtrans_parameters['temperature_guillot_2010_parameters']['infrared_mean_opacity'],
         gamma=radtrans_parameters['temperature_guillot_2010_parameters']['gamma'],
         grav=radtrans_parameters['planetary_parameters']['surface_gravity'],
         t_int=radtrans_parameters['temperature_guillot_2010_parameters']['intrinsic_temperature'],

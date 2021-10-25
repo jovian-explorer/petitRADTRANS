@@ -5,7 +5,7 @@ from scipy.interpolate import interp1d
 plotting = False
 if plotting:
     import pylab as plt
-    from petitRADTRANS import nat_cst as nc
+    from petitRADTRANS.physics import guillot_global
     
 #############################################################
 # Cloud Cond
@@ -513,18 +513,18 @@ if plotting:
 
     pressures = np.logspace(-6, 2, 100)
 
-    temperature = nc.guillot_global(pressures, kappa_IR, gamma, gravity, T_int, T_equ)
+    temperature = guillot_global(pressures, kappa_IR, gamma, gravity, T_int, T_equ)
 
     simple_cdf_Fe(pressures, temperature, 0., 0.55)
     simple_cdf_MgSiO3(pressures, temperature, 0., 0.55)
 
     T_int = 200.
     T_equ = 800.
-    temperature = nc.guillot_global(pressures, kappa_IR, gamma, gravity, T_int, T_equ)
+    temperature = guillot_global(pressures, kappa_IR, gamma, gravity, T_int, T_equ)
     simple_cdf_Na2S(pressures, temperature, 0., 0.55)
 
     T_int = 150.
     T_equ = 650.
-    temperature = nc.guillot_global(pressures, kappa_IR, gamma, gravity, T_int, T_equ)
+    temperature = guillot_global(pressures, kappa_IR, gamma, gravity, T_int, T_equ)
     simple_cdf_KCL(pressures, temperature, 0., 0.55)
     

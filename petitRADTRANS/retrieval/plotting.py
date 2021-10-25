@@ -10,19 +10,20 @@ from matplotlib import rc
 from scipy.stats import binned_statistic
 from petitRADTRANS import nat_cst as nc
 from .data import Data
+from scipy.ndimage.filters import uniform_filter1d
 
 def plot_specs(fig, ax, path, name, nsample, color1, color2, zorder, rebin_val = None):
     # TODO write generic plotting functions rather than copy pasting code.
     specs = sorted([f for f in glob.glob(path+'/' + name + '*.dat')])
     wlen = np.genfromtxt(specs[0])[:,0]
     if rebin_val != None:
-        wlen = nc.running_mean(wlen, rebin_val)[::rebin_val]
+        wlen = uniform_filter1d(wlen, rebin_val)[::rebin_val]
     npoints = int(len(wlen))
     spectra= np.zeros((nsample,npoints))
     for i_s in range(nsample):
         if rebin_val != None:
             npoints = int(len(wlen))
-            spectra[i_s, :]= nc.running_mean(np.genfromtxt(specs[i_s])[:,1], \
+            spectra[i_s, :]= uniform_filter1d(np.genfromtxt(specs[i_s])[:,1], \
                                                 rebin_val)[::rebin_val]
         else:
             wlen = np.genfromtxt(specs[i_s])[:,0]

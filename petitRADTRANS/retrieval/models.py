@@ -6,6 +6,7 @@ import numpy as np
 from scipy.interpolate import interp1d,CubicSpline
 from petitRADTRANS import nat_cst as nc
 from petitRADTRANS.retrieval import cloud_cond as fc
+from petitRADTRANS.physics import guillot_global
 from .util import surf_to_meas, calc_MMW
 """
 Models Module
@@ -218,7 +219,7 @@ def guillot_free_emission(pRT_object, \
         p_use = PGLOBAL
     else:
         p_use = pRT_object.press/1e6
-    temperatures = nc.guillot_global(p_use, \
+    temperatures = guillot_global(p_use, \
                                 10**parameters['log_kappa_IR'].value,
                                 parameters['gamma'].value, \
                                 10**parameters['log_g'].value, \
@@ -350,7 +351,7 @@ def guillot_eqchem_transmission(pRT_object, \
         sys.exit(2)
     # Make the P-T profile
     pressures = pRT_object.press/1e6
-    temperatures = nc.guillot_global(pressures, \
+    temperatures = guillot_global(pressures, \
                                     10**parameters['log_kappa_IR'].value, \
                                     parameters['gamma'].value, \
                                     10**parameters['log_g'].value, \
@@ -585,7 +586,7 @@ def isothermal_free_transmission(pRT_object, \
 # Helper Functions
 ##################
 
-### Global Guillot P-T formula with kappa/grav replaced by delta
+### Global Guillot P-T formula with kappa/gravity replaced by delta
 def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv = True):
     '''
     Self-luminous retrieval P-T model.

@@ -7,14 +7,16 @@ import pyvo
 from astropy.table.table import Table
 from petitRADTRANS.fort_rebin import fort_rebin as fr
 
-from petitRADTRANS import Radtrans
 from petitRADTRANS import nat_cst as nc
 from petitRADTRANS.ccf.utils import calculate_uncertainty, module_dir
+from petitRADTRANS.phoenix import get_PHOENIX_spec
+from petitRADTRANS.physics import guillot_global
+from petitRADTRANS.radtrans import Radtrans
 
-# from petitRADTRANS import petitradtrans_config
+# from petitRADTRANS.config import petitradtrans_config
 
 # planet_models_directory = os.path.abspath(Path.home()) + os.path.sep + 'Downloads' + os.path.sep + 'tmp' #os.path.abspath(os.path.dirname(__file__) + os.path.sep + 'planet_models')
-planet_models_directory = os.path.abspath(os.path.dirname(__file__) + os.path.sep + 'planet_models')
+planet_models_directory = os.path.abspath(os.path.dirname(__file__) + os.path.sep + 'planet_models')  # TODO change that
 
 
 # planet_models_directory = petitradtrans_config['Paths']['pRT_outputs_path']
@@ -1019,7 +1021,7 @@ class SpectralModel:
 
     @staticmethod
     def generate_phoenix_star_spectrum_file(star_spectrum_file, star_effective_temperature):
-        stellar_spectral_radiance = nc.get_PHOENIX_spec(star_effective_temperature)
+        stellar_spectral_radiance = get_PHOENIX_spec(star_effective_temperature)
 
         # Convert the spectrum to units accepted by the ETC website
         # Don't take the first wavelength to avoid spike in convolution
@@ -1131,7 +1133,7 @@ class SpectralModel:
         kappa_ir = self.kappa_ir_z0 * 10 ** self.metallicity
         pressures = atmosphere.press * 1e-6  # cgs to bar
 
-        temperature = nc.guillot_global(
+        temperature = guillot_global(
             pressures, kappa_ir, self.gamma, planet.surface_gravity, self.t_int, planet.equilibrium_temperature
         )
 
@@ -1428,13 +1430,13 @@ class ParametersDict(dict):
     def __init__(self, t_int, metallicity, co_ratio, p_cloud):
         super().__init__()
 
-        self['t_int'] = t_int
+        self['intrinsic_temperature'] = t_int
         self['metallicity'] = metallicity
         self['co_ratio'] = co_ratio
         self['p_cloud'] = p_cloud
 
     def to_str(self):
-        return f"T_int = {self['t_int']}, [Fe/H] = {self['metallicity']}, C/O = {self['co_ratio']}, " \
+        return f"T_int = {self['intrinsic_temperature']}, [Fe/H] = {self['metallicity']}, C/O = {self['co_ratio']}, " \
                f"P_cloud = {self['p_cloud']}"
 
 
@@ -1552,7 +1554,7 @@ def get_model_grid(planet_name, lbl_opacity_sampling, do_scat_emis, parameter_di
                 wavelength_boundaries=wavelength_boundaries,
                 lbl_opacity_sampling=lbl_opacity_sampling,
                 do_scat_emis=do_scat_emis,
-                t_int=parameter_dict['t_int'],
+                t_int=parameter_dict['intrinsic_temperature'],
                 metallicity=parameter_dict['metallicity'],
                 co_ratio=parameter_dict['co_ratio'],
                 p_cloud=parameter_dict['p_cloud'],
@@ -1628,7 +1630,7 @@ def init_model_grid(planet_name, lbl_opacity_sampling, do_scat_emis, parameter_d
                 wavelength_boundaries=wavelength_boundaries,
                 lbl_opacity_sampling=lbl_opacity_sampling,
                 do_scat_emis=do_scat_emis,
-                t_int=parameter_dict['t_int'],
+                t_int=parameter_dict['intrinsic_temperature'],
                 metallicity=parameter_dict['metallicity'],
                 co_ratio=parameter_dict['co_ratio'],
                 p_cloud=parameter_dict['p_cloud'],

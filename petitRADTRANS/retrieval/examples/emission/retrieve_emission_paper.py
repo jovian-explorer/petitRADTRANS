@@ -1,15 +1,17 @@
-import numpy as np
-import sys
-import emcee
 import pickle as pickle
+import sys
 import time
-from emcee.utils import MPIPool
 
-from petitRADTRANS import Radtrans
+import emcee
+import numpy as np
+import rebin_give_width as rgw
+from emcee.utils import MPIPool
+from scipy.interpolate import interp1d
+
 import master_retrieval_model as rm
 from petitRADTRANS import nat_cst as nc
-import rebin_give_width as rgw
-from scipy.interpolate import interp1d
+from petitRADTRANS import physics
+from petitRADTRANS.radtrans import Radtrans
 
 sys.stdout.flush()
 
@@ -83,11 +85,11 @@ for name in observation_files.keys():
 temp_params = {}
 temp_params['log_delta'] = -6.
 temp_params['log_gamma'] = np.log10(0.4)
-temp_params['t_int'] = 750.
-temp_params['t_equ'] = 0.
+temp_params['intrinsic_temperature'] = 750.
+temp_params['equilibrium_temperature'] = 0.
 temp_params['log_p_trans'] = -3.
 temp_params['alpha'] = 0.
-p, t = nc.make_press_temp(temp_params)
+p, t = physics.make_press_temp(temp_params)
 
 # Create the Ratrans object here
 rt_object = Radtrans(line_species=['H2', 'CO_all_iso', 'H2O', \
@@ -125,8 +127,8 @@ def a_b_range(x, a, b):
 log_priors = {}
 log_priors['log_delta']      = lambda x: -((x-(-5.5))/2.5)**2./2.                           
 log_priors['log_gamma']      = lambda x: -((x-(-0.0))/2.)**2./2. 
-log_priors['t_int']          = lambda x: a_b_range(x, 0., 1500.)
-log_priors['t_equ']          = lambda x: a_b_range(x, 0., 4000.)
+log_priors['intrinsic_temperature']          = lambda x: a_b_range(x, 0., 1500.)
+log_priors['equilibrium_temperature']          = lambda x: a_b_range(x, 0., 4000.)
 log_priors['log_p_trans']    = lambda x: -((x-(-3))/3.)**2./2.
 log_priors['alpha']          = lambda x: -((x-0.25)/0.4)**2./2.
 log_priors['log_g']          = lambda x: a_b_range(x, 2.0, 3.7) 
@@ -167,8 +169,8 @@ def calc_log_prob(params):
     temp_params = {}
     temp_params['log_delta'] = log_delta
     temp_params['log_gamma'] = log_gamma
-    temp_params['t_int'] = t_int
-    temp_params['t_equ'] = t_equ
+    temp_params['intrinsic_temperature'] = t_int
+    temp_params['equilibrium_temperature'] = t_equ
     temp_params['log_p_trans'] = log_p_trans
     temp_params['alpha'] = alpha
 

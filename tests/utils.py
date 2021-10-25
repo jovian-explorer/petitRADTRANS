@@ -114,7 +114,7 @@ def create_test_radtrans_config_file(filename):
                 },
                 'temperature_isothermal': 1200.0,  # (K)
                 'temperature_guillot_2010_parameters': {
-                    'kappa_ir': 0.01,
+                    'infrared_mean_opacity': 0.01,
                     'gamma': 0.4,
                     'intrinsic_temperature': 200.0,  # (K)
                     'equilibrium_temperature': 1500.0  # (K)
@@ -255,7 +255,7 @@ def compare_from_reference_file(reference_file, comparison_dict, relative_tolera
 
 # Initializations
 def init_guillot_2010_temperature_profile():
-    temperature_guillot = petitRADTRANS.nat_cst.guillot_global(
+    temperature_guillot = petitRADTRANS.physics.guillot_global(
         pressure=radtrans_parameters['pressures'],
         kappa_ir=radtrans_parameters['temperature_guillot_2010_parameters']['kappa_ir'],
         gamma=radtrans_parameters['temperature_guillot_2010_parameters']['gamma'],
