@@ -1,5 +1,5 @@
-"""
-Test the correlated-k scattering part of the radtrans module.
+"""Test the correlated-k scattering part of the radtrans module.
+
 Essentially go through a simplified version of the tutorial, and compare the results with previous ones.
 C.f. (https://petitradtrans.readthedocs.io/en/latest/content/notebooks/getting_started.html).
 

@@ -1,12 +1,13 @@
-import sys
-import os
 import logging
+import os
+import sys
+
 # To not have numpy start parallelizing on its own
 os.environ["OMP_NUM_THREADS"] = "1"
 import numpy as np
 from .data import Data
 from .parameter import Parameter
-from config.configuration import petitradtrans_config
+from petitRADTRANS.config.configuration import petitradtrans_config
 
 
 class RetrievalConfig:
@@ -59,6 +60,7 @@ class RetrievalConfig:
             logging.error("run_mode must be either 'retrieval' or 'evaluate'!")
             sys.exit(1)
         self.AMR = AMR
+
         if pressures is not None:
             self.p_global = pressures
         else:
@@ -119,12 +121,12 @@ class RetrievalConfig:
                 The number of cells in the low pressure grid to replace with the high resolution grid.
         """
 
-        print("Setting up AMR pressure grid.")
+        print("Setting up amr pressure grid.")
         self.scaling = scaling
         self.width = width
         nclouds = len(self.cloud_species)
         if nclouds == 0:
-            print("WARNING: there are no clouds in the retrieval, please add cloud species before setting up AMR")
+            print("WARNING: there are no clouds in the retrieval, please add cloud species before setting up amr")
         new_len = self.p_global.shape[0]  + nclouds*width*(scaling-1)
         self.amr_pressure = np.logspace(np.log10(self.p_global[0]),np.log10(self.p_global[-1]),new_len)
         self.add_parameter("pressure_scaling",False,value = scaling)
@@ -361,7 +363,7 @@ class RetrievalConfig:
                 A pair of wavelenths in units of micron that determine the lower and upper boundaries of the
                 model computation.
             external_pRT_reference : str
-                The name of an existing Data object. This object's pRT_object will be used to calculate the chi squared
+                The name of an existing Data object. This object's prt_object will be used to calculate the chi squared
                 of the new Data object. This is useful when two datasets overlap, as only one model computation is required
                 to compute the log likelihood of both datasets.
             opacity_mode : str
@@ -418,7 +420,7 @@ class RetrievalConfig:
                 A pair of wavelenths in units of micron that determine the lower and upper boundaries of
                 the model computation.
             external_pRT_reference : str
-                The name of an existing Data object. This object's pRT_object will be used to calculate the
+                The name of an existing Data object. This object's prt_object will be used to calculate the
                 chi squared of the new Data object. This is useful when two datasets overlap, as only
                 one model computation is required to compute the log likelihood of both datasets.
             photometric_transformation_function : method

@@ -11,4 +11,5 @@ import petitRADTRANS.phoenix
 import petitRADTRANS.physics
 import petitRADTRANS.poor_mans_nonequ_chem
 import petitRADTRANS.radtrans
+import petitRADTRANS.retrieval
 import petitRADTRANS.version

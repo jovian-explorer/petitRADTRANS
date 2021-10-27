@@ -1,5 +1,5 @@
-"""
-Test the radtrans module in line-by-line mode.
+"""Test the radtrans module in line-by-line mode.
+
 Essentially go through a simplified version of the tutorial, and compare the results with previous ones.
 C.f. (https://petitradtrans.readthedocs.io/en/latest/content/notebooks/getting_started.html).
 

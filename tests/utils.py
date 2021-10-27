@@ -1,5 +1,5 @@
-"""
-Utility functions for tests.
+"""Utility functions for tests.
+
 Regenerate the comparison files only when changing the precision of the models.
 """
 import json
@@ -13,6 +13,7 @@ version = "2.3.2"  # petitRADTRANS.version.version
 
 tests_data_directory = os.path.join(os.path.dirname(__file__), 'data')
 tests_error_directory = os.path.join(os.path.dirname(__file__), 'errors')
+tests_results_directory = os.path.join(os.path.dirname(__file__), 'results')
 reference_filenames = {
     'config_test_radtrans':
         'config_test_radtrans',
@@ -73,6 +74,11 @@ reference_filenames = {
     os.path.join(tests_data_directory, value + '.json')
     for key, value in reference_filenames.items()
 }
+
+
+# Make directories if needed
+if not os.path.isdir(tests_results_directory):
+    os.mkdir(tests_results_directory)
 
 
 # Common parameters
@@ -160,6 +166,12 @@ def create_test_radtrans_config_file(filename):
                            'b_hansen': 0.01
                        },
                    }
+                },
+                'retrieval_parameters': {
+                    'planetary_radius_bounds': (1.8, 2.0),
+                    'intrinsic_temperature_bounds': (500, 1500),
+                    'log10_cloud_pressure_bounds': (-6, 2),
+                    'log10_species_mass_fractions_bounds': (-6, 0)
                 }
             },
             fp=f,
@@ -257,7 +269,7 @@ def compare_from_reference_file(reference_file, comparison_dict, relative_tolera
 def init_guillot_2010_temperature_profile():
     temperature_guillot = petitRADTRANS.physics.guillot_global(
         pressure=radtrans_parameters['pressures'],
-        kappa_ir=radtrans_parameters['temperature_guillot_2010_parameters']['kappa_ir'],
+        kappa_ir=radtrans_parameters['temperature_guillot_2010_parameters']['infrared_mean_opacity'],
         gamma=radtrans_parameters['temperature_guillot_2010_parameters']['gamma'],
         grav=radtrans_parameters['planetary_parameters']['surface_gravity'],
         t_int=radtrans_parameters['temperature_guillot_2010_parameters']['intrinsic_temperature'],

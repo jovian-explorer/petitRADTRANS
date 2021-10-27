@@ -1,6 +1,7 @@
-import sys
-import os
 import copy as cp
+import os
+import sys
+
 os.environ["OMP_NUM_THREADS"] = "1"
 import numpy as np
 from scipy.interpolate import interp1d,CubicSpline
@@ -18,17 +19,17 @@ transfer to compute the emission or transmission spectrum.
 
 All models must take the same set of inputs:
 
-    pRT_object : petitRADTRANS.RadTrans
+    prt_object : petitRADTRANS.RadTrans
         This is the pRT object that is used to compute the spectrum
         It must be fully initialized prior to be used in the model function
     parameters : dict
         A dictionary of Parameter objects. The naming of the parameters
         must be consistent between the Priors and the model function you
         are using.
-    PT_plot_mode : bool
+    pt_plot_mode : bool
         If this argument is True, the model function should return the pressure
         and temperature arrays before computing the flux.
-    AMR : bool
+    amr : bool
         If this parameter is True, your model should allow for reshaping of the
         pressure and temperature arrays based on the position of the clouds or
         the location of the photosphere, increasing the resolution where required.
@@ -125,7 +126,7 @@ def emission_model_diseq(pRT_object,
         pressures = PGLOBAL[small_index]
         MMW = MMW[small_index]
         Kzz_use = Kzz_use[small_index]
-        #pRT_object.setup_opa_structure(pressures)
+        #prt_object.setup_opa_structure(pressures)
     # Calculate the spectrum
     if pressures.shape[0] != pRT_object.press.shape[0]:
         return None,None
@@ -913,7 +914,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
     try:
         press_out = np.vstack((press_small,press_plus_index[total_inds]))
     except:
-        print("AMR returned incorrect length")
+        print("amr returned incorrect length")
         return PGLOBAL, np.array([0])
     press_out = np.sort(press_out, axis = 0)
     p_out,ind = np.unique(press_out[:,0],return_index = True)
@@ -928,7 +929,7 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
 
     Args:
         pressures : numpy.ndarray
-            A log spaced pressure array. If AMR is on it should be the full high resolution grid.
+            A log spaced pressure array. If amr is on it should be the full high resolution grid.
         temperatures : numpy.ndarray
             A temperature array with the same shape as pressures
         line_species : List(str)
@@ -1039,9 +1040,9 @@ def pglobal_check(press,shape,scaling):
 
     Args:
         press : numpy.ndarray
-            Pressure array from a pRT_object. Used to set the min and max values of PGLOBAL
+            Pressure array from a prt_object. Used to set the min and max values of PGLOBAL
         shape : int
-            the shape of the pressure array if no AMR is used
+            the shape of the pressure array if no amr is used
         scaling :
             The factor by which the pressure array resolution should be scaled.
     """

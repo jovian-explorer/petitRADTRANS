@@ -1,16 +1,13 @@
-import numpy as np
 import glob
-import seaborn as sns
+
 import corner
 import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
+import numpy as np
+import seaborn as sns
 from matplotlib.lines import Line2D
-from matplotlib import rcParams
-from matplotlib import rc
-from scipy.stats import binned_statistic
-from petitRADTRANS import nat_cst as nc
-from .data import Data
 from scipy.ndimage.filters import uniform_filter1d
+from scipy.stats import binned_statistic
+
 
 def plot_specs(fig, ax, path, name, nsample, color1, color2, zorder, rebin_val = None):
     # TODO write generic plotting functions rather than copy pasting code.

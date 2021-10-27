@@ -1,5 +1,4 @@
-"""
-Test petitRADTRANS chemistry module.
+"""Test petitRADTRANS chemistry module.
 """
 import numpy as np
 from .context import petitRADTRANS

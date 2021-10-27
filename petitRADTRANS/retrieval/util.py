@@ -3,12 +3,10 @@ This module contains a set of useful functions that don't really fit anywhere
 else. This includes flux conversions, prior functions, mean molecular weight
 calculations, transforms from mass to number fractions, and fits file output.
 """
-import sys
 import os
 # To not have numpy start parallelizing on its own
 os.environ["OMP_NUM_THREADS"] = "1"
-import numpy as np
-from scipy.special import gamma,erfcinv
+from scipy.special import erfcinv
 import numpy as np
 import math as math
 from molmass import Formula

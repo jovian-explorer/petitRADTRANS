@@ -1,5 +1,4 @@
-"""
-Test the fortran modules.
+"""Test the fortran modules.
 """
 import numpy as np
 

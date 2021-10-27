@@ -1,5 +1,6 @@
-import numpy as np
 import copy as cp
+
+import numpy as np
 from scipy.interpolate import interp1d
 
 plotting = False

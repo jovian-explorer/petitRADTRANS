@@ -1,0 +1,250 @@
+"""Test the petitRADTRANS retrieval module.
+
+Essentially go through a simplified version of the tutorial, and compare the results with previous ones.
+C.f. (https://petitradtrans.readthedocs.io/en/latest/content/notebooks/getting_started.html).
+"""
+
+import os
+# To not have numpy start parallelizing on its own
+os.environ["OMP_NUM_THREADS"] = "1"
+import numpy as np
+
+# Import Prior functions, if necessary.
+from petitRADTRANS.retrieval.util import gaussian_prior
+# Import atmospheric model function
+# You could also write your own!
+from petitRADTRANS.retrieval.models import emission_model_diseq
+from petitRADTRANS.retrieval.util import calc_MMW
+
+from .context import petitRADTRANS
+from .utils import compare_from_reference_file, tests_results_directory, \
+    reference_filenames, radtrans_parameters, temperature_guillot_2010, temperature_isothermal
+
+
+relative_tolerance = 1e-6  # relative tolerance when comparing with older results
+
+
+def init_run():
+    # Since our retrieval has already ran before, we'll set the mode to 'evaluate' so we can make some plots.
+    run_definition_simple = petitRADTRANS.retrieval.RetrievalConfig(
+        retrieval_name="test",
+        run_mode="retrieval",  # This must be 'retrieval' to run PyMultiNest
+        AMR=False,  # We won't be using adaptive mesh refinement for the pressure grid
+        pressures=radtrans_parameters['pressures'],
+        scattering=False  # This would turn on scattering when calculating emission spectra
+    )
+    # Scattering is automatically included for transmission spectra
+
+    # Fixed parameters
+    run_definition_simple.add_parameter(
+        'Rstar',  # name
+        False,  # is_free_parameter, So Rstar is not retrieved here.
+        value=radtrans_parameters['stellar_parameters']['radius'] * petitRADTRANS.nat_cst.r_sun
+    )
+
+    # Log of the surface gravity
+    run_definition_simple.add_parameter(
+        'log_g',
+        False,  # is_free_parameter: we are retrieving log(g) here
+        value=np.log10(radtrans_parameters['planetary_parameters']['surface_gravity'])
+    )
+
+    # Retrieved parameters
+    # Prior functions
+    def prior_planet_radius(x):
+        return petitRADTRANS.retrieval.util.uniform_prior(
+            cube=x,
+            x1=radtrans_parameters['retrieval_parameters']['planetary_radius_bounds'][0]
+            * petitRADTRANS.nat_cst.r_jup_mean,
+            x2=radtrans_parameters['retrieval_parameters']['planetary_radius_bounds'][1]
+            * petitRADTRANS.nat_cst.r_jup_mean,
+        )
+
+    def prior_temperature(x):
+        return petitRADTRANS.retrieval.util.uniform_prior(
+            cube=x,
+            x1=radtrans_parameters['retrieval_parameters']['intrinsic_temperature_bounds'][0],
+            x2=radtrans_parameters['retrieval_parameters']['intrinsic_temperature_bounds'][1]
+        )
+
+    def prior_cloud_pressure(x):
+        return petitRADTRANS.retrieval.util.uniform_prior(
+            cube=x,
+            x1=radtrans_parameters['retrieval_parameters']['log10_cloud_pressure_bounds'][0],
+            x2=radtrans_parameters['retrieval_parameters']['log10_cloud_pressure_bounds'][1]
+        )
+
+    # Planet radius
+    run_definition_simple.add_parameter(
+        'R_pl',
+        True,
+        transform_prior_cube_coordinate=lambda x: (1.8 + 1.0*x) * petitRADTRANS.nat_cst.r_jup_mean#prior_planet_radius
+    )
+
+    # Intrinsic temperature
+    run_definition_simple.add_parameter(
+        'Temperature',
+        True,
+        transform_prior_cube_coordinate=prior_temperature
+    )
+
+    # Include a grey cloud as well to see what happens
+    run_definition_simple.add_parameter(
+        "log_Pcloud",
+        True,
+        transform_prior_cube_coordinate=prior_cloud_pressure
+    )
+
+    # Spectrum parameters
+    run_definition_simple.set_rayleigh_species(radtrans_parameters['spectrum_parameters']['rayleigh_species'])
+    run_definition_simple.set_continuum_opacities(radtrans_parameters['spectrum_parameters']['continuum_opacities'])
+
+    run_definition_simple.set_line_species(
+        radtrans_parameters['spectrum_parameters']['line_species_correlated_k'],
+        free=True,
+        abund_lim=(
+            np.mean(radtrans_parameters['retrieval_parameters']['log10_species_mass_fractions_bounds']),
+            (radtrans_parameters['retrieval_parameters']['log10_species_mass_fractions_bounds'][1]
+             - radtrans_parameters['retrieval_parameters']['log10_species_mass_fractions_bounds'][0]) / 2
+        )
+    )
+
+    # Load data
+    run_definition_simple.add_data(
+        name='test',
+        path=reference_filenames[
+                 'correlated_k_transmission_cloud_calculated_radius_scattering'
+             ].rsplit('.', 1)[0] + '.dat',
+        model_generating_function=retrieval_model_spec_iso,
+        opacity_mode='c-k',
+        data_resolution=60,
+        model_resolution=120
+    )
+
+    # Plot parameters
+    # Corner plot
+    run_definition_simple.parameters['R_pl'].plot_in_corner = True
+    run_definition_simple.parameters['R_pl'].corner_label = r'$R_{\rm P}$ ($\rm R_{Jup}$)'
+    run_definition_simple.parameters['R_pl'].corner_transform = lambda x: x / petitRADTRANS.nat_cst.r_jup_mean
+    run_definition_simple.parameters['Temperature'].plot_in_corner = True
+    run_definition_simple.parameters['Temperature'].corner_label = "Temp"
+    run_definition_simple.parameters['log_Pcloud'].plot_in_corner = True
+    run_definition_simple.parameters['log_Pcloud'].corner_label = r"log P$_{\rm cloud}$"
+    run_definition_simple.parameters['log_Pcloud'].corner_ranges = [-6, 2]
+
+    for spec in run_definition_simple.line_species:
+        run_definition_simple.parameters[spec].plot_in_corner = True
+        run_definition_simple.parameters[spec].corner_ranges = [-6.0, 0.0]
+
+    # Spectrum plot
+    run_definition_simple.plot_kwargs["spec_xlabel"] = 'Wavelength [micron]'
+    run_definition_simple.plot_kwargs["spec_ylabel"] = r'$(R_{\rm P}/R_*)^2$ [ppm]'
+    run_definition_simple.plot_kwargs["y_axis_scaling"] = 1e6  # so we have units of ppm
+    run_definition_simple.plot_kwargs["xscale"] = 'linear'
+    run_definition_simple.plot_kwargs["yscale"] = 'linear'
+
+    run_definition_simple.plot_kwargs["nsample"] = 10
+
+    # Temperature profile plot
+    run_definition_simple.plot_kwargs["take_PTs_from"] = 'test'
+    run_definition_simple.plot_kwargs["temp_limits"] = [150, 3000]
+    run_definition_simple.plot_kwargs["press_limits"] = [1e2, 1e-5]
+
+    return run_definition_simple
+
+
+# Atmospheric model
+def retrieval_model_spec_iso(prt_object, parameters, pt_plot_mode=None, AMR=False):
+    """
+    This model computes a transmission spectrum based on free retrieval chemistry
+    and an isothermal temperature-pressure profile.
+
+    Args:
+        prt_object : object
+            An instance of the pRT class, with optical properties as defined in the RunDefinition.
+        parameters : dict
+            Dictionary of required parameters:
+                Rstar : Radius of the host star [cm]
+                log_g : Log of surface gravity
+                R_pl : planet radius [cm]
+                Temperature : Isothermal temperature [K]
+                species : Log abundances for each species used in the retrieval
+                log_Pcloud : optional, cloud base pressure of a grey cloud deck.
+        pt_plot_mode:
+            Return only the pressure-temperature profile for plotting. Evaluate mode only. Mandatory.
+        AMR:
+            Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base. Mandatory.
+
+    Returns:
+        wlen_model : np.array
+            Wavlength array of computed model, not binned to data [um]
+        spectrum_model : np.array
+            Computed transmission spectrum R_pl**2/Rstar**2
+    """
+    # Make the P-T profile
+    pressures = prt_object.press / 1e6  # bar to cgs
+    temperatures = parameters['Temperature'].value * np.ones_like(pressures)
+
+    # Make the abundance profiles
+    abundances = {}
+    m_sum = 0.0  # Check that the total mass fraction of all species is <1
+
+    for species in prt_object.line_species:
+        spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities (see below)
+        abundances[species] = 10 ** parameters[spec].value * np.ones_like(pressures)
+        m_sum += 10**parameters[spec].value
+
+    abundances['H2'] = radtrans_parameters['mass_fractions']['H2'] * (1.0 - m_sum) * np.ones_like(pressures)
+    abundances['He'] = radtrans_parameters['mass_fractions']['He'] * (1.0 - m_sum) * np.ones_like(pressures)
+
+    # Find the mean molecular weight in each layer
+    mmw = calc_MMW(abundances)
+
+    # Calculate the spectrum
+    prt_object.calc_transm(
+        temperatures,
+        abundances,
+        10 ** parameters['log_g'].value,
+        mmw,
+        R_pl=parameters['R_pl'].value,
+        P0_bar=radtrans_parameters['planetary_parameters']['reference_pressure'],
+        Pcloud=10 ** parameters['log_Pcloud'].value
+    )
+
+    # Transform the outputs into the units of our data.
+    wlen_model = petitRADTRANS.nat_cst.c / prt_object.freq * 1e4  # wlen in micron
+    spectrum_model = (prt_object.transm_rad / parameters['Rstar'].value) ** 2.
+
+    return wlen_model, spectrum_model
+
+
+run_definition = init_run()
+
+
+def test_list_available_species():
+    run_definition.list_available_line_species()
+
+
+def test_simple_retrieval():
+    output_dir = tests_results_directory
+    print(np.loadtxt(run_definition.data['test'].path_to_observations))
+
+    retrieval = petitRADTRANS.retrieval.Retrieval(
+        run_definition,
+        output_dir=output_dir,
+        sample_spec=False,  # Output the spectrum from nsample random samples.
+        pRT_plot_style=True,  # We think that our plots look nice.
+        ultranest=False  # Let's use pyMultiNest rather than Ultranest
+    )
+
+    retrieval.run(
+        sampling_efficiency=0.3,
+        n_live_points=50,
+        const_efficiency_mode=False,
+        resume=False
+    )
+
+    sample_dict, parameter_dict = retrieval.get_samples()
+    samples_use = sample_dict[retrieval.retrieval_name]
+    parameters_read = parameter_dict[retrieval.retrieval_name]
+    # TODO add assertion of previous results

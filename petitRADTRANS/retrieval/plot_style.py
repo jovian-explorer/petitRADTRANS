@@ -6,8 +6,10 @@ This will affect the matplotlib rcParams, which can be reset to
 the default values after pRT is finished.
 """
 
-import matplotlib as mpl
 import os
+
+import matplotlib as mpl
+
 have_display = bool(os.environ.get('DISPLAY', None))
 if not have_display:
     mpl.use('Agg')

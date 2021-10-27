@@ -1,5 +1,4 @@
-"""
-Test petitRADTRANS utility functions.
+"""Test petitRADTRANS utility functions.
 """
 import numpy as np
 

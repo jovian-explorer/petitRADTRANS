@@ -1,13 +1,12 @@
 # Input / output, general run definitions
-import sys
 import os
+import sys
 
 # To not have numpy start parallelizing on its own
 os.environ["OMP_NUM_THREADS"] = "1"
 # Read external packages
 import numpy as np
 import copy as cp
-import pymultinest
 import json
 import logging
 from scipy.stats import binned_statistic
@@ -15,11 +14,11 @@ from scipy.stats import binned_statistic
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator, LogLocator, NullFormatter
 # Read own packages
-from petitRADTRANS import Radtrans
+from petitRADTRANS.radtrans import Radtrans
 from .parameter import Parameter
 from .plotting import plot_specs, plot_data, contour_corner
-from config.configuration import petitradtrans_config
-from petitRADTRANS.rebin_give_width import rebin_give_width as rgw
+from petitRADTRANS.config.configuration import petitradtrans_config
+from .rebin_give_width import rebin_give_width as rgw
 
 
 class Retrieval:
@@ -135,6 +134,7 @@ class Retrieval:
         """
         Run mode for the class. Uses pynultinest to sample parameter space
         and produce standard PMN outputs.
+        See also: https://github.com/JohannesBuchner/PyMultiNest/blob/master/multinest_marginals.py
 
         Args:
             sampling_efficiency : Float
@@ -153,24 +153,30 @@ class Retrieval:
             resume : bool
                 Continue existing retrieval. If FALSE THIS WILL OVERWRITE YOUR EXISTING RETRIEVAL.
         """
+        import pymultinest
+
         if self.sampling_efficiency is not None:
             logging.warning(
                 "Setting sampling_efficiency as a class variable will be deprecated. Use the run method arguments."
             )
             sampling_efficiency = self.sampling_efficiency
+
         if self.n_live_points:
             logging.warning(
                 "Setting n_live_points as a class variable will be deprecated. Use the run method arguments."
             )
             n_live_points = self.n_live_points
+
         if self.resume is not None:
             logging.warning("Setting resume as a class variable will be deprecated. Use the run method arguments.")
             resume = self.resume
+
         if self.const_efficiency_mode is not None:
             logging.warning(
                 "Setting const_efficiency_mode as a class variable will be deprecated. Use the run method arguments."
             )
             const_efficiency_mode = self.const_efficiency_mode
+
         if self.ultranest:
             self._run_ultranest(n_live_points,
                                 log_z_convergence,
@@ -188,30 +194,45 @@ class Retrieval:
         # How many free parameters?
         n_params = 0
         free_parameter_names = []
+
         for pp in self.parameters:
             if self.parameters[pp].is_free_parameter:
                 free_parameter_names.append(self.parameters[pp].name)
                 n_params += 1
+
         if self.run_mode == 'retrieval':
             print("Starting retrieval: " + self.retrieval_name + '\n')
-            json.dump(free_parameter_names,
-                      open(self.output_dir + 'out_PMN/' + self.retrieval_name + '_params.json', 'w'))
-            pymultinest.run(self.log_likelihood,
-                            self.prior,
-                            n_params,
-                            outputfiles_basename=prefix,
-                            resume=resume,
-                            verbose=True,
-                            sampling_efficiency=sampling_efficiency,
-                            const_efficiency_mode=const_efficiency_mode,
-                            n_live_points=n_live_points,
-                            n_iter_before_update=10)
+
+            with open(self.output_dir + 'out_PMN/' + self.retrieval_name + '_params.json', 'w') as f:
+                json.dump(free_parameter_names, f)
+
+            pymultinest.run(
+                LogLikelihood=self.log_likelihood,
+                Prior=self.prior,
+                n_dims=n_params,
+                const_efficiency_mode=const_efficiency_mode,
+                n_live_points=n_live_points,
+                evidence_tolerance=0.5,  # default value is 0.5
+                sampling_efficiency=sampling_efficiency,  # default value is 0.8
+                n_iter_before_update=10,  # default value is 100
+                outputfiles_basename=prefix,
+                verbose=True,
+                resume=resume
+            )
+
+        # Analyze the output data
         self.analyzer = pymultinest.Analyzer(n_params=n_params,
                                              outputfiles_basename=prefix)
         s = self.analyzer.get_stats()
+
         self.run_mode = 'evaluate'
         self.generate_retrieval_summary(s)
-        json.dump(s, open(prefix + 'stats.json', 'w'), indent=4)
+
+        # Save the analyze
+        with open(prefix + 'stats.json', 'w') as f:
+            json.dump(s, f, indent=4)
+
+        # Informative prints
         print('  marginal likelihood:')
         print('    ln Z = %.1f +- %.1f' % (s['global evidence'], s['global evidence error']))
         print('  parameters:')
@@ -313,6 +334,7 @@ class Retrieval:
             summary.write("Fixed Parameters\n")
 
             for key, value in self.parameters.items():
+                print(key, value.value)
                 if key in ['pressure_simple', 'pressure_width', 'pressure_scaling']:
                     continue
                 if not value.is_free_parameter:
@@ -407,7 +429,7 @@ class Retrieval:
         """
         Creates a pRT object for each data set that asks for a unique object.
         Checks if there are low resolution c-k models from exo-k, and creates them if necessary.
-        The scaling and width parameters adjust the AMR grid as described in RetrievalConfig.setup_pres
+        The scaling and width parameters adjust the amr grid as described in RetrievalConfig.setup_pres
         and models.fixed_length_amr. It is recommended to keep the defaults.
 
         Args:
@@ -507,7 +529,7 @@ class Retrieval:
         pyMultiNest required likelihood function.
 
         This function wraps the model computation and log-likelihood calculations
-        for pyMultiNest to sample. If PT_plot_mode is True, it will return the
+        for pyMultiNest to sample. If pt_plot_mode is True, it will return the
         calculate only the pressure and temperature arrays rather than the wavelength
         and flux. If run_mode is evaluate, it will save the provided sample to the
         best-fit spectrum file, and add it to the best_fit_specs dictionary.
@@ -655,15 +677,21 @@ class Retrieval:
         for name in self.corner_files:
             samples = np.genfromtxt(output_dir + 'out_PMN/' + name + '_post_equal_weights.dat')
 
-            parameters_read = json.load(open(output_dir + 'out_PMN/' + name + '_params.json'))
+            with open(output_dir + 'out_PMN/' + name + '_params.json', 'r') as f:
+                parameters_read = json.load(f)
+
             self.samples[name] = samples
             self.param_dict[name] = parameters_read
+
         for name in ret_names:
             samples = np.genfromtxt(output_dir + 'out_PMN/' + name + '_post_equal_weights.dat')
 
-            parameters_read = json.load(open(output_dir + 'out_PMN/' + name + '_params.json'))
+            with open(output_dir + 'out_PMN/' + name + '_params.json', 'r') as f:
+                parameters_read = json.load(f)
+
             self.samples[name] = samples
             self.param_dict[name] = parameters_read
+
         return self.samples, self.param_dict
 
     def get_best_fit_params(self, best_fit_params, parameters_read):
@@ -703,7 +731,7 @@ class Retrieval:
                 A list of the free parameters as read from the output files.
             model_generating_func : method
                 A function that will take in the standard 'model' arguments
-                (pRT_object, params, pt_plot_mode, AMR, resolution)
+                (prt_object, params, pt_plot_mode, amr, resolution)
                 and will return the wavlength and flux arrays as calculated by petitRadTrans.
                 If no argument is given, it uses the method of the dataset given in the take_PTs_from kwarg.
             ret_name : str
@@ -841,11 +869,15 @@ class Retrieval:
                 The name of the retrieval that prepends all of the PMN
                 output files.
         """
+        import pymultinest
+
         # Avoid loading if we just want the current retrievals output
-        if ret_name is "" and self.analyzer is not None:
+        if ret_name == "" and self.analyzer is not None:
             return self.analyzer
-        if ret_name is "":
+
+        if ret_name == "":
             ret_name = self.retrieval_name
+
         prefix = self.output_dir + 'out_PMN/' + ret_name + '_'
 
         # How many free parameters?
@@ -925,7 +957,7 @@ class Retrieval:
                 A list of the free parameters as read from the output files.
             model_generating_func : method
                 A function that will take in the standard 'model' arguments
-                (pRT_object, params, pt_plot_mode, AMR, resolution)
+                (prt_object, params, pt_plot_mode, amr, resolution)
                 and will return the wavlength and flux arrays as calculated by petitRadTrans.
                 If no argument is given, it uses the method of the first dataset included in the retrieval.
 
@@ -959,10 +991,16 @@ class Retrieval:
         # Setup best fit spectrum
         # First get the fit for each dataset for the residual plots
         self.log_likelihood(samples_use[best_fit_index, :-1], 0, 0)
+
         # Then get the full wavelength range
-        bf_wlen, bf_spectrum = self.get_best_fit_model(samples_use[best_fit_index, :-1],
-                                                       parameters_read, model_generating_func)
-        # Iterate through each dataset, plotting the data and the residuals.
+        # Generate the best fit spectrum using the set of parameters with the lowest log-likelihood
+        bf_wlen, bf_spectrum = self.get_best_fit_model(
+            samples_use[best_fit_index, :-1],  # set of parameters with the lowest log-likelihood (best-fit)
+            parameters_read,  # name of the parameters
+            model_generating_func
+        )
+
+        # Iterate through each dataset, plotting the data and the residuals
         for name, dd in self.data.items():
             # If the user has specified a resolution, rebin to that
             if not dd.photometry:
@@ -1332,27 +1370,35 @@ class Retrieval:
         if not self.run_mode == 'evaluate':
             logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
             self.run_mode = 'evaluate'
+
         print("Making corner plot")
         sample_use_dict = {}
         p_plot_inds = {}
         p_ranges = {}
         p_use_dict = {}
+
         for name, params in parameter_dict.items():
             samples_use = cp.copy(sample_dict[name])
             parameters_use = cp.copy(params)
             parameter_plot_indices = []
             parameter_ranges = []
             i_p = 0
+
             for pp in parameters_read:
                 parameter_ranges.append(self.parameters[pp].corner_ranges)
+
                 if self.parameters[pp].plot_in_corner:
                     parameter_plot_indices.append(i_p)
+
                 if self.parameters[pp].corner_label is not None:
                     parameters_use[i_p] = self.parameters[pp].corner_label
+
                 if self.parameters[pp].corner_transform is not None:
                     samples_use[:, i_p] = \
                         self.parameters[pp].corner_transform(samples_use[:, i_p])
+
                 i_p += 1
+
             p_plot_inds[name] = parameter_plot_indices
             p_ranges[name] = parameter_ranges
             p_use_dict[name] = parameters_use

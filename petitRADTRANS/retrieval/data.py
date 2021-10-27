@@ -1,8 +1,10 @@
-import sys
-import os
-import numpy as np
 import logging
+import os
+import sys
+
+import numpy as np
 from scipy.ndimage.filters import gaussian_filter
+
 import petitRADTRANS.nat_cst as nc
 from .rebin_give_width import rebin_give_width
 
