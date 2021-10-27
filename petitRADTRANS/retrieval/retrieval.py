@@ -597,16 +597,9 @@ class Retrieval:
                     # Sanity checks on outputs
                     # print(spectrum_model)
                     if spectrum_model is None:
-                        if self.ultranest:
-                            return -1e99
-                        else:
-                            return -np.inf
-
+                        return -1e99
                     if np.isnan(spectrum_model).any():
-                        if self.ultranest:
-                            return -1e99
-                        else:
-                            return -np.inf
+                        return -1e99
 
                     log_likelihood += dd.get_chisq(wlen_model,
                                                    spectrum_model,
