@@ -553,15 +553,9 @@ class Retrieval:
                     # Sanity checks on outputs
                     #print(spectrum_model)
                     if spectrum_model is None:
-                        if self.ultranest:
-                            return -1e99
-                        else:
-                            return -np.inf
+                        return -1e99
                     if np.isnan(spectrum_model).any():
-                        if self.ultranest:
-                            return -1e99
-                        else:
-                            return -np.inf
+                        return -1e99
                     log_likelihood += dd.get_chisq(wlen_model,
                                             spectrum_model,
                                             self.plotting)
@@ -599,14 +593,13 @@ class Retrieval:
                         log_likelihood += dede.get_chisq(wlen_model, \
                                         spectrum_model, \
                                         self.plotting)
-        #print(log_likelihood)
+        print(log_likelihood)
         if log_likelihood + log_prior < -9e99:
             return -1e99
         if np.abs(log_likelihood + log_prior) < 1e-99:
             return -1e-99
         if self.ultranest and np.isinf(log_likelihood+log_prior):
             return -1e99
-
         return log_likelihood + log_prior
 
     def get_samples(self, output_dir = None, ret_names = []):

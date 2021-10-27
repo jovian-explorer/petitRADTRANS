@@ -1716,7 +1716,7 @@ def py_calc_cloud_opas(rho,
     cloud_abs_opa_TOT = np.zeros((N_cloud_lambda_bins,nstruct))
     cloud_scat_opa_TOT = np.zeros((N_cloud_lambda_bins,nstruct))
     cloud_red_fac_aniso_TOT = np.zeros((N_cloud_lambda_bins,nstruct))
-
+    print(f"{cloud_mass_fracs[0,0]},{r_g[0,0]},{sigma_n}")
     for i_struct in range(nstruct):
         for i_c in range(ncloud):
             N = 3.0 * cloud_mass_fracs[i_struct,i_c] * rho[i_struct] /(4.0 *np.pi*rho_p[i_c] * (r_g[i_struct,i_c]**3.0))* \

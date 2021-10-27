@@ -79,7 +79,7 @@ def emission_model_diseq(pRT_object,
         spectrum_model : np.array
             Computed emission spectrum [W/m2/micron]
     """
-    start = time.time()
+    #start = time.time()
     pglobal_check(pRT_object.press/1e6,
                     parameters['pressure_simple'].value,
                     parameters['pressure_scaling'].value)
@@ -88,10 +88,10 @@ def emission_model_diseq(pRT_object,
     #    print(key,val.value)
 
     # Priors for these parameters are implemented here, as they depend on each other
-    T3 = ((3./4.*parameters['T_int'].value**4.*(0.1+2./3.))**0.25)*(1-parameters['T3'].value)
+    T3 = ((3./4.*parameters['T_int'].value**4.*(0.1+2./3.))**0.25)*(1.0-parameters['T3'].value)
     T2 = T3*(1.0-parameters['T2'].value)
     T1 = T2*(1.0-parameters['T1'].value)
-    delta = ((10**(-3.0+5.0*parameters['log_delta'].value))*1e6)**(-parameters['alpha'].value)
+    delta = ((10.0**(-3.0+5.0*parameters['log_delta'].value))*1e6)**(-parameters['alpha'].value)
 
     # Make the P-T profile
     temp_arr = np.array([T1,T2,T3])
@@ -117,7 +117,7 @@ def emission_model_diseq(pRT_object,
                                                   pRT_object.cloud_species,
                                                   parameters,
                                                   AMR =AMR)
-    Kzz_use = (10**parameters['log_kzz'].value ) * np.ones_like(p_use)
+    Kzz_use = (10.0**parameters['log_kzz'].value ) * np.ones_like(p_use)
 
     # Only include the high resolution pressure array near the cloud base.
     pressures = p_use
@@ -178,8 +178,8 @@ def emission_model_diseq(pRT_object,
     spectrum_model = surf_to_meas(f_lambda,
                                   R_pl,
                                   parameters['D_pl'].value)    #print(wlen_model,spectrum_model)
-    end = time.time()
-    print(end-start)
+    #end = time.time()
+    #print(end-start)
     return wlen_model, spectrum_model
 
 def guillot_free_emission(pRT_object, \
@@ -858,18 +858,18 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
         c_list.append(inds)
     # We need to return a list that's always the same length
     # So we need to check for duplicates
-    total_inds = []
+    total_inds = [-1]
     for j in range(len(c_list)):
         # At first, just copy in the list
-        if j == 0:
-            if np.any(c_list[j] < 0):
-                total_inds.extend(np.linspace(0,len(c_list[j]),len(c_list[j]),dtype=int))
-                continue
-            if np.any(c_list[j] > press.shape[0]):
-                total_inds.extend(np.linspace(press.shape[0]-len(c_list[j]),press.shape[0],dtype=int))
-                continue
-            total_inds.extend(c_list[j])
-            continue
+        #if j == 0:
+        #    if np.any(c_list[j] < 0):
+        #        total_inds.extend(np.linspace(0,len(c_list[j]),len(c_list[j]),dtype=int))
+        #        continue
+        #    if np.any(c_list[j] > press.shape[0]):
+        #        total_inds.extend(np.linspace(press.shape[0]-len(c_list[j]),press.shape[0],dtype=int))
+        #        continue
+        #    total_inds.extend(c_list[j])
+        #    continue
         # Check if the next set of indices is lower than the current minimum
         # if so, we want to add scaling*width indices below the current minimum
         if min(c_list[j])<=min(np.array(total_inds)):
@@ -930,12 +930,13 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
                     done += 1
     #total_inds = np.array(sorted(total_inds,reverse=False))
     # Stack the low res and high res grids, sort it, and take the unique values
+    total_inds.pop(0)
     press_out = np.vstack((press_small,press_plus_index[total_inds]))
     press_out = np.sort(press_out, axis = 0)
     p_out,ind = np.unique(press_out[:,0],return_index = True)
     shape = int((press.shape[0]/scaling) + P_clouds.shape[0]*width*(scaling - 1))
     if p_out.shape[0] != shape:
-        print("AMR returned incorrect shape: {p_out.shape[0]} instead of {shape}!")
+        print(f"AMR returned incorrect shape: {p_out.shape[0]} instead of {shape}!")
     return p_out,  press_out[ind, 1].astype('int')
 
 
