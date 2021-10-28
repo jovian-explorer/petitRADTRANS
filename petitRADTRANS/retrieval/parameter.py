@@ -30,15 +30,15 @@ class Parameter:
             The axis label for the parameter, defaults to name.
     """
 
-    def __init__(self, \
-                 name, \
-                 is_free_parameter, \
-                 value = None, \
-                 transform_prior_cube_coordinate = None, \
-                 plot_in_corner = False, \
-                 corner_ranges = None, \
-                 corner_transform = None, \
-                 corner_label = None):
+    def __init__(self,
+                 name,
+                 is_free_parameter,
+                 value=None,
+                 transform_prior_cube_coordinate=None,
+                 plot_in_corner=False,
+                 corner_ranges=None,
+                 corner_transform=None,
+                 corner_label=None):
 
         self.name = name
         self.is_free_parameter = is_free_parameter
@@ -46,18 +46,21 @@ class Parameter:
         self.transform_prior_cube_coordinate = \
             transform_prior_cube_coordinate
         self.plot_in_corner = plot_in_corner
-        self.corner_ranges  = corner_ranges
+        self.corner_ranges = corner_ranges
         self.corner_transform = corner_transform
         self.corner_label = corner_label
 
     def get_param_uniform(self, cube):
         if self.is_free_parameter:
             return self.transform_prior_cube_coordinate(cube)
-        logging.error('Error! Parameter '+self.name+' is not a free parameter!')
+
+        logging.error('Error! Parameter ' + self.name + ' is not a free parameter!')
         sys.exit(1)
+
     def set_param(self, value):
         if self.is_free_parameter:
             self.value = value
             return
-        logging.error('Error! Parameter '+self.name+' is not a free parameter!')
+
+        logging.error('Error! Parameter ' + self.name + ' is not a free parameter!')
         sys.exit(1)

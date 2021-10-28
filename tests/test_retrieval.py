@@ -3,7 +3,7 @@
 Essentially go through a simplified version of the tutorial, and compare the results with previous ones.
 C.f. (https://petitradtrans.readthedocs.io/en/latest/content/notebooks/getting_started.html).
 """
-
+import json
 import os
 # To not have numpy start parallelizing on its own
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -78,7 +78,7 @@ def init_run():
     run_definition_simple.add_parameter(
         'R_pl',
         True,
-        transform_prior_cube_coordinate=lambda x: (1.8 + 1.0*x) * petitRADTRANS.nat_cst.r_jup_mean#prior_planet_radius
+        transform_prior_cube_coordinate=prior_planet_radius
     )
 
     # Intrinsic temperature
@@ -112,13 +112,11 @@ def init_run():
     # Load data
     run_definition_simple.add_data(
         name='test',
-        path=reference_filenames[
-                 'correlated_k_transmission_cloud_calculated_radius_scattering'
-             ].rsplit('.', 1)[0] + '.dat',
+        path=reference_filenames['mock_observation_transmission'],
         model_generating_function=retrieval_model_spec_iso,
         opacity_mode='c-k',
-        data_resolution=60,
-        model_resolution=120
+        data_resolution=radtrans_parameters['mock_observation_parameters']['resolution_power'],
+        model_resolution=radtrans_parameters['mock_observation_parameters']['resolution_power'] * 2
     )
 
     # Plot parameters
@@ -192,7 +190,7 @@ def retrieval_model_spec_iso(prt_object, parameters, pt_plot_mode=None, AMR=Fals
     for species in prt_object.line_species:
         spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities (see below)
         abundances[species] = 10 ** parameters[spec].value * np.ones_like(pressures)
-        m_sum += 10**parameters[spec].value
+        m_sum += 10 ** parameters[spec].value
 
     abundances['H2'] = radtrans_parameters['mass_fractions']['H2'] * (1.0 - m_sum) * np.ones_like(pressures)
     abundances['He'] = radtrans_parameters['mass_fractions']['He'] * (1.0 - m_sum) * np.ones_like(pressures)
@@ -226,25 +224,38 @@ def test_list_available_species():
 
 
 def test_simple_retrieval():
-    output_dir = tests_results_directory
-    print(np.loadtxt(run_definition.data['test'].path_to_observations))
-
     retrieval = petitRADTRANS.retrieval.Retrieval(
         run_definition,
-        output_dir=output_dir,
-        sample_spec=False,  # Output the spectrum from nsample random samples.
-        pRT_plot_style=True,  # We think that our plots look nice.
-        ultranest=False  # Let's use pyMultiNest rather than Ultranest
+        output_dir=tests_results_directory,
+        sample_spec=radtrans_parameters['retrieval_parameters']['sample_spectrum_output'],
+        ultranest=radtrans_parameters['retrieval_parameters']['ultranest']  # if False, use PyMultiNest
     )
 
     retrieval.run(
-        sampling_efficiency=0.3,
-        n_live_points=50,
-        const_efficiency_mode=False,
-        resume=False
+        sampling_efficiency=radtrans_parameters['retrieval_parameters']['sampling_efficiency'],
+        n_live_points=radtrans_parameters['retrieval_parameters']['n_live_points'],
+        const_efficiency_mode=radtrans_parameters['retrieval_parameters']['const_efficiency_mode'],
+        resume=radtrans_parameters['retrieval_parameters']['resume']
     )
 
+    # Just check if get_samples works
     sample_dict, parameter_dict = retrieval.get_samples()
-    samples_use = sample_dict[retrieval.retrieval_name]
-    parameters_read = parameter_dict[retrieval.retrieval_name]
-    # TODO add assertion of previous results
+
+    # Get results and reference
+    with open(reference_filenames['pymultinest_parameter_analysis']) as f:
+        reference = json.load(f)
+
+    new_result_file = os.path.join(
+        tests_results_directory,
+        'out_PMN',
+        os.path.basename(reference_filenames['pymultinest_parameter_analysis'])
+    )
+
+    with open(new_result_file) as f:
+        new_results = json.load(f)
+
+    # Check if retrieved parameters are in +/- 1 sigma of the previous retrieved parameters
+    for i, marginal in enumerate(new_results['marginals']):
+        assert marginal['median'] - reference['marginals'][i]['sigma'] \
+               <= reference['marginals'][i]['median'] \
+               <= marginal['median'] + reference['marginals'][i]['sigma']

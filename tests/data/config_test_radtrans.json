@@ -109,6 +109,16 @@
         "log10_species_mass_fractions_bounds": [
             -6,
             0
-        ]
+        ],
+        "sample_spectrum_output": false,
+        "ultranest": false,
+        "sampling_efficiency": 0.8,
+        "n_live_points": 50,
+        "const_efficiency_mode": false,
+        "resume": false
+    },
+    "mock_observation_parameters": {
+        "resolution_power": 60,
+        "relative_error": 0.01
     }
 }

@@ -75,6 +75,12 @@ reference_filenames = {
     for key, value in reference_filenames.items()
 }
 
+reference_filenames['mock_observation_transmission'] = reference_filenames[
+        'correlated_k_transmission_cloud_calculated_radius_scattering'
+    ].rsplit('.', 1)[0] + '.dat'
+reference_filenames['pymultinest_parameter_analysis'] = \
+    os.path.join(tests_data_directory, 'test_stats' + '.json')
+
 
 # Make directories if needed
 if not os.path.isdir(tests_results_directory):
@@ -171,7 +177,17 @@ def create_test_radtrans_config_file(filename):
                     'planetary_radius_bounds': (1.8, 2.0),
                     'intrinsic_temperature_bounds': (500, 1500),
                     'log10_cloud_pressure_bounds': (-6, 2),
-                    'log10_species_mass_fractions_bounds': (-6, 0)
+                    'log10_species_mass_fractions_bounds': (-6, 0),
+                    'sample_spectrum_output': False,
+                    'ultranest': False,
+                    'sampling_efficiency': 0.8,
+                    'n_live_points': 50,
+                    'const_efficiency_mode': False,
+                    'resume': False
+                },
+                'mock_observation_parameters': {
+                    'resolution_power': 60,
+                    'relative_error': 1e-2
                 }
             },
             fp=f,

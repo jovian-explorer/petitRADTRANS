@@ -245,6 +245,27 @@ def create_guillot_2010_temperature_profile_ref(plot_figure=False):
     )
 
 
+def create_mock_observation_transmission_spectrum(plot_figure=False):
+    npz2dat(
+        file=reference_filenames['correlated_k_transmission_cloud_calculated_radius_scattering'],
+        new_resolution_power=radtrans_parameters['mock_observation_parameters']['resolution_power'],
+        relative_error=radtrans_parameters['mock_observation_parameters']['relative_error'],
+        mode='transmission'
+    )
+
+    if plot_figure:
+        data = np.loadtxt(reference_filenames['mock_observation_transmission'])
+        wavelength = data[:, 0]
+        transit_radius = data[:, 1]
+        error = data[:, 2]
+
+        plt.figure()
+        plt.errorbar(wavelength, transit_radius, yerr=error, ls='', marker='+', capsize=2)
+        plt.xlabel(r'Wavelength ($\mu$m)')
+        plt.ylabel(r'Transit radius (R$_{\rm{Jup}}$)')
+        plt.title('Mock observed spectrum')
+
+
 def create_radtrans_correlated_k_emission_spectrum_ref(plot_figure=False):
     from .test_radtrans_correlated_k import atmosphere_ck
 
@@ -736,3 +757,5 @@ def create_all_comparison_files(plot_figure=False):
     create_radtrans_mass_fractions_atmosphere_quench_ref(plot_figure)
     create_radtrans_mass_fractions_c_o_ratios_ref(plot_figure)
     create_radtrans_mass_fractions_metallicities_ref(plot_figure)
+
+    create_mock_observation_transmission_spectrum(plot_figure)

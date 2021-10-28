@@ -85,6 +85,7 @@ class Retrieval:
         self.corner_files = corner_plot_names
         if self.corner_files is None:
             self.corner_files = [self.retrieval_name]
+
         self.short_names = short_names
 
         # Plotting variables
