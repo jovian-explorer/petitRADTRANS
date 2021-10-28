@@ -50,6 +50,10 @@ class Retrieval:
             List of additional retrieval names that should be included in the corner plot.
         short_names : List(Str)
             For each corner_plot_name, a shorter name to be included when plotting.
+        pRT_plot_style : Bool
+            Use the petitRADTRANS plotting style as described in plot_style.py. Recommended to
+            turn this parameter to false if you want to use interactive plotting, or if the
+            test_plotting parameter is True.
     """
 
     def __init__(self,
@@ -68,7 +72,7 @@ class Retrieval:
                  pRT_plot_style=True):
         self.rd = run_definition
         if len(self.rd.line_species) < 1:
-            logging.error("There are no line species present in the run definition!")
+            logging.warning("There are no line species present in the run definition!")
 
         # Maybe inherit from retrieval config class?
         self.retrieval_name = self.rd.retrieval_name
@@ -107,7 +111,8 @@ class Retrieval:
         self.param_dict = {}
         # Set up pretty plotting
         if pRT_plot_style:
-            pass
+            import petitRADTRANS.retrieval.plot_style
+        self.prt_plot_style =pRT_plot_style
         # Path to input opacities
         self.path = petitradtrans_config['Paths']['pRT_input_data_path']
 
@@ -125,11 +130,11 @@ class Retrieval:
         self.generate_retrieval_summary()
 
     def run(self,
-            sampling_efficiency=0.05,
+            sampling_efficiency=0.8,
             const_efficiency_mode=True,
             n_live_points=4000,
             log_z_convergence=0.5,
-            step_sampler=True,
+            step_sampler=False,
             warmstart_max_tau=0.5,
             resume=True):
         """
@@ -139,7 +144,9 @@ class Retrieval:
 
         Args:
             sampling_efficiency : Float
-                pymultinest sampling efficiency
+                pymultinest sampling efficiency. If const efficiency mode is true, should be set to around
+                0.05. Otherwise, it should be around 0.8 for parameter estimation and 0.3 for evidence
+                comparison.
             const_efficiency_mode : Bool
                 pymultinest constant efficiency mode
             n_live_points : Int
@@ -149,8 +156,8 @@ class Retrieval:
                 If ultranest is being used, the convergence criterion on log z.
             step_sampler : bool
                 Use a step sampler to improve the efficiency in ultranest.
-            warmstart_max_tau :
-                # TODO fill warmstart_max_tau docstring field
+            warmstart_max_tau : float
+                Warm start allows accelerated computation based on a different but similar UltraNest run.
             resume : bool
                 Continue existing retrieval. If FALSE THIS WILL OVERWRITE YOUR EXISTING RETRIEVAL.
         """
@@ -185,7 +192,8 @@ class Retrieval:
                                 warmstart_max_tau,
                                 resume)
             return
-
+        if const_efficiency_mode and sampling_efficiency > 0.1:
+            logging.warning("Sampling efficiency should be ~ 0.5 if you're using constant efficiency mode!")
         prefix = self.output_dir + 'out_PMN/' + self.retrieval_name + '_'
 
         if len(self.output_dir + 'out_PMN/') > 100:
@@ -213,7 +221,7 @@ class Retrieval:
                 n_dims=n_params,
                 const_efficiency_mode=const_efficiency_mode,
                 n_live_points=n_live_points,
-                evidence_tolerance=0.5,  # default value is 0.5
+                evidence_tolerance=log_z_convergence,  # default value is 0.5
                 sampling_efficiency=sampling_efficiency,  # default value is 0.8
                 n_iter_before_update=10,  # default value is 100
                 outputfiles_basename=prefix,
@@ -440,6 +448,7 @@ class Retrieval:
             width : int
                 The number of cells in the low pressure grid to replace with the high resolution grid.
         """
+        exo_k_check = False
 
         for name, dd in self.data.items():
             # Only create if there's no other data
@@ -457,6 +466,9 @@ class Retrieval:
                     # If not, setup low-res c-k tables
                     if len(species) > 0:
                         from .util import getMM
+                        exo_k_check = True
+                        print("Exo-k should only be run on a single thread.")
+                        print("The retrieval should be run once on a single core to build the c-k\ntables, and then again with multiple cores for the remainder of the retrieval.")
                         # Automatically build the entire table
                         atmosphere = Radtrans(line_species=species,
                                               wlen_bords_micron=[0.1, 251.])
@@ -501,6 +513,13 @@ class Retrieval:
                     p = self.rd.p_global
                 rt_object.setup_opa_structure(p)
                 dd.pRT_object = rt_object
+
+        if exo_k_check:
+            # Sorry that we have to do this, not sure how to use mpi4py to run the
+            # exo-k in a single thread.
+            print("c-k tables have been binned with exo-k. Exiting single-core process.")
+            print("Please restart the retrieval.")
+            sys.exit(12)
 
     def prior(self, cube, ndim=0, nparams=0):
         """
@@ -899,19 +918,21 @@ class Retrieval:
     #############################################################
     # Plotting functions
     #############################################################
-    def plot_all(self, output_dir=None):
+    def plot_all(self, output_dir=None, ret_names=None):
         """
         Produces plots for the best fit spectrum, a sample of 100 output spectra,
         the best fit PT profile and a corner plot for parameters specified in the
         run definition.
         """
+        if ret_names is None:
+            ret_names = []
 
         if not self.run_mode == 'evaluate':
             logging.warning("Not in evaluate mode. Changing run mode to evaluate.")
             self.run_mode = 'evaluate'
         if output_dir is None:
             output_dir = self.output_dir
-        sample_dict, parameter_dict = self.get_samples(output_dir)
+        sample_dict, parameter_dict = self.get_samples(output_dir,ret_names=ret_names)
 
         ###########################################
         # Plot best-fit spectrum
@@ -1354,7 +1375,7 @@ class Retrieval:
         plt.savefig(self.output_dir + 'evaluate_' + self.retrieval_name + '/PT_envelopes.pdf')
         return fig, ax
 
-    def plot_corner(self, sample_dict, parameter_dict, parameters_read):
+    def plot_corner(self, sample_dict, parameter_dict, parameters_read, **kwargs):
         """
         Make the corner plots
 
@@ -1366,6 +1387,10 @@ class Retrieval:
             parameters_read : List
                 Used to plot correct parameters, as some in self.parameters are not free, and
                 aren't included in the PMN outputs
+            kwargs : dict
+                Each kwarg can be one of the kwargs used in corner.corner. These can be used to adjust
+                the title_kwargs,label_kwargs,hist_kwargs, hist2d_kawargs or the contour kwargs. Each
+                kwarg must be a dictionary with the arguments as keys and values as the values.
         """
 
         if not self.run_mode == 'evaluate':
@@ -1408,9 +1433,12 @@ class Retrieval:
         output_file = self.output_dir + 'evaluate_' + self.retrieval_name + '/corner_nice.pdf'
 
         # from Plotting
-        contour_corner(sample_use_dict,
+        fig =contour_corner(sample_use_dict,
                        p_use_dict,
                        output_file,
                        parameter_plot_indices=p_plot_inds,
                        parameter_ranges=p_ranges,
-                       true_values=None)
+                       true_values=None,
+                             prt_plot_style=self.prt_plot_style,
+                             **kwargs)
+        return fig

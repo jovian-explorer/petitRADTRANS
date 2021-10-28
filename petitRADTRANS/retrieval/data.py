@@ -309,23 +309,23 @@ class Data:
         """
 
         if plotting:
-            import pylab as plt
+            import matplotlib.pyplot as plt
         # Convolve to data resolution
         if self.data_resolution is not None:
-            spectrum_model = self.convolve(wlen_model, \
-                        spectrum_model, \
-                        self.data_resolution)
+            spectrum_model = self.convolve(wlen_model,
+                                           spectrum_model,
+                                           self.data_resolution)
 
         if not self.photometry:
             # Rebin to model observation
-            flux_rebinned = rebin_give_width(wlen_model, \
-                                            spectrum_model, \
-                                            self.wlen, \
-                                            self.wlen_bins)
+            flux_rebinned = rebin_give_width(wlen_model,
+                                             spectrum_model,
+                                             self.wlen,
+                                             self.wlen_bins)
         else:
             flux_rebinned = \
-                self.photometric_transformation_function(wlen_model, \
-                                                spectrum_model)
+                self.photometric_transformation_function(wlen_model,
+                                                         spectrum_model)
             # species spectrum_to_flux functions return (flux,error)
             if isinstance(flux_rebinned,(tuple,list)):
                 flux_rebinned = flux_rebinned[0]
@@ -341,10 +341,10 @@ class Data:
         if plotting:
             if not self.photometry:
                 plt.plot(self.wlen, flux_rebinned)
-                plt.errorbar(self.wlen, \
-                                self.flux*self.scale_factor, \
-                                yerr = f_err, \
-                                fmt = '+')
+                plt.errorbar(self.wlen,
+                             self.flux*self.scale_factor,
+                             yerr = f_err,
+                             fmt = '+')
                 plt.show()
         return logL
 

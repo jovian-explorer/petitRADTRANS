@@ -46,6 +46,7 @@ legend = {'fancybox' : True,
 scatter = {'marker' : 'o',
            'edgecolors' : 'k'}
 
+
 print("Using pRT Plotting style!")
 mpl.rc('font', **font)
 mpl.rc('lines',**lines)
