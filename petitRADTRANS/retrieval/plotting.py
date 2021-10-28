@@ -98,8 +98,8 @@ def contour_corner(sampledict,
                    true_values=None,
                    short_name=None,
                    legend=False,
-                prt_plot_style = True,
-                **kwargs):
+                   prt_plot_style=True,
+                   **kwargs):
     """
     Use the corner package to plot the posterior distributions produced by pymultinest.
 
@@ -144,28 +144,29 @@ def contour_corner(sampledict,
     import matplotlib as mpl
     if prt_plot_style:
         mpl.rcParams.update(mpl.rcParamsDefault)
-        font = {'family' : 'serif'}
-        xtick = {'top' : True,
-                 'bottom' : True,
-                 'direction' : 'in'}
+        font = {'family': 'serif'}
+        xtick = {'top': True,
+                 'bottom': True,
+                 'direction': 'in'}
 
-        ytick = {'left' : True,
-                 'right' : True,
-                 'direction' : 'in'}
-        xmin = {'visible' : True}
-        ymin = {'visible' : True}
-        mpl.rc('xtick',**xtick)
-        mpl.rc('xtick.minor',**xmin)
-        mpl.rc('ytick',**ytick)
-        mpl.rc('ytick.minor',**ymin)
+        ytick = {'left': True,
+                 'right': True,
+                 'direction': 'in'}
+        xmin = {'visible': True}
+        ymin = {'visible': True}
+        mpl.rc('xtick', **xtick)
+        mpl.rc('xtick.minor', **xmin)
+        mpl.rc('ytick', **ytick)
+        mpl.rc('ytick.minor', **ymin)
         mpl.rc('font', **font)
 
-        color_list = ['#009FB8','#FF695C', '#70FF92',  '#FFBB33', '#6171FF', "#FF1F69", "#52AC25", '#E574FF', "#FF261D", "#B429FF" ]
+        color_list = ['#009FB8', '#FF695C', '#70FF92', '#FFBB33', '#6171FF', "#FF1F69", "#52AC25", '#E574FF', "#FF261D",
+                      "#B429FF"]
     else:
         mpl.rcParams.update(mpl.rcParamsDefault)
 
-        #from .plot_style import prt_colours
-    #color_list = prt_colours
+        # from .plot_style import prt_colours
+    # color_list = prt_colours
     N_samples = []
     range_list = []
     handles = []
@@ -218,7 +219,7 @@ def contour_corner(sampledict,
                 truths_list.append(true_values[key][i])
         except:
             pass
-        #fig = plt.figure(figsize = (60,60),dpi=80)
+        # fig = plt.figure(figsize = (60,60),dpi=80)
         label_kwargs = None
         title_kwargs = None
         hist_kwargs = None

@@ -101,7 +101,7 @@ def init_run():
 
     run_definition_simple.set_line_species(
         radtrans_parameters['spectrum_parameters']['line_species_correlated_k'],
-        free=True,
+        eq=False,
         abund_lim=(
             np.mean(radtrans_parameters['retrieval_parameters']['log10_species_mass_fractions_bounds']),
             (radtrans_parameters['retrieval_parameters']['log10_species_mass_fractions_bounds'][1]

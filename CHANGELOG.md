@@ -4,7 +4,7 @@ All notable changes to the CCF module will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com)
 and this project adheres to [Semantic Versioning](http://semver.org).
 
-## [2.4.0-a6] - 2021-10-25
+## [2.4.0-a7] - 2021-10-28
 ### Added
 - Module `phoenix` for PHOENIX stellar models.
 - Module `physics` to store useful physical functions.

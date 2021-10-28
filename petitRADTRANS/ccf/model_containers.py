@@ -15,7 +15,7 @@ from petitRADTRANS.radtrans import Radtrans
 
 # from petitRADTRANS.config import petitradtrans_config
 
-# planet_models_directory = os.path.abspath(Path.home()) + os.path.sep + 'Downloads' + os.path.sep + 'tmp' #os.path.abspath(os.path.dirname(__file__) + os.path.sep + 'planet_models')
+# planet_models_directory = os.path_input_data.abspath(Path.home()) + os.path_input_data.sep + 'Downloads' + os.path_input_data.sep + 'tmp' #os.path_input_data.abspath(os.path_input_data.dirname(__file__) + os.path_input_data.sep + 'planet_models')
 planet_models_directory = os.path.abspath(os.path.dirname(__file__) + os.path.sep + 'planet_models')  # TODO change that
 
 
