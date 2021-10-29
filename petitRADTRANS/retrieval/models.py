@@ -941,7 +941,8 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
     shape = int((press.shape[0]/scaling) + P_clouds.shape[0]*width*(scaling - 1))
     if p_out.shape[0] != shape:
         print(f"AMR returned incorrect shape: {p_out.shape[0]} instead of {shape}!")
-    return p_out, ind
+
+    return p_out, press_out[ind, 1].astype('int')
 
 
 def get_abundances(pressures, temperatures, line_species, cloud_species, parameters, AMR = False):
