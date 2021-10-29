@@ -934,6 +934,9 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
     press_out = np.vstack((press_small,press_plus_index[total_inds]))
     press_out = np.sort(press_out, axis = 0)
     p_out,ind = np.unique(press_out[:,0],return_index = True)
+    print(p_out,ind)
+    print(type(p_out),type(ind))
+    print(p_out.shape,ind.shape)
     shape = int((press.shape[0]/scaling) + P_clouds.shape[0]*width*(scaling - 1))
     if p_out.shape[0] != shape:
         print(f"AMR returned incorrect shape: {p_out.shape[0]} instead of {shape}!")
