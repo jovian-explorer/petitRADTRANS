@@ -842,12 +842,11 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
     # guarantees total length will be press.shape[0] + P_clouds.shape[0]*width*(scaling - 1)
     # scaling is how many hi-res points per normal point. Must be int
     # width is the number of low res points to replace. Must be int.
-
     press_plus_index = np.zeros((press.shape[0],2))
     press_plus_index[:,0] = np.logspace(np.log10(np.min(press)),np.log10(np.max(press)),press.shape[0])
     press_plus_index[:,1] = range(len(press_plus_index[:,0]))
     # Set up arrays for indexing
-    press_small= press_plus_index[::scaling,:]
+    press_small = press_plus_index[::scaling,:]
     # Make some lists to store the replacement indices
     c_list = []
     for i,P_cloud in enumerate(P_clouds):
@@ -858,8 +857,13 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
         c_list.append(inds)
     # We need to return a list that's always the same length
     # So we need to check for duplicates
-    total_inds = [-1]
+    total_inds = [-9999]
     for j in range(len(c_list)):
+        uselist = c_list[j]
+        if np.min(uselist) < 0:
+            uselist -= np.min(uselist)
+        if np.max(uselist) > len(press_plus_index)-1:
+            uselist -= (np.max(uselist)-len(press_plus_index)-1)
         # At first, just copy in the list
         #if j == 0:
         #    if np.any(c_list[j] < 0):
@@ -872,14 +876,14 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
         #    continue
         # Check if the next set of indices is lower than the current minimum
         # if so, we want to add scaling*width indices below the current minimum
-        if min(c_list[j])<=min(np.array(total_inds)):
-            start = c_list[j][-1]
+        if min(uselist)<=min(np.array(total_inds)):
+            start = uselist[-1]
             sl = len(total_inds)
             ind = 0
             done = 0
             while len(total_inds) < sl+int(scaling*width):
                 if start-ind < 0:
-                    start = start + len(c_list[j])
+                    start = start + len(uselist)
                     ind = done
                 if np.in1d(start-ind,np.array(total_inds)).any():
                     ind += 1
@@ -891,14 +895,14 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
         # Check if the smallest new index is larger than the current max
         # if so, we can just add the indexes
         # I can probably replace all this with total_inds.extend(c_list[j])
-        elif max(c_list[j])>=max(np.array(total_inds)):
-            start = c_list[j][0]
+        elif max(uselist)>=max(np.array(total_inds)):
+            start = uselist[0]
             sl = len(total_inds)
             ind = 0
             done = 0
             while len(total_inds) < sl+int(scaling*width):
                 if (start+ind) >= (len(press_plus_index)-1):
-                    start = start - len(c_list[j])
+                    start = start - len(uselist)
                     ind = done
                     continue
                 if np.in1d(start+ind,np.array(total_inds)).any():
@@ -912,13 +916,13 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
             # This loop takes care of cases where we're between existing entries
             # it adds indices until duplicates are found, then keeps incrementing
             # until there is a free index to add.
-            start = c_list[j][0]
+            start = uselist[0]
             sl = len(total_inds)
             ind = 0
             done = 0
             while len(total_inds) < sl+int(scaling*width):
                 if (start+ind) >= (len(press_plus_index)-1):
-                    start = start - len(c_list[j])
+                    start = start - len(uselist)
                     ind = done
                     continue
                 if np.in1d(start+ind,np.array(total_inds)).any():
@@ -933,14 +937,11 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
     total_inds.pop(0)
     press_out = np.vstack((press_small,press_plus_index[total_inds]))
     press_out = np.sort(press_out, axis = 0)
-    p_out,ind = np.unique(press_out[:,0],return_index = True)
-    print(p_out,ind)
-    print(type(p_out),type(ind))
-    print(p_out.shape,ind.shape)
+    p_out,ind = np.unique(press_out[:,0],return_index=True)
     shape = int((press.shape[0]/scaling) + P_clouds.shape[0]*width*(scaling - 1))
     if p_out.shape[0] != shape:
         print(f"AMR returned incorrect shape: {p_out.shape[0]} instead of {shape}!")
-    return p_out,  press_out[ind, 1].astype('int')
+    return p_out, ind
 
 
 def get_abundances(pressures, temperatures, line_species, cloud_species, parameters, AMR = False):
