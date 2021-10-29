@@ -348,7 +348,7 @@ class Data:
                              yerr=f_err*self.scale_factor,
                              fmt='+')
                 plt.show()
-        print(self.name,logL)
+
         return log_l
 
     @staticmethod
