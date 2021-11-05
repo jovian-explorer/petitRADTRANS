@@ -138,6 +138,9 @@ def emission_model_diseq(pRT_object,
         return None, None
     pRT_object.press = pressures * 1e6
 
+    gravity = -np.inf
+    R_pl = -np.inf
+
     if 'log_g' in parameters.keys() and 'mass' in parameters.keys():
         gravity = 10 ** parameters['log_g'].value
         r_pl = np.sqrt(nc.G * parameters['mass'].value / gravity)
