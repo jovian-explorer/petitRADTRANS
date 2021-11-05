@@ -655,11 +655,24 @@ class Radtrans(_read_opacities.ReadOpacities):
                                           self.g_gauss, self.w_gauss, \
                                           160)
             '''
-            self.line_struc_kappas[:, :, 0, :] = \
+            import time
+            test = np.zeros_like(self.line_struc_kappas[:, :, 0, :])
+            s1 = time.time()
+            #np.save("/Users/nasedkin/Documents/RetrievalNotebooks/line_struc_kappas_inputs",self.line_struc_kappas)
+
+            """test = \
               fs.combine_opas_sample_ck(self.line_struc_kappas, \
                                           self.g_gauss, self.w_gauss, \
-                                          1000)
+                                          10000,
+                                          fast=False)"""
+            self.line_struc_kappas[:, :, 0, :]  = fs.combine_opas_ck(self.line_struc_kappas, \
+                                          self.g_gauss, self.w_gauss)
 
+
+            #print("Time: ",e1-s1,e2-e1)
+            #np.save("/Users/nasedkin/Documents/RetrievalNotebooks/line_struc_kappas_out_complete",self.line_struc_kappas[:, :, 0, :])
+            #np.save("/Users/nasedkin/Documents/RetrievalNotebooks/line_struc_kappas_out_sampled",test)
+            #sys.exit(1)
             #stamps.append(time.clock())
             #self.combine_opas_shuffle_ck()
             #stamps.append(time.clock())

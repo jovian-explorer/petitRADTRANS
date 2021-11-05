@@ -133,8 +133,8 @@ def emission_model_diseq(pRT_object,
         return None,None
     pRT_object.press = pressures*1e6
 
-    gravity = 2.0
-    R_pl = 1.0
+    gravity = -np.inf
+    R_pl = -np.inf
     if 'log_g' in parameters.keys() and 'mass' in parameters.keys():
         gravity = 10**parameters['log_g'].value
         R_pl = np.sqrt(nc.G*parameters['mass'].value/gravity)
@@ -941,7 +941,6 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
     shape = int((press.shape[0]/scaling) + P_clouds.shape[0]*width*(scaling - 1))
     if p_out.shape[0] != shape:
         print(f"AMR returned incorrect shape: {p_out.shape[0]} instead of {shape}!")
-
     return p_out, press_out[ind, 1].astype('int')
 
 
