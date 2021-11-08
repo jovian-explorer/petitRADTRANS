@@ -151,7 +151,8 @@ class RetrievalConfig:
         self.parameters[name] = Parameter(name, free, value,
                                           transform_prior_cube_coordinate=transform_prior_cube_coordinate)
 
-    def list_available_line_species(self):
+    @staticmethod
+    def list_available_line_species():
         """
         List the currently installed opacity tables that are available for species that contribute to the line opacity.
         """
@@ -161,15 +162,21 @@ class RetrievalConfig:
         files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/corr_k/")]
         files = set([f.split('_R_')[0] for f in files])
         print("\ncorrelated-k opacities")
-        for f in files: print(f)
+
+        for f in files:
+            print(f)
 
         lbl = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/line_by_line/")]
         lbl = set(lbl)
         print("\nline-by-line opacities")
-        for f in lbl: print(f)
+
+        for f in lbl:
+            print(f)
+
         return files.union(lbl)
 
-    def list_available_cloud_species(self):
+    @staticmethod
+    def list_available_cloud_species():
         """
         List the currently installed opacity tables that are available for cloud species.
         """
@@ -178,10 +185,14 @@ class RetrievalConfig:
 
         files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/continuum/clouds/")]
         files = set(files)
-        for f in files: print(f)
+
+        for f in files:
+            print(f)
+
         return files
 
-    def list_available_cia_species(self):
+    @staticmethod
+    def list_available_cia_species():
         """
         List the currently installed opacity tables that are available for CIA species.
         """
@@ -190,7 +201,10 @@ class RetrievalConfig:
 
         files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/continuum/cia/")]
         files = set(files)
-        for f in files: print(f)
+
+        for f in files:
+            print(f)
+
         return files
 
     def set_line_species(self, linelist, eq=False, abund_lim=(-6.0, 6.0)):
@@ -424,7 +438,7 @@ class RetrievalConfig:
         If using species, the name in the data file must be of the format instrument/filter.
 
         Args:
-            name : str
+            model_generating_function : str
                 Identifier for this data set.
             path : str
                 Path to observations file, including filename.
@@ -447,6 +461,8 @@ class RetrievalConfig:
             photometric_transformation_function : method
                 A function that will transform a spectrum into an average synthetic photometric point,
                 typicall accounting for filter transmission.
+            opacity_mode: str
+                Opacity mode.
         """
 
         photometry = open(path)

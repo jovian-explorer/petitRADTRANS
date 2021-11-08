@@ -373,8 +373,7 @@ class Data:
         # it to be sure, or more versatile in the future.
         # Also, we have a log-spaced grid, so the spacing is constant
         # as a function of wavelength
-        spacing = np.mean(2. * np.diff(input_wavelength) / \
-                          (input_wavelength[1:] + input_wavelength[:-1]))
+        spacing = np.mean(2. * np.diff(input_wavelength) / (input_wavelength[1:] + input_wavelength[:-1]))
 
         # Calculate the sigma to be used in the gauss filter in units
         # of input wavelength bins

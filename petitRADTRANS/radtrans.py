@@ -776,7 +776,6 @@ class Radtrans(_read_opacities.ReadOpacities):
                                       dtype='d', order='F').T
             except:
                 print("You must provide a value for the Hansen distribution width, b_hans!")
-                b_hans = None
                 sys.exit(15)
         for i_spec in range(len(self.cloud_species)):
             self.cloud_mass_fracs[:, i_spec] = abundances[self.cloud_species[i_spec]]
@@ -1374,10 +1373,6 @@ class Radtrans(_read_opacities.ReadOpacities):
                     Standard is ``True``. If ``False`` the gravity will be
                     constant as a function of pressure, during the transmission
                     radius calculation.
-                add_cloud_scat_as_abs (Optional[bool]):
-                    If ``True``, 20 % of the cloud scattering opacity will be
-                    added to the absorption opacity, introduced to test for the
-                    effect of neglecting scattering.
                 dist (Optional[string]):
                     The cloud particle size distribution to use.
                     Can be either 'lognormal' (default) or 'hansen'.
@@ -1557,6 +1552,10 @@ class Radtrans(_read_opacities.ReadOpacities):
                 haze_factor (Optional[float]):
                     Scalar factor, increasing the gas Rayleigh scattering
                     cross-section.
+                add_cloud_scat_as_abs (Optional[bool]):
+                    If ``True``, 20 % of the cloud scattering opacity will be
+                    added to the absorption opacity, introduced to test for the
+                    effect of neglecting scattering.
                 dist (Optional[string]):
                     The cloud particle size distribution to use.
                     Can be either 'lognormal' (default) or 'hansen'.
@@ -1659,7 +1658,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         import pylab as plt
 
         plt_weights = {}
-        if mass_fraction == None:
+        if mass_fraction is None:
             for spec in species:
                 plt_weights[spec] = 1.
         elif mass_fraction == 'eq':
@@ -1736,7 +1735,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             ret_opa_table = ret_opa_table.reshape(self.custom_diffTs[spec],
                                                   self.custom_diffPs[spec],
                                                   self.freq_len,
-                                                  len(self.w_gauss))
+                                                  len(self.w_gauss))  # TODO fix incorrect call argument
             ret_opa_table = np.swapaxes(ret_opa_table, 1, 0)
             ret_opa_table[ret_opa_table < 1e-60] = 1e-60
             f.create_dataset('kcoeff', data=ret_opa_table)
@@ -1808,11 +1807,11 @@ def py_calc_cloud_opas(rho,
                 np.exp(-4.5 * np.log(sigma_n) ** 2.0)
 
             dndr = n / (cloud_radii * np.sqrt(2.0 * np.pi) * np.log(sigma_n)) \
-                   * np.exp(-np.log(cloud_radii / r_g[i_struct, i_c]) ** 2.0 / (2.0 * (np.log(sigma_n) ** 2.0)))
+                * np.exp(-np.log(cloud_radii / r_g[i_struct, i_c]) ** 2.0 / (2.0 * (np.log(sigma_n) ** 2.0)))
             integrand_abs = (4.0 * np.pi / 3.0) * (cloud_radii[:, np.newaxis] ** 3.0) * rho_p[i_c] \
-                            * dndr[:, np.newaxis] * cloud_specs_abs_opa[:, :, i_c]
+                * dndr[:, np.newaxis] * cloud_specs_abs_opa[:, :, i_c]
             integrand_scat = (4.0 * np.pi / 3.0) * (cloud_radii[:, np.newaxis] ** 3.0) * rho_p[i_c] \
-                             * dndr[:, np.newaxis] * cloud_specs_scat_opa[:, :, i_c]
+                * dndr[:, np.newaxis] * cloud_specs_scat_opa[:, :, i_c]
             integrand_aniso = integrand_scat * (1.0 - cloud_aniso[:, :, i_c])
             add_abs = np.sum(integrand_abs * (cloud_rad_bins[1:n_cloud_rad_bins + 1, np.newaxis] -
                                               cloud_rad_bins[0:n_cloud_rad_bins, np.newaxis]), axis=0)

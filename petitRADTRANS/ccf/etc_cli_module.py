@@ -88,11 +88,11 @@ def collapse(jsondata):
         return dic
 
     def goThroughList(lst):
-        if(not any(not isinstance(y, (int, float)) for y in lst)):  # pure numeric list
+        if not any(not isinstance(y, (int, float)) for y in lst):  # pure numeric list
             if len(lst) <= 2:
                 return lst
             else:
-                return '['+str(lst[0]) + ' ... '+str(lst[-1])+'] ('+str(len(lst))+')'
+                return '[' + str(lst[0]) + ' ... ' + str(lst[-1]) + '] (' + str(len(lst)) + ')'
         else:
             return [goThrough(y) for y in lst]
 
@@ -109,15 +109,15 @@ def callEtc(postdatafile, url, uploadfile=None):
 
     if uploadfile is None:
         return requests.post(url,
-                          data=json.dumps(postdata),
-                          headers={'Content-Type': 'application/json'},
-                          verify=False,
-                          )
+                             data=json.dumps(postdata),
+                             headers={'Content-Type': 'application/json'},
+                             verify=False,
+                             )
     else:
         return requests.post(url,
-                          data={"data": json.dumps(postdata)},
-                          files={"target": open(uploadfile, 'rb')},
-                          verify=False)
+                             data={"data": json.dumps(postdata)},
+                             files={"target": open(uploadfile, 'rb')},
+                             verify=False)
 
 
 def output(jsondata, do_collapse, indent, outputfile):
@@ -132,9 +132,9 @@ def output(jsondata, do_collapse, indent, outputfile):
 
 
 def getEtcUrl(etcname):
-    if('4most' in etcname.lower() or 'qmost' in etcname.lower() or 'fourmost' in etcname.lower()):
+    if '4most' in etcname.lower() or 'qmost' in etcname.lower() or 'fourmost' in etcname.lower():
         return 'Qmost/'
-    elif('crires' in etcname.lower()):
+    elif 'crires' in etcname.lower():
         return 'Crires2/'
     else:
         print("error: no match for etcname: " + etcname)
@@ -144,9 +144,9 @@ def get_data(etcname, postdatafile, uploadfile=None, do_collapse=False, indent=4
     # ETC backend test server with public access
     baseurl = 'https://etctestpub.eso.org/observing/etc/etcapi/'
 
-    etcName = getEtcUrl(etcname)
+    etc_name = getEtcUrl(etcname)
 
-    url = baseurl + getEtcUrl(etcName)
+    url = baseurl + getEtcUrl(etc_name)
 
     jsondata = callEtc(postdatafile, url, uploadfile).json()
 
@@ -169,16 +169,16 @@ def write_request_file(file_name, star_apparent_magnitude, exposure_time, integr
     if not isinstance(setting_orders, list):
         raise TypeError(f"setting_orders must be a list, not '{type(setting_orders)}'")
 
-    request_file = copy.copy(request_file_base_dict)
-    request_file['target']['brightness']['params']['magband'] = star_apparent_magnitude_band
-    request_file['target']['brightness']['params']['mag'] = star_apparent_magnitude
-    request_file['timesnr']['dit'] = integration_time
-    request_file['timesnr']['ndit']['ndit'] = int(np.ceil(exposure_time / integration_time))
-    request_file['sky']['airmass'] = airmass
-    request_file['instrument']['settingkey'] = setting
-    request_file['instrument']['order'] = setting_orders
+    request_file_ = copy.copy(request_file_base_dict)
+    request_file_['target']['brightness']['params']['magband'] = star_apparent_magnitude_band
+    request_file_['target']['brightness']['params']['mag'] = star_apparent_magnitude
+    request_file_['timesnr']['dit'] = integration_time
+    request_file_['timesnr']['ndit']['ndit'] = int(np.ceil(exposure_time / integration_time))
+    request_file_['sky']['airmass'] = airmass
+    request_file_['instrument']['settingkey'] = setting
+    request_file_['instrument']['order'] = setting_orders
 
-    output(request_file, do_collapse=False, indent=2, outputfile=file_name)
+    output(request_file_, do_collapse=False, indent=2, outputfile=file_name)
 
 
 def get_snr_data_file_name(instrument, setting, exposure_time, integration_time, airmass, star_model,

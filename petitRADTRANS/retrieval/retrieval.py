@@ -112,7 +112,7 @@ class Retrieval:
         # Set up pretty plotting
         if pRT_plot_style:
             import petitRADTRANS.retrieval.plot_style
-        self.prt_plot_style =pRT_plot_style
+        self.prt_plot_style = pRT_plot_style
         # Path to input opacities
         self.path = petitradtrans_config['Paths']['pRT_input_data_path']
 
@@ -308,7 +308,7 @@ class Retrieval:
                     import ultranest.stepsampler
                     sampler.run(min_num_live_points=400,
                                 max_n_calls=400000,
-                                region_class=RobustEllipsoidRegion)
+                                region_class=RobustEllipsoidRegion)  # TODO fix incorrect call argument
                     sampler.stepsampler = ultranest.stepsampler.RegionSliceSampler(nsteps=n_live_points,
                                                                                    adaptive_nsteps='move-distance')
                 except:  # TODO find which exception is expected
@@ -422,8 +422,8 @@ class Retrieval:
                     samples_use = self.samples[self.retrieval_name]
                     parameters_read = self.param_dict[self.retrieval_name]
                     # Get best-fit index
-                    logL = samples_use[:, -1]
-                    best_fit_index = np.argmax(logL)
+                    log_l = samples_use[:, -1]
+                    best_fit_index = np.argmax(log_l)
                     self.get_best_fit_params(samples_use[best_fit_index, :-1], parameters_read)
                 for key, value in self.best_fit_params.items():
                     if key in ['pressure_simple', 'pressure_width', 'pressure_scaling']:
@@ -932,7 +932,7 @@ class Retrieval:
             self.run_mode = 'evaluate'
         if output_dir is None:
             output_dir = self.output_dir
-        sample_dict, parameter_dict = self.get_samples(output_dir,ret_names=ret_names)
+        sample_dict, parameter_dict = self.get_samples(output_dir, ret_names=ret_names)
 
         ###########################################
         # Plot best-fit spectrum
@@ -1433,12 +1433,14 @@ class Retrieval:
         output_file = self.output_dir + 'evaluate_' + self.retrieval_name + '/corner_nice.pdf'
 
         # from Plotting
-        fig =contour_corner(sample_use_dict,
-                       p_use_dict,
-                       output_file,
-                       parameter_plot_indices=p_plot_inds,
-                       parameter_ranges=p_ranges,
-                       true_values=None,
-                             prt_plot_style=self.prt_plot_style,
-                             **kwargs)
+        fig = contour_corner(
+            sample_use_dict,
+            p_use_dict,
+            output_file,
+            parameter_plot_indices=p_plot_inds,
+            parameter_ranges=p_ranges,
+            true_values=None,
+            prt_plot_style=self.prt_plot_style,
+            **kwargs
+        )
         return fig

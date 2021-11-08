@@ -40,7 +40,7 @@ def calc_MMW(abundances):
 ####################################################################################
 ####################################################################################
 
-def retrieval_model_plain(rt_object, temperature_parameters, log_g, log_P0, \
+def retrieval_model_plain(rt_object, temperature_parameters, log_g, log_P0,
                           R_pl, ab_metals):
     gravity = 1e1 ** log_g
 
@@ -59,7 +59,7 @@ def retrieval_model_plain(rt_object, temperature_parameters, log_g, log_P0, \
 
     MMW = calc_MMW(abundances)
 
-    rt_object.calc_transm(temp, abundances, gravity, MMW, \
+    rt_object.calc_transm(temp, abundances, gravity, MMW,
                           R_pl=R_pl, P0_bar=1e1 ** log_P0)
 
     return nc.c / rt_object.freq, rt_object.transm_rad / nc.r_jup_mean

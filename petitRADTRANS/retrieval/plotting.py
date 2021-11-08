@@ -119,7 +119,7 @@ def contour_corner(sampledict,
             A dictionary with keys for each retrieval name as in sampledict. Each value
             contains the ranges of parameters that have a range set with corner_range in the
             parameter class. Otherwise the range is +/- 4 sigma
-        parameter_plot_indicies : dict
+        parameter_plot_indices : dict
             A dictionary with keys for each retrieval name as in sampledict. Each value
             contains the indices of the sample to plot, as set by the plot_in_corner
             parameter of the parameter class
@@ -433,10 +433,6 @@ def nice_corner(samples,
 
         else:
             ax.axis('off')
-
-        labels = ax.yaxis.get_ticklabels(which='both')
-        # print(labels)
-        # labels[-1].set_visible(False)
 
         i_col += 1
         if i_col % dimensions == 0:

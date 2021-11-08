@@ -628,11 +628,6 @@ def main_aumicc():
             if species + '_' in line_species:
                 mmr_neq[line_species] = molecular_w[line_species] * 1e-3 * vmr_neq_i / mmmr_neq_i
 
-    mass_fractions = [
-        None,
-        mmr_neq
-    ]
-
     # Observation parameters
     # Actually matter (used to get the CRIRES SNR data from the ETC website)
     exposure_time = 6 * 3600
@@ -973,7 +968,6 @@ def main_hd():
     snrs = {}
     snrs_error = {}
     results = {}
-    tsm = 0
 
     for trans in [2]:
         for i, planet in enumerate(planets):
@@ -2023,7 +2017,6 @@ def test():
 
     # Observation parameters
     # Actually matter (used to get the CRIRES SNR data from the ETC website)
-    exposure_time = 6 * 3600  # 4 * 3600
     integration_time = 60
     airmass = 1.2
     velocity_range = [-1400, 1400]
@@ -2207,7 +2200,6 @@ def test_emission():
 
     # Observation parameters
     # Actually matter (used to get the CRIRES SNR data from the ETC website)
-    exposure_time = 6 * 3600  # 4 * 3600
     integration_time = 60
     airmass = 1.2
     velocity_range = [-1400, 1400]

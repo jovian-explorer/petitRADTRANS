@@ -96,13 +96,13 @@ def hminus_opacity(lambda_angstroem, border_lambda_angstroem,
     n_e = mmw / m_e * abundances['e-']
 
     # Calc. e- partial pressure
-    P_e = press * n_e
+    p_e = press * n_e
 
     kappa_hminus_bf = sigma_bf_mean(border_lambda_angstroem) / nc.amu
 
     for i_struct in range(len(n_e)):
         kappa_hminus_ff = sigma_hm_ff(lambda_angstroem, temp[i_struct],
-                                      P_e[i_struct]) / nc.amu * abundances['H'][i_struct]
+                                      p_e[i_struct]) / nc.amu * abundances['H'][i_struct]
 
         ret_val[:, i_struct] = kappa_hminus_bf * abundances['H-'][i_struct] \
             + kappa_hminus_ff

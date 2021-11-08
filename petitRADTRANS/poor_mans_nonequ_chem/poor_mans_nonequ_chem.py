@@ -93,20 +93,20 @@ chem_table = np.array(chem_table, order='F')  # change the order to column-wise 
 
 
 def interpol_abundances(COs_goal_in, FEHs_goal_in, temps_goal_in, pressures_goal_in,
-                        Pquench_carbon = None):
+                        Pquench_carbon=None):
     """
     Interpol abundances to desired coordinates.
     """
 
-    COs_goal, FEHs_goal, temps_goal, pressures_goal = \
-      cp.copy(COs_goal_in), cp.copy(FEHs_goal_in), cp.copy(temps_goal_in), cp.copy(pressures_goal_in)
+    co_ratios_goal, fehs_goal, temps_goal, pressures_goal = \
+        cp.copy(COs_goal_in), cp.copy(FEHs_goal_in), cp.copy(temps_goal_in), cp.copy(pressures_goal_in)
 
     # Apply boundary treatment
-    COs_goal[COs_goal <= np.min(COs)] = np.min(COs) + 1e-6
-    COs_goal[COs_goal >= np.max(COs)] = np.max(COs) - 1e-6
+    co_ratios_goal[co_ratios_goal <= np.min(COs)] = np.min(COs) + 1e-6
+    co_ratios_goal[co_ratios_goal >= np.max(COs)] = np.max(COs) - 1e-6
 
-    FEHs_goal[FEHs_goal <= np.min(FEHs)] = np.min(FEHs) + 1e-6
-    FEHs_goal[FEHs_goal >= np.max(FEHs)] = np.max(FEHs) - 1e-6
+    fehs_goal[fehs_goal <= np.min(FEHs)] = np.min(FEHs) + 1e-6
+    fehs_goal[fehs_goal >= np.max(FEHs)] = np.max(FEHs) - 1e-6
 
     temps_goal[temps_goal <= np.min(temps)] = np.min(temps) + 1e-6
     temps_goal[temps_goal >= np.max(temps)] = np.max(temps) - 1e-6
@@ -117,22 +117,24 @@ def interpol_abundances(COs_goal_in, FEHs_goal_in, temps_goal_in, pressures_goal
         - 1e-6
 
     # Get interpolation indices
-    COs_large_int = np.searchsorted(COs, COs_goal)+1
-    FEHs_large_int = np.searchsorted(FEHs, FEHs_goal)+1
+    co_ratios_large_int = np.searchsorted(COs, co_ratios_goal)+1
+    fehs_large_int = np.searchsorted(FEHs, fehs_goal)+1
     temps_large_int = np.searchsorted(temps, temps_goal)+1
     pressures_large_int = np.searchsorted(pressures, pressures_goal)+1
 
     # Get the interpolated values from Fortran routine
-    abundances_arr = cfu.interpolate(COs_goal, FEHs_goal, temps_goal,
-                                      pressures_goal, COs_large_int,
-                                      FEHs_large_int, temps_large_int,
-                                      pressures_large_int, FEHs, COs, temps,
-                                      pressures, chem_table)
+    abundances_arr = cfu.interpolate(
+        co_ratios_goal, fehs_goal, temps_goal,
+        pressures_goal, co_ratios_large_int,
+        fehs_large_int, temps_large_int,
+        pressures_large_int, FEHs, COs, temps,
+        pressures, chem_table
+    )
 
     # Sort in output format of this function
     abundances = {}
-    for id, name in enumerate(names):
-        abundances[name] = abundances_arr[id, :]
+    for id_, name in enumerate(names):
+        abundances[name] = abundances_arr[id_, :]
 
     # Carbon quenching? Assumes pressures_goal is sorted in ascending order
     if Pquench_carbon is not None:
