@@ -1,3 +1,4 @@
+import copy as cp
 import glob
 
 import corner
@@ -19,13 +20,11 @@ def plot_specs(fig, ax, path, name, nsample, color1, color2, zorder, rebin_val=N
     spectra = np.zeros((nsample, npoints))
     for i_s in range(nsample):
         if rebin_val is not None:
-            npoints = int(len(wlen))
             spectra[i_s, :] = uniform_filter1d(np.genfromtxt(specs[i_s])[:, 1],
                                                rebin_val)[::rebin_val]
         else:
             wlen = np.genfromtxt(specs[i_s])[:, 0]
-            npoints = int(len(wlen))
-            for i_s in range(nsample):
+            for i_s in range(nsample):  # TODO check this weird loop
                 spectra[i_s, :] = np.genfromtxt(specs[i_s])[:, 1]
 
     sort_spec = np.sort(spectra, axis=0)
@@ -62,7 +61,7 @@ def plot_data(fig, ax, data, resolution=None, scaling=1.0):
                 wlen = data.wlen
                 error = data.flux_error
                 flux = data.calculate_star_radiosity
-        except:
+        except:  # TODO find what is the error expected here
             wlen = data.wlen
             error = data.flux_error
             flux = data.calculate_star_radiosity
@@ -70,7 +69,7 @@ def plot_data(fig, ax, data, resolution=None, scaling=1.0):
         wlen = np.mean(data.width_photometry)
         flux = data.calculate_star_radiosity
         error = data.flux_error
-        wlen_bins = data.wlen_bins
+
     marker = 'o'
     if data.photometry:
         marker = 's'
@@ -167,7 +166,7 @@ def contour_corner(sampledict,
 
         # from .plot_style import prt_colours
     # color_list = prt_colours
-    N_samples = []
+
     range_list = []
     handles = []
     count = 0
@@ -177,9 +176,9 @@ def contour_corner(sampledict,
             print("Not enough colors to continue plotting. Please add to the list.")
             print("Outputting first " + str(count) + " retrievals.")
             break
-        dimensions = len(parameter_plot_indices[key])
-        N_samples = len(samples)
-        S = N_samples
+
+        n_samples = len(samples)
+        s = n_samples
         try:
             if parameter_plot_indices[key] is None:
                 parameter_plot_indices = {key: np.linspace(0, len(parameter_names[key]) - 1,
@@ -191,12 +190,12 @@ def contour_corner(sampledict,
         labels_list = []
 
         for i in parameter_plot_indices[key]:
-            data_list.append(samples[len(samples) - S:, i])
+            data_list.append(samples[len(samples) - s:, i])
             labels_list.append(parameter_names[key][i])
 
             if parameter_ranges[key][i] is None:
-                range_mean = np.mean(samples[len(samples) - S:, i])
-                range_std = np.std(samples[len(samples) - S:, i])
+                range_mean = np.mean(samples[len(samples) - s:, i])
+                range_std = np.std(samples[len(samples) - s:, i])
                 low = range_mean - 4 * range_std
                 high = range_mean + 4 * range_std
 
@@ -283,8 +282,7 @@ def contour_corner(sampledict,
         fig.get_axes()[2].legend(handles=handles,
                                  loc='upper right')
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
-    if prt_plot_style:
-        import petitRADTRANS.retrieval.plot_style
+
     return fig
 
 
@@ -308,9 +306,9 @@ def nice_corner(samples,
     plt.rc('text', usetex=True)
 
     if N_samples is not None:
-        S = N_samples
+        s = N_samples
     else:
-        S = len(samples)
+        s = len(samples)
 
     try:
         if parameter_plot_indices is None:
@@ -328,20 +326,20 @@ def nice_corner(samples,
 
     for i in parameter_plot_indices:
 
-        data_list.append(samples[len(samples) - S:, i])
+        data_list.append(samples[len(samples) - s:, i])
         labels_list.append(parameter_names[i])
 
         try:
-            if parameter_ranges[i] == None:
-                range_mean = np.mean(samples[len(samples) - S:, i])
-                range_std = np.std(samples[len(samples) - S:, i])
+            if parameter_ranges[i] is None:
+                range_mean = np.mean(samples[len(samples) - s:, i])
+                range_std = np.std(samples[len(samples) - s:, i])
                 range_take = (range_mean - 4 * range_std, range_mean + 4 * range_std)
                 range_list.append(range_take)
             else:
                 range_list.append(parameter_ranges[i])
         except:
-            range_mean = np.mean(samples[len(samples) - S:, i])
-            range_std = np.std(samples[len(samples) - S:, i])
+            range_mean = np.mean(samples[len(samples) - s:, i])
+            range_std = np.std(samples[len(samples) - s:, i])
             range_take = (range_mean - 4 * range_std, range_mean + 4 * range_std)
             range_list.append(range_take)
 
@@ -381,7 +379,7 @@ def nice_corner(samples,
 
             gridsize = 22
             ax.hexbin(x, y, cmap='bone_r', gridsize=gridsize,
-                      vmax=int(max_val_ratio * S / gridsize ** 2.),
+                      vmax=int(max_val_ratio * s / gridsize ** 2.),
                       rasterized=True)
 
             ax.set_xlim([range_list[i_col][0], range_list[i_col][1]])
@@ -411,7 +409,6 @@ def nice_corner(samples,
             ax.set_title(med + r'$^{+' + up + '}_{-' + do + '}$',
                          fontdict=font, fontsize=int(22 * 5. / len(parameter_plot_indices)))
 
-            import copy as cp
             use_data = cp.copy(data_list[i_col])
             index = (use_data >= range_list[i_col][0]) & \
                     (use_data <= range_list[i_col][1])
