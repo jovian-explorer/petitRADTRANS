@@ -1768,7 +1768,7 @@ end SUBROUTINE fit_linear
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 subroutine combine_opas_sample_ck(line_struc_kappas, g_gauss, weights, &
    nsample, fast, g_len, freq_len, N_species, struc_len, line_struc_kappas_out)
-
+   ! DEPRECATED - use combine_opas_ck
    implicit none
 
    INTEGER, INTENT(IN)          :: nsample, g_len, freq_len, N_species, struc_len
@@ -2068,7 +2068,10 @@ subroutine combine_opas_sample_ck(line_struc_kappas, g_gauss, weights, &
 
 end subroutine combine_opas_sample_ck
 
-
+! Implementation of linear interpolation function
+! Takes arrays of points in x and y, together with an
+! array of output points. Interpolates to find
+! the output y-values.
 subroutine linear_interpolate(x,y,x_out,input_len,output_len,y_out)
 
    implicit none
@@ -2174,11 +2177,14 @@ subroutine combine_opas_ck(line_struc_kappas, g_gauss, weights, &
                   cum_sum = cum_sum + &
                         sampled_opa_weights_2(i_samp, 2)
                end do
+
                g_final_2(nsample_2+1) = 1d0
+
                k_final_2(1:nsample_2) = sampled_opa_weights_2(:, 1)
                k_final_2(1) = line_struc_kappas_out(1, i_freq, i_struc) + spec2(1)
                k_final_2(nsample_2+1) = line_struc_kappas_out(g_len, i_freq, i_struc) + spec2(g_len)
 
+               ! Linearly interpolate back to the 16-point grid, storing in the output array
                call linear_interpolate(g_final_2, k_final_2, g_gauss, nsample_2+1, g_len, &
                                        line_struc_kappas_out(:, i_freq, i_struc))
             end do
