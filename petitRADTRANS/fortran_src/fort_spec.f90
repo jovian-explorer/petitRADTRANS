@@ -1824,240 +1824,33 @@ module fort_spec
 
         end SUBROUTINE fit_linear
 
-        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        subroutine linear_interpolate(x,y,x_out,input_len,output_len,y_out)
+            implicit none
+
+            ! inputs
+            DOUBLE PRECISION, INTENT(IN) :: x(input_len), y(input_len), x_out(output_len)
+            INTEGER, INTENT(IN) :: input_len, output_len
+
+            ! outputs
+            DOUBLE PRECISION, INTENT(INOUT) :: y_out(output_len)
+
+            ! internal
+            INTEGER :: i, interp_ind(output_len)
+            DOUBLE PRECISION :: dx, dy, delta_x
+
+            call search_intp_ind(x, input_len, x_out, output_len, interp_ind)
+
+            do i = 1, output_len
+                dy = y(interp_ind(i))-y(interp_ind(i)+1)
+                dx = x(interp_ind(i))-x(interp_ind(i)+1)
+                delta_x = x_out(i) - x(interp_ind(i))
+                y_out(i) = y(interp_ind(i)) + ((dy/dx)*delta_x)
+            enddo
+        end subroutine linear_interpolate
+
 
         ! Subroutine to randomly correlate the opacities
-
-        subroutine combine_opas_sample_ck_old(line_struc_kappas, g_gauss, weights, &
-             nsample, g_len, freq_len, N_species, struc_len, line_struc_kappas_out)
-
-          implicit none
-
-          integer, intent(in)          :: nsample, g_len, freq_len, N_species, struc_len
-          double precision, intent(in) :: line_struc_kappas(g_len, freq_len, &
-               N_species, struc_len), g_gauss(g_len), weights(g_len)
-          double precision, intent(out) :: line_struc_kappas_out(g_len, freq_len, &
-               struc_len)
-          ! Internal
-        !!$    integer          :: i_freq, i_spec, i_struc, inds_avail(48), &
-          integer          :: i_freq, i_spec, i_struc, inds_avail(32), &
-        !!$  integer          :: i_freq, i_spec, i_struc, inds_avail(16), &
-               ind_use(nsample), i_samp, intpint(g_len), i_g
-        !  double precision :: r_index(nsample,freq_len, &
-          !       N_species, struc_len), weights_use(g_len), g_sample(nsample)
-          double precision :: r_index(nsample), weights_use(g_len), g_sample(nsample)
-          double precision :: sampled_opa_weights(nsample, 2, freq_len, struc_len), &
-               cum_sum, k_min(freq_len, struc_len), k_max(freq_len, struc_len), &
-               g_final(nsample+2), k_final(nsample+2)
-
-        !  double precision :: time_test, t1, t2, t0
-          double precision :: threshold(freq_len, struc_len)
-          integer          :: take_spec(freq_len, struc_len), take_spec_ind(freq_len, struc_len) !, &
-                                !     not_one, equal_two
-
-
-          inds_avail = (/ 1, 2, 3, 4, 5, 6, 7, 8, &
-               1, 2, 3, 4, 5, 6, 7, 8, &
-               1, 2, 3, 4, 5, 6, 7, 8, &
-               9, 10, 11, 12, 13, 14, 15, 16 /)
-
-        !!$  inds_avail = (/ 1, 2, 3, 4, 5, 6, 7, 8, &
-        !!$       9, 10, 11, 12, 13, 14, 15, 16 /)
-
-        !!$  inds_avail = (/ 1, 2, 3, 4, 5, 6, 7, 8, &
-        !!$       1, 2, 3, 4, 5, 6, 7, 8, &
-        !!$       1, 2, 3, 4, 5, 6, 7, 8, &
-        !!$       1, 2, 3, 4, 5, 6, 7, 8, &
-        !!$       1, 2, 3, 4, 5, 6, 7, 8, &
-        !!$       9, 10, 11, 12, 13, 14, 15, 16 /)
-
-          sampled_opa_weights(:, 1, :, :) = 0d0
-          sampled_opa_weights(:, 2, :, :) = 1d0
-          k_min = 0d0
-          k_max = 0d0
-          weights_use = weights
-          weights_use(1:8) = weights_use(1:8)/3d0
-          take_spec = 0
-          take_spec_ind = 1
-
-        !!$  weights_use(1:8) = weights_use(1:8)/5d0
-
-          call init_random_seed()
-          !call random_number(r_index)
-
-          !time_test = TIME()
-          !t1 = time_test
-
-          ! Find threshold
-          !time_test = TIME()
-          !t0 = time_test
-
-          ! In every layer and frequency bin:
-          ! find the species with the largest kappa(g=0) value,
-          ! save that value.
-          do i_struc = 1, struc_len
-             do i_freq = 1, freq_len
-                threshold(i_freq, i_struc) = MAXVAL(line_struc_kappas(1, i_freq, :, i_struc))
-             end do
-          end do
-
-          do i_struc = 1, struc_len
-             do i_spec = 1, N_species
-                do i_freq = 1, freq_len
-
-                   ! Only consider a species if kappa(g=1) > 0.01 * treshold
-                   if (line_struc_kappas(g_len, i_freq, i_spec, i_struc) < &
-                        threshold(i_freq, i_struc)*1d-2) then
-                      cycle
-                   end if
-
-                   take_spec(i_freq, i_struc) = take_spec(i_freq, i_struc)+1
-                   take_spec_ind(i_freq, i_struc) = i_spec
-
-                end do
-             end do
-          end do
-
-          !not_one = 0
-          !equal_two = 0
-          !do i_struc = 1, struc_len
-          !      do i_freq = 1, freq_len
-          !         if (take_spec(i_freq, i_struc) == 2) then
-          !             equal_two = equal_two+1
-          !         end if
-          !         if (take_spec(i_freq, i_struc) .NE. 1) then
-          !             not_one = not_one+1
-          !         end if
-          !      end do
-          !end do
-
-          !write(*,*) 'not_one, equal_two', not_one, equal_two
-
-          !time_test = TIME()
-          !t0 = time_test - t0
-
-          do i_struc = 1, struc_len
-             do i_spec = 1, N_species
-                do i_freq = 1, freq_len
-
-                   ! Only do the sampling if more than one species is to be considered.
-                   if (take_spec(i_freq, i_struc) < 2) then
-                      cycle
-                   end if
-
-                   ! Check again: really sample the current species?
-                   if (line_struc_kappas(g_len, i_freq, i_spec, i_struc) < &
-                        threshold(i_freq, i_struc)*1d-2) then
-                      cycle
-                   end if
-
-        !!$           ind_use = inds_avail( &
-        !!$                int(r_index(:, i_freq, i_spec, i_struc)*(8*6))+1)
-
-                   call random_number(r_index)
-                   !ind_use = inds_avail( &
-                   !     int(r_index(:, i_freq, i_spec, i_struc)*(8*4))+1)
-                   ind_use = inds_avail(int(r_index*(8*4))+1)
-
-
-        !!$           ind_use = inds_avail( &
-        !!$                int(r_index(:, i_freq, i_spec, i_struc)*(8*2))+1)
-
-                   sampled_opa_weights(:, 1, i_freq, i_struc) = &
-                        sampled_opa_weights(:, 1, i_freq, i_struc) + &
-                        line_struc_kappas(ind_use, i_freq, i_spec, i_struc)
-
-                   sampled_opa_weights(:, 2, i_freq, i_struc) = &
-                        sampled_opa_weights(:, 2, i_freq, i_struc) * &
-                        weights_use(ind_use)
-
-                   k_min(i_freq, i_struc) = k_min(i_freq, i_struc) + &
-                        MINVAL(line_struc_kappas(:, i_freq, i_spec, i_struc))
-
-                   k_max(i_freq, i_struc) = k_max(i_freq, i_struc) + &
-                        MAXVAL(line_struc_kappas(:, i_freq, i_spec, i_struc))
-
-                end do
-             end do
-             !write(*,*) take_spec(:, i_struc)
-          end do
-
-          !time_test = TIME()
-          !t1 = time_test - t1
-
-          !time_test = TIME()
-          !t2 = time_test
-
-          do i_struc = 1, struc_len
-             do i_freq = 1, freq_len
-
-                ! Interpolate new corr-k table if more than one species is to be considered
-                if (take_spec(i_freq, i_struc) > 1) then
-
-                   call wrap_quicksort_swap(nsample, sampled_opa_weights(:, :, i_freq, i_struc))
-
-                   sampled_opa_weights(:, 2, i_freq, i_struc) = &
-                        sampled_opa_weights(:, 2, i_freq, i_struc) / &
-                        sum(sampled_opa_weights(:, 2, i_freq, i_struc))
-
-                   g_sample = 0d0
-                   cum_sum = 0d0
-                   do i_samp = 1, nsample
-                      g_sample(i_samp) = &
-                           sampled_opa_weights(i_samp, 2, i_freq, i_struc)/2d0 + &
-                           cum_sum
-                      cum_sum = cum_sum + &
-                           sampled_opa_weights(i_samp, 2, i_freq, i_struc)
-                   end do
-
-                   g_final(1) = 0d0
-                   g_final(2:nsample+1) = g_sample
-                   g_final(nsample+2) = 1d0
-
-                   k_final(1) = k_min(i_freq, i_struc)
-                   k_final(2:nsample+1) = sampled_opa_weights(:, 1, i_freq, i_struc)
-                   k_final(nsample+2) = k_max(i_freq, i_struc)
-
-                   call search_intp_ind(g_final, nsample+2, g_gauss, g_len, intpint)
-                   !if ((i_struc == 1) .and. (i_freq == 1)) then
-                   do i_g = 1, g_len
-        !!$              write(*,*) g_final(intpint(i_g)), g_gauss(i_g), &
-        !!$                   g_final(intpint(i_g)+1), ((g_final(intpint(i_g)) <= &
-        !!$                   g_gauss(i_g)) .and. &
-        !!$                   (g_gauss(i_g) <= g_final(intpint(i_g)+1)))
-
-                      line_struc_kappas_out(i_g, i_freq, i_struc) = &
-                           k_final(intpint(i_g)) + &
-                           (k_final(intpint(i_g)+1) - k_final(intpint(i_g))) / &
-                           (g_final(intpint(i_g)+1) - g_final(intpint(i_g))) * &
-                           (g_gauss(i_g) - g_final(intpint(i_g)))
-
-                   end do
-                   !end if
-
-                ! Otherwise: just take the opacity of the only species as the full combined k-table
-                else
-
-                   line_struc_kappas_out(:, i_freq, i_struc) = &
-                        line_struc_kappas(:, i_freq, take_spec_ind(i_freq, i_struc), i_struc)
-
-                end if
-
-             end do
-          end do
-
-          !time_test = TIME()
-          !t2 = time_test - t2
-
-          !write(*,*) 'Time spend where', t0/(t0+t1+t2), t1/(t0+t1+t2), t2/(t0+t1+t2)
-
-        end subroutine combine_opas_sample_ck_old
-
-
         subroutine combine_opas_sample_ck(line_struc_kappas, g_gauss, weights, &
                 nsample, fast, g_len, freq_len, N_species, struc_len, line_struc_kappas_out)
             implicit none
@@ -2292,7 +2085,7 @@ module fort_spec
             double precision, intent(out) :: line_struc_kappas_out(g_len, freq_len, struc_len)
             
             integer          :: i_freq, i_spec, i_struc, inds_avail(32), &
-                    i_samp,intpint(g_len), i_g, j_g, nsample_2
+                    i_samp, i_g, j_g, nsample_2
             
             double precision :: weights_use(g_len)
             double precision :: cum_sum, k_min(freq_len, struc_len), k_max(freq_len, struc_len), &
@@ -2303,7 +2096,7 @@ module fort_spec
             
             double precision :: threshold(freq_len, struc_len)
             
-            nsample_2 = g_len ** 2d0
+            nsample_2 = g_len ** 2
             inds_avail = [ 1, 2, 3, 4, 5, 6, 7, 8, &
                 1, 2, 3, 4, 5, 6, 7, 8, &
                 1, 2, 3, 4, 5, 6, 7, 8, &
@@ -2330,7 +2123,11 @@ module fort_spec
                     g_final_2_presort((i_g - 1) * g_len + j_g) = weights(i_g) * weights(j_g)
                 end do
             end do
-            
+
+            ! Here we'll loop over every entry, mix and add the kappa values,
+            ! calculate the g-weights and then interpolate back to the standard
+            ! g-grid.
+
             line_struc_kappas_out = line_struc_kappas(:, :, 1, :)
             
             if (N_species > 1) then
@@ -2338,7 +2135,7 @@ module fort_spec
                     do i_freq = 1, freq_len
                         do i_spec = 2, N_species
                             if (line_struc_kappas(g_len, i_freq, i_spec, i_struc) < &
-                                threshold(i_freq, i_struc)*1d-3) then
+                                threshold(i_freq, i_struc) * 1d-3) then
                                 cycle
                             endif
 
@@ -2375,19 +2172,13 @@ module fort_spec
                             k_final_2(1) = line_struc_kappas_out(1, i_freq, i_struc) + spec2(1)
                             k_final_2(nsample_2+1) = line_struc_kappas_out(g_len, i_freq, i_struc) + spec2(g_len)
 
-                            call search_intp_ind(g_final_2, nsample_2+1, g_gauss, g_len, intpint)
-
-                            do i_g = 1, g_len
-                                ! Here we turned off the linear interpolation, this works much better.
-                                line_struc_kappas_out(i_g, i_freq, i_struc) = k_final_2(intpint(i_g))
-                            end do
+                            call linear_interpolate(g_final_2, k_final_2, g_gauss, nsample_2+1, g_len, &
+                                                    line_struc_kappas_out(:, i_freq, i_struc))
                         end do
                     end do
                 end do
             endif
         end subroutine combine_opas_ck
-
-
 
         ! Self-written? Too long ago... Check if not rather from numrep...
         subroutine search_intp_ind(binbord,binbordlen,arr,arrlen,intpint)
