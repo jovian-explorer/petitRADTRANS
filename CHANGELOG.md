@@ -4,7 +4,7 @@ All notable changes to the CCF module will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com)
 and this project adheres to [Semantic Versioning](http://semver.org).
 
-## [2.4.0-a7] - 2021-10-28
+## [2.4.0-a8] - 2021-11-09
 ### Added
 - Module `phoenix` for PHOENIX stellar models.
 - Module `physics` to store useful physical functions.
@@ -28,9 +28,7 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 
 ### Fixed
 - Hansen cloud particle distribution returning NaN if `b_hansen` set too low.
-
-### Issues
-- Retrieval not tested with new organization.
+- [?]Retrieval not converging when using correlated-k.
 
 ---
 No changelog before version 2.4.0.
