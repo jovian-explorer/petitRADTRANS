@@ -723,31 +723,11 @@ class Radtrans(_read_opacities.ReadOpacities):
         # then carry the remaining radiative transfer steps only over that 0
         # index.
         if (self.mode == 'c-k') and self.test_ck_shuffle_comp:
-            # stamps = []
-            # import time
-            # stamps.append(time.clock())
-            # self.combine_opas_shuffle_ck()
-            # stamps.append(time.clock())
-            '''
-            line_struc_kappas_comb = \
-              fs.combine_opas_sample_ck(self.line_struc_kappas, \
-                                          self.g_gauss, self.w_gauss, \
-                                          160)
-            '''
-            self.line_struc_kappas[:, :, 0, :] = \
-                fs.combine_opas_sample_ck(self.line_struc_kappas,
-                                          self.g_gauss, self.w_gauss,
-                                          1000)
-            # TODO !!! test this
-            # self.line_struc_kappas[:, :, 0, :]  = fs.combine_opas_ck(self.line_struc_kappas, \
-            #                              self.g_gauss, self.w_gauss)
-
-            # stamps.append(time.clock())
-            # self.combine_opas_shuffle_ck()
-            # stamps.append(time.clock())
-            # print("Times", np.diff(stamps), \
-            #          np.diff(stamps)/np.sum(np.diff(stamps))*100)
-            # sys.exit(1)
+            self.line_struc_kappas[:, :, 0, :] = fs.combine_opas_ck(
+                self.line_struc_kappas,
+                self.g_gauss,
+                self.w_gauss
+            )
 
         # In the line-by-line case we can simply
         # add the opacities of different species
