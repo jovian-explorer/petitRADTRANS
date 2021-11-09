@@ -1826,6 +1826,12 @@ module fort_spec
 
 
         subroutine linear_interpolate(x,y,x_out,input_len,output_len,y_out)
+            ! """Implementation of linear interpolation function.
+            !
+            ! Takes arrays of points in x and y, together with an
+            ! array of output points. Interpolates to find
+            ! the output y-values.
+            ! """
             implicit none
 
             ! inputs
@@ -1853,6 +1859,7 @@ module fort_spec
         ! Subroutine to randomly correlate the opacities
         subroutine combine_opas_sample_ck(line_struc_kappas, g_gauss, weights, &
                 nsample, fast, g_len, freq_len, N_species, struc_len, line_struc_kappas_out)
+            ! DEPRECATED - use combine_opas_ck
             implicit none
 
             integer, intent(in)          :: nsample, g_len, freq_len, N_species, struc_len
@@ -2076,7 +2083,8 @@ module fort_spec
 
         subroutine combine_opas_ck(line_struc_kappas, g_gauss, weights, &
                 g_len, freq_len, N_species, struc_len, line_struc_kappas_out)
-
+            ! """Subroutine to completely mix the c-k opacities.
+            ! """
             implicit none
             
             integer, intent(in)          :: g_len, freq_len, N_species, struc_len
@@ -2084,23 +2092,17 @@ module fort_spec
                     N_species, struc_len), g_gauss(g_len), weights(g_len)
             double precision, intent(out) :: line_struc_kappas_out(g_len, freq_len, struc_len)
             
-            integer          :: i_freq, i_spec, i_struc, inds_avail(32), &
-                    i_samp, i_g, j_g, nsample_2
-            
+            integer :: i_freq, i_spec, i_struc, i_samp, i_g, j_g, n_sample
             double precision :: weights_use(g_len)
             double precision :: cum_sum, k_min(freq_len, struc_len), k_max(freq_len, struc_len), &
-                    g_final_2(g_len*g_len+1), k_final_2(g_len*g_len+1), &
-                    g_final_2_presort(g_len*g_len+1), &
-                    sampled_opa_weights_2(g_len*g_len, 2), &
+                    g_out(g_len ** 2 + 1), k_out(g_len ** 2 + 1), &
+                    g_presort(g_len ** 2 + 1), &
+                    sampled_opa_weights(g_len ** 2, 2), &
                     spec2(g_len)
             
             double precision :: threshold(freq_len, struc_len)
-            
-            nsample_2 = g_len ** 2
-            inds_avail = [ 1, 2, 3, 4, 5, 6, 7, 8, &
-                1, 2, 3, 4, 5, 6, 7, 8, &
-                1, 2, 3, 4, 5, 6, 7, 8, &
-                9, 10, 11, 12, 13, 14, 15, 16 ]
+
+            n_sample = g_len ** 2
             
             k_min = 0d0
             k_max = 0d0
@@ -2120,7 +2122,7 @@ module fort_spec
             ! get combined. Only need to do this here once.
             do i_g = 1, g_len
                 do j_g = 1, g_len
-                    g_final_2_presort((i_g - 1) * g_len + j_g) = weights(i_g) * weights(j_g)
+                    g_presort((i_g - 1) * g_len + j_g) = weights(i_g) * weights(j_g)
                 end do
             end do
 
@@ -2141,38 +2143,40 @@ module fort_spec
 
                             spec2 = line_struc_kappas(:, i_freq, i_spec, i_struc)
 
-                            k_final_2 = 0d0
+                            k_out = 0d0
 
                             do i_g = 1, g_len
                                 do j_g = 1, g_len
-                                    k_final_2((i_g-1)*g_len+j_g) = line_struc_kappas_out(i_g, i_freq, i_struc) + spec2(j_g)
+                                    k_out((i_g-1)*g_len+j_g) = line_struc_kappas_out(i_g, i_freq, i_struc) + spec2(j_g)
                                 end do
                             end do
 
-                            sampled_opa_weights_2(:,1) = k_final_2(1:nsample_2)
-                            sampled_opa_weights_2(:,2) = g_final_2_presort(1:nsample_2)
+                            sampled_opa_weights(:,1) = k_out(1:n_sample)
+                            sampled_opa_weights(:,2) = g_presort(1:n_sample)
 
-                            call wrap_quicksort_swap(nsample_2, sampled_opa_weights_2)
+                            call wrap_quicksort_swap(n_sample, sampled_opa_weights)
 
-                            sampled_opa_weights_2(:, 2) = sampled_opa_weights_2(:, 2) / sum(sampled_opa_weights_2(:, 2))
+                            sampled_opa_weights(:, 2) = sampled_opa_weights(:, 2) / sum(sampled_opa_weights(:, 2))
 
-                            g_final_2 = 0d0
+                            g_out = 0d0
                             cum_sum = 0d0
 
-                            do i_samp = 1, nsample_2
-                                g_final_2(i_samp) = &
-                                sampled_opa_weights_2(i_samp, 2)/2d0 + &
+                            do i_samp = 1, n_sample
+                                g_out(i_samp) = &
+                                sampled_opa_weights(i_samp, 2)/2d0 + &
                                 cum_sum
                                 cum_sum = cum_sum + &
-                                sampled_opa_weights_2(i_samp, 2)
+                                sampled_opa_weights(i_samp, 2)
                             end do
 
-                            g_final_2(nsample_2+1) = 1d0
-                            k_final_2(1:nsample_2) = sampled_opa_weights_2(:, 1)
-                            k_final_2(1) = line_struc_kappas_out(1, i_freq, i_struc) + spec2(1)
-                            k_final_2(nsample_2+1) = line_struc_kappas_out(g_len, i_freq, i_struc) + spec2(g_len)
+                            g_out(n_sample+1) = 1d0
 
-                            call linear_interpolate(g_final_2, k_final_2, g_gauss, nsample_2+1, g_len, &
+                            k_out(1:n_sample) = sampled_opa_weights(:, 1)
+                            k_out(1) = line_struc_kappas_out(1, i_freq, i_struc) + spec2(1)
+                            k_out(n_sample+1) = line_struc_kappas_out(g_len, i_freq, i_struc) + spec2(g_len)
+
+                            ! Linearly interpolate back to the 16-point grid, storing in the output array
+                            call linear_interpolate(g_out, k_out, g_gauss, n_sample+1, g_len, &
                                                     line_struc_kappas_out(:, i_freq, i_struc))
                         end do
                     end do
