@@ -1059,6 +1059,19 @@ class Radtrans(_read_opacities.ReadOpacities):
         """
 
         if self.do_scat_emis:
+            # TODO investigate bug with scattering and low VMR near surface
+            # print(np.shape(self.total_tau[:, :, 0, :]))
+            # with open('tau.txt', 'w') as f:
+            #     for i in range(np.shape(self.total_tau[:, :, 0, :])[0]):
+            #         f.write('')
+            #         for j in range(np.shape(self.total_tau[:, :, 0, :])[1]):
+            #             line = self.total_tau[i, j, 0, :]
+            #
+            #             line = ' '.join(str(x) for x in line)
+            #
+            #             f.write(line)
+
+            #raise ValueError('!')
             # Only use 0 index for species because for lbl or test_ck_shuffle_comp = True
             # everything has been moved into the 0th index
             self.flux, self.contr_em = fs.feautrier_rad_trans(

@@ -2273,6 +2273,8 @@ module fort_spec
           double precision, intent(out)   :: contr_em(struc_len,freq_len_p_1-1)
           character(len=20), intent(in)        :: geom
 
+          double precision, parameter     :: inv_del_tau_min = log(huge(0.))
+
           ! Internal
           integer                         :: j,i,k,l
           double precision                :: I_J(struc_len,N_mu), I_H(struc_len,N_mu)
@@ -2300,7 +2302,6 @@ module fort_spec
           double precision                :: lambda_loc(N_g,freq_len_p_1-1,struc_len)
 
           ! control
-          double precision                :: inv_del_tau_min
           integer                         :: iter_scat, i_iter_scat
 
           ! GCM spec calc
@@ -2368,7 +2369,6 @@ module fort_spec
 
             J_planet_scat = 0d0
 
-            inv_del_tau_min = 1d10
             J_bol(1) = 0d0
             I_GCM = 0d0
 
