@@ -17,8 +17,7 @@ from .context import petitRADTRANS
 from .utils import compare_from_reference_file, \
     reference_filenames, radtrans_parameters, temperature_guillot_2010
 
-relative_tolerance = 7.5e-3  # relative tolerance when comparing with older spectra
-number_tests_max = 10  # maximum number of tests to perform
+relative_tolerance = 1e-6  # relative tolerance when comparing with older spectra
 
 
 # Initializations
@@ -41,7 +40,7 @@ def init_radtrans_correlated_k():
 atmosphere_ck_surface_scattering = init_radtrans_correlated_k()
 
 
-def test_correlated_k_emission_spectrum_surface_scattering(test_id=0, id_max=number_tests_max):
+def test_correlated_k_emission_spectrum_surface_scattering():
     # Copy atmosphere so that change in reflectance is not carried outside the function
     atmosphere = copy.deepcopy(atmosphere_ck_surface_scattering)
 
@@ -61,26 +60,13 @@ def test_correlated_k_emission_spectrum_surface_scattering(test_id=0, id_max=num
     )
 
     # Comparison
-    try:
-        compare_from_reference_file(
-            reference_file=reference_filenames[
-                'correlated_k_emission_surface_scattering'
-            ],
-            comparison_dict={
-                'wavelength': petitRADTRANS.nat_cst.c / atmosphere.freq * 1e4,
-                'spectral_radiosity': atmosphere.flux
-            },
-            relative_tolerance=relative_tolerance
-        )
-    except AssertionError as error_message:
-        if test_id < id_max:
-            test_id += 1
-            test_correlated_k_emission_spectrum_surface_scattering(test_id)
-        else:
-            raise AssertionError(
-                f"scattering in petitRADTRANS is known to have an important relative error. "
-                f"To take that into account, {id_max} tests were performed, but all failed to reach a relative error"
-                f" <= {relative_tolerance} compared to the results of the previous version.\n"
-                f"Complete error message was: \n" +
-                str(error_message)
-            )
+    compare_from_reference_file(
+        reference_file=reference_filenames[
+            'correlated_k_emission_surface_scattering'
+        ],
+        comparison_dict={
+            'wavelength': petitRADTRANS.nat_cst.c / atmosphere.freq * 1e4,
+            'spectral_radiosity': atmosphere.flux
+        },
+        relative_tolerance=relative_tolerance
+    )

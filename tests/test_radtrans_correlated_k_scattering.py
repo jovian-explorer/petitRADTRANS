@@ -17,8 +17,7 @@ from .context import petitRADTRANS
 from .utils import compare_from_reference_file, \
     reference_filenames, radtrans_parameters, temperature_guillot_2010
 
-relative_tolerance = 7.5e-3  # relative tolerance when comparing with older spectra
-number_tests_max = 10  # maximum number of tests to perform
+relative_tolerance = 1e-6  # relative tolerance when comparing with older spectra
 
 
 # Initializations
@@ -41,7 +40,7 @@ def init_radtrans_correlated_k():
 atmosphere_ck_scattering = init_radtrans_correlated_k()
 
 
-def test_correlated_k_emission_spectrum_cloud_calculated_radius_scattering(test_id=0, id_max=number_tests_max):
+def test_correlated_k_emission_spectrum_cloud_calculated_radius_scattering():
     mass_fractions = copy.deepcopy(radtrans_parameters['mass_fractions'])
     mass_fractions['Mg2SiO4(c)'] = \
         radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['mass_fraction']
@@ -58,31 +57,17 @@ def test_correlated_k_emission_spectrum_cloud_calculated_radius_scattering(test_
     )
 
     # Comparison
-    try:
-        compare_from_reference_file(
-            reference_file=reference_filenames['correlated_k_emission_cloud_calculated_radius_scattering'],
-            comparison_dict={
-                'wavelength': petitRADTRANS.nat_cst.c / atmosphere_ck_scattering.freq * 1e4,
-                'spectral_radiosity': atmosphere_ck_scattering.flux
-            },
-            relative_tolerance=relative_tolerance
-        )
-    except AssertionError as error_message:
-        if test_id < id_max:
-            test_id += 1
-            test_correlated_k_emission_spectrum_cloud_calculated_radius_scattering(test_id)
-        else:
-            raise AssertionError(
-                f"scattering in petitRADTRANS is known to have an important relative error. "
-                f"To take that into account, {id_max} tests were performed, but all failed to reach a relative error"
-                f" <= {relative_tolerance} compared to the results of the previous version.\n"
-                f"Complete error message was: \n" +
-                str(error_message)
-            )
+    compare_from_reference_file(
+        reference_file=reference_filenames['correlated_k_emission_cloud_calculated_radius_scattering'],
+        comparison_dict={
+            'wavelength': petitRADTRANS.nat_cst.c / atmosphere_ck_scattering.freq * 1e4,
+            'spectral_radiosity': atmosphere_ck_scattering.flux
+        },
+        relative_tolerance=relative_tolerance
+    )
 
 
-def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_planetary_average(
-        test_id=0, id_max=number_tests_max):
+def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_planetary_average():
     mass_fractions = copy.deepcopy(radtrans_parameters['mass_fractions'])
     mass_fractions['Mg2SiO4(c)'] = \
         radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['mass_fraction']
@@ -104,33 +89,19 @@ def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scatteri
     )
 
     # Comparison
-    try:
-        compare_from_reference_file(
-            reference_file=reference_filenames[
-                'correlated_k_emission_cloud_calculated_radius_scattering_planetary_ave'
-            ],
-            comparison_dict={
-                'wavelength': petitRADTRANS.nat_cst.c / atmosphere_ck_scattering.freq * 1e4,
-                'spectral_radiosity': atmosphere_ck_scattering.flux
-            },
-            relative_tolerance=relative_tolerance
-        )
-    except AssertionError as error_message:
-        if test_id < id_max:
-            test_id += 1
-            test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_planetary_average(test_id)
-        else:
-            raise AssertionError(
-                f"scattering in petitRADTRANS is known to have an important relative error. "
-                f"To take that into account, {id_max} tests were performed, but all failed to reach a relative error"
-                f" <= {relative_tolerance} compared to the results of the previous version.\n"
-                f"Complete error message was: \n" +
-                str(error_message)
-            )
+    compare_from_reference_file(
+        reference_file=reference_filenames[
+            'correlated_k_emission_cloud_calculated_radius_scattering_planetary_ave'
+        ],
+        comparison_dict={
+            'wavelength': petitRADTRANS.nat_cst.c / atmosphere_ck_scattering.freq * 1e4,
+            'spectral_radiosity': atmosphere_ck_scattering.flux
+        },
+        relative_tolerance=relative_tolerance
+    )
 
 
-def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_dayside(
-        test_id=0, id_max=number_tests_max):
+def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_dayside():
     mass_fractions = copy.deepcopy(radtrans_parameters['mass_fractions'])
     mass_fractions['Mg2SiO4(c)'] = \
         radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['mass_fraction']
@@ -152,31 +123,17 @@ def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scatteri
     )
 
     # Comparison
-    try:
-        compare_from_reference_file(
-            reference_file=reference_filenames['correlated_k_emission_cloud_calculated_radius_scattering_dayside_ave'],
-            comparison_dict={
-                'wavelength': petitRADTRANS.nat_cst.c / atmosphere_ck_scattering.freq * 1e4,
-                'spectral_radiosity': atmosphere_ck_scattering.flux
-            },
-            relative_tolerance=relative_tolerance
-        )
-    except AssertionError as error_message:
-        if test_id < id_max:
-            test_id += 1
-            test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_dayside(test_id)
-        else:
-            raise AssertionError(
-                f"scattering in petitRADTRANS is known to have an important relative error. "
-                f"To take that into account, {id_max} tests were performed, but all failed to reach a relative error"
-                f" <= {relative_tolerance} compared to the results of the previous version.\n"
-                f"Complete error message was: \n" +
-                str(error_message)
-            )
+    compare_from_reference_file(
+        reference_file=reference_filenames['correlated_k_emission_cloud_calculated_radius_scattering_dayside_ave'],
+        comparison_dict={
+            'wavelength': petitRADTRANS.nat_cst.c / atmosphere_ck_scattering.freq * 1e4,
+            'spectral_radiosity': atmosphere_ck_scattering.flux
+        },
+        relative_tolerance=relative_tolerance
+    )
 
 
-def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_non_isotropic(
-        test_id=0, id_max=number_tests_max):
+def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_non_isotropic():
     mass_fractions = copy.deepcopy(radtrans_parameters['mass_fractions'])
     mass_fractions['Mg2SiO4(c)'] = \
         radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['mass_fraction']
@@ -199,32 +156,19 @@ def test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scatteri
     )
 
     # Comparison
-    try:
-        compare_from_reference_file(
-            reference_file=reference_filenames[
-                'correlated_k_emission_cloud_calculated_radius_scattering_non-isotropic'
-            ],
-            comparison_dict={
-                'wavelength': petitRADTRANS.nat_cst.c / atmosphere_ck_scattering.freq * 1e4,
-                'spectral_radiosity': atmosphere_ck_scattering.flux
-            },
-            relative_tolerance=relative_tolerance
-        )
-    except AssertionError as error_message:
-        if test_id < id_max:
-            test_id += 1
-            test_correlated_k_emission_spectrum_cloud_calculated_radius_stellar_scattering_non_isotropic(test_id)
-        else:
-            raise AssertionError(
-                f"scattering in petitRADTRANS is known to have an important relative error. "
-                f"To take that into account, {id_max} tests were performed, but all failed to reach a relative error"
-                f" <= {relative_tolerance} compared to the results of the previous version.\n"
-                f"Complete error message was: \n" +
-                str(error_message)
-            )
+    compare_from_reference_file(
+        reference_file=reference_filenames[
+            'correlated_k_emission_cloud_calculated_radius_scattering_non-isotropic'
+        ],
+        comparison_dict={
+            'wavelength': petitRADTRANS.nat_cst.c / atmosphere_ck_scattering.freq * 1e4,
+            'spectral_radiosity': atmosphere_ck_scattering.flux
+        },
+        relative_tolerance=relative_tolerance
+    )
 
 
-def test_correlated_k_transmission_spectrum_cloud_calculated_radius_scattering(test_id=0, id_max=number_tests_max):
+def test_correlated_k_transmission_spectrum_cloud_calculated_radius_scattering():
     mass_fractions = copy.deepcopy(radtrans_parameters['mass_fractions'])
     mass_fractions['Mg2SiO4(c)'] = \
         radtrans_parameters['cloud_parameters']['cloud_species']['Mg2SiO4(c)_cd']['mass_fraction']
@@ -242,24 +186,11 @@ def test_correlated_k_transmission_spectrum_cloud_calculated_radius_scattering(t
     )
 
     # Comparison
-    try:
-        compare_from_reference_file(
-            reference_file=reference_filenames['correlated_k_transmission_cloud_calculated_radius_scattering'],
-            comparison_dict={
-                'wavelength': petitRADTRANS.nat_cst.c / atmosphere_ck_scattering.freq * 1e4,
-                'transit_radius': atmosphere_ck_scattering.transm_rad / petitRADTRANS.nat_cst.r_jup_mean
-            },
-            relative_tolerance=relative_tolerance
-        )
-    except AssertionError as error_message:
-        if test_id < id_max:
-            test_id += 1
-            test_correlated_k_transmission_spectrum_cloud_calculated_radius_scattering(test_id)
-        else:
-            raise AssertionError(
-                f"scattering in petitRADTRANS is known to have an important relative error. "
-                f"To take that into account, {id_max} tests were performed, but all failed to reach a relative error"
-                f" <= {relative_tolerance} compared to the results of the previous version.\n"
-                f"Complete error message was: \n" +
-                str(error_message)
-            )
+    compare_from_reference_file(
+        reference_file=reference_filenames['correlated_k_transmission_cloud_calculated_radius_scattering'],
+        comparison_dict={
+            'wavelength': petitRADTRANS.nat_cst.c / atmosphere_ck_scattering.freq * 1e4,
+            'transit_radius': atmosphere_ck_scattering.transm_rad / petitRADTRANS.nat_cst.r_jup_mean
+        },
+        relative_tolerance=relative_tolerance
+    )
