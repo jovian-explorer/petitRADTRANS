@@ -58,7 +58,6 @@ class ReadOpacities:
 
                 # If not Exomol k-table made by Katy Chubb
                 if not chubb:
-
                     # Check and sort custom grid for species, if defined.
                     custom_grid_data = \
                         pyi.get_custom_PT_grid(path_input_data,
@@ -121,19 +120,17 @@ class ReadOpacities:
         self.line_grid_kappas_custom_PT = {}
 
         if len(self.line_species) > 0:
-
             tot_str = ''
             for sstring in self.line_species:
                 tot_str = tot_str + sstring + ':'
 
-
             for i_spec in range(len(self.line_species)):
-
                 # Read in opacities in the petitRADTRANS format, either
                 # in pRT P-T grid spacing or custom P-T grid spacing.
 
                 # Check if it is an Exomol hdf5 file that needs to be read:
                 chubb = False
+
                 if self.mode == 'c-k':
                     path_opa = os.path.join(path_input_data, 'opacities', 'lines', 'corr_k', self.line_species[i_spec])
 
@@ -141,7 +138,6 @@ class ReadOpacities:
                         chubb = True
 
                 if not chubb:
-
                     if not self.custom_grid[self.line_species[i_spec]]:
                         len_tp = len(self.line_TP_grid[:, 0])
                     else:
@@ -149,6 +145,7 @@ class ReadOpacities:
                                          self.line_species[i_spec]][:, 0])
 
                     custom_file_names = ''
+
                     if self.custom_grid[self.line_species[i_spec]]:
                         for i_TP in range(len_tp):
                             custom_file_names = custom_file_names + \
@@ -165,13 +162,14 @@ class ReadOpacities:
                         local_freq_len, local_g_len = fi.get_freq_len(path_input_data, self.line_species[i_spec])
                         local_freq_len_full = cp.copy(local_freq_len)
                         # Read in the frequency range of the opcity data
-                        local_freq, local_border_freqs = fi.get_freq(path_input_data,
-                                                                     self.line_species[i_spec],
-                                                                     local_freq_len)
+                        local_freq, local_border_freqs = fi.get_freq(
+                            path_input_data, self.line_species[i_spec], local_freq_len
+                        )
                     else:
-                        local_freq_len_full = self.freq_len_full
+                        local_freq_len_full = self.freq_len
                         local_g_len = self.g_len
 
+                    print('r')
                     self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
                         fi.read_in_molecular_opacities(
                             path_input_data,
@@ -183,22 +181,25 @@ class ReadOpacities:
                             self.mode,
                             arr_min,
                             self.custom_grid[self.line_species[i_spec]],
-                            custom_file_names)
+                            custom_file_names
+                        )
+                    print('re', i_spec)
+                    print(self.line_species[i_spec], np.shape(self.line_grid_kappas_custom_PT[self.line_species[i_spec]]))
 
                     if self.mode == 'c-k':
                         # Initialize an empty array that has the same spectral entries as
                         # pRT object has nominally. Only fill those values where the k-tables
                         # have entries.
-                        ret_val = np.zeros(self.g_len * self.freq_len_full * len_tp).reshape(
-                            self.g_len, self.freq_len_full, 1,
+                        ret_val = np.zeros(self.g_len * self.freq_len * len_tp).reshape(
+                            self.g_len, self.freq_len, 1,
                             len_tp)  # TODO fix incorrect call argument
 
                         # Indices in retVal to be filled with read-in opacities
-                        index_fill = (self.freq_full <= local_freq[0] * (1. + 1e-10)) & \
-                                     (self.freq_full >= local_freq[-1] * (1. - 1e-10))
+                        index_fill = (self.freq <= local_freq[0] * (1. + 1e-10)) & \
+                                     (self.freq >= local_freq[-1] * (1. - 1e-10))
                         # Indices of read-in opacities to be filled into retVal
-                        index_use = (local_freq <= self.freq_full[0] * (1. + 1e-10)) & \
-                                    (local_freq >= self.freq_full[-1] * (1. - 1e-10))
+                        index_use = (local_freq <= self.freq[0] * (1. + 1e-10)) & \
+                                    (local_freq >= self.freq[-1] * (1. - 1e-10))
 
                         ret_val[:, index_fill, 0, :] = \
                             self.line_grid_kappas_custom_PT[self.line_species[i_spec]][:, index_use, 0, :]
@@ -209,58 +210,57 @@ class ReadOpacities:
                         self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
                             self.line_grid_kappas_custom_PT[self.line_species[i_spec]] \
                             [:, ::self.lbl_opacity_sampling, :]
-
-                # Read in the Exomol k-table by Katy Chubb if requested by the user
-                else:
+                else:  # read in the Exomol k-table by Katy Chubb if requested by the user
                     print('  Read line opacities of ' + self.line_species[i_spec] + '...')
 
                     path_opa = os.path.join(path_input_data, 'opacities', 'lines', 'corr_k', self.line_species[i_spec])
                     file_path_hdf5 = glob.glob(path_opa + '/*.h5')[0]
-                    f = h5py.File(file_path_hdf5, 'r')
 
-                    lenf = len(f['bin_centers'][:])
-                    freqs_chubb = nc.c * f['bin_centers'][:][::-1]
-                    lent = len(f['t'][:])
-                    lenp = len(f['p'][:])
+                    with h5py.File(file_path_hdf5, 'r') as f:
+                        lenf = len(f['bin_centers'][:])
+                        freqs_chubb = nc.c * f['bin_centers'][:][::-1]
+                        lent = len(f['t'][:])
+                        lenp = len(f['p'][:])
 
-                    # Some swapaxes magic is required because the tables are sorted
-                    # differently when coming from the Exomol website.
-                    k_table = np.array(f['kcoeff'])
-                    k_table = np.swapaxes(k_table, 0, 1)
-                    k_table2 = k_table.reshape(lenp * lent, lenf, 16)  # TODO fix incorrect call argument
-                    k_table2 = np.swapaxes(k_table2, 0, 2)
-                    k_table2 = k_table2[:, ::-1, :]
+                        # Some swapaxes magic is required because the tables are sorted
+                        # differently when coming from the Exomol website.
+                        k_table = np.array(f['kcoeff'])
+                        k_table = np.swapaxes(k_table, 0, 1)
+                        k_table2 = k_table.reshape(lenp * lent, lenf, 16)  # TODO fix incorrect call argument
+                        k_table2 = np.swapaxes(k_table2, 0, 2)
+                        k_table2 = k_table2[:, ::-1, :]
 
-                    # Initialize an empty array that has the same spectral entries as
-                    # pRT object has nominally. Only fill those values where the Exomol tables
-                    # have entries.
-                    ret_val = np.zeros(
-                        self.g_len * self.freq_len_full * len(self.custom_line_TP_grid[self.line_species[i_spec]])
-                    ).reshape(
-                        self.g_len, self.freq_len_full, 1,
-                        len(self.custom_line_TP_grid[self.line_species[i_spec]])
-                    )  # TODO fix incorrect call argument
-                    index_fill = (self.freq_full <= freqs_chubb[0] * (1. + 1e-10)) & \
-                                 (self.freq_full >= freqs_chubb[-1] * (1. - 1e-10))
-                    index_use = (freqs_chubb <= self.freq_full[0] * (1. + 1e-10)) & \
-                                (freqs_chubb >= self.freq_full[-1] * (1. - 1e-10))
-                    ret_val[:, index_fill, 0, :] = k_table2[:, index_use, :]
+                        # Initialize an empty array that has the same spectral entries as
+                        # pRT object has nominally. Only fill those values where the Exomol tables
+                        # have entries.
+                        ret_val = np.zeros(
+                            self.g_len * self.freq_len * len(self.custom_line_TP_grid[self.line_species[i_spec]])
+                        ).reshape(
+                            self.g_len, self.freq_len, 1,
+                            len(self.custom_line_TP_grid[self.line_species[i_spec]])
+                        )  # TODO fix incorrect call argument
+                        index_fill = (self.freq <= freqs_chubb[0] * (1. + 1e-10)) & \
+                                     (self.freq >= freqs_chubb[-1] * (1. - 1e-10))
+                        index_use = (freqs_chubb <= self.freq[0] * (1. + 1e-10)) & \
+                                    (freqs_chubb >= self.freq[-1] * (1. - 1e-10))
+                        ret_val[:, index_fill, 0, :] = k_table2[:, index_use, :]
+                        #ret_val[:, :, 0, :] = k_table2[:, :, :]
 
-                    # Divide by mass to go from cross-sections to opacities, the latter
-                    # is what pRT requires.
-                    exomol_mass = float(f['mol_mass'][0])
-                    self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = ret_val / exomol_mass / nc.amu
-                    print(' Done.')
-
-                    f.close()
+                        # Divide by mass to go from cross-sections to opacities, the latter
+                        # is what pRT requires.
+                        exomol_mass = float(f['mol_mass'][0])
+                        self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = ret_val / exomol_mass / nc.amu
+                        print(' Done.')
+                        print(self.line_species[i_spec], np.shape(k_table2))
 
                 # Cut the wavelength range of the just-read species to the wavelength range
                 # requested by the user
                 if self.mode == 'c-k':
                     self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
-                        np.array(self.line_grid_kappas_custom_PT[
-                                     self.line_species[i_spec]][:, index, 0, :],
-                                 dtype='d', order='F')
+                        np.array(
+                            self.line_grid_kappas_custom_PT[self.line_species[i_spec]][:, :, 0, :],
+                            dtype='d', order='F'
+                        )
                 else:
                     self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
                         np.array(self.line_grid_kappas_custom_PT[
