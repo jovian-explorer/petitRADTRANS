@@ -169,7 +169,6 @@ class ReadOpacities:
                         local_freq_len_full = self.freq_len
                         local_g_len = self.g_len
 
-                    print('r')
                     self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
                         fi.read_in_molecular_opacities(
                             path_input_data,
@@ -183,8 +182,6 @@ class ReadOpacities:
                             self.custom_grid[self.line_species[i_spec]],
                             custom_file_names
                         )
-                    print('re', i_spec)
-                    print(self.line_species[i_spec], np.shape(self.line_grid_kappas_custom_PT[self.line_species[i_spec]]))
 
                     if self.mode == 'c-k':
                         # Initialize an empty array that has the same spectral entries as
@@ -251,7 +248,6 @@ class ReadOpacities:
                         exomol_mass = float(f['mol_mass'][0])
                         self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = ret_val / exomol_mass / nc.amu
                         print(' Done.')
-                        print(self.line_species[i_spec], np.shape(k_table2))
 
                 # Cut the wavelength range of the just-read species to the wavelength range
                 # requested by the user
