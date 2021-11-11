@@ -2068,6 +2068,8 @@ subroutine combine_opas_sample_ck(line_struc_kappas, g_gauss, weights, &
 
 end subroutine combine_opas_sample_ck
 
+
+
 ! Implementation of linear interpolation function
 ! Takes arrays of points in x and y, together with an
 ! array of output points. Interpolates to find
@@ -2088,12 +2090,15 @@ subroutine linear_interpolate(x,y,x_out,input_len,output_len,y_out)
    DOUBLE PRECISION :: dx, dy, delta_x
    call search_intp_ind(x, input_len, x_out, output_len, interp_ind)
    do i = 1, output_len
-      dy = y(interp_ind(i))-y(interp_ind(i)+1)
-      dx = x(interp_ind(i))-x(interp_ind(i)+1)
+      dy = y(interp_ind(i)+1)-y(interp_ind(i))
+      dx = x(interp_ind(i)+1)-x(interp_ind(i))
       delta_x = x_out(i) - x(interp_ind(i))
       y_out(i) = y(interp_ind(i)) + ((dy/dx)*delta_x)
    enddo
 end subroutine linear_interpolate
+
+
+
 
 ! Subroutine to completely mix the c-k opacities
 subroutine combine_opas_ck(line_struc_kappas, g_gauss, weights, &

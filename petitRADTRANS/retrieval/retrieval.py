@@ -134,7 +134,11 @@ class Retrieval:
         # Setup pRT Objects for each data structure.
         print("Setting up PRT Objects")
         self.setup_data()
-        self.generate_retrieval_summary()
+        try:
+            self.generate_retrieval_summary()
+        except:
+            print("Could not generate summary file!")
+
 
     def run(self,
             sampling_efficiency = 0.8,

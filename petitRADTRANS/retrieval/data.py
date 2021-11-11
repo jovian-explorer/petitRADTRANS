@@ -333,14 +333,13 @@ class Data:
 
 
         diff = (flux_rebinned - self.flux*self.scale_factor)
-        f_err = self.flux_error*self.scale_factor
+        f_err = self.flux_error#*self.scale_factor
         logL=0.0
         if self.covariance is not None:
-            logL += -1*np.dot(diff, np.dot(self.inv_cov*(self.scale_factor**-2.), diff))/2.
+            logL += -1*np.dot(diff, np.dot(self.inv_cov, diff))/2.
         else:
             logL += -1*np.sum( (diff / f_err)**2. ) / 2.
         if plotting:
-            print(self.name,logL)
             if not self.photometry:
                 plt.plot(self.wlen, flux_rebinned)
                 plt.errorbar(self.wlen,
@@ -348,6 +347,7 @@ class Data:
                              yerr = f_err*self.scale_factor,
                              fmt = '+')
                 plt.show()
+        #print(self.name,logL)
         return logL
 
     def convolve(self, \

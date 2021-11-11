@@ -177,9 +177,7 @@ def emission_model_diseq(pRT_object,
     f_lambda = f_lambda * 1e-7
     spectrum_model = surf_to_meas(f_lambda,
                                   R_pl,
-                                  parameters['D_pl'].value)    #print(wlen_model,spectrum_model)
-    #end = time.time()
-    #print(end-start)
+                                  parameters['D_pl'].value)
     return wlen_model, spectrum_model
 
 def guillot_free_emission(pRT_object, \
