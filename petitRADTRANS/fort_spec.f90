@@ -1248,97 +1248,111 @@ end subroutine calc_cloud_opas
 
 !!$ Subroutine to calculate cloud opacities
 subroutine calc_hansen_opas(rho,rho_p,cloud_mass_fracs,a_h,b_h,cloud_rad_bins, &
-   cloud_radii,cloud_lambdas,cloud_specs_abs_opa,cloud_specs_scat_opa,cloud_aniso, &
+   cloud_radii,cloud_specs_abs_opa,cloud_specs_scat_opa,cloud_aniso, &
    cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT, &
    struc_len,N_cloud_spec,N_cloud_rad_bins, N_cloud_lambda_bins)
+   ! """
+   ! Subroutine to calculate cloud opacities.
+   ! """
+   use constants_block
+   implicit none
 
-  use constants_block
-  implicit none
+   integer, intent(in) :: struc_len, N_cloud_spec, N_cloud_rad_bins, N_cloud_lambda_bins
+   double precision, intent(in) :: rho(struc_len), rho_p(N_cloud_spec)
+   double precision, intent(in) :: cloud_mass_fracs(struc_len,N_cloud_spec), &
+         a_h(struc_len,N_cloud_spec), b_h(struc_len,N_cloud_spec)
+   double precision, intent(in) :: cloud_rad_bins(N_cloud_rad_bins+1), cloud_radii(N_cloud_rad_bins)
+   double precision, intent(in) :: cloud_specs_abs_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
+         cloud_specs_scat_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
+         cloud_aniso(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec)
+   double precision, intent(out) :: cloud_abs_opa_TOT(N_cloud_lambda_bins,struc_len), &
+         cloud_scat_opa_TOT(N_cloud_lambda_bins,struc_len), &
+         cloud_red_fac_aniso_TOT(N_cloud_lambda_bins,struc_len)
 
-  ! I/O
-  INTEGER, intent(in) :: struc_len, N_cloud_spec, N_cloud_rad_bins, N_cloud_lambda_bins
-  DOUBLE PRECISION, intent(in) :: rho(struc_len), rho_p(N_cloud_spec)
-  DOUBLE PRECISION, intent(in) :: cloud_mass_fracs(struc_len,N_cloud_spec), &
-       a_h(struc_len,N_cloud_spec), b_h(struc_len,N_cloud_spec)
-  DOUBLE PRECISION, intent(in) :: cloud_rad_bins(N_cloud_rad_bins+1), cloud_radii(N_cloud_rad_bins), &
-       cloud_lambdas(N_cloud_lambda_bins)
-  DOUBLE PRECISION, intent(in) :: cloud_specs_abs_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
-       cloud_specs_scat_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
-       cloud_aniso(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec)
+   integer :: i_struc, i_spec, i_lamb, i_cloud
+   double precision :: N, dndr(N_cloud_rad_bins), integrand_abs(N_cloud_rad_bins), mass_to_vol, &
+         integrand_scat(N_cloud_rad_bins), add_abs, add_scat, integrand_aniso(N_cloud_rad_bins), add_aniso, &
+         dndr_scale
 
-  DOUBLE PRECISION, intent(out) :: cloud_abs_opa_TOT(N_cloud_lambda_bins,struc_len), &
-       cloud_scat_opa_TOT(N_cloud_lambda_bins,struc_len), &
-       cloud_red_fac_aniso_TOT(N_cloud_lambda_bins,struc_len)
+   cloud_abs_opa_TOT = 0d0
+   cloud_scat_opa_TOT = 0d0
+   cloud_red_fac_aniso_TOT = 0d0
 
+   do i_struc = 1, struc_len
+         do i_spec = 1, N_cloud_spec
+            do i_lamb = 1, N_cloud_lambda_bins
+               mass_to_vol = 0.75d0 * cloud_mass_fracs(i_struc, i_spec) * rho(i_struc) / pi / rho_p(i_spec)
 
-  ! internal
-  INTEGER :: i_struc, i_spec, i_lamb, i_cloud
-  DOUBLE PRECISION :: N, dndr(N_cloud_rad_bins), integrand_abs(N_cloud_rad_bins), mass_to_vol, &
-       integrand_scat(N_cloud_rad_bins), add_abs, add_scat, integrand_aniso(N_cloud_rad_bins), add_aniso, &
-       hansen_size_nr, dndr_scale
+               N = mass_to_vol / (&
+                     a_h(i_struc, i_spec) ** 3d0 * (b_h(i_struc,i_spec) -1d0) &
+                     * (2d0 * b_h(i_struc,i_spec) - 1d0) &
+               )
+               dndr_scale = &
+                     log(N) + log(a_h(i_struc, i_spec) * b_h(i_struc, i_spec)) &
+                        * ((2d0 * (b_h(i_struc, i_spec)) - 1d0) / b_h(i_struc, i_spec)) &
+                        - log(gamma((1d0 - 2d0 * b_h(i_struc, i_spec)) / b_h(i_struc, i_spec)))
 
-  !~~~~~~~~~~~~~~~~
+               do i_cloud = 1, N_cloud_rad_bins
+                     dndr(i_cloud) = dndr_scale + hansen_size_nr(&
+                        cloud_radii(i_cloud), &
+                        a_h(i_struc,i_spec), &
+                        b_h(i_struc,i_spec) &
+                     )
+               end do
 
-  cloud_abs_opa_TOT = 0d0
-  cloud_scat_opa_TOT = 0d0
-  cloud_red_fac_aniso_TOT = 0d0
+               dndr = exp(dndr)
 
-  do i_struc = 1, struc_len
-     do i_spec = 1, N_cloud_spec
+               integrand_abs = 0.75d0 * pi * cloud_radii ** 3d0 * rho_p(i_spec) * dndr &
+                     * cloud_specs_abs_opa(:,i_lamb,i_spec)
+               integrand_scat = 0.75d0 * pi * cloud_radii ** 3d0 * rho_p(i_spec) * dndr &
+                     * cloud_specs_scat_opa(:,i_lamb,i_spec)
+               integrand_aniso = integrand_scat * (1d0 - cloud_aniso(:, i_lamb, i_spec))
 
-           do i_lamb = 1, N_cloud_lambda_bins
+               add_abs = sum(&
+                     integrand_abs &
+                     * (cloud_rad_bins(2:N_cloud_rad_bins + 1) - cloud_rad_bins(1:N_cloud_rad_bins)) &
+               )
+               cloud_abs_opa_TOT(i_lamb,i_struc) = cloud_abs_opa_TOT(i_lamb, i_struc) + add_abs
 
-              mass_to_vol= 3d0*cloud_mass_fracs(i_struc,i_spec)*rho(i_struc)/4d0/pi/rho_p(i_spec)
+               add_scat = sum(&
+                     integrand_scat &
+                     * (cloud_rad_bins(2:N_cloud_rad_bins + 1) - cloud_rad_bins(1:N_cloud_rad_bins)) &
+               )
+               cloud_scat_opa_TOT(i_lamb, i_struc) = cloud_scat_opa_TOT(i_lamb, i_struc) + add_scat
 
-              N = mass_to_vol/((a_h(i_struc,i_spec)**3d0) *(b_h(i_struc,i_spec) -1d0)*&
-                               ((2d0*b_h(i_struc,i_spec)) -1d0))
-              dndr_scale = N * (a_h(i_struc,i_spec)*b_h(i_struc,i_spec))**((2d0*(b_h(i_struc,i_spec))&
-                                 - 1d0)/(b_h(i_struc,i_spec))) /gamma((1d0-(2d0*(b_h(i_struc,i_spec))))/&
-                                 (b_h(i_struc,i_spec)))
-              do i_cloud = 1, N_cloud_rad_bins
-                 dndr(i_cloud) =  dndr_scale * hansen_size_nr(cloud_radii(i_cloud),a_h(i_struc,i_spec),&
-                                                              b_h(i_struc,i_spec))
-              end do
-              integrand_abs = 4d0*pi/3d0*cloud_radii**3d0*rho_p(i_spec)*dndr* &
-                   cloud_specs_abs_opa(:,i_lamb,i_spec)
-              integrand_scat = 4d0*pi/3d0*cloud_radii**3d0*rho_p(i_spec)*dndr* &
-                   cloud_specs_scat_opa(:,i_lamb,i_spec)
-              integrand_aniso = integrand_scat*(1d0-cloud_aniso(:,i_lamb,i_spec))
+               add_aniso = sum(&
+                     integrand_aniso &
+                     * (cloud_rad_bins(2:N_cloud_rad_bins+1) - cloud_rad_bins(1:N_cloud_rad_bins)) &
+               )
+               cloud_red_fac_aniso_TOT(i_lamb, i_struc) = &
+                     cloud_red_fac_aniso_TOT(i_lamb, i_struc) + add_aniso
+            end do
+         end do
 
-              add_abs = sum(integrand_abs*(cloud_rad_bins(2:N_cloud_rad_bins+1)- &
-                   cloud_rad_bins(1:N_cloud_rad_bins)))
-              cloud_abs_opa_TOT(i_lamb,i_struc) = cloud_abs_opa_TOT(i_lamb,i_struc) + &
-                   add_abs
+         do i_lamb = 1, N_cloud_lambda_bins
+            if (cloud_scat_opa_TOT(i_lamb,i_struc) > 1d-200) then
+               cloud_red_fac_aniso_TOT(i_lamb, i_struc) = &
+                     cloud_red_fac_aniso_TOT(i_lamb, i_struc) / cloud_scat_opa_TOT(i_lamb, i_struc)
+            else
+               cloud_red_fac_aniso_TOT(i_lamb, i_struc) = 0d0
+            end if
+         end do
 
-              add_scat = sum(integrand_scat*(cloud_rad_bins(2:N_cloud_rad_bins+1)- &
-                   cloud_rad_bins(1:N_cloud_rad_bins)))
-              cloud_scat_opa_TOT(i_lamb,i_struc) = cloud_scat_opa_TOT(i_lamb,i_struc) + &
-                   add_scat
+         cloud_abs_opa_TOT(:, i_struc) = cloud_abs_opa_TOT(:, i_struc) / rho(i_struc)
+         cloud_scat_opa_TOT(:, i_struc) = cloud_scat_opa_TOT(:, i_struc) / rho(i_struc)
+   end do
 
-              add_aniso = sum(integrand_aniso*(cloud_rad_bins(2:N_cloud_rad_bins+1)- &
-                   cloud_rad_bins(1:N_cloud_rad_bins)))
-              cloud_red_fac_aniso_TOT(i_lamb,i_struc) = cloud_red_fac_aniso_TOT(i_lamb,i_struc) + &
-                   add_aniso
+   contains
+         function hansen_size_nr(r,a,b)
+            implicit none
 
-           end do
+            double precision :: r, a, b
+            double precision :: hansen_size_nr
 
-     end do
-
-     do i_lamb = 1, N_cloud_lambda_bins
-        if (cloud_scat_opa_TOT(i_lamb,i_struc) > 1d-200) then
-           cloud_red_fac_aniso_TOT(i_lamb,i_struc) = cloud_red_fac_aniso_TOT(i_lamb,i_struc)/ &
-                     cloud_scat_opa_TOT(i_lamb,i_struc)
-        else
-           cloud_red_fac_aniso_TOT(i_lamb,i_struc) = 0d0
-        end if
-     end do
-
-     cloud_abs_opa_TOT(:,i_struc) = cloud_abs_opa_TOT(:,i_struc)/rho(i_struc)
-     cloud_scat_opa_TOT(:,i_struc) = cloud_scat_opa_TOT(:,i_struc)/rho(i_struc)
-
-  end do
-
+            hansen_size_nr = log(r) * (1d0 - 3d0 * b) / b - 1d0 * r / (a * b)
+         end function hansen_size_nr
 end subroutine calc_hansen_opas
+
 !!$ #########################################################################
 !!$ #########################################################################
 !!$ #########################################################################

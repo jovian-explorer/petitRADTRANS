@@ -1737,6 +1737,7 @@ def py_calc_cloud_opas(rho,
 
             dndr = N/(cloud_radii * np.sqrt(2.0*np.pi)*np.log(sigma_n)) *\
                     np.exp(-np.log(cloud_radii/r_g[i_struct,i_c])**2.0 /(2.0*(np.log(sigma_n)**2.0)))
+
             integrand_abs = (4.0*np.pi/3.0)*(cloud_radii[:,np.newaxis]**3.0)*rho_p[i_c]*\
                 dndr[:,np.newaxis]*cloud_specs_abs_opa[:,:,i_c]
             integrand_scat = (4.0*np.pi/3.0)*(cloud_radii[:,np.newaxis]**3.0)*rho_p[i_c]*dndr[:,np.newaxis]* \
