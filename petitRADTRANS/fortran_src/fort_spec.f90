@@ -2277,23 +2277,27 @@ module fort_spec
             character(len=20), intent(in)        :: geom
 
             integer                         :: j,i,k,l
-            double precision :: dtau
             double precision                :: I_J(struc_len,N_mu), I_H(struc_len,N_mu)
-            double precision                :: source(N_g,freq_len_p_1-1,struc_len), &
-            J_planet_scat(N_g,freq_len_p_1-1,struc_len), &
-            photon_destruct(N_g,freq_len_p_1-1,struc_len), &
-            source_planet_scat_n(N_g,freq_len_p_1-1,struc_len), &
-            source_planet_scat_n1(N_g,freq_len_p_1-1,struc_len), &
-            source_planet_scat_n2(N_g,freq_len_p_1-1,struc_len), &
-            source_planet_scat_n3(N_g,freq_len_p_1-1,struc_len)
+            double precision                :: source(struc_len, N_g, freq_len_p_1 - 1)
+            double precision                :: source_tmp(N_g, freq_len_p_1 - 1, struc_len), &
+                J_planet_scat(N_g,freq_len_p_1-1,struc_len), &
+                photon_destruct(N_g,freq_len_p_1-1,struc_len), &
+                source_planet_scat_n(N_g,freq_len_p_1-1,struc_len), &
+                source_planet_scat_n1(N_g,freq_len_p_1-1,struc_len), &
+                source_planet_scat_n2(N_g,freq_len_p_1-1,struc_len), &
+                source_planet_scat_n3(N_g,freq_len_p_1-1,struc_len)
             double precision                :: J_star_ini(N_g,freq_len_p_1-1,struc_len)
             double precision                :: I_star_calc(N_g,N_mu,struc_len,freq_len_p_1-1)
             double precision                :: flux_old(freq_len_p_1-1), conv_val
             ! tridag variables
-            double precision                :: a(struc_len),b(struc_len),c(struc_len),r(struc_len), &
-            planck(struc_len)
+            double precision                :: a(struc_len, N_mu, N_g, freq_len_p_1 - 1),&
+                b(struc_len, N_mu, N_g, freq_len_p_1 - 1),&
+                c(struc_len, N_mu, N_g, freq_len_p_1 - 1),&
+                r(struc_len), &
+                planck(struc_len, freq_len_p_1 - 1)
             double precision                :: f1,f2,f3, deriv1, deriv2, I_plus, I_minus
-            double precision                :: f2_struct(struc_len),f3_struct(struc_len)
+            double precision                :: f2_struct(struc_len, N_mu, N_g, freq_len_p_1 - 1),&
+                                               f3_struct(struc_len, N_mu, N_g, freq_len_p_1 - 1)
 
             ! quantities for P-T structure iteration
             double precision                :: J_bol(struc_len)
@@ -2301,7 +2305,7 @@ module fort_spec
             double precision                :: J_bol_g(struc_len)
 
             ! ALI
-            double precision                :: lambda_loc(N_g,freq_len_p_1-1,struc_len)
+            double precision                :: lambda_loc(struc_len, N_g, freq_len_p_1 - 1)
 
             ! control
             double precision                :: inv_del_tau_min, inv_del_tau_min_half
@@ -2318,12 +2322,15 @@ module fort_spec
 
             ! Variables for surface scattering
             double precision                :: I_plus_surface(N_mu, N_g, freq_len_p_1-1), mu_double(N_mu)
-
+            double precision                :: t0,tf, t1, ti, ttri,tder,ttot,ti2,tstuff
+! TODO clean debug
+!call cpu_time(t0)
             I_plus_surface = 0d0
             I_minus = 0d0
 
             GCM_read = .FALSE.
             iter_scat = 100
+            source_tmp = 0d0
             source = 0d0
             flux_old = 0d0
             flux = 0d0
@@ -2365,135 +2372,46 @@ module fort_spec
 
             mu_double(:) = mu(:) * 2d0
 
+            ! Initialize the parameters that will be constant through the iterations
+            call init_iteration_parameters()
+!call cpu_time(tf)
+!print*, 'init: ', tf-t0
             do i_iter_scat = 1, iter_scat
-				if(i_iter_scat == 16) then
+!print*,i_iter_scat
+				if(i_iter_scat == 16) then  ! most "normal" runs converge before ~12 iterations, so hopefully this shouldn't affect them
 					write(*,*) "Feautrier radiative transfer: temporary fix enabled, use results with extreme caution"
-					inv_del_tau_min = 1d1
+					inv_del_tau_min = 1d1  ! drastically reduce that: improve convergence but can strongly underestimate opacities
 				end if
 
                 flux_old = flux
-
-                lambda_loc = 0d0
-
                 J_planet_scat = 0d0
 
                 J_bol(1) = 0d0
                 I_GCM = 0d0
-
-                do i = 1, freq_len_p_1-1
+!ti=0d0
+!ttri = 0d0
+!tder = 0d0
+!ti2 = 0d0
+!tstuff = 0d0
+!call cpu_time(ttot)
+                do i = 1, freq_len_p_1 - 1
                     flux(i) = 0d0
                     J_bol_a = 0d0
 
-                    r = 0
-
-                    call planck_f_lr(struc_len,temp(1:struc_len),border_freqs(i),border_freqs(i+1),r)
-                    planck = r
+                    r = planck(:, i)
 
                     do l = 1, N_g
+!call cpu_time(t0)
                         if (i_iter_scat == 1) then
-                            source(l,i,:) = photon_destruct(l,i,:)*r +  (1d0-photon_destruct(l,i,:))*J_star_ini(l,i,:)
+                            source(:, l, i) = photon_destruct(l, i, :) * r &
+                                + (1d0 - photon_destruct(l, i, :)) * J_star_ini(l, i, :)
                         else
-                            r = source(l,i,:)
+                            r = source(:, l, i)
                         end if
-
+!call cpu_time(tf)
+!ti2 = ti2 + tf - t0
                         do j = 1, N_mu
-                            ! Own boundary treatment
-                            dtau = tau_approx_scat(l, i, 1 + 1) - tau_approx_scat(l, i, 1)
-
-                            if(dtau > tiniest) then
-                                f1 = mu(j) / dtau
-
-                                ! own test against instability
-                                if (f1 > inv_del_tau_min) then
-                                    f1 = inv_del_tau_min
-                                end if
-                            else
-                                f1 = inv_del_tau_min
-                            end if
-
-                            b(1) = 1d0 + 2d0 * f1 * (1d0 + f1)
-                            c(1) = -2d0 * f1 ** 2d0
-                            a(1) = 0d0
-
-                            ! Calculate the local approximate lambda iterator
-                            lambda_loc(l,i,1) = lambda_loc(l,i,1) + &
-                                w_gauss_mu(j)/(1d0 + 2d0 * f1 * (1d0 + f1))
-
-                            do k = 2, struc_len - 1
-                                ! f1
-                                dtau = tau_approx_scat(l, i, k + 1) - tau_approx_scat(l, i, k - 1)
-
-                                if(dtau > tiniest) then
-                                    f1 = mu_double(j) / dtau
-
-                                    ! own test against instability
-                                    if (f1 > inv_del_tau_min_half) then
-                                        f1 = inv_del_tau_min_half
-                                    end if
-                                else
-                                    f1 = inv_del_tau_min_half
-                                end if
-
-                                ! f2
-                                dtau = tau_approx_scat(l, i, k + 1) - tau_approx_scat(l, i, k)
-
-                                if(dtau > tiniest) then
-                                    f2 = mu(j) / dtau
-
-                                    ! own test against instability
-                                    if (f2 > inv_del_tau_min) then
-                                        f2 = inv_del_tau_min
-                                    end if
-                                else
-                                    f2 = inv_del_tau_min
-                                end if
-
-                                ! f3
-                                dtau = tau_approx_scat(l, i, k) - tau_approx_scat(l, i, k - 1)
-
-                                if(dtau > tiniest) then
-                                    f3 = mu(j) / dtau
-
-                                    ! own test against instability
-                                    if (f3 > inv_del_tau_min) then
-                                        f3 = inv_del_tau_min
-                                    end if
-                                else
-                                    f3 = inv_del_tau_min
-                                end if
-
-                                ! abc
-                                b(k) = 1d0 + f1 * (f2 + f3)
-                                c(k) = -f1 * f2
-                                a(k) = -f1 * f3
-
-                                f2_struct(k) = f2
-                                f3_struct(k) = f3
-
-                                ! Calculate the local approximate lambda iterator
-                                lambda_loc(l,i,k) = lambda_loc(l,i,k) + &
-                                     w_gauss_mu(j)/(1d0+f1*(f2+f3))
-                            end do
-
-                            ! Own boundary treatment
-                            dtau = tau_approx_scat(l, i, struc_len) - tau_approx_scat(l, i, struc_len - 1)
-
-                            if(dtau > tiniest) then
-                                f1 = mu(j) / dtau
-
-                                ! own test against instability
-                                if (f1 > inv_del_tau_min) then
-                                    f1 = inv_del_tau_min
-                                end if
-                            else
-                                f1 = inv_del_tau_min
-                            end if
-
-                            ! TEST PAUL SCAT
-                            b(struc_len) = 1d0
-                            c(struc_len) = 0d0
-                            a(struc_len) = 0d0
-
+!call cpu_time(t0)
                             ! r(struc_len) = I_J(struc_len) = 0.5[I_plus + I_minus]
                             ! where I_plus is the light that goes downwards and
                             ! I_minus is the light that goes upwards.
@@ -2501,35 +2419,45 @@ module fort_spec
                             I_plus = I_plus_surface(j, l, i)
 
                                         !!!!!!!!!!!!!!! EMISSION ONLY TERM !!!!!!!!!!!!!!!!
-                            I_minus = surf_emi(i)*planck(struc_len) &
+                            I_minus = surf_emi(i) * planck(struc_len, i) &
                                        !!!!!!!!!!!!!!! SURFACE SCATTERING !!!!!!!!!!!!!!!!
                                        ! ----> of the emitted/scattered atmospheric light
                                        ! + surf_refl(i) * sum(I_plus_surface(:, l, i) * w_gauss_mu) ! OLD PRE 091220
                                        + surf_refl(i) * 2d0 * sum(I_plus_surface(:, l, i) * mu * w_gauss_mu)
                                        ! ----> of the direct stellar beam (depends on geometry)
+
                             if  (trim(adjustl(geom)) /= 'non-isotropic') then
-                                I_minus = I_minus + surf_refl(i) &
-                                    ! * sum(I_star_calc(l,:, struc_len, i) * w_gauss_mu) ! OLD PRE 091220
-                                    * 2d0 * sum(I_star_calc(l,:, struc_len, i) * mu * w_gauss_mu)
+                                I_minus = I_minus &
+                                    + surf_refl(i) * 2d0 * sum(I_star_calc(l, :, struc_len, i) * mu * w_gauss_mu)
                             else
-                                !I_minus = I_minus + surf_refl(i) *J_star_ini(l,i,struc_len)  !to be checked! ! OLD PRE 091220
-                                I_minus = I_minus + surf_refl(i) *J_star_ini(l,i,struc_len) * 4d0 * mu_star
+                                I_minus = I_minus + surf_refl(i) * J_star_ini(l, i, struc_len) * 4d0 * mu_star
                             end if
 
                             !sum to get I_J
-                            r(struc_len)=0.5*(I_plus + I_minus)
+                            r(struc_len) = 0.5d0 * (I_plus + I_minus)
 
-                            ! Calculate the local approximate lambda iterator
-                            lambda_loc(l,i,struc_len) = lambda_loc(l,i,struc_len) + &
-                                w_gauss_mu(j)/(1d0 + 2d0*f1**2d0)
+!                            do k = 1, struc_len
+!                                if(r(k) > huge(0d0)) then
+!                                    print*,'test',i,l,j,k,r(k), I_plus, I_minus
+!                                    print*,sum(I_plus_surface(:, l, i) * mu * w_gauss_mu), planck(struc_len, i)
+!                                    print*,sum(I_star_calc(l, :, struc_len, i) * mu * w_gauss_mu)
+!                                    stop
+!                                end if
+!                            end do
+!call cpu_time(tf)
+!ti = ti + tf - t0
+!call cpu_time(t0)
 
-                            call tridag_own(a,b,c,r,I_J(:,j),struc_len)
-
+                            call tridag_own(a(:, j, l, i),b(:, j, l, i),c(:, j, l, i),r,I_J(:,j),struc_len)
+!call cpu_time(tf)
+!ttri = ttri + tf - t0
+!call cpu_time(t0)
                             I_H(1,j) = -I_J(1,j)
 
                             do k = 2, struc_len - 1
-                                deriv1 = f2_struct(k) * (I_J(k + 1, j) - I_J(k, j))
-                                deriv2 = f3_struct(k) * (I_J(k, j) - I_J(k - 1, j))
+                                !if(i_iter_scat >= 76 .and. i >1780) print*,i,l,j,k,I_J(k + 1, j), I_J(k, j), f2_struct(k)
+                                deriv1 = f2_struct(k, j, l, i) * (I_J(k + 1, j) - I_J(k, j))
+                                deriv2 = f3_struct(k, j, l, i) * (I_J(k, j) - I_J(k - 1, j))
                                 I_H(k, j) = -(deriv1 + deriv2) * 0.5d0
 
                                 ! TEST PAUL SCAT
@@ -2540,28 +2468,32 @@ module fort_spec
                             end do
 
                             I_H(struc_len,j) = 0d0
-                        end do
-
+!call cpu_time(tf)
+!tder = tder + tf - t0
+                        end do  ! mu
+!call cpu_time(t0)
                         J_bol_g = 0d0
 
                         do j = 1, N_mu
-                            J_bol_g = J_bol_g + I_J(:,j) * w_gauss_mu(j)
-                            flux(i) = flux(i) - I_H(1,j)*mu(j) &
-                                * 4d0*pi * w_gauss_ck(l) * w_gauss_mu(j)
+                            J_bol_g = J_bol_g + I_J(:, j) * w_gauss_mu(j)
+                            flux(i) = flux(i) - I_H(1, j) * mu(j) * 4d0 * pi * w_gauss_ck(l) * w_gauss_mu(j)
                         end do
 
                         ! Save angle-dependent surface flux
                         if (GCM_read) then
                             do j = 1, N_mu
-                                I_GCM(j,i) = I_GCM(j,i) - 2d0*I_H(1,j)*w_gauss_ck(l)
+                                I_GCM(j,i) = I_GCM(j,i) - 2d0 * I_H(1,j) * w_gauss_ck(l)
                             end do
                         end if
 
                         J_planet_scat(l,i,:) = J_bol_g
-
-                    end do
-                end do
-
+!call cpu_time(tf)
+!tstuff = tstuff + tf - t0
+                    end do  ! g
+                end do  ! frequencies
+!call cpu_time(tf)
+!ttot = tf - ttot
+!print*,'res',ti,ttri,tder,ti2,tstuff,ttot,ti+ttri+tder+ti2+tstuff
                 do k = 1, struc_len
                     do i = 1, freq_len_p_1-1
                         do l = 1, N_g
@@ -2574,30 +2506,37 @@ module fort_spec
 
                 do i = 1, freq_len_p_1-1
                     call planck_f_lr(struc_len,temp(1:struc_len),border_freqs(i),border_freqs(i+1),r)
+
                     do l = 1, N_g
-                        source(l,i,:) = (photon_destruct(l,i,:)*r+(1d0-photon_destruct(l,i,:))* &
-                            (J_star_ini(l,i,:)+J_planet_scat(l,i,:)-lambda_loc(l,i,:)*source(l,i,:))) / &
-                            (1d0-(1d0-photon_destruct(l,i,:))*lambda_loc(l,i,:))
+                        source(:, l, i) = (photon_destruct(l,i,:)*r+(1d0-photon_destruct(l,i,:))* &
+                            (J_star_ini(l,i,:)+J_planet_scat(l,i,:)-lambda_loc(:, l, i)*source(:, l, i))) / &
+                            (1d0-(1d0-photon_destruct(l,i,:))*lambda_loc(:, l, i))
                     end do
                 end do
+                    source_planet_scat_n3 = source_planet_scat_n2
+                    source_planet_scat_n2 = source_planet_scat_n1
+                    source_planet_scat_n1 = source_planet_scat_n
+                    source_tmp = reshape(source, shape=shape(source_tmp), order=[3, 1, 2])
+                    source_planet_scat_n  = source_tmp
 
-                source_planet_scat_n3 = source_planet_scat_n2
-                source_planet_scat_n2 = source_planet_scat_n1
-                source_planet_scat_n1 = source_planet_scat_n
-                source_planet_scat_n  = source
+                if (mod(i_iter_scat, 4) == 0) then
+                    !write(*,*) 'Ng acceleration!'
 
-                if (mod(i_iter_scat,4) == 0) then
-                   !write(*,*) 'Ng acceleration!'
-                   call NG_source_approx(source_planet_scat_n,source_planet_scat_n1, &
-                        source_planet_scat_n2,source_planet_scat_n3,source, &
+                    call NG_source_approx(source_planet_scat_n,source_planet_scat_n1, &
+                        source_planet_scat_n2,source_planet_scat_n3,source_tmp, &
                         N_g,freq_len_p_1,struc_len)
+
+                    source = reshape(source_tmp, shape=shape(source), order=[2, 3, 1])
                 end if
 
-                conv_val = maxval(ABS((flux-flux_old)/flux))
+                ! Test if the flux has converged
+                conv_val = maxval(abs((flux - flux_old) / flux))
+!print*,i_iter_scat,conv_val
+                
                 if ((conv_val < 1d-2) .and. (i_iter_scat > 9)) then
                     exit
                 end if
-            end do
+            end do  ! iterations
 
             ! Calculate the contribution function.
             ! Copied from flux_ck, here using "source" as the source function
@@ -2623,7 +2562,7 @@ module fort_spec
                         transm_all_loc = transm_all(i_freq,:)
                         ! Calc Eq. 9 of manuscript (em_deriv.pdf)
                         do i_str = 1, struc_len
-                            r(i_str) = sum(source(:,i_freq,i_str)*w_gauss_ck)
+                            r(i_str) = sum(source(i_str,:,i_freq)*w_gauss_ck)
                         end do
 
                         do i_str = 1, struc_len-1
@@ -2643,6 +2582,111 @@ module fort_spec
                     contr_em(:,i_freq) = contr_em(:,i_freq)/sum(contr_em(:,i_freq))
                 end do
             end if
+
+            contains
+                subroutine init_iteration_parameters()
+                    implicit none
+
+                    double precision :: &
+                        dtau_1_level(struc_len - 1), &
+                        dtau_2_level(struc_len - 2)
+
+                    b(struc_len, :, :, :) = 1d0
+                    c(struc_len, :, :, :) = 0d0
+                    a(struc_len, :, :, :) = 0d0
+
+                    lambda_loc = 0d0
+
+                    do i = 1, freq_len_p_1 - 1
+                        call planck_f_lr(&
+                            struc_len,temp(1:struc_len), border_freqs(i), border_freqs(i + 1), planck(:, i)&
+                        )
+
+                        do l = 1, N_g
+                            dtau_1_level(1) = tau_approx_scat(l, i, 2) - tau_approx_scat(l, i, 1)
+
+                            if(abs(dtau_1_level(1)) < tiniest) then
+                                dtau_1_level(1) = tiniest
+                            end if
+
+                            do k = 2, struc_len - 1
+                                dtau_1_level(k) = tau_approx_scat(l, i, k + 1) - tau_approx_scat(l, i, k)
+
+                                if(abs(dtau_1_level(k)) < tiniest) then
+                                    dtau_1_level(k) = tiniest
+                                end if
+
+                                dtau_2_level(k - 1) = tau_approx_scat(l, i, k + 1) - tau_approx_scat(l, i, k - 1)
+
+                               if(abs(dtau_2_level(k - 1)) < tiniest) then
+                                    dtau_2_level(k - 1) = tiniest
+                               end if
+                            end do
+
+!if(i == 800 .and. l == 8) print*,dtau_1_level(50),dtau_2_level(50)
+
+                            do j = 1, N_mu
+                                ! Own boundary treatment
+                                ! Frist level (top)
+                                f1 = mu(j) / dtau_1_level(1)
+
+                                ! own test against instability
+                                if (f1 > inv_del_tau_min) then
+                                    f1 = inv_del_tau_min
+                                end if
+
+                                b(1, j, l, i) = 1d0 + 2d0 * f1 * (1d0 + f1)
+                                c(1, j, l, i) = -2d0 * f1 ** 2d0
+                                a(1, j, l, i) = 0d0
+
+                                ! Calculate the local approximate lambda iterator
+                                lambda_loc(1, l, i) = &
+                                    lambda_loc(1, l, i) + w_gauss_mu(j) / (1d0 + 2d0 * f1 * (1d0 + f1))
+
+                                ! Mid levels
+                                do k = 2, struc_len - 1
+                                    f1 = mu_double(j) / dtau_2_level(k - 1)
+                                    f2 = mu(j) / dtau_1_level(k)
+                                    f3 = mu(j) / dtau_1_level(k - 1)
+
+                                    ! own test against instability
+                                    if (f1 > inv_del_tau_min_half) then
+                                        f1 = inv_del_tau_min_half
+                                    end if
+
+                                    if (f2 > inv_del_tau_min) then
+                                        f2 = inv_del_tau_min
+                                    end if
+
+                                    if (f3 > inv_del_tau_min) then
+                                            f3 = inv_del_tau_min
+                                    end if
+
+                                    b(k, j, l, i) = 1d0 + f1 * (f2 + f3)
+                                    c(k, j, l, i) = -f1 * f2
+                                    a(k, j, l, i) = -f1 * f3
+
+                                    f2_struct(k, j, l, i) = f2
+                                    f3_struct(k, j, l, i) = f3
+
+                                    ! Calculate the local approximate lambda iterator
+                                    lambda_loc(k, l, i) = lambda_loc(k, l, i) + w_gauss_mu(j) / (1d0 + f1 * (f2 + f3))
+                                end do
+
+                                ! Own boundary treatment
+                                ! Last level (surface)
+                                f1 = mu(j) / dtau_1_level(struc_len - 1)
+
+                                if (f1 > inv_del_tau_min) then
+                                    f1 = inv_del_tau_min
+                                end if
+
+                                lambda_loc(struc_len, l, i) = &
+                                    lambda_loc(struc_len, l, i) + w_gauss_mu(j) / (1d0 + 2d0 * f1 ** 2d0)
+                            end do
+                        end do
+                    end do
+                end subroutine init_iteration_parameters
         end subroutine feautrier_rad_trans
 
 
@@ -2912,10 +2956,16 @@ module fort_spec
                 end if
 
                 solution(ind) = res(ind) / buffer_scalar
+!                if(res(ind) > hugest) then
+!                    print*,'!!',solution(ind),buffer_vector(ind+1),solution(ind + 1)
+!                    stop
+!                end if
                 a_solution_pre = solution(ind - 1) / buffer_scalar
 
-                if(a_solution_pre > hugest / max(-a(ind), 1d0)) then
-                    solution(ind) = solution(ind)  ! very dirty... but it works
+                if(a_solution_pre > (hugest - solution(ind)) / max(-a(ind), 1d0)) then
+                    !print*,'!',ind,length,solution(ind),a(ind),a_solution_pre,res(ind),buffer_scalar
+                    !stop
+                    solution(ind) = hugest  ! very dirty... but it works
                 else
                     a_solution_pre = a_solution_pre * a(ind)
                     solution(ind) = solution(ind) - a_solution_pre
@@ -2924,6 +2974,10 @@ module fort_spec
 
             do ind = length - 1, 1, -1
                 solution(ind) = solution(ind) - buffer_vector(ind+1) * solution(ind + 1)
+                !if(solution(ind) > hugest) then
+                    !print*,'!!',solution(ind),buffer_vector(ind+1),solution(ind + 1)
+                    !stop
+                !end if
             end do
         end subroutine tridag_own
 
@@ -2934,27 +2988,28 @@ module fort_spec
         !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-        subroutine planck_f_lr(PT_length,T,nul,nur,B_nu)
+        subroutine planck_f_lr(PT_length, T, nul, nur, B_nu)
 
           use constants_block
           implicit none
-          integer                         :: PT_length
-          double precision                :: T(PT_length),B_nu(PT_length)
-          double precision                ::  nu1, nu2, nu3, nu4, nu5, nu_large, nu_small, &
-               nul, nur, diff_nu
+          integer, intent(in)             :: PT_length
+          double precision, intent(in)    :: T(PT_length)
+          double precision, intent(out)   :: B_nu(PT_length)
 
-          !~~~~~~~~~~~~~
+          double precision                ::  nu1, nu2, nu3, nu4, nu5, nu_large, nu_small, nul, nur, diff_nu
 
           B_nu = 0d0
           ! Take mean using Boole's method
-          nu_large = max(nul,nur)
-          nu_small = min(nul,nur)
+          nu_large = max(nul, nur)
+          nu_small = min(nul, nur)
           nu1 = nu_small
-          nu2 = nu_small+dble(1)*(nu_large-nu_small)/4d0
-          nu3 = nu_small+dble(2)*(nu_large-nu_small)/4d0
-          nu4 = nu_small+dble(3)*(nu_large-nu_small)/4d0
+          nu2 = nu_small + 1d0 * (nu_large - nu_small) * 0.25d0
+          nu3 = nu_small + 2d0 * (nu_large - nu_small) * 0.25d0
+          nu4 = nu_small + 3d0 * (nu_large - nu_small) * 0.25d0
           nu5 = nu_large
+
           diff_nu = nu2-nu1
+
           B_nu = B_nu + 1d0/90d0*( &
                7d0* 2d0*hplanck*nu1**3d0/c_l**2d0/(exp(hplanck*nu1/kB/T)-1d0) + &
                32d0*2d0*hplanck*nu2**3d0/c_l**2d0/(exp(hplanck*nu2/kB/T)-1d0) + &
