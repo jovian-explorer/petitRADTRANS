@@ -2260,7 +2260,7 @@ module fort_spec
             implicit none
 
             integer, parameter :: iter_scat = 100
-            double precision, parameter :: tiniest = tiny(0d0)
+            double precision, parameter :: tiniest = tiny(0d0), pi_4 = 4d0 * pi
 
             integer, intent(in)             :: freq_len_p_1, struc_len, N_mu, N_g
             double precision, intent(in)    :: mu_star
@@ -2281,7 +2281,7 @@ module fort_spec
             double precision                :: I_J(struc_len,N_mu), I_H(struc_len,N_mu)
             double precision                :: source(struc_len, N_g, freq_len_p_1 - 1)
             double precision                :: source_tmp(N_g, freq_len_p_1 - 1, struc_len), &
-                J_planet_scat(N_g,freq_len_p_1-1,struc_len), &
+                J_planet_scat(struc_len, N_g, freq_len_p_1 - 1), &
                 photon_destruct(struc_len, N_g, freq_len_p_1-1), &
                 source_planet_scat_n(N_g,freq_len_p_1-1,struc_len), &
                 source_planet_scat_n1(N_g,freq_len_p_1-1,struc_len), &
@@ -2290,8 +2290,9 @@ module fort_spec
             double precision                :: J_star_ini(N_g,freq_len_p_1-1,struc_len)
             double precision                :: I_star_calc(N_g,N_mu,struc_len,freq_len_p_1-1)
             double precision                :: flux_old(freq_len_p_1-1), conv_val
-            double precision                :: I_surface_reflection(N_g, freq_len_p_1 - 1)
-            double precision                :: I_surface_emission(freq_len_p_1 - 1)
+            double precision                :: I_surface_reflection
+            double precision                :: I_surface_no_scattering(N_g, freq_len_p_1 - 1)
+            double precision                :: I_surface_emission
             double precision                :: surf_refl_2(freq_len_p_1 - 1)
             double precision                :: mu_weight(N_mu)
             ! tridag variables
@@ -2300,7 +2301,7 @@ module fort_spec
                 c(struc_len, N_mu, N_g, freq_len_p_1 - 1),&
                 r(struc_len), &
                 planck(struc_len, freq_len_p_1 - 1)
-            double precision                :: f1,f2,f3, deriv1, deriv2, I_plus, I_minus
+            double precision                :: f1,f2,f3, deriv1, deriv2, I_minus
             double precision                :: f2_struct(struc_len, N_mu, N_g, freq_len_p_1 - 1),&
                                                f3_struct(struc_len, N_mu, N_g, freq_len_p_1 - 1)
 
@@ -2327,9 +2328,10 @@ module fort_spec
 
             ! Variables for surface scattering
             double precision                :: I_plus_surface(N_mu, N_g, freq_len_p_1-1), mu_double(N_mu)
-            double precision                :: t0,tf, t1, ti, ttri,tder,ttot,ti2,tstuff, i_minus_pre
+!            double precision                :: t0,tf, t1, ti, ttri,tder,ttot,ti2,tstuff,t2,t3,tx
 ! TODO clean debug
 !call cpu_time(t0)
+!print*,'fixed'
             I_plus_surface = 0d0
             I_minus = 0d0
 
@@ -2380,29 +2382,28 @@ module fort_spec
             ! Initialize the parameters that will be constant through the iterations
             call init_iteration_parameters()
 
-            I_surface_emission = surf_emi * planck(struc_len, :)
             surf_refl_2 = 2d0 * surf_refl
             mu_weight = mu * w_gauss_mu
 
             do i = 1, freq_len_p_1 - 1
+                I_surface_emission = surf_emi(i) * planck(struc_len, i)
+
                 do l = 1, N_g
                     if  (trim(adjustl(geom)) /= 'non-isotropic') then
-                        I_surface_reflection(l, i) = surf_refl_2(i) &
+                        I_surface_reflection= surf_refl_2(i) &
                             * sum(I_star_calc(l, :, struc_len, i) * mu_weight)
                     else
-                        I_surface_reflection(l, i) = surf_refl(i) &
+                        I_surface_reflection = surf_refl(i) &
                             * J_star_ini(l, i, struc_len) * 4d0 * mu_star
                     end if
+
+                    I_surface_no_scattering(l, i) = I_surface_emission + I_surface_reflection
                 end do
             end do
 !call cpu_time(tf)
 !print*, 'init: ', tf-t0
             do i_iter_scat = 1, iter_scat
 !print*,i_iter_scat
-				!if(i_iter_scat == 16) then  ! most "normal" runs converge before ~12 iterations, so hopefully this shouldn't affect them
-			!		write(*,*) "Feautrier radiative transfer: temporary fix enabled, use results with extreme caution"
-			!		inv_del_tau_min = 1d1  ! drastically reduce that: improve convergence but can strongly underestimate opacities
-		!		end if
 
                 flux_old = flux
                 J_planet_scat = 0d0
@@ -2414,6 +2415,9 @@ module fort_spec
 !tder = 0d0
 !ti2 = 0d0
 !tstuff = 0d0
+!t1 = 0d0
+!t2 = 0d0
+!t3 = 0d0
 !call cpu_time(ttot)
                 do i = 1, freq_len_p_1 - 1
                     flux(i) = 0d0
@@ -2422,16 +2426,12 @@ module fort_spec
                     r = planck(:, i)
 
                     do l = 1, N_g
-!call cpu_time(t0)
                         if (i_iter_scat == 1) then
                             source(:, l, i) = photon_destruct(:, l, i) * r &
                                 + (1d0 - photon_destruct(:, l, i)) * J_star_ini(l, i, :)
                         else
                             r = source(:, l, i)
                         end if
-!call cpu_time(tf)
-!ti2 = ti2 + tf - t0
-!i_minus_pre = 0d0
 
                         do j = 1, N_mu
 !call cpu_time(t0)
@@ -2439,32 +2439,17 @@ module fort_spec
                             ! where I_plus is the light that goes downwards and
                             ! I_minus is the light that goes upwards.
                             !!!!!!!!!!!!!!!!!! ALWAYS NEEDED !!!!!!!!!!!!!!!!!!
-                            I_plus = I_plus_surface(j, l, i)
-!if(i_iter_scat>=76.and.i>1700)print*,'i+',i_iter_scat,i,l,j,surf_emi(i),surf_refl(i),planck(struc_len, i),I_plus
-!if(i_iter_scat>=76.and.i>1700)print*,'mu',mu(:),w_gauss_mu(:)
+                            !I_plus = I_plus_surface(j, l, i)
 
                             !!!!!!!!!!!!!!! EMISSION ONLY TERM !!!!!!!!!!!!!!!!
-                            I_minus = I_surface_emission(i) &
+                            I_minus = I_surface_no_scattering(l, i) &
                             !!!!!!!!!!!!!!! SURFACE SCATTERING !!!!!!!!!!!!!!!!
                             ! ----> of the emitted/scattered atmospheric light
                             ! + surf_refl(i) * sum(I_plus_surface(:, l, i) * w_gauss_mu) ! OLD PRE 091220
-                                + surf_refl_2(i) * sum(I_plus_surface(:, l, i) * mu_weight) &
-                            ! ----> of the direct stellar beam (depends on geometry)
-                                + I_surface_reflection(l, i)
+                                + surf_refl_2(i) * sum(I_plus_surface(:, l, i) * mu_weight) !&
 
-!if(j > 1 .and. abs(i_minus_pre - i_minus) > tiny(0d0)) print*,i_iter_scat,i,l,j,i_minus_pre,i_minus
-!i_minus_pre = i_minus
                             !sum to get I_J
-                            r(struc_len) = 0.5d0 * (I_plus + I_minus)
-
-!                            do k = 1, struc_len
-!                                if(r(k) > huge(0d0)) then
-!                                    print*,'test',i,l,j,k,r(k), I_plus, I_minus
-!                                    print*,sum(I_plus_surface(:, l, i) * mu * w_gauss_mu), planck(struc_len, i)
-!                                    print*,sum(I_star_calc(l, :, struc_len, i) * mu * w_gauss_mu)
-!                                    stop
-!                                end if
-!                            end do
+                            r(struc_len) = 0.5d0 * (I_plus_surface(j, l, i) + I_minus)
 !call cpu_time(tf)
 !ti = ti + tf - t0
 !call cpu_time(t0)
@@ -2473,7 +2458,7 @@ module fort_spec
 !call cpu_time(tf)
 !ttri = ttri + tf - t0
 !call cpu_time(t0)
-                            I_H(1,j) = -I_J(1,j)
+                            I_H(1, j) = -I_J(1, j)
 
                             do k = 2, struc_len - 1
                                 !if(i_iter_scat >= 76 .and. i >1780) print*,i,l,j,k,I_J(k + 1, j), I_J(k, j), f2_struct(k)
@@ -2483,12 +2468,12 @@ module fort_spec
 
                                 ! TEST PAUL SCAT
                                 if (k == struc_len - 1) then
-                                    I_plus_surface(j, l, i) = I_J(struc_len,j)  - deriv1
+                                    I_plus_surface(j, l, i) = I_J(struc_len, j) - deriv1
                                 end if
                                 ! END TEST PAUL SCAT
                             end do
 
-                            I_H(struc_len,j) = 0d0
+                            I_H(struc_len, j) = 0d0
 !call cpu_time(tf)
 !tder = tder + tf - t0
                         end do  ! mu
@@ -2497,27 +2482,28 @@ module fort_spec
 
                         do j = 1, N_mu
                             J_bol_g = J_bol_g + I_J(:, j) * w_gauss_mu(j)
-                            flux(i) = flux(i) - I_H(1, j) * mu(j) * 4d0 * pi * w_gauss_ck(l) * w_gauss_mu(j)
+                            flux(i) = flux(i) - I_H(1, j) * pi_4 * w_gauss_ck(l) * mu_weight(j)
                         end do
 
                         ! Save angle-dependent surface flux
                         if (GCM_read) then
                             do j = 1, N_mu
-                                I_GCM(j,i) = I_GCM(j,i) - 2d0 * I_H(1,j) * w_gauss_ck(l)
+                                I_GCM(j,i) = I_GCM(j,i) - 2d0 * I_H(1, j) * w_gauss_ck(l)
                             end do
                         end if
 
-                        J_planet_scat(l,i,:) = J_bol_g
+                        J_planet_scat(:, l, i) = J_bol_g
 !call cpu_time(tf)
 !tstuff = tstuff + tf - t0
                     end do  ! g
                 end do  ! frequencies
 !call cpu_time(tf)
 !ttot = tf - ttot
-!print*,'res',ti,ttri,tder,ti2,tstuff,ttot,ti+ttri+tder+ti2+tstuff
-                do k = 1, struc_len
-                    do i = 1, freq_len_p_1-1
-                        do l = 1, N_g
+!print*,'res3',ti,ttri,tder,ti2,tstuff,ttot,ti+ttri+tder+ti2+tstuff
+!print*,'ti',ti,t1,t2,t3,t1+t2+t3
+                do i = 1, freq_len_p_1-1
+                    do l = 1, N_g
+                        do k = 1, struc_len
                             if (photon_destruct(k, l, i) < 1d-10) then
                                 photon_destruct(k, l, i) = 1d-10
                             end if
@@ -2526,19 +2512,23 @@ module fort_spec
                 end do
 
                 do i = 1, freq_len_p_1-1
-                    call planck_f_lr(struc_len,temp(1:struc_len),border_freqs(i),border_freqs(i+1),r)
+                    call planck_f_lr(struc_len,temp(1:struc_len), border_freqs(i), border_freqs(i + 1), r)
 
                     do l = 1, N_g
-                        source(:, l, i) = (photon_destruct(:, l, i)*r+(1d0-photon_destruct(:, l, i))* &
-                            (J_star_ini(l,i,:)+J_planet_scat(l,i,:)-lambda_loc(:, l, i)*source(:, l, i))) / &
-                            (1d0-(1d0-photon_destruct(:, l, i))*lambda_loc(:, l, i))
+                        source(:, l, i) = (&
+                                photon_destruct(:, l, i) * r &
+                                + (1d0 - photon_destruct(:, l, i)) &
+                                * (J_star_ini(l, i, :)+J_planet_scat(:, l, i)-lambda_loc(:, l, i) * source(:, l, i))&
+                            ) / &
+                            (1d0 - (1d0 - photon_destruct(:, l, i)) * lambda_loc(:, l, i))
                     end do
                 end do
-                    source_planet_scat_n3 = source_planet_scat_n2
-                    source_planet_scat_n2 = source_planet_scat_n1
-                    source_planet_scat_n1 = source_planet_scat_n
-                    source_tmp = reshape(source, shape=shape(source_tmp), order=[3, 1, 2])
-                    source_planet_scat_n  = source_tmp
+
+                source_planet_scat_n3 = source_planet_scat_n2
+                source_planet_scat_n2 = source_planet_scat_n1
+                source_planet_scat_n1 = source_planet_scat_n
+                source_tmp = reshape(source, shape=shape(source_tmp), order=[3, 1, 2])
+                source_planet_scat_n  = source_tmp
 
                 if (mod(i_iter_scat, 4) == 0) then
                     !write(*,*) 'Ng acceleration!'
@@ -2552,7 +2542,6 @@ module fort_spec
 
                 ! Test if the flux has converged
                 conv_val = maxval(abs((flux - flux_old) / flux))
-!print*,i_iter_scat,conv_val
                 
                 if ((conv_val < 1d-2) .and. (i_iter_scat > 9)) then
                     exit
@@ -2941,10 +2930,10 @@ module fort_spec
 
         ! Tridag, own implementation, following the numerical recipes book.
 
-        subroutine tridag_own(a,b,c,res,solution,length)
+        subroutine tridag_own(a, b, c, res, solution, length)
             implicit none
 
-            double precision, parameter :: hugest = huge(0d0), tiniest = tiny(0d0)
+            double precision, parameter :: sqrt_hugest = sqrt(huge(0d0)), tiniest = tiny(0d0)
             ! I/O
             integer, intent(in) :: length
             double precision, intent(in) :: a(length), &
@@ -2954,8 +2943,11 @@ module fort_spec
             double precision, intent(out) :: solution(length)
 
             ! Internal variables
+            logical :: huge_value_warning_trigger
             integer :: ind
-            double precision :: buffer_scalar, buffer_vector(length), a_solution_pre
+            double precision :: buffer_scalar, buffer_vector(length), solution_pre
+
+            huge_value_warning_trigger = .false.
 
             ! Test if b(1) == 0:
             if (abs(b(1)) < tiniest) then
@@ -2968,37 +2960,37 @@ module fort_spec
 
             do ind = 2, length
                 buffer_vector(ind) = c(ind - 1) / buffer_scalar
-                buffer_scalar = b(ind) - a(ind) * buffer_vector(ind)
+                buffer_scalar = b(ind) - a(ind) * buffer_vector(ind)  ! TODO might be possible to gain time here by pre-calculating buffer_scalar
 
                 if (abs(buffer_scalar) < tiniest) then
                     write(*,*) "Tridag routine failed!"
+
                     solution = 0d0
+
                     return
                 end if
 
                 solution(ind) = res(ind) / buffer_scalar
-!                if(res(ind) > hugest) then
-!                    print*,'!!',solution(ind),buffer_vector(ind+1),solution(ind + 1)
-!                    stop
-!                end if
-                a_solution_pre = solution(ind - 1) / buffer_scalar
+                solution_pre = solution(ind - 1) / buffer_scalar
 
-                if(a_solution_pre > (hugest - solution(ind)) / max(-a(ind), 1d0)) then
-                    !print*,'!',ind,length,solution(ind),a(ind),a_solution_pre,res(ind),buffer_scalar
-                    !stop
-                    solution(ind) = hugest  ! very dirty... but it works
-                else
-                    a_solution_pre = a_solution_pre * a(ind)
-                    solution(ind) = solution(ind) - a_solution_pre
+                if(solution_pre <= sqrt_hugest) then ! less accurate than a proper overflow detection, but less costly
+                    solution(ind) = max(solution(ind) - solution_pre * a(ind), tiniest)  ! max() prevent < 0 solutions
+                else  ! overflow prevention
+                    if(.not. huge_value_warning_trigger) then
+                        write(&
+                            *, &
+                            '("tridag_own: Warning: very high value (> ", ES11.3, ") found during inversion, &
+                            &capping solution...")'&
+                        ) sqrt_hugest
+                        huge_value_warning_trigger = .true.
+                    end if
+
+                    solution(ind) = sqrt_hugest  ! capping value to avoid infinity
                 end if
             end do
 
             do ind = length - 1, 1, -1
-                solution(ind) = solution(ind) - buffer_vector(ind+1) * solution(ind + 1)
-                !if(solution(ind) > hugest) then
-                    !print*,'!!',solution(ind),buffer_vector(ind+1),solution(ind + 1)
-                    !stop
-                !end if
+                solution(ind) = solution(ind) - buffer_vector(ind + 1) * solution(ind + 1)
             end do
         end subroutine tridag_own
 
