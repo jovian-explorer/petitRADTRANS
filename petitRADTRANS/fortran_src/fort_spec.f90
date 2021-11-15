@@ -1811,7 +1811,7 @@ module fort_spec
         ! Subroutine to calculate slope and y-axis intercept of x,y data,
         ! assuming zero error on data.
 
-        SUBROUTINE fit_linear(x, y, ndata, a, b)
+        subroutine fit_linear(x, y, ndata, a, b)
 
           implicit none
           integer :: ndata
@@ -1822,7 +1822,7 @@ module fort_spec
                (sum(x)**2d0/dble(ndata) - sum(x**2d0))
           a = sum(y-b*x)/dble(ndata)
 
-        end SUBROUTINE fit_linear
+        end subroutine fit_linear
 
 
         subroutine linear_interpolate(x,y,x_out,input_len,output_len,y_out)
@@ -1835,15 +1835,15 @@ module fort_spec
             implicit none
 
             ! inputs
-            DOUBLE PRECISION, INTENT(IN) :: x(input_len), y(input_len), x_out(output_len)
-            INTEGER, INTENT(IN) :: input_len, output_len
+            integer, intent(in) :: input_len, output_len
+            double precision, intent(in) :: x(input_len), y(input_len), x_out(output_len)
 
             ! outputs
-            DOUBLE PRECISION, INTENT(INOUT) :: y_out(output_len)
+            double precision, intent(inout) :: y_out(output_len)
 
             ! internal
-            INTEGER :: i, interp_ind(output_len)
-            DOUBLE PRECISION :: dx, dy, delta_x
+            integer :: i, interp_ind(output_len)
+            double precision :: dx, dy, delta_x
 
             call search_intp_ind(x, input_len, x_out, output_len, interp_ind)
 
@@ -2259,6 +2259,7 @@ module fort_spec
 
             implicit none
 
+            integer, parameter :: iter_scat = 100
             double precision, parameter :: tiniest = tiny(0d0)
 
             integer, intent(in)             :: freq_len_p_1, struc_len, N_mu, N_g
@@ -2281,7 +2282,7 @@ module fort_spec
             double precision                :: source(struc_len, N_g, freq_len_p_1 - 1)
             double precision                :: source_tmp(N_g, freq_len_p_1 - 1, struc_len), &
                 J_planet_scat(N_g,freq_len_p_1-1,struc_len), &
-                photon_destruct(N_g,freq_len_p_1-1,struc_len), &
+                photon_destruct(struc_len, N_g, freq_len_p_1-1), &
                 source_planet_scat_n(N_g,freq_len_p_1-1,struc_len), &
                 source_planet_scat_n1(N_g,freq_len_p_1-1,struc_len), &
                 source_planet_scat_n2(N_g,freq_len_p_1-1,struc_len), &
@@ -2289,6 +2290,10 @@ module fort_spec
             double precision                :: J_star_ini(N_g,freq_len_p_1-1,struc_len)
             double precision                :: I_star_calc(N_g,N_mu,struc_len,freq_len_p_1-1)
             double precision                :: flux_old(freq_len_p_1-1), conv_val
+            double precision                :: I_surface_reflection(N_g, freq_len_p_1 - 1)
+            double precision                :: I_surface_emission(freq_len_p_1 - 1)
+            double precision                :: surf_refl_2(freq_len_p_1 - 1)
+            double precision                :: mu_weight(N_mu)
             ! tridag variables
             double precision                :: a(struc_len, N_mu, N_g, freq_len_p_1 - 1),&
                 b(struc_len, N_mu, N_g, freq_len_p_1 - 1),&
@@ -2309,7 +2314,7 @@ module fort_spec
 
             ! control
             double precision                :: inv_del_tau_min, inv_del_tau_min_half
-            integer                         :: iter_scat, i_iter_scat
+            integer                         :: i_iter_scat
 
             ! GCM spec calc
             logical                         :: GCM_read
@@ -2322,14 +2327,13 @@ module fort_spec
 
             ! Variables for surface scattering
             double precision                :: I_plus_surface(N_mu, N_g, freq_len_p_1-1), mu_double(N_mu)
-            double precision                :: t0,tf, t1, ti, ttri,tder,ttot,ti2,tstuff
+            double precision                :: t0,tf, t1, ti, ttri,tder,ttot,ti2,tstuff, i_minus_pre
 ! TODO clean debug
 !call cpu_time(t0)
             I_plus_surface = 0d0
             I_minus = 0d0
 
             GCM_read = .FALSE.
-            iter_scat = 100
             source_tmp = 0d0
             source = 0d0
             flux_old = 0d0
@@ -2340,7 +2344,8 @@ module fort_spec
             source_planet_scat_n2 = 0d0
             source_planet_scat_n3 = 0d0
 
-            photon_destruct = photon_destruct_in
+            ! Optimize shape for loops
+            photon_destruct = reshape(photon_destruct_in, shape(photon_destruct), order=[2, 3, 1])
 
             ! DO THE STELLAR ATTENUATION CALCULATION
             J_star_ini = 0d0
@@ -2374,14 +2379,30 @@ module fort_spec
 
             ! Initialize the parameters that will be constant through the iterations
             call init_iteration_parameters()
+
+            I_surface_emission = surf_emi * planck(struc_len, :)
+            surf_refl_2 = 2d0 * surf_refl
+            mu_weight = mu * w_gauss_mu
+
+            do i = 1, freq_len_p_1 - 1
+                do l = 1, N_g
+                    if  (trim(adjustl(geom)) /= 'non-isotropic') then
+                        I_surface_reflection(l, i) = surf_refl_2(i) &
+                            * sum(I_star_calc(l, :, struc_len, i) * mu_weight)
+                    else
+                        I_surface_reflection(l, i) = surf_refl(i) &
+                            * J_star_ini(l, i, struc_len) * 4d0 * mu_star
+                    end if
+                end do
+            end do
 !call cpu_time(tf)
 !print*, 'init: ', tf-t0
             do i_iter_scat = 1, iter_scat
 !print*,i_iter_scat
-				if(i_iter_scat == 16) then  ! most "normal" runs converge before ~12 iterations, so hopefully this shouldn't affect them
-					write(*,*) "Feautrier radiative transfer: temporary fix enabled, use results with extreme caution"
-					inv_del_tau_min = 1d1  ! drastically reduce that: improve convergence but can strongly underestimate opacities
-				end if
+				!if(i_iter_scat == 16) then  ! most "normal" runs converge before ~12 iterations, so hopefully this shouldn't affect them
+			!		write(*,*) "Feautrier radiative transfer: temporary fix enabled, use results with extreme caution"
+			!		inv_del_tau_min = 1d1  ! drastically reduce that: improve convergence but can strongly underestimate opacities
+		!		end if
 
                 flux_old = flux
                 J_planet_scat = 0d0
@@ -2403,13 +2424,15 @@ module fort_spec
                     do l = 1, N_g
 !call cpu_time(t0)
                         if (i_iter_scat == 1) then
-                            source(:, l, i) = photon_destruct(l, i, :) * r &
-                                + (1d0 - photon_destruct(l, i, :)) * J_star_ini(l, i, :)
+                            source(:, l, i) = photon_destruct(:, l, i) * r &
+                                + (1d0 - photon_destruct(:, l, i)) * J_star_ini(l, i, :)
                         else
                             r = source(:, l, i)
                         end if
 !call cpu_time(tf)
 !ti2 = ti2 + tf - t0
+!i_minus_pre = 0d0
+
                         do j = 1, N_mu
 !call cpu_time(t0)
                             ! r(struc_len) = I_J(struc_len) = 0.5[I_plus + I_minus]
@@ -2417,22 +2440,20 @@ module fort_spec
                             ! I_minus is the light that goes upwards.
                             !!!!!!!!!!!!!!!!!! ALWAYS NEEDED !!!!!!!!!!!!!!!!!!
                             I_plus = I_plus_surface(j, l, i)
+!if(i_iter_scat>=76.and.i>1700)print*,'i+',i_iter_scat,i,l,j,surf_emi(i),surf_refl(i),planck(struc_len, i),I_plus
+!if(i_iter_scat>=76.and.i>1700)print*,'mu',mu(:),w_gauss_mu(:)
 
-                                        !!!!!!!!!!!!!!! EMISSION ONLY TERM !!!!!!!!!!!!!!!!
-                            I_minus = surf_emi(i) * planck(struc_len, i) &
-                                       !!!!!!!!!!!!!!! SURFACE SCATTERING !!!!!!!!!!!!!!!!
-                                       ! ----> of the emitted/scattered atmospheric light
-                                       ! + surf_refl(i) * sum(I_plus_surface(:, l, i) * w_gauss_mu) ! OLD PRE 091220
-                                       + surf_refl(i) * 2d0 * sum(I_plus_surface(:, l, i) * mu * w_gauss_mu)
-                                       ! ----> of the direct stellar beam (depends on geometry)
+                            !!!!!!!!!!!!!!! EMISSION ONLY TERM !!!!!!!!!!!!!!!!
+                            I_minus = I_surface_emission(i) &
+                            !!!!!!!!!!!!!!! SURFACE SCATTERING !!!!!!!!!!!!!!!!
+                            ! ----> of the emitted/scattered atmospheric light
+                            ! + surf_refl(i) * sum(I_plus_surface(:, l, i) * w_gauss_mu) ! OLD PRE 091220
+                                + surf_refl_2(i) * sum(I_plus_surface(:, l, i) * mu_weight) &
+                            ! ----> of the direct stellar beam (depends on geometry)
+                                + I_surface_reflection(l, i)
 
-                            if  (trim(adjustl(geom)) /= 'non-isotropic') then
-                                I_minus = I_minus &
-                                    + surf_refl(i) * 2d0 * sum(I_star_calc(l, :, struc_len, i) * mu * w_gauss_mu)
-                            else
-                                I_minus = I_minus + surf_refl(i) * J_star_ini(l, i, struc_len) * 4d0 * mu_star
-                            end if
-
+!if(j > 1 .and. abs(i_minus_pre - i_minus) > tiny(0d0)) print*,i_iter_scat,i,l,j,i_minus_pre,i_minus
+!i_minus_pre = i_minus
                             !sum to get I_J
                             r(struc_len) = 0.5d0 * (I_plus + I_minus)
 
@@ -2448,7 +2469,7 @@ module fort_spec
 !ti = ti + tf - t0
 !call cpu_time(t0)
 
-                            call tridag_own(a(:, j, l, i),b(:, j, l, i),c(:, j, l, i),r,I_J(:,j),struc_len)
+                            call tridag_own(a(:, j, l, i), b(:, j, l, i), c(:, j, l, i), r, I_J(:,j), struc_len)
 !call cpu_time(tf)
 !ttri = ttri + tf - t0
 !call cpu_time(t0)
@@ -2497,8 +2518,8 @@ module fort_spec
                 do k = 1, struc_len
                     do i = 1, freq_len_p_1-1
                         do l = 1, N_g
-                            if (photon_destruct(l,i,k) < 1d-10) then
-                                photon_destruct(l,i,k) = 1d-10
+                            if (photon_destruct(k, l, i) < 1d-10) then
+                                photon_destruct(k, l, i) = 1d-10
                             end if
                         end do
                     end do
@@ -2508,9 +2529,9 @@ module fort_spec
                     call planck_f_lr(struc_len,temp(1:struc_len),border_freqs(i),border_freqs(i+1),r)
 
                     do l = 1, N_g
-                        source(:, l, i) = (photon_destruct(l,i,:)*r+(1d0-photon_destruct(l,i,:))* &
+                        source(:, l, i) = (photon_destruct(:, l, i)*r+(1d0-photon_destruct(:, l, i))* &
                             (J_star_ini(l,i,:)+J_planet_scat(l,i,:)-lambda_loc(:, l, i)*source(:, l, i))) / &
-                            (1d0-(1d0-photon_destruct(l,i,:))*lambda_loc(:, l, i))
+                            (1d0-(1d0-photon_destruct(:, l, i))*lambda_loc(:, l, i))
                     end do
                 end do
                     source_planet_scat_n3 = source_planet_scat_n2
