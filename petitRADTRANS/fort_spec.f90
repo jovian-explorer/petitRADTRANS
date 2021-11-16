@@ -2138,7 +2138,7 @@ subroutine feautrier_rad_trans(border_freqs, &
   ! END PAUL NEW
 
   GCM_read = .FALSE.
-  iter_scat = 100
+  iter_scat = 1000
   source = 0d0
   flux_old = 0d0
   flux = 0d0
@@ -2407,7 +2407,7 @@ subroutine feautrier_rad_trans(border_freqs, &
     end if
 
     conv_val = MAXVAL(ABS((flux-flux_old)/flux))
-    if ((conv_val < 1d-2) .AND. (i_iter_scat > 9)) then
+    if ((conv_val < 1d-3) .AND. (i_iter_scat > 9)) then
         exit
     end if
 
@@ -2734,7 +2734,7 @@ subroutine tridag_own(a,b,c,res,solution,length)
      if (buffer_scalar .EQ. 0) then
         write(*,*) "Tridag routine failed!"
         solution = 0d0
-  return
+        return
      end if
      solution(ind) = (res(ind) - &
           a(ind)*solution(ind-1))/buffer_scalar
