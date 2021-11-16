@@ -2237,74 +2237,60 @@ module fort_spec
         
         subroutine corr_k_LBL_RT_tot_olson_kunasz(HIT_coarse_borders,HIT_border_freqs, &
                 tau_approx,struc_len,press,temp,flux,&
-                j_deep,N_mu,mu,HIT_N_g,w_gauss_mu,HIT_kappa_tot_g_approx, &
+                j_deep,N_mu,mu,w_gauss_mu,HIT_kappa_tot_g_approx, &
                 kappa_H,kappa_J,eddington_F,eddington_Psi,H_star,mu_star,H_star_0, &
-                abs_S,t_irr,HIT_N_g_eff,R_10,J_bol,H_bol,K_bol,i_iter, &
+                abs_S,t_irr,HIT_N_g_eff,J_bol,H_bol,K_bol, &
                 w_gauss_ck,gravity,dayside_ave,planetary_ave,j_for_zbrent,jstar_for_zbrent, &
-                range_int,range_write,I_minus_out_Olson,bord_ind_1dm6,I_J_out_Feautrier,iter_tot)
+                range_int,range_write,I_minus_out_Olson,bord_ind_1dm6,I_J_out_Feautrier)
             use constants_block
             
             implicit none
-            
-            integer                         :: HIT_coarse_borders, struc_len, HIT_N_g,HIT_N_g_eff
-            double precision                :: HIT_border_freqs(HIT_coarse_borders), gravity
-            integer                         :: j,i,k,l,i_PT,bord_ind_1dm6
-            double precision                :: press(struc_len), temp(struc_len)
-            double precision                :: flux(HIT_coarse_borders-1),j_deep(HIT_coarse_borders-1)
-            double precision                :: tau_approx(HIT_N_g_eff,HIT_coarse_borders-1,struc_len),r(struc_len)
-            
-            integer                         :: N_mu, i_iter, i_mu,range_int,range_write,range_int_use,range_write_use, &
-                                               iter_tot
-            double precision                :: mu(N_mu)
-            double precision                :: I_plus(struc_len,N_mu), I_minus(struc_len,N_mu)
-            double precision                :: f1,f2, deriv1, deriv2, deriv_tot
-            double precision                :: I_J(struc_len,N_mu), I_H(struc_len,N_mu)
-            double precision                :: HIT_kappa_tot_g_approx(HIT_N_g_eff,HIT_coarse_borders-1,struc_len)
-            logical                         :: R_10, dayside_ave, planetary_ave
+
+            logical, intent(in)             :: dayside_ave, planetary_ave
+            integer, intent(in)             :: HIT_coarse_borders, struc_len, HIT_N_g_eff, bord_ind_1dm6
+            integer, intent(in)             :: N_mu, range_int, range_write
+            double precision, intent(in)    :: HIT_border_freqs(HIT_coarse_borders), gravity
+            double precision, intent(in)    :: press(struc_len), temp(struc_len)
+            double precision, intent(in)    :: tau_approx(HIT_N_g_eff,HIT_coarse_borders-1,struc_len)
+            double precision, intent(in)    :: mu(N_mu)
+            double precision, intent(in)    :: H_star_0(HIT_coarse_borders-1), t_irr
+            double precision, intent(inout) :: J_bol(struc_len), H_bol(struc_len), K_bol(struc_len)
+            double precision, intent(inout) :: kappa_J(struc_len), kappa_H(struc_len)
+            double precision, intent(inout) :: HIT_kappa_tot_g_approx(HIT_N_g_eff,HIT_coarse_borders-1,struc_len), &
+                                               jstar_for_zbrent(HIT_N_g_eff,HIT_coarse_borders-1,struc_len), &
+                                               w_gauss_mu(N_mu),w_gauss_ck(HIT_N_g_eff)
+            double precision, intent(out)   :: eddington_F(struc_len), eddington_Psi
+            double precision, intent(out)   :: flux(HIT_coarse_borders-1), &
+                                               j_deep(HIT_coarse_borders-1), &
+                                               I_minus_out_Olson(N_mu,HIT_N_g_eff,HIT_coarse_borders-1), &
+                                               I_J_out_Feautrier(N_mu,HIT_N_g_eff,HIT_coarse_borders-1), &
+                                               abs_S(struc_len), &
+                                               j_for_zbrent(HIT_N_g_eff,HIT_coarse_borders-1,struc_len)
+
             double precision                :: del_tau(struc_len-1), atten_factors(struc_len-1), &
                                                mean_source(struc_len-1), atten_factors_no_exp(struc_len-1), &
                                                atten_factors_no_exp_p1(struc_len-2)
-            double precision                :: plus_val_j(struc_len), neg_val_j(struc_len), plus_val_h(struc_len), &
-                                               neg_val_h(struc_len), plus_val_k(struc_len),neg_val_k(struc_len)
-            double precision                :: J_bol_g(struc_len), H_bol_g(struc_len), Q, Q_max, u, v, w, f, dt1, edt1,&
-                                               dt2, e0, e1, e2, &
-                                               j_for_zbrent(HIT_N_g_eff,HIT_coarse_borders-1,struc_len), &
-                                               jstar_for_zbrent(HIT_N_g_eff,HIT_coarse_borders-1,struc_len)
+            double precision                :: plus_val_j(struc_len), plus_val_h(struc_len), &
+                                               plus_val_k(struc_len)
+            double precision                :: Q, Q_max, u, v, w, f, dt1, edt1,&
+                                               dt2, e0, e1, e2, r(struc_len)
             double precision                :: j_out_test(struc_len,HIT_coarse_borders-1), &
                                                kappa_out_test(struc_len,HIT_coarse_borders-1), &
                                                kappa_S(struc_len), kappa_S_nu(struc_len,HIT_coarse_borders-1), &
-                                               kappa_j_out_corr(struc_len,HIT_coarse_borders-1), &
-                                               H_tot_layer(struc_len), I_star_calc(HIT_N_g_eff,N_mu,struc_len), &
-                                               I_minus_out_Olson(N_mu,HIT_N_g_eff,HIT_coarse_borders-1), &
-                                               I_J_out_Feautrier(N_mu,HIT_N_g_eff,HIT_coarse_borders-1)
+                                               H_tot_layer(struc_len), I_star_calc(HIT_N_g_eff,N_mu,struc_len)
 
-            ! gaussian integ
-            double precision                :: w_gauss_mu(N_mu),w_gauss_ck(HIT_N_g_eff)
-            
-            ! quantities for P-T structure iteration
-            double precision                :: J_bol(struc_len), H_bol(struc_len), K_bol(struc_len)
-            double precision                :: kappa_J(struc_len), kappa_H(struc_len)
             double precision                :: J_bol_a(struc_len), H_bol_a(struc_len), K_bol_a(struc_len)
             double precision                :: kappa_J_a(struc_len), kappa_H_a(struc_len)
-            double precision                :: eddington_F(struc_len), eddington_Psi
             double precision                :: H_star(HIT_coarse_borders-1,struc_len)
-            double precision                :: abs_S(struc_len), abs_S_nu(struc_len)
-            double precision                :: H_star_0(HIT_coarse_borders-1)
+            double precision                :: abs_S_nu(struc_len)
             double precision                :: H_star_calc(HIT_N_g_eff,struc_len),mu_star
-            double precision                :: k_R_kappa_test
-            
-            ! Guillot test
-            double precision                :: t_irr, gamma
-            
-            ! control
-            double precision                :: inv_del_tau_min
-            
-            ! testing stuff...
-            double precision                :: nu_write, ma_rat, maxa,maxb,maxc,mina,minb,minc,min_a
-            
-            ! output
-            integer, save                   :: n_run = 1
-            character(len=8)                :: fmt,x1
+            double precision                :: gamma
+
+            character(len=8)                :: fmt
+            integer                         :: j,i,k,l
+            integer                         :: i_mu, range_int_use, range_write_use
+            double precision                :: I_plus(struc_len,N_mu), I_minus(struc_len,N_mu)
+
             fmt = '(I5.5)'
             
             if (range_int < 0) then
@@ -2427,7 +2413,7 @@ module fort_spec
                     ! Boundary conditions
                     I_plus(1,j) = 0d0
 
-                    if (range_int_use .EQ. struc_len) then
+                    if (range_int_use == struc_len) then
                         I_minus(struc_len,j) = r(struc_len)
                     else
                         I_minus(range_int_use,j) = I_minus_out_Olson(j,l,i)
@@ -2486,15 +2472,15 @@ module fort_spec
                                 w = (e2-dt1*e1)/(dt2*(dt1+dt2))
                             else
                                 u = -(1d0/24d0)*dt1*(-8d0-12d0*f+6d0*dt1+8d0*f*dt1-2d0*dt1**2d0- &
-                                3d0*f*dt1**2+dt1**3d0+f*dt1**3d0)/(1d0+f)
+                                    3d0*f*dt1**2+dt1**3d0+f*dt1**3d0)/(1d0+f)
                                 v = (1d0/24d0)*dt1*(4d0-2d0*dt1+dt1**2d0+12d0*f-4d0*f*dt1+f*dt1**2d0)/f
                                 w = (1d0/120d0)*dt1*(-20d0+10d0*dt1-3d0*dt1**2d0+dt1**3d0)/(f*(1d0+f))
                             end if
 
                             Q = u*r(range_int_use-k+2)+v*r(range_int_use-k+1)+w*r(range_int_use-k)
                             Q_max = 0.5d0*(r(range_int_use-k+2)*HIT_kappa_tot_g_approx(l,i,range_int_use-k+2)+ &
-                            r(range_int_use-k+1)*HIT_kappa_tot_g_approx(l,i,range_int_use-k+1))* &
-                            (press(range_int_use-k+2)-press(range_int_use-k+1))/gravity/mu(j)
+                                r(range_int_use-k+1)*HIT_kappa_tot_g_approx(l,i,range_int_use-k+1))* &
+                                (press(range_int_use-k+2)-press(range_int_use-k+1))/gravity/mu(j)
                             Q = max(min(Q,Q_max),0d0)
                             I_minus(range_int_use-k+1,j) = I_minus(range_int_use-k+2,j)&
                                 *atten_factors(range_int_use-k+1) + Q
@@ -2559,7 +2545,7 @@ module fort_spec
                 H_bol_a = H_bol_a + w_gauss_ck(l)*(plus_val_h)
                 K_bol_a = K_bol_a + w_gauss_ck(l)*(plus_val_k)
 
-                if (range_write_use .EQ. struc_len) then
+                if (range_write_use == struc_len) then
                     j_for_zbrent(l,i,1:range_write_use) = plus_val_j(1:range_write_use)
                 else
                     j_for_zbrent(l,i,1:range_write_use-1) = plus_val_j(1:range_write_use-1)
@@ -2603,38 +2589,38 @@ module fort_spec
 
                 j_out_test(:,i) = J_bol_a
 
-                if (range_int_use .EQ. struc_len) then
+                if (range_int_use == struc_len) then
                     j_deep(i) = J_bol_a(struc_len-1)
                 end if
 
                 flux(i) = H_bol_a(1)* 4d0* pi
 
-                if (range_write_use .EQ. struc_len) then
+                if (range_write_use == struc_len) then
                     J_bol(1:range_write_use) = J_bol(1:range_write_use) + &
-                    J_bol_a(1:range_write_use)*(HIT_border_freqs(i)-HIT_border_freqs(i+1))
+                        J_bol_a(1:range_write_use)*(HIT_border_freqs(i)-HIT_border_freqs(i+1))
                     H_bol(1:range_write_use) = H_bol(1:range_write_use) + &
-                    H_bol_a(1:range_write_use)*(HIT_border_freqs(i)-HIT_border_freqs(i+1))
+                        H_bol_a(1:range_write_use)*(HIT_border_freqs(i)-HIT_border_freqs(i+1))
 
                     K_bol = K_bol + K_bol_a*(HIT_border_freqs(i)-HIT_border_freqs(i+1))
                     kappa_J(1:range_write_use) = kappa_J(1:range_write_use) + kappa_J_a(1:range_write_use)* &
-                    (HIT_border_freqs(i)-HIT_border_freqs(i+1))
+                        (HIT_border_freqs(i)-HIT_border_freqs(i+1))
                     kappa_H(1:range_write_use) = kappa_H(1:range_write_use) + kappa_H_a(1:range_write_use)* &
-                    (HIT_border_freqs(i)-HIT_border_freqs(i+1))
+                        (HIT_border_freqs(i)-HIT_border_freqs(i+1))
                 else
                     J_bol(1:range_write_use-1) = J_bol(1:range_write_use-1) + &
-                    J_bol_a(1:range_write_use-1)*(HIT_border_freqs(i)-HIT_border_freqs(i+1))
+                        J_bol_a(1:range_write_use-1)*(HIT_border_freqs(i)-HIT_border_freqs(i+1))
                     H_bol(1:range_write_use-1) = H_bol(1:range_write_use-1) + &
-                    H_bol_a(1:range_write_use-1)*(HIT_border_freqs(i)-HIT_border_freqs(i+1))
+                        H_bol_a(1:range_write_use-1)*(HIT_border_freqs(i)-HIT_border_freqs(i+1))
 
                     K_bol = K_bol + K_bol_a*(HIT_border_freqs(i)-HIT_border_freqs(i+1))
                     kappa_J(1:range_write_use-1) = kappa_J(1:range_write_use-1) + kappa_J_a(1:range_write_use-1)* &
-                    (HIT_border_freqs(i)-HIT_border_freqs(i+1))
+                        (HIT_border_freqs(i)-HIT_border_freqs(i+1))
                     kappa_H(1:range_write_use-1) = kappa_H(1:range_write_use-1) + kappa_H_a(1:range_write_use-1)* &
-                    (HIT_border_freqs(i)-HIT_border_freqs(i+1))
+                        (HIT_border_freqs(i)-HIT_border_freqs(i+1))
                 end if
             end do
             
-            if (range_write_use .EQ. struc_len) then
+            if (range_write_use == struc_len) then
                 kappa_J(1:range_write_use) = kappa_J(1:range_write_use) / J_bol(1:range_write_use)
                 kappa_H(1:range_write_use) = kappa_H(1:range_write_use) / H_bol(1:range_write_use)
                 eddington_F(1:range_write_use) = K_bol(1:range_write_use)/J_bol(1:range_write_use)
@@ -2652,7 +2638,7 @@ module fort_spec
             !!$  kappa_H(1) = kappa_H(2)
             
             ! Use that we are optically thick at the bottom (hopefully)
-            if (range_int_use .EQ. struc_len) then
+            if (range_int_use == struc_len) then
                 call calc_rosse_opa(&
                     HIT_kappa_tot_g_approx(:,:,struc_len), &
                     HIT_border_freqs,temp(struc_len), &
