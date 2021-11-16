@@ -2249,16 +2249,15 @@ module fort_spec
             logical, intent(in)             :: dayside_ave, planetary_ave
             integer, intent(in)             :: HIT_coarse_borders, struc_len, HIT_N_g_eff, bord_ind_1dm6
             integer, intent(in)             :: N_mu, range_int, range_write
-            double precision, intent(in)    :: HIT_border_freqs(HIT_coarse_borders), gravity
+            double precision, intent(in)    :: HIT_border_freqs(HIT_coarse_borders), gravity, &
+                                               HIT_kappa_tot_g_approx(HIT_N_g_eff,HIT_coarse_borders-1,struc_len)
             double precision, intent(in)    :: press(struc_len), temp(struc_len)
             double precision, intent(in)    :: tau_approx(HIT_N_g_eff,HIT_coarse_borders-1,struc_len)
-            double precision, intent(in)    :: mu(N_mu)
+            double precision, intent(in)    :: mu(N_mu), w_gauss_mu(N_mu),w_gauss_ck(HIT_N_g_eff)
             double precision, intent(in)    :: H_star_0(HIT_coarse_borders-1), t_irr
             double precision, intent(inout) :: J_bol(struc_len), H_bol(struc_len), K_bol(struc_len)
             double precision, intent(inout) :: kappa_J(struc_len), kappa_H(struc_len)
-            double precision, intent(inout) :: HIT_kappa_tot_g_approx(HIT_N_g_eff,HIT_coarse_borders-1,struc_len), &
-                                               jstar_for_zbrent(HIT_N_g_eff,HIT_coarse_borders-1,struc_len), &
-                                               w_gauss_mu(N_mu),w_gauss_ck(HIT_N_g_eff)
+            double precision, intent(inout) :: jstar_for_zbrent(HIT_N_g_eff,HIT_coarse_borders-1,struc_len)
             double precision, intent(out)   :: eddington_F(struc_len), eddington_Psi
             double precision, intent(out)   :: flux(HIT_coarse_borders-1), &
                                                j_deep(HIT_coarse_borders-1), &
@@ -2266,6 +2265,7 @@ module fort_spec
                                                I_J_out_Feautrier(N_mu,HIT_N_g_eff,HIT_coarse_borders-1), &
                                                abs_S(struc_len), &
                                                j_for_zbrent(HIT_N_g_eff,HIT_coarse_borders-1,struc_len)
+            double precision, intent(out)   :: H_star(HIT_coarse_borders-1,struc_len), mu_star
 
             double precision                :: del_tau(struc_len-1), atten_factors(struc_len-1), &
                                                mean_source(struc_len-1), atten_factors_no_exp(struc_len-1), &
@@ -2281,9 +2281,8 @@ module fort_spec
 
             double precision                :: J_bol_a(struc_len), H_bol_a(struc_len), K_bol_a(struc_len)
             double precision                :: kappa_J_a(struc_len), kappa_H_a(struc_len)
-            double precision                :: H_star(HIT_coarse_borders-1,struc_len)
             double precision                :: abs_S_nu(struc_len)
-            double precision                :: H_star_calc(HIT_N_g_eff,struc_len),mu_star
+            double precision                :: H_star_calc(HIT_N_g_eff,struc_len)
             double precision                :: gamma
 
             character(len=8)                :: fmt
