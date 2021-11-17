@@ -597,7 +597,7 @@ class Retrieval:
                         log_likelihood += dede.get_chisq(wlen_model, \
                                         spectrum_model, \
                                         self.plotting)
-        #print(log_likelihood)
+        print(log_likelihood+log_prior)
         if log_likelihood + log_prior < -9e99:
             return -1e99
         if np.abs(log_likelihood + log_prior) < 1e-99:
