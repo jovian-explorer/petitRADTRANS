@@ -155,6 +155,7 @@ def emission_model_diseq(pRT_object,
     elif "b_hans" in parameters.keys():
         b_hans = parameters['b_hans'].value
         distribution = "hansen"
+
     pRT_object.calc_flux(temperatures,
                         abundances,
                         gravity,
@@ -260,7 +261,7 @@ def guillot_free_emission(pRT_object, \
         temperatures = temperatures[small_index]
     else:
         pressures = pRT_object.press/1e6
-
+    print(Pbases)
     # If in evaluation mode, and PTs are supposed to be plotted
     if PT_plot_mode:
         return pressures, temperatures
