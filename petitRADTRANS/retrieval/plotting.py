@@ -159,6 +159,7 @@ def contour_corner(sampledict, \
 
         color_list = ['#009FB8','#FF695C', '#70FF92',  '#FFBB33', '#6171FF', "#FF1F69", "#52AC25", '#E574FF', "#FF261D", "#B429FF" ]
     else:
+        color_list = [None,None,None,None,None] #TODO get the default cmap
         mpl.rcParams.update(mpl.rcParamsDefault)
 
         #from .plot_style import prt_colours
@@ -168,7 +169,7 @@ def contour_corner(sampledict, \
     handles = []
     count = 0
     for key,samples in sampledict.items():
-        if count > len(color_list):
+        if prt_plot_style and count > len(color_list):
             print("Not enough colors to continue plotting. Please add to the list.")
             print("Outputting first " + str(count) + " retrievals.")
             break

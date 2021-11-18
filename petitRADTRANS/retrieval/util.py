@@ -216,7 +216,7 @@ def bin_species_exok(species,resolution):
     prt_path = os.environ.get("pRT_input_data_path")
     atmosphere = Radtrans(line_species = species,
                             wlen_bords_micron = [0.1, 251.])
-    ck_path = prt_path + 'opacities/lines/corr_k/'
+    ck_path = prt_path + '/opacities/lines/corr_k/'
     print("Saving to " + ck_path)
     print("Resolution: ", resolution)
     masses = {}

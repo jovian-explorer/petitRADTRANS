@@ -344,10 +344,10 @@ class Data:
                 plt.plot(self.wlen, flux_rebinned)
                 plt.errorbar(self.wlen,
                              self.flux*self.scale_factor,
-                             yerr = f_err*self.scale_factor,
+                             yerr = f_err,
                              fmt = '+')
                 plt.show()
-        #print(self.name,logL)
+        # print(self.name,logL)
         return logL
 
     def convolve(self, \
