@@ -1226,17 +1226,6 @@ class Radtrans(_read_opacities.ReadOpacities):
                                  'smaller than the wavelength range of '
                                  'wlen_bords_micron.')
 
-        if "hansen" in dist.lower():
-            try:
-                if type(b_hans) is dict:
-                    self.b_hans = np.array(list(b_hans.values()),dtype='d',order='F').T
-                if type(b_hans) is float:
-                    self.b_hans = np.array(np.tile(b_hans * np.ones_like(self.press),(len(self.cloud_species),1)),dtype='d',order='F').T
-                    print(self.b_hans.shape)
-            except:
-                print("You must provide a value for the Hansen distribution width, b_hans!")
-                self.b_hans = None
-
         if self.mu_star<=0.:
             self.mu_star=1e-8
 
