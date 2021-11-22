@@ -1994,6 +1994,132 @@ subroutine combine_opas_sample_ck(line_struc_kappas, g_gauss, weights, &
 
 end subroutine combine_opas_sample_ck
 
+
+
+! Implementation of linear interpolation function
+! Takes arrays of points in x and y, together with an
+! array of output points. Interpolates to find
+! the output y-values.
+subroutine linear_interpolate(x,y,x_out,input_len,output_len,y_out)
+
+   implicit none
+
+   ! inputs
+   DOUBLE PRECISION, INTENT(IN) :: x(input_len), y(input_len), x_out(output_len)
+   INTEGER, INTENT(IN) :: input_len, output_len
+
+   ! outputs
+   DOUBLE PRECISION, INTENT(INOUT) :: y_out(output_len)
+
+   ! internal
+   INTEGER :: i, interp_ind(output_len)
+   DOUBLE PRECISION :: dx, dy, delta_x
+   call search_intp_ind(x, input_len, x_out, output_len, interp_ind)
+   do i = 1, output_len
+      dy = y(interp_ind(i)+1)-y(interp_ind(i))
+      dx = x(interp_ind(i)+1)-x(interp_ind(i))
+      delta_x = x_out(i) - x(interp_ind(i))
+      y_out(i) = y(interp_ind(i)) + ((dy/dx)*delta_x)
+   enddo
+end subroutine linear_interpolate
+
+
+
+
+! Subroutine to completely mix the c-k opacities
+subroutine combine_opas_ck(line_struc_kappas, g_gauss, weights, &
+   g_len, freq_len, N_species, struc_len, line_struc_kappas_out)
+
+   implicit none
+
+   INTEGER, INTENT(IN)          :: g_len, freq_len, N_species, struc_len
+   DOUBLE PRECISION, INTENT(IN) :: line_struc_kappas(g_len, freq_len, &
+      N_species, struc_len), g_gauss(g_len), weights(g_len)
+   DOUBLE PRECISION, INTENT(OUT) :: line_struc_kappas_out(g_len, freq_len, &
+      struc_len)
+
+   ! Internal
+   INTEGER          :: i_freq, i_spec, i_struc, i_samp, i_g, j_g, nsample
+   DOUBLE PRECISION :: cum_sum, g_out(g_len*g_len+1), k_out(g_len*g_len+1), &
+      g_presort(g_len*g_len+1), sampled_opa_weights(g_len*g_len, 2), &
+      spec2(g_len), threshold(freq_len, struc_len)
+
+   nsample = g_len*g_len
+
+
+   ! In every layer and frequency bin:
+   ! find the species with the largest kappa(g=0) value,
+   ! save that value.
+   do i_struc = 1, struc_len
+      do i_freq = 1, freq_len
+         threshold(i_freq, i_struc) = MAXVAL(line_struc_kappas(1, i_freq, :, i_struc))
+      end do
+   end do
+
+   ! This is for the everything-with-everything combination, if only two species
+   ! get combined. Only need to do this here once.
+   do i_g = 1, g_len
+      do j_g = 1, g_len
+         g_presort((i_g-1)*g_len+j_g) = weights(i_g) * weights(j_g)
+      end do
+   end do
+   ! Here we'll loop over every entry, mix and add the kappa values,
+   ! calculate the g-weights and then interpolate back to the standard
+   ! g-grid.
+   line_struc_kappas_out = line_struc_kappas(:,:,1,:)
+   if (N_species > 1) then
+      do i_struc = 1, struc_len
+         do i_freq = 1, freq_len
+            do i_spec = 2, N_species
+               if (line_struc_kappas(g_len, i_freq, i_spec, i_struc) < &
+                  threshold(i_freq, i_struc)*1d-2) then
+                     cycle
+               endif
+               spec2 = line_struc_kappas(:, i_freq, i_spec, i_struc)
+
+               k_out = 0d0
+               do i_g = 1, g_len
+                  do j_g = 1, g_len
+                        k_out((i_g-1)*g_len+j_g) = line_struc_kappas_out(i_g, i_freq, i_struc) + spec2(j_g)
+                  end do
+               end do
+
+               sampled_opa_weights(:,1) = k_out(1:nsample)
+               sampled_opa_weights(:,2) = g_presort(1:nsample)
+
+               call wrap_quicksort_swap(nsample, sampled_opa_weights)
+
+               sampled_opa_weights(:, 2) = &
+                        sampled_opa_weights(:, 2) / &
+                        SUM(sampled_opa_weights(:, 2))
+
+               g_out = 0d0
+               cum_sum = 0d0
+               do i_samp = 1, nsample
+                  g_out(i_samp) = &
+                        sampled_opa_weights(i_samp, 2)/2d0 + &
+                           cum_sum
+                  cum_sum = cum_sum + &
+                        sampled_opa_weights(i_samp, 2)
+               end do
+
+               g_out(nsample+1) = 1d0
+
+               k_out(1:nsample) = sampled_opa_weights(:, 1)
+               k_out(1) = line_struc_kappas_out(1, i_freq, i_struc) + spec2(1)
+               k_out(nsample+1) = line_struc_kappas_out(g_len, i_freq, i_struc) + spec2(g_len)
+
+               ! Linearly interpolate back to the 16-point grid, storing in the output array
+               call linear_interpolate(g_out, k_out, g_gauss, nsample+1, g_len, &
+                                       line_struc_kappas_out(:, i_freq, i_struc))
+            end do
+         end do
+      end do
+
+   endif
+end subroutine combine_opas_ck
+
+
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2138,7 +2264,7 @@ subroutine feautrier_rad_trans(border_freqs, &
   ! END PAUL NEW
 
   GCM_read = .FALSE.
-  iter_scat = 100
+  iter_scat = 1000
   source = 0d0
   flux_old = 0d0
   flux = 0d0
@@ -2407,7 +2533,7 @@ subroutine feautrier_rad_trans(border_freqs, &
     end if
 
     conv_val = MAXVAL(ABS((flux-flux_old)/flux))
-    if ((conv_val < 1d-2) .AND. (i_iter_scat > 9)) then
+    if ((conv_val < 1d-3) .AND. (i_iter_scat > 9)) then
         exit
     end if
 
@@ -2734,7 +2860,7 @@ subroutine tridag_own(a,b,c,res,solution,length)
      if (buffer_scalar .EQ. 0) then
         write(*,*) "Tridag routine failed!"
         solution = 0d0
-  return
+        return
      end if
      solution(ind) = (res(ind) - &
           a(ind)*solution(ind-1))/buffer_scalar

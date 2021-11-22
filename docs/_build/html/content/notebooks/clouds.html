@@ -9,7 +9,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Including clouds &mdash; petitRADTRANS 2.2.1 documentation</title>
+  <title>Including clouds &mdash; petitRADTRANS 2.3.1 documentation</title>
   
 
   
@@ -70,7 +70,7 @@
             
             
               <div class="version">
-                2.2
+                2.3
               </div>
             
           
@@ -108,6 +108,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#Calculating-the-particle-size">Calculating the particle size</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="#Hansen-Distribution-Clouds">Hansen Distribution Clouds</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#Emission-spectra">Emission spectra</a></li>
 </ul>
 </li>
@@ -424,7 +425,7 @@ div.rendered_html tbody tr:hover {
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">from</span> <span class="nn">petitRADTRANS</span> <span class="kn">import</span> <span class="n">Radtrans</span>
 
@@ -467,7 +468,7 @@ div.rendered_html tbody tr:hover {
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="kn">from</span> <span class="nn">petitRADTRANS</span> <span class="kn">import</span> <span class="n">nat_cst</span> <span class="k">as</span> <span class="n">nc</span>
 <span class="n">R_pl</span> <span class="o">=</span> <span class="mf">1.838</span><span class="o">*</span><span class="n">nc</span><span class="o">.</span><span class="n">r_jup_mean</span>
 <span class="n">gravity</span> <span class="o">=</span> <span class="mf">1e1</span><span class="o">**</span><span class="mf">2.45</span>
@@ -507,7 +508,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">pylab</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;figure.figsize&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span>
 
@@ -523,7 +524,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="n">kappa_zero</span> <span class="o">=</span> <span class="mf">0.01</span>
 <span class="n">gamma_scat</span> <span class="o">=</span> <span class="o">-</span><span class="mf">4.</span>
 
@@ -540,7 +541,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="n">kappa_zero</span> <span class="o">=</span> <span class="mf">0.01</span>
 <span class="n">gamma_scat</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.</span>
 
@@ -557,7 +558,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="n">kappa_zero</span> <span class="o">=</span> <span class="mf">0.01</span>
 <span class="n">gamma_scat</span> <span class="o">=</span> <span class="mf">0.</span>
 
@@ -574,7 +575,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="n">kappa_zero</span> <span class="o">=</span> <span class="mf">0.01</span>
 <span class="n">gamma_scat</span> <span class="o">=</span> <span class="mf">1.</span>
 
@@ -632,7 +633,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">pylab</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;figure.figsize&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span>
 
@@ -721,7 +722,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">from</span> <span class="nn">petitRADTRANS</span> <span class="kn">import</span> <span class="n">Radtrans</span>
 
@@ -765,7 +766,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="kn">from</span> <span class="nn">petitRADTRANS</span> <span class="kn">import</span> <span class="n">nat_cst</span> <span class="k">as</span> <span class="n">nc</span>
 <span class="n">R_pl</span> <span class="o">=</span> <span class="mf">1.838</span><span class="o">*</span><span class="n">nc</span><span class="o">.</span><span class="n">r_jup_mean</span>
 <span class="n">gravity</span> <span class="o">=</span> <span class="mf">1e1</span><span class="o">**</span><span class="mf">2.45</span>
@@ -804,7 +805,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="n">radius</span> <span class="o">=</span> <span class="p">{}</span>
 <span class="n">radius</span><span class="p">[</span><span class="s1">&#39;Mg2SiO4(c)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.00005</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span> <span class="c1"># I.e. a 0.5-micron particle size (0.00005 cm)</span>
 
@@ -817,7 +818,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="n">atmosphere</span><span class="o">.</span><span class="n">calc_transm</span><span class="p">(</span><span class="n">temperature</span><span class="p">,</span> <span class="n">mass_fractions</span><span class="p">,</span> <span class="n">gravity</span><span class="p">,</span> <span class="n">MMW</span><span class="p">,</span> \
                        <span class="n">R_pl</span><span class="o">=</span><span class="n">R_pl</span><span class="p">,</span> <span class="n">P0_bar</span><span class="o">=</span><span class="n">P0</span><span class="p">,</span> \
                        <span class="n">radius</span> <span class="o">=</span> <span class="n">radius</span><span class="p">,</span> <span class="n">sigma_lnorm</span> <span class="o">=</span> <span class="n">sigma_lnorm</span><span class="p">)</span>
@@ -843,8 +844,17 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/molliere/Documents/Project_Docs/petitRADTRANS/petitRADTRANS/radtrans.py:1692: RuntimeWarning: invalid value encountered in true_divide
+  cloud_red_fac_aniso_TOT[:,i_struct] = cloud_red_fac_aniso_TOT[:,i_struct]/cloud_scat_opa_TOT[:,i_struct]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
 <div class="output_area docutils container">
-<img alt="../../_images/content_notebooks_clouds_39_0.png" src="../../_images/content_notebooks_clouds_39_0.png" />
+<img alt="../../_images/content_notebooks_clouds_39_1.png" src="../../_images/content_notebooks_clouds_39_1.png" />
 </div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -864,7 +874,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="n">Kzz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span><span class="o">*</span><span class="mf">1e1</span><span class="o">**</span><span class="mf">7.5</span>
 <span class="n">fsed</span> <span class="o">=</span> <span class="mf">2.</span>
 <span class="n">sigma_lnorm</span> <span class="o">=</span> <span class="mf">1.05</span>
@@ -876,7 +886,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;Mg2SiO4(c)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0000005</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
 
 <span class="n">atmosphere</span><span class="o">.</span><span class="n">calc_transm</span><span class="p">(</span><span class="n">temperature</span><span class="p">,</span> <span class="n">mass_fractions</span><span class="p">,</span> <span class="n">gravity</span><span class="p">,</span> <span class="n">MMW</span><span class="p">,</span> \
@@ -905,8 +915,17 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/molliere/Documents/Project_Docs/petitRADTRANS/petitRADTRANS/radtrans.py:1692: RuntimeWarning: invalid value encountered in true_divide
+  cloud_red_fac_aniso_TOT[:,i_struct] = cloud_red_fac_aniso_TOT[:,i_struct]/cloud_scat_opa_TOT[:,i_struct]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
 <div class="output_area docutils container">
-<img alt="../../_images/content_notebooks_clouds_45_0.png" src="../../_images/content_notebooks_clouds_45_0.png" />
+<img alt="../../_images/content_notebooks_clouds_45_1.png" src="../../_images/content_notebooks_clouds_45_1.png" />
 </div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -922,7 +941,7 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="n">plt</span><span class="o">.</span><span class="n">yscale</span><span class="p">(</span><span class="s1">&#39;log&#39;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">xscale</span><span class="p">(</span><span class="s1">&#39;log&#39;</span><span class="p">)</span>
 
@@ -952,19 +971,74 @@ X_i = \frac{\mu_i}{\mu}n_i,
 &lt;Figure size 720x432 with 0 Axes&gt;
 </pre></div></div>
 </div>
+</section>
+</section>
+<section id="Hansen-Distribution-Clouds">
+<h2>Hansen Distribution Clouds<a class="headerlink" href="#Hansen-Distribution-Clouds" title="Permalink to this headline">¶</a></h2>
+<p>While the Ackermann-Marley model used here typically uses a log-normal distribution for the cloud particle radii, it is also possible to use the <a class="reference external" href="http://web.gps.caltech.edu/~vijay/Papers/Polarisation/hansen-71b.pdf">Hansen+ (1971)</a> distribution. To do this, you’ll need to set the <code class="docutils literal notranslate"><span class="pre">dist</span></code> parameter in <code class="docutils literal notranslate"><span class="pre">calc_flux</span></code> to <code class="docutils literal notranslate"><span class="pre">hansen</span></code>, and set the effective width of the distribution with the <code class="docutils literal notranslate"><span class="pre">b_hans</span></code> parameter. Alternately, you can specify both the distribution width and center using the
+<code class="docutils literal notranslate"><span class="pre">b_hans</span></code> and <code class="docutils literal notranslate"><span class="pre">a_hans</span></code> arguments. Note that the value of <code class="docutils literal notranslate"><span class="pre">b_hans</span></code> will be different from that of <code class="docutils literal notranslate"><span class="pre">sigma_lnorm</span></code> to give a similar distribution, as the effective width is weighted by the particle area. See the Hansen+ (1971) paper for more details.</p>
+<p>Here, we’ll calculate the mean particle size as a function of altitude</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
+<span></span><span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;Mg2SiO4(c)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0000005</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
+<span class="n">Kzz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span><span class="o">*</span><span class="mf">1e1</span><span class="o">**</span><span class="mf">7.5</span>
+<span class="n">fsed</span> <span class="o">=</span> <span class="mf">2.</span>
+<span class="n">b_hans</span> <span class="o">=</span> <span class="mf">0.01</span>
+<span class="n">atmosphere</span><span class="o">.</span><span class="n">calc_flux</span><span class="p">(</span><span class="n">temperature</span><span class="p">,</span> <span class="n">mass_fractions</span><span class="p">,</span> <span class="n">gravity</span><span class="p">,</span> <span class="n">MMW</span><span class="p">,</span>
+                       <span class="n">Kzz</span> <span class="o">=</span> <span class="n">Kzz</span><span class="p">,</span> <span class="n">fsed</span><span class="o">=</span><span class="n">fsed</span><span class="p">,</span> <span class="n">b_hans</span><span class="o">=</span><span class="n">b_hans</span><span class="p">,</span><span class="n">dist</span><span class="o">=</span><span class="s1">&#39;hansen&#39;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">yscale</span><span class="p">(</span><span class="s1">&#39;log&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xscale</span><span class="p">(</span><span class="s1">&#39;log&#39;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">([</span><span class="mf">1e2</span><span class="p">,</span><span class="mf">1e-6</span><span class="p">])</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;P (bar)&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Average particle size (microns)&#39;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">atmosphere</span><span class="o">.</span><span class="n">r_g</span><span class="p">[:,</span><span class="n">atmosphere</span><span class="o">.</span><span class="n">cloud_species</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">&#39;Mg2SiO4(c)&#39;</span><span class="p">)]</span><span class="o">/</span><span class="mf">1e-4</span><span class="p">,</span> <span class="n">pressures</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">clf</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+(100, 1)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../../_images/content_notebooks_clouds_49_1.png" src="../../_images/content_notebooks_clouds_49_1.png" />
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;Figure size 720x432 with 0 Axes&gt;
+</pre></div></div>
+</div>
 <div class="admonition warning">
 <p><strong>Minimum particle size:</strong> the opacity of particles smaller than 1 nm is set to zero.</p>
 </div>
-</section>
 </section>
 <section id="Emission-spectra">
 <h2>Emission spectra<a class="headerlink" href="#Emission-spectra" title="Permalink to this headline">¶</a></h2>
 <p>We can use the Radtrans object created above to calculate emission spectra as well. Here we will also generate an instance of pRT with scattering turned on with <code class="docutils literal notranslate"><span class="pre">do_scat_emis</span> <span class="pre">=</span> <span class="pre">True</span></code>, (see <a class="reference external" href="emis_scat.html">“Scattering for Emission Spectra”</a> for an example on how to do this in detail).</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre>
 <span></span><span class="n">mass_fractions</span><span class="p">[</span><span class="s1">&#39;Mg2SiO4(c)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0000005</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span>
 
 <span class="n">atmosphere</span><span class="o">.</span><span class="n">calc_flux</span><span class="p">(</span><span class="n">temperature</span><span class="p">,</span> <span class="n">mass_fractions</span><span class="p">,</span> <span class="n">gravity</span><span class="p">,</span> <span class="n">MMW</span><span class="p">,</span> \
@@ -1031,8 +1105,17 @@ X_i = \frac{\mu_i}{\mu}n_i,
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/molliere/Documents/Project_Docs/petitRADTRANS/petitRADTRANS/radtrans.py:1692: RuntimeWarning: invalid value encountered in true_divide
+  cloud_red_fac_aniso_TOT[:,i_struct] = cloud_red_fac_aniso_TOT[:,i_struct]/cloud_scat_opa_TOT[:,i_struct]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
 <div class="output_area docutils container">
-<img alt="../../_images/content_notebooks_clouds_51_1.png" src="../../_images/content_notebooks_clouds_51_1.png" />
+<img alt="../../_images/content_notebooks_clouds_53_2.png" src="../../_images/content_notebooks_clouds_53_2.png" />
 </div>
 </div>
 <div class="nboutput nblast docutils container">
