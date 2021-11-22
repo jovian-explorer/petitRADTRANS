@@ -656,11 +656,14 @@ class Radtrans(_read_opacities.ReadOpacities):
                                           self.g_gauss, self.w_gauss, \
                                           160)
             '''
+            '''
             self.line_struc_kappas[:, :, 0, :] = \
               fs.combine_opas_sample_ck(self.line_struc_kappas, \
                                           self.g_gauss, self.w_gauss, \
                                           1000)
-
+            '''
+            self.line_struc_kappas[:, :, 0, :] = fs.combine_opas_ck(self.line_struc_kappas,
+                                                                    self.g_gauss, self.w_gauss)
             #stamps.append(time.clock())
             #self.combine_opas_shuffle_ck()
             #stamps.append(time.clock())
