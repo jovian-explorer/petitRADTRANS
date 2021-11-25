@@ -17,6 +17,7 @@ from .utils import tests_results_directory, reference_filenames, radtrans_parame
 
 
 relative_tolerance = 1e-6  # relative tolerance when comparing with older results
+max_number_of_tests = 3
 
 
 def init_run():
@@ -218,7 +219,7 @@ def test_list_available_species():
     run_definition.list_available_line_species()
 
 
-def test_simple_retrieval():
+def test_simple_retrieval(test_number=0, max_test_number=max_number_of_tests):
     retrieval = petitRADTRANS.retrieval.Retrieval(
         run_definition,
         output_dir=tests_results_directory,
@@ -226,31 +227,46 @@ def test_simple_retrieval():
         ultranest=radtrans_parameters['retrieval_parameters']['ultranest']  # if False, use PyMultiNest
     )
 
-    retrieval.run(
-        sampling_efficiency=radtrans_parameters['retrieval_parameters']['sampling_efficiency'],
-        n_live_points=radtrans_parameters['retrieval_parameters']['n_live_points'],
-        const_efficiency_mode=radtrans_parameters['retrieval_parameters']['const_efficiency_mode'],
-        resume=radtrans_parameters['retrieval_parameters']['resume']
-    )
+    try:
+        retrieval.run(
+            sampling_efficiency=radtrans_parameters['retrieval_parameters']['sampling_efficiency'],
+            n_live_points=radtrans_parameters['retrieval_parameters']['n_live_points'],
+            const_efficiency_mode=radtrans_parameters['retrieval_parameters']['const_efficiency_mode'],
+            resume=radtrans_parameters['retrieval_parameters']['resume']
+        )
 
-    # Just check if get_samples works
-    sample_dict, parameter_dict = retrieval.get_samples()
+        # Just check if get_samples works
+        sample_dict, parameter_dict = retrieval.get_samples()
 
-    # Get results and reference
-    with open(reference_filenames['pymultinest_parameter_analysis']) as f:
-        reference = json.load(f)
+        # Get results and reference
+        with open(reference_filenames['pymultinest_parameter_analysis']) as f:
+            reference = json.load(f)
 
-    new_result_file = os.path.join(
-        tests_results_directory,
-        'out_PMN',
-        os.path.basename(reference_filenames['pymultinest_parameter_analysis'])
-    )
+        new_result_file = os.path.join(
+            tests_results_directory,
+            'out_PMN',
+            os.path.basename(reference_filenames['pymultinest_parameter_analysis'])
+        )
 
-    with open(new_result_file) as f:
-        new_results = json.load(f)
+        with open(new_result_file) as f:
+            new_results = json.load(f)
 
-    # Check if retrieved parameters are in +/- 1 sigma of the previous retrieved parameters
-    for i, marginal in enumerate(new_results['marginals']):
-        assert marginal['median'] - reference['marginals'][i]['sigma'] \
-               <= reference['marginals'][i]['median'] \
-               <= marginal['median'] + reference['marginals'][i]['sigma']
+        # Check if retrieved parameters are in +/- 1 sigma of the previous retrieved parameters
+        for i, marginal in enumerate(new_results['marginals']):
+            assert marginal['median'] - reference['marginals'][i]['sigma'] \
+                   <= reference['marginals'][i]['median'] \
+                   <= marginal['median'] + reference['marginals'][i]['sigma']
+    except AssertionError as error_message:
+        test_number += 1
+
+        if test_number < max_test_number:
+            test_simple_retrieval(test_number=test_number, max_test_number=max_test_number)
+        else:
+            raise AssertionError(
+                f"Retrievals are expected to give results within a +/- 1 sigma uncertainty range. "
+                f"To take that into account, {test_number} tests were performed, "
+                f"but all failed to fall within this range "
+                f"compared to the results of the previous version.\n"
+                f"Complete error message was: \n" +
+                str(error_message)
+            )
