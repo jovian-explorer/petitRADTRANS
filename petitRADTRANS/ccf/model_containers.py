@@ -1,3 +1,4 @@
+import copy
 import os
 import pickle
 
@@ -148,6 +149,9 @@ class Planet:
             system_apparent_magnitude_j=0.,
             system_apparent_magnitude_j_error_upper=0.,
             system_apparent_magnitude_j_error_lower=0.,
+            system_apparent_magnitude_k=0.,
+            system_apparent_magnitude_k_error_upper=0.,
+            system_apparent_magnitude_k_error_lower=0.,
             system_proper_motion=0.,
             system_proper_motion_error_upper=0.,
             system_proper_motion_error_lower=0.,
@@ -282,6 +286,9 @@ class Planet:
         self.system_apparent_magnitude_j = system_apparent_magnitude_j
         self.system_apparent_magnitude_j_error_upper = system_apparent_magnitude_j_error_upper
         self.system_apparent_magnitude_j_error_lower = system_apparent_magnitude_j_error_lower
+        self.system_apparent_magnitude_k = system_apparent_magnitude_k
+        self.system_apparent_magnitude_k_error_upper = system_apparent_magnitude_k_error_upper
+        self.system_apparent_magnitude_k_error_lower = system_apparent_magnitude_k_error_lower
         self.system_proper_motion = system_proper_motion
         self.system_proper_motion_error_upper = system_proper_motion_error_upper
         self.system_proper_motion_error_lower = system_proper_motion_error_lower
@@ -417,6 +424,9 @@ class Planet:
                 'system_apparent_magnitude_j': 'None',
                 'system_apparent_magnitude_j_error_upper': 'None',
                 'system_apparent_magnitude_j_error_lower': 'None',
+                'system_apparent_magnitude_k': 'None',
+                'system_apparent_magnitude_k_error_upper': 'None',
+                'system_apparent_magnitude_k_error_lower': 'None',
                 'system_proper_motion': 'deg/s',
                 'system_proper_motion_error_upper': 'deg/s',
                 'system_proper_motion_error_lower': 'deg/s',
@@ -473,6 +483,142 @@ class Planet:
 
                 if self.units[key] != 'N/A':
                     data_set.attrs['units'] = self.units[key]
+
+    @classmethod
+    def from_tab_file(cls, filename, use_best_mass=True):
+        """Read from a NASA Exoplanet Archive Database .tab file.
+        Args:
+            filename: file to read
+            use_best_mass: if True, use NASA Exoplanet Archive Database 'bmass' argument instead of 'mass'.
+
+        Returns:
+            planets: a list of Planet objects
+        """
+        with open(filename, 'r') as f:
+            line = f.readline()
+            line = line.strip()
+
+            # Skip header
+            while line[0] == '#':
+                line = f.readline()
+                line = line.strip()
+
+            # Read column names
+            columns_name = line.split('\t')
+
+            planet_name_index = columns_name.index('pl_name')
+
+            planets = {}
+
+            # Read data
+            for line in f:
+                line = line.strip()
+                columns = line.split('\t')
+
+                new_planet = cls(columns[planet_name_index])
+                keys = []
+
+                for i, value in enumerate(columns):
+                    # Clearer keynames
+                    keys.append(columns_name[i])
+
+                    if value != '':
+                        try:
+                            value = float(value)
+                        except ValueError:
+                            pass
+
+                        value, keys[i] = Planet.__convert_nasa_exoplanet_archive(
+                            value, keys[i], use_best_mass=use_best_mass
+                        )
+                    else:
+                        value = None
+
+                    if keys[i] in new_planet.__dict__:
+                        new_planet.__dict__[keys[i]] = value
+
+                # Try to calculate the planet mass and radius if missing
+                if new_planet.radius == 0 and new_planet.mass > 0 and new_planet.density > 0:
+                    new_planet.radius = (3 * new_planet.mass / (4 * np.pi * new_planet.density)) ** (1 / 3)
+
+                    partial_derivatives = np.array([
+                        new_planet.radius / (3 * new_planet.mass),  # dr/dm
+                        - new_planet.radius / (3 * new_planet.density)  # dr/drho
+                    ])
+                    uncertainties = np.abs(np.array([
+                        [new_planet.mass_error_lower, new_planet.mass_error_upper],
+                        [new_planet.density_error_lower, new_planet.density_error_upper]
+                    ]))
+
+                    new_planet.radius_error_lower, new_planet.radius_error_upper = \
+                        calculate_uncertainty(partial_derivatives, uncertainties)  # lower and upper errors
+                elif new_planet.mass == 0 and new_planet.radius > 0 and new_planet.density > 0:
+                    new_planet.mass = new_planet.density * 4 / 3 * np.pi * new_planet.radius ** 3
+
+                    partial_derivatives = np.array([
+                        new_planet.mass / new_planet.density,  # dm/drho
+                        3 * new_planet.radius / new_planet.radius  # dm/dr
+                    ])
+                    uncertainties = np.abs(np.array([
+                        [new_planet.density_error_lower, new_planet.density_error_upper],
+                        [new_planet.radius_error_lower, new_planet.radius_error_upper]
+                    ]))
+
+                    new_planet.mass_error_lower, new_planet.mass_error_upper = \
+                        calculate_uncertainty(partial_derivatives, uncertainties)  # lower and upper errors
+
+                # Try to calculate the star radius if missing
+                if new_planet.star_radius == 0 and new_planet.star_mass > 0:
+                    if new_planet.star_surface_gravity > 0:
+                        new_planet.star_radius, \
+                            new_planet.star_radius_error_upper, new_planet.star_radius_error_lower = \
+                            new_planet.surface_gravity2radius(
+                                new_planet.star_surface_gravity,
+                                new_planet.star_mass,
+                                surface_gravity_error_upper=new_planet.star_surface_gravity_error_upper,
+                                surface_gravity_error_lower=new_planet.star_surface_gravity_error_lower,
+                                mass_error_upper=new_planet.star_mass_error_upper,
+                                mass_error_lower=new_planet.star_mass_error_lower
+                            )
+                    elif new_planet.star_density > 0:
+                        new_planet.star_radius = \
+                            (3 * new_planet.star_mass / (4 * np.pi * new_planet.star_density)) ** (1 / 3)
+
+                        partial_derivatives = np.array([
+                            new_planet.star_radius / (3 * new_planet.star_mass),  # dr/dm
+                            - new_planet.star_radius / (3 * new_planet.star_density)  # dr/drho
+                        ])
+                        uncertainties = np.abs(np.array([
+                            [new_planet.star_mass_error_lower, new_planet.star_mass_error_upper],
+                            [new_planet.star_density_error_lower, new_planet.star_density_error_upper]
+                        ]))
+
+                        new_planet.star_radius_error_lower, new_planet.star_radius_error_upper = \
+                            calculate_uncertainty(partial_derivatives, uncertainties)  # lower and upper errors
+
+                if 'surface_gravity' not in keys and new_planet.radius > 0 and new_planet.mass > 0:
+                    new_planet.surface_gravity, \
+                        new_planet.surface_gravity_error_upper, new_planet.surface_gravity_error_lower = \
+                        new_planet.mass2surface_gravity(
+                            new_planet.mass,
+                            new_planet.radius,
+                            mass_error_upper=new_planet.mass_error_upper,
+                            mass_error_lower=new_planet.mass_error_lower,
+                            radius_error_upper=new_planet.radius_error_upper,
+                            radius_error_lower=new_planet.radius_error_lower
+                        )
+
+                if 'equilibrium_temperature' not in keys \
+                        and new_planet.orbit_semi_major_axis > 0 \
+                        and new_planet.star_effective_temperature > 0 \
+                        and new_planet.star_radius > 0:
+                    new_planet.equilibrium_temperature, \
+                        new_planet.equilibrium_temperature_error_upper, new_planet.equilibrium_temperature_error_lower = \
+                        new_planet.calculate_planetary_equilibrium_temperature()
+
+                planets[new_planet.name] = new_planet
+
+        return planets
 
     @classmethod
     def from_votable(cls, votable):
@@ -564,7 +710,7 @@ class Planet:
         return new_planet
 
     @staticmethod
-    def __convert_nasa_exoplanet_archive(value, key, verbose=False):
+    def __convert_nasa_exoplanet_archive(value, key, verbose=False, use_best_mass=False):
         skip_unit_conversion = False
 
         # Heads
@@ -668,10 +814,17 @@ class Planet:
             if not skip_unit_conversion:
                 value *= nc.m_jup
         elif '_massj' in key:
-            key = key.replace('_massj', '_mass')
+            if not use_best_mass:
+                key = key.replace('_massj', '_mass')
 
-            if not skip_unit_conversion:
-                value *= nc.m_jup
+                if not skip_unit_conversion:
+                    value *= nc.m_jup
+        elif '_bmassj' in key:
+            if use_best_mass:
+                key = key.replace('_bmassj', '_mass')
+
+                if not skip_unit_conversion:
+                    value *= nc.m_jup
         elif '_teff' in key:
             key = key.replace('_teff', '_effective_temperature')
         elif '_met' in key:
@@ -855,6 +1008,38 @@ class Planet:
         errors = calculate_uncertainty(partial_derivatives, uncertainties)  # lower and upper errors
 
         return surface_gravity, errors[1], -errors[0]
+
+    @staticmethod
+    def surface_gravity2radius(surface_gravity, mass,
+                               surface_gravity_error_upper=0., surface_gravity_error_lower=0.,
+                               mass_error_upper=0., mass_error_lower=0.):
+        """
+        Convert the mass of a planet to its surface gravity.
+        Args:
+            surface_gravity: (cm.s-2) surface_gravity of the planet
+            mass: (g) mass of the planet
+            mass_error_upper: (g) upper error on the planet mass
+            mass_error_lower: (g) lower error on the planet mass
+            surface_gravity_error_upper: (cm.s-2) upper error on the planet radius
+            surface_gravity_error_lower: (cm.s-2) lower error on the planet radius
+
+        Returns:
+            (cm.s-2) the surface gravity of the planet, and its upper and lower error
+        """
+        radius = (nc.G * mass / surface_gravity) ** 0.5
+
+        partial_derivatives = np.array([
+            radius / (2 * mass),  # dr/dm
+            - radius / (2 * surface_gravity)  # dr/dg
+        ])
+        uncertainties = np.abs(np.array([
+            [mass_error_lower, mass_error_upper],
+            [surface_gravity_error_lower, surface_gravity_error_upper]
+        ]))
+
+        errors = calculate_uncertainty(partial_derivatives, uncertainties)  # lower and upper errors
+
+        return radius, errors[1], -errors[0]
 
 
 class SimplePlanet(Planet):

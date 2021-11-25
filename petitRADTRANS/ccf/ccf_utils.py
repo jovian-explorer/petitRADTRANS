@@ -7,6 +7,7 @@ from petitRADTRANS.ccf.mock_observation import *
 from petitRADTRANS.ccf.model_containers import *
 
 from petitRADTRANS import phoenix
+from petitRADTRANS import physics
 
 
 def calculate_star_snr(wavelengths, star_effective_temperature, star_radius, star_distance, exposure_time,
@@ -86,6 +87,40 @@ def calculate_star_apparent_magnitude(wavelength_boundaries, star_effective_temp
     )
 
     return -2.5 * np.log10(star_radiosity / vega_radiosity)
+
+
+def calculate_esm(wavelength_boundaries, planet_radius, planet_equilibrium_temperature,
+                  star_radius, star_effective_temperature, star_distance,
+                  scale_factor=4.29e6, star_apparent_magnitude=None):
+    """
+    Source: Kempton et al. 2018 (https://iopscience.iop.org/article/10.1088/1538-3873/aadf6f)
+
+    Args:
+        wavelength_boundaries: (cm)
+        planet_radius: (cm)
+        planet_equilibrium_temperature: (K)
+        star_radius: (cm)
+        star_effective_temperature: (K)
+        star_distance: (cm)
+        scale_factor: see source
+        star_apparent_magnitude:
+
+    Returns:
+
+    """
+    if star_apparent_magnitude is None:
+        star_apparent_magnitude = calculate_star_apparent_magnitude(
+            wavelength_boundaries, star_effective_temperature, star_radius, star_distance
+        )
+
+    planet_dayside_temperature = planet_equilibrium_temperature * 1.1  # from Kempton et al. 2018
+
+    nu_75 = nc.c / 7.5e-4  # (cgs) frequency at 7.5 um, following Kempton et al. 2018
+    planck_75_planet = physics.b(planet_dayside_temperature, nu_75)
+    planck_75_star = physics.b(star_effective_temperature, nu_75)
+
+    return scale_factor \
+        * planck_75_planet / planck_75_star * (planet_radius / star_radius) ** 2 * 10 ** (-star_apparent_magnitude / 5)
 
 
 def calculate_tsm(wavelength_boundaries, planet_radius, planet_mass, planet_equilibrium_temperature,

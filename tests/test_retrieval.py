@@ -5,20 +5,15 @@ C.f. (https://petitradtrans.readthedocs.io/en/latest/content/notebooks/getting_s
 """
 import json
 import os
-# To not have numpy start parallelizing on its own
-os.environ["OMP_NUM_THREADS"] = "1"
+
+os.environ["OMP_NUM_THREADS"] = "1"  # to not have numpy start parallelizing on its own
 import numpy as np
 
-# Import Prior functions, if necessary.
 from petitRADTRANS.retrieval.util import gaussian_prior
-# Import atmospheric model function
-# You could also write your own!
-from petitRADTRANS.retrieval.models import emission_model_diseq
 from petitRADTRANS.retrieval.util import calc_MMW
 
 from .context import petitRADTRANS
-from .utils import compare_from_reference_file, tests_results_directory, \
-    reference_filenames, radtrans_parameters, temperature_guillot_2010, temperature_isothermal
+from .utils import tests_results_directory, reference_filenames, radtrans_parameters
 
 
 relative_tolerance = 1e-6  # relative tolerance when comparing with older results
@@ -37,15 +32,15 @@ def init_run():
 
     # Fixed parameters
     run_definition_simple.add_parameter(
-        'Rstar',  # name
-        False,  # is_free_parameter, So Rstar is not retrieved here.
+        'Rstar',
+        False,
         value=radtrans_parameters['stellar_parameters']['radius'] * petitRADTRANS.nat_cst.r_sun
     )
 
     # Log of the surface gravity
     run_definition_simple.add_parameter(
         'log_g',
-        False,  # is_free_parameter: we are retrieving log(g) here
+        False,
         value=np.log10(radtrans_parameters['planetary_parameters']['surface_gravity'])
     )
 
@@ -103,10 +98,10 @@ def init_run():
         radtrans_parameters['spectrum_parameters']['line_species_correlated_k'],
         eq=False,
         abund_lim=(
-            np.mean(radtrans_parameters['retrieval_parameters']['log10_species_mass_fractions_bounds']),
-            (radtrans_parameters['retrieval_parameters']['log10_species_mass_fractions_bounds'][1]
-             - radtrans_parameters['retrieval_parameters']['log10_species_mass_fractions_bounds'][0]) / 2
-        )
+            radtrans_parameters['retrieval_parameters']['log10_species_mass_fractions_bounds'][0],
+            radtrans_parameters['retrieval_parameters']['log10_species_mass_fractions_bounds'][1]
+            - radtrans_parameters['retrieval_parameters']['log10_species_mass_fractions_bounds'][0]
+        )  # prior: min = abund_lim[0], max = min + abund_lim[1]
     )
 
     # Load data
@@ -180,7 +175,7 @@ def retrieval_model_spec_iso(prt_object, parameters, pt_plot_mode=None, AMR=Fals
             Computed transmission spectrum R_pl**2/Rstar**2
     """
     # Make the P-T profile
-    pressures = prt_object.press / 1e6  # bar to cgs
+    pressures = prt_object.press * 1e-6  # bar to cgs
     temperatures = parameters['Temperature'].value * np.ones_like(pressures)
 
     # Make the abundance profiles

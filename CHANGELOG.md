@@ -4,12 +4,17 @@ All notable changes to the CCF module will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com)
 and this project adheres to [Semantic Versioning](http://semver.org).
 
-## [2.4.0-a8] - 2021-11-09
+## [2.4.0-a9] - 2021-11-25
 ### Added
 - Module `phoenix` for PHOENIX stellar models.
 - Module `physics` to store useful physical functions.
 - Module `utils` to store generic useful functions.
 - Function `get_guillot_2010_temperature_profile`, a more general Guillot 2010 temperature profile.
+- Function to calculate the ESM of a planet.
+- System apparent magnitude in the K-band default attribute in object `Planet`.
+- Method to generate a `Planet` using a NASA Exoplanet Archive tab file.
+- Function to calculate the radius of a planet from its surface gravity and mass.
+- Option to use the NASA Exoplanet Archive "best mass" when genrating a `Planet`.
 - Test suite.
 - Module `configuration` to manage paths.
 - Module `version` to store petitRADTRANS version number.
@@ -29,6 +34,7 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 ### Fixed
 - Hansen cloud particle distribution returning NaN if `b_hansen` set too low.
 - [?]Retrieval not converging when using correlated-k.
+- Function `contour_corner` not working when not giving optional arguments `parameter_ranges` and `parameter_plot_indices`.
 
 ---
 No changelog before version 2.4.0.

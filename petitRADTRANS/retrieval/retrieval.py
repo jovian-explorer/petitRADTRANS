@@ -112,7 +112,7 @@ class Retrieval:
         self.param_dict = {}
         # Set up pretty plotting
         if pRT_plot_style:
-            import petitRADTRANS.retrieval.plot_style
+            import petitRADTRANS.retrieval.plot_style  # TODO improve so that it doesn't break matplotlib
         self.prt_plot_style = pRT_plot_style
         # Path to input opacities
         self.path = petitradtrans_config['Paths']['pRT_input_data_path']
@@ -195,8 +195,10 @@ class Retrieval:
                                 resume,
                                 max_iter)
             return
+
         if const_efficiency_mode and sampling_efficiency > 0.1:
             logging.warning("Sampling efficiency should be ~ 0.05 if you're using constant efficiency mode!")
+
         prefix = self.output_dir + 'out_PMN/' + self.retrieval_name + '_'
 
         if len(self.output_dir + 'out_PMN/') > 100:
@@ -302,7 +304,7 @@ class Retrieval:
                     free_parameter_names.append(self.parameters[pp].name)
                     n_params += 1
 
-            if max_iter is 0:
+            if max_iter == 0:
                 max_iter = None
 
             sampler = un.ReactiveNestedSampler(free_parameter_names,
@@ -340,7 +342,6 @@ class Retrieval:
                 A Pymultinest stats dictionary, from Analyzer.get_stats().
                 This contains the evidence and best fit parameters.
         """
-
         with open(
                 self.output_dir + "evaluate_" + self.retrieval_name + "/" + self.retrieval_name + "_ret_summary.txt",
                 "w+"
@@ -674,11 +675,11 @@ class Retrieval:
                 of the parameters used in the retrieval. The first name corresponds to the first column
                 of the samples, and so on.
         """
-
+        # TODO could be static
         if ret_names is None:
             ret_names = []
         if output_dir is None:
-            output_dir = self.output_dir
+            output_dir = self.output_dir  # TODO output dir should not have a "/" in it
         if self.ultranest:
             for name in self.corner_files:
                 samples = np.genfromtxt(output_dir + 'out_' + name + '/chains/equal_weighted_post.txt')
@@ -938,8 +939,8 @@ class Retrieval:
                 params[pp] = Parameter(pp, False, value=self.parameters[pp].value)
         return params
 
-    def sample_teff(self,sample_dict,param_dict,ret_names = None,nsample = None,resolution=40):
-        """
+    def sample_teff(self, sample_dict, param_dict, ret_names=None, nsample=None, resolution=40):
+        r"""
         This function samples the outputs of a retrieval and computes Teff
         for each sample. For each sample, a model is computed at low resolution,
         and integrated to find the total radiant emittance, which is converted into

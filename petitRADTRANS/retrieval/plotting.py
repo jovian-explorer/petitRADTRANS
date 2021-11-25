@@ -141,6 +141,13 @@ def contour_corner(sampledict,
             kwarg must be a dictionary with the arguments as keys and values as the values.
     """
     import matplotlib as mpl
+
+    if parameter_ranges is None:
+        parameter_ranges = {}
+
+    if parameter_plot_indices is None:
+        parameter_plot_indices = {}
+
     if prt_plot_style:
         mpl.rcParams.update(mpl.rcParamsDefault)
         font = {'family': 'serif'}
@@ -163,6 +170,7 @@ def contour_corner(sampledict,
                       "#B429FF"]
     else:
         mpl.rcParams.update(mpl.rcParamsDefault)
+        color_list = [f'C{i}' for i in range(8)]  # standard matplotlib color cycle
 
         # from .plot_style import prt_colours
     # color_list = prt_colours
@@ -179,12 +187,14 @@ def contour_corner(sampledict,
 
         n_samples = len(samples)
         s = n_samples
-        try:
-            if parameter_plot_indices[key] is None:
-                parameter_plot_indices = {key: np.linspace(0, len(parameter_names[key]) - 1,
-                                                           len(parameter_names[key]) - 1).astype('int')}
-        except:
-            pass
+
+        if key not in parameter_plot_indices:
+            parameter_plot_indices[key] = range(len(parameter_names[key]))
+        elif parameter_plot_indices[key] is None:  # same as in the case the key doesn't exists
+            parameter_plot_indices[key] = range(len(parameter_names[key]))
+
+        if key not in parameter_ranges:
+            parameter_ranges[key] = [None] * (max(parameter_plot_indices[key]) + 1)
 
         data_list = []
         labels_list = []
