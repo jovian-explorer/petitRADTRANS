@@ -908,6 +908,7 @@ class Retrieval:
         if ret_name == self.retrieval_name:
             self.analyzer = analyzer
         return analyzer
+
     def build_param_dict(self,sample,free_param_names):
         """
         This function builds a dictionary of parameters that can be passed to the
@@ -1077,11 +1078,14 @@ class Retrieval:
 
         # Plotting
         self.plot_spectra(samples_use, parameters_read)
+
         if self.evaluate_sample_spectra:
             self.plot_sampled(samples_use, parameters_read)
+
         self.plot_PT(sample_dict, parameters_read)
         self.plot_corner(sample_dict, parameter_dict, parameters_read)
         print("Done!")
+
         return
 
     def plot_spectra(self, samples_use, parameters_read, model_generating_func=None):

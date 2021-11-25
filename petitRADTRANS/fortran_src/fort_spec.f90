@@ -1777,7 +1777,7 @@ module fort_spec
              call turbulent_settling_speed(c,gravity,rho,rho_p,temp,MMW,fc)
              fc = fc - w_star
 
-             if (((fc > 0d0) .and. (fa > 0d0)) .OR. ((fc < 0d0) .and. (fa < 0d0))) then
+             if (((fc > 0d0) .and. (fa > 0d0)) .or. ((fc < 0d0) .and. (fa < 0d0))) then
                 del = 2d0*abs(a-c)/(a+b)
                 a = c
                 fa = fc
@@ -2254,14 +2254,14 @@ module fort_spec
             double precision, intent(in)    :: press(struc_len), temp(struc_len)
             double precision, intent(in)    :: tau_approx(HIT_N_g_eff,HIT_coarse_borders-1,struc_len)
             double precision, intent(in)    :: mu(N_mu), w_gauss_mu(N_mu),w_gauss_ck(HIT_N_g_eff)
-            double precision, intent(in)    :: H_star_0(HIT_coarse_borders-1), t_irr
+            double precision, intent(in)    :: H_star_0(HIT_coarse_borders-1), t_irr, &
+                                               I_minus_out_Olson(N_mu,HIT_N_g_eff,HIT_coarse_borders-1)
             double precision, intent(inout) :: J_bol(struc_len), H_bol(struc_len), K_bol(struc_len)
             double precision, intent(inout) :: kappa_J(struc_len), kappa_H(struc_len)
             double precision, intent(inout) :: jstar_for_zbrent(HIT_N_g_eff,HIT_coarse_borders-1,struc_len)
             double precision, intent(out)   :: eddington_F(struc_len), eddington_Psi
             double precision, intent(out)   :: flux(HIT_coarse_borders-1), &
                                                j_deep(HIT_coarse_borders-1), &
-                                               I_minus_out_Olson(N_mu,HIT_N_g_eff,HIT_coarse_borders-1), &
                                                I_J_out_Feautrier(N_mu,HIT_N_g_eff,HIT_coarse_borders-1), &
                                                abs_S(struc_len), &
                                                j_for_zbrent(HIT_N_g_eff,HIT_coarse_borders-1,struc_len)
@@ -2313,19 +2313,12 @@ module fort_spec
             kappa_S_nu = 0d0
             H_tot_layer = 0d0
             I_star_calc = 0d0
-            !!$  kappa_H(range_write_use) = 0d0
-            !!$  kappa_J(range_write_use) = 0d0
-            !!$  J_bol(range_write_use) = 0d0
-            !!$  H_bol(range_write_use) = 0d0
-            !!$  K_bol(range_write_use) = 0d0
-            
+
             ! Guillot test
-            gamma = 6d-1 * SQRT(T_irr / 2d3)
+            gamma = 6d-1 * sqrt(T_irr / 2d3)
             
             do i = 1, HIT_coarse_borders-1
-                ! I_star_calc(HIT_N_g_eff,N_mu,struc_len)
-
-                if (dayside_ave .OR. planetary_ave) then
+                if (dayside_ave .or. planetary_ave) then
                     do i_mu = 1, N_mu
                         I_star_calc(:,i_mu,:) = -4d0*H_star_0(i)*exp(-tau_approx(:,i,:)/mu(i_mu))
                     end do
@@ -2340,17 +2333,17 @@ module fort_spec
                 end if
 
                 H_star(i,:) = 0d0
-
                 abs_S_nu = 0d0
+
                 do j = 1, HIT_N_g_eff
                     H_star(i,:) = H_star(i,:)+H_star_calc(j,:)*w_gauss_ck(j)
 
                     ! Guillot test
-                    if (dayside_ave .OR. planetary_ave) then
+                    if (dayside_ave .or. planetary_ave) then
                         do i_mu = 1, N_mu
                             abs_S_nu(:) = abs_S_nu(:) &
-                                + 0.5d0 * w_gauss_ck(j) * HIT_kappa_tot_g_approx(j,i,:) * I_star_calc(j,i_mu,:) * &
-                                w_gauss_mu(i_mu)
+                                + 0.5d0 * w_gauss_ck(j) * HIT_kappa_tot_g_approx(j,i,:) * I_star_calc(j,i_mu,:) &
+                                * w_gauss_mu(i_mu)
                             jstar_for_zbrent(j,i,:) = jstar_for_zbrent(j,i,:) &
                                 + 0.5d0 * I_star_calc(j,i_mu,:) * w_gauss_mu(i_mu)
                         end do
@@ -2362,10 +2355,10 @@ module fort_spec
                     (HIT_border_freqs(i)-HIT_border_freqs(i+1))
 
                     kappa_S_nu(:,i) = kappa_S_nu(:,i)+H_star_calc(j,:)*HIT_kappa_tot_g_approx(j,i,:)*w_gauss_ck(j)* &
-                    (HIT_border_freqs(i)-HIT_border_freqs(i+1))
+                        (HIT_border_freqs(i)-HIT_border_freqs(i+1))
 
                     H_tot_layer = H_tot_layer + H_star_calc(j,:)*w_gauss_ck(j)*&
-                    (HIT_border_freqs(i)-HIT_border_freqs(i+1))
+                        (HIT_border_freqs(i)-HIT_border_freqs(i+1))
                 end do
 
                 abs_S = abs_S + abs_S_nu*(HIT_border_freqs(i)-HIT_border_freqs(i+1))
@@ -2376,214 +2369,156 @@ module fort_spec
             do i = 1, HIT_coarse_borders-1
                 kappa_S_nu(:,i) = kappa_S_nu(:,i) / H_tot_layer
             end do
+            ! ***0
             
             ! do the full RT step
             K_bol = 0d0
             
-            do i = 1, HIT_coarse_borders-1
-            flux(i) = 0d0
-            j_deep(i) = 0d0
-            J_bol_a = 0d0
-            H_bol_a = 0d0
-            K_bol_a = 0d0
-            kappa_J_a = 0d0
-            kappa_H_a = 0d0
-            
-            r = 0
-            
-            call planck_f(struc_len,temp(1:struc_len),(HIT_border_freqs(i)+HIT_border_freqs(i+1))/2d0,r)
-            
-            do l = 1, HIT_N_g_eff
-                ! Calculate the optical thickness of a layer
-                del_tau = 0d0
-                mean_source = 0d0
+            do i = 1, HIT_coarse_borders - 1
+                flux(i) = 0d0
+                j_deep(i) = 0d0
+                J_bol_a = 0d0
+                H_bol_a = 0d0
+                K_bol_a = 0d0
+                kappa_J_a = 0d0
+                kappa_H_a = 0d0
 
-                do k = 2, range_int_use
-                    del_tau(k-1) = tau_approx(l,i,k)-tau_approx(l,i,k-1)
-                    mean_source(k-1) = (r(k-1)+r(k))/2d0
-                end do
+                r = 0
 
-                do j = 1, N_mu
-                    ! Calculate the attenuation factors
-                    atten_factors_no_exp = del_tau/mu(j)
-                    atten_factors_no_exp_p1 = atten_factors_no_exp(2:struc_len-1)
-                    atten_factors = exp(-atten_factors_no_exp)
+                call planck_f(struc_len,temp(1:struc_len), (HIT_border_freqs(i) + HIT_border_freqs(i + 1)) * 0.5d0, r)
 
-                    ! Boundary conditions
-                    I_plus(1,j) = 0d0
+                do l = 1, HIT_N_g_eff
+                    ! Calculate the optical thickness of a layer
+                    del_tau = 0d0
+                    mean_source = 0d0
 
-                    if (range_int_use == struc_len) then
-                        I_minus(struc_len,j) = r(struc_len)
-                    else
-                        I_minus(range_int_use,j) = I_minus_out_Olson(j,l,i)
-                    end if
-
-                    ! integrate
                     do k = 2, range_int_use
-                        if (k < range_int_use) then
-                            !!$              if (.False.) then
-
-                            dt1 = atten_factors_no_exp(k-1)
-                            f = atten_factors_no_exp(k)/dt1
-                            edt1 = exp(-dt1)
-                            e0 = 1d0-edt1
-                            e1 = dt1 -e0
-                            e2 = dt1**2d0 - 2d0*e1
-                            dt2 = f * dt1
-
-                            if (dt1 > 1d-4) then
-                                !!$                 if (.TRUE.) then
-                                u = e0 + (e2-(2*dt1+dt2)*e1)/(dt1*(dt1+dt2))
-                                v = ((dt1+dt2)*e1-e2)/(dt1*dt2)
-                                w = (e2-dt1*e1)/(dt2*(dt1+dt2))
-                            else
-                                u = -(1d0/24d0)*dt1*(-8d0-12d0*f+6d0*dt1+8d0*f*dt1-2d0*dt1**2d0- &
-                                3d0*f*dt1**2+dt1**3d0+f*dt1**3d0)/(1d0+f)
-                                v = (1d0/24d0)*dt1*(4d0-2d0*dt1+dt1**2d0+12d0*f-4d0*f*dt1+f*dt1**2d0)/f
-                                w = (1d0/120d0)*dt1*(-20d0+10d0*dt1-3d0*dt1**2d0+dt1**3d0)/(f*(1d0+f))
-                            end if
-
-                            Q = u*r(k-1)+v*r(k)+w*r(k+1)
-                            Q_max = 0.5d0*(r(k-1)*HIT_kappa_tot_g_approx(l,i,k-1)+r(k)*HIT_kappa_tot_g_approx(l,i,k))* &
-                            (press(k)-press(k-1))/gravity/mu(j)
-                            Q = max(min(Q,Q_max),0d0)
-                            I_plus(k,j) = I_plus(k-1,j)*atten_factors(k-1) + Q
-                            !!$                 write(*,*) 'A', Q, (1d0-atten_factors(k-1))*mean_source(k-1)
-                        else
-                            I_plus(k,j) = I_plus(k-1,j)*atten_factors(k-1)+(1d0-atten_factors(k-1))*mean_source(k-1)
-                        end if
-
-                        if (k < range_int_use) then
-                            !!$              if (.False.) then
-
-                            dt1 = atten_factors_no_exp(range_int_use-k+1)
-                            f = atten_factors_no_exp(range_int_use-k)/dt1
-                            edt1 = exp(-dt1)
-                            e0 = 1d0-edt1
-                            e1 = dt1 -e0
-                            e2 = dt1**2d0 - 2d0*e1
-                            dt2 = f * dt1
-
-                            if (dt1 > 1d-4) then
-                                !!$                 if (.TRUE.) then
-                                u = e0 + (e2-(2*dt1+dt2)*e1)/(dt1*(dt1+dt2))
-                                v = ((dt1+dt2)*e1-e2)/(dt1*dt2)
-                                w = (e2-dt1*e1)/(dt2*(dt1+dt2))
-                            else
-                                u = -(1d0/24d0)*dt1*(-8d0-12d0*f+6d0*dt1+8d0*f*dt1-2d0*dt1**2d0- &
-                                    3d0*f*dt1**2+dt1**3d0+f*dt1**3d0)/(1d0+f)
-                                v = (1d0/24d0)*dt1*(4d0-2d0*dt1+dt1**2d0+12d0*f-4d0*f*dt1+f*dt1**2d0)/f
-                                w = (1d0/120d0)*dt1*(-20d0+10d0*dt1-3d0*dt1**2d0+dt1**3d0)/(f*(1d0+f))
-                            end if
-
-                            Q = u*r(range_int_use-k+2)+v*r(range_int_use-k+1)+w*r(range_int_use-k)
-                            Q_max = 0.5d0*(r(range_int_use-k+2)*HIT_kappa_tot_g_approx(l,i,range_int_use-k+2)+ &
-                                r(range_int_use-k+1)*HIT_kappa_tot_g_approx(l,i,range_int_use-k+1))* &
-                                (press(range_int_use-k+2)-press(range_int_use-k+1))/gravity/mu(j)
-                            Q = max(min(Q,Q_max),0d0)
-                            I_minus(range_int_use-k+1,j) = I_minus(range_int_use-k+2,j)&
-                                *atten_factors(range_int_use-k+1) + Q
-                            !!$                 write(*,*) 'B', Q, (1d0-atten_factors(range_int_use-k+1))*mean_source(range_int_use-k+1)
-                            !!$                 write(*,*)
-                        else
-                            I_minus(range_int_use-k+1,j) = I_minus(range_int_use-k+2,j)*atten_factors(range_int_use-k+1)+ &
-                                (1d0-atten_factors(range_int_use-k+1))*mean_source(range_int_use-k+1)
-                        end if
-
+                        del_tau(k - 1) = tau_approx(l,i,k) - tau_approx(l,i,k - 1)
+                        mean_source(k - 1) = (r(k - 1) + r(k)) * 0.5d0
                     end do
 
-                    I_J_out_Feautrier(j,l,i) = 0.5d0*(I_minus(bord_ind_1dm6,j)+I_plus(bord_ind_1dm6,j))
+                    do j = 1, N_mu
+                        ! Calculate the attenuation factors
+                        atten_factors_no_exp = del_tau / mu(j)
+                        atten_factors_no_exp_p1 = atten_factors_no_exp(2:struc_len-1)
+                        atten_factors = exp(-atten_factors_no_exp)
 
-                    !!$           ! FROM HERE ON USE FEAUTRIER TO GET FLUX RIGHT!
-                    !!$           I_J(:,j) = 0.5d0 * (I_plus(:,j)+I_minus(:,j))
-                    !!$
-                    !!$           I_H(1,j) = -I_J(1,j)
-                    !!$
-                    !!$           do k = 2, range_int_use-1 !! REPLACE WITH ATTEN_FACTORS (REDUNDANCY)
-                    !!$              f1 = 1d0/atten_factors_no_exp(k)
-                    !!$              f2 = 1d0/atten_factors_no_exp(k-1)
-                    !!$              !deriv1 = f1*(I_J(k+1,j)-I_J(k,j))
-                    !!$              !deriv2 = f2*(I_J(k,j)-I_J(k-1,j))
-                    !!$              deriv_tot = f1*I_J(k+1,j)+(f2-f1)*I_J(k,j)-f2*I_J(k-1,j)
-                    !!$              !I_H(k,j) = -(deriv1+deriv2)/2d0
-                    !!$              I_H(k,j) = -deriv_tot/2d0
-                    !!$
-                    !!$           end do
-                    !!$
-                    !!$           I_H(range_int_use,j) = 0d0
-                end do
+                        ! Boundary conditions
+                        I_plus(1, j) = 0d0
 
-                ! OLD NON FEAUTRIER PART
+                        if (range_int_use == struc_len) then
+                            I_minus(struc_len,j) = r(struc_len)
+                        else
+                            I_minus(range_int_use,j) = I_minus_out_Olson(j,l,i)
+                        end if
 
-                plus_val_j = 0d0 ! flux going in
-                !neg_val_j = 0d0  ! flux going out
-                plus_val_h = 0d0 ! flux going in
-                !neg_val_h = 0d0  ! flux going out
-                plus_val_k = 0d0 ! flux going in
-                !neg_val_k = 0d0  ! flux going out
+                        ! integrate
+                        do k = 2, range_int_use
+                            ! I_plus calculation
+                            if (k < range_int_use) then
+                                dt1 = atten_factors_no_exp(k - 1)
+                                f = atten_factors_no_exp(k) / dt1
 
-                do j = 1, N_mu
-                    !plus_val_j = plus_val_j + I_plus(:,j) * w_gauss_mu(j)
-                    plus_val_j = plus_val_j + (I_plus(:,j)+I_minus(:,j))/2d0 * w_gauss_mu(j)
-                    !neg_val_j = neg_val_j + I_minus(:,j) * w_gauss_mu(j)
+                                edt1 = exp(-dt1)
+                                e0 = 1d0 - edt1
+                                e1 = dt1 - e0
+                                e2 = dt1 ** 2d0 - 2d0 * e1
+                                dt2 = f * dt1
 
-                    !plus_val_h = plus_val_h + I_plus(:,j) * mu(j) * w_gauss_mu(j)
-                    plus_val_h = plus_val_h + (I_plus(:,j)-I_minus(:,j))/2d0 * mu(j) * w_gauss_mu(j)
-                    !neg_val_h = neg_val_h - I_minus(:,j) * mu(j) * w_gauss_mu(j)
+                                if (dt1 > 1d-4) then
+                                    u = e0 + (e2 - (2d0 * dt1 + dt2) * e1) / (dt1 * (dt1 + dt2))
+                                    v = ((dt1 + dt2) * e1 - e2) / (dt1 * dt2)
+                                    w = (e2-dt1*e1)/(dt2*(dt1+dt2))
+                                else
+                                    u = -(1d0/24d0)*dt1*(-8d0-12d0*f+6d0*dt1+8d0*f*dt1-2d0*dt1**2d0- &
+                                        3d0*f*dt1**2+dt1**3d0+f*dt1**3d0)/(1d0+f)
+                                    v = (1d0/24d0)*dt1*(4d0-2d0*dt1+dt1**2d0+12d0*f-4d0*f*dt1+f*dt1**2d0)/f
+                                    w = (1d0/120d0)*dt1*(-20d0+10d0*dt1-3d0*dt1**2d0+dt1**3d0)/(f*(1d0+f))
+                                end if
 
-                    !plus_val_k = plus_val_k + I_plus(:,j) * mu(j)**2d0 * w_gauss_mu(j)
-                    plus_val_k = plus_val_k + (I_plus(:,j)+I_minus(:,j))/2d0 * mu(j)**2d0 * w_gauss_mu(j)
-                    !neg_val_k = neg_val_k + I_minus(:,j) * mu(j)**2d0 * w_gauss_mu(j)
-                end do
+                                Q = u * r(k - 1) + v * r(k) + w * r(k + 1)
+                                Q_max = 0.5d0 * (r(k - 1) * HIT_kappa_tot_g_approx(l, i, k - 1) &
+                                    + r(k) * HIT_kappa_tot_g_approx(l, i, k)) * (press(k) - press(k - 1)) &
+                                    / gravity / mu(j)  ! use MP/RT for rho?
+                                Q = max(min(Q, Q_max), 0d0)
+                                I_plus(k, j) = I_plus(k - 1, j)*atten_factors(k - 1) + Q
+                            else
+                                I_plus(k,j) = I_plus(k-1,j)*atten_factors(k-1)+(1d0-atten_factors(k-1))*mean_source(k-1)
+                            end if
 
-                !J_bol_a = J_bol_a + w_gauss_ck(l)*(plus_val_j+neg_val_j)/2d0
-                !H_bol_a = H_bol_a + w_gauss_ck(l)*(plus_val_h+neg_val_h)/2d0
-                !K_bol_a = K_bol_a + w_gauss_ck(l)*(plus_val_k+neg_val_k)/2d0
+                            ! I_minus calculation
+                            if (k < range_int_use) then  ! 2 times the same thing?
+                                dt1 = atten_factors_no_exp(range_int_use - k + 1)
+                                f = atten_factors_no_exp(range_int_use - k) / dt1
 
-                J_bol_a = J_bol_a + w_gauss_ck(l)*(plus_val_j)
-                H_bol_a = H_bol_a + w_gauss_ck(l)*(plus_val_h)
-                K_bol_a = K_bol_a + w_gauss_ck(l)*(plus_val_k)
+                                edt1 = exp(-dt1)
+                                e0 = 1d0-edt1
+                                e1 = dt1 -e0
+                                e2 = dt1**2d0 - 2d0*e1
+                                dt2 = f * dt1
 
-                if (range_write_use == struc_len) then
-                    j_for_zbrent(l,i,1:range_write_use) = plus_val_j(1:range_write_use)
-                else
-                    j_for_zbrent(l,i,1:range_write_use-1) = plus_val_j(1:range_write_use-1)
-                end if
+                                if (dt1 > 1d-4) then
+                                    u = e0 + (e2 - (2d0 * dt1 + dt2) * e1) / (dt1 * (dt1 + dt2))
+                                    v = ((dt1+dt2)*e1-e2)/(dt1*dt2)
+                                    w = (e2-dt1*e1)/(dt2*(dt1+dt2))
+                                else
+                                    u = -(1d0/24d0)*dt1*(-8d0-12d0*f+6d0*dt1+8d0*f*dt1-2d0*dt1**2d0- &
+                                        3d0*f*dt1**2+dt1**3d0+f*dt1**3d0)/(1d0+f)
+                                    v = (1d0/24d0)*dt1*(4d0-2d0*dt1+dt1**2d0+12d0*f-4d0*f*dt1+f*dt1**2d0)/f
+                                    w = (1d0/120d0)*dt1*(-20d0+10d0*dt1-3d0*dt1**2d0+dt1**3d0)/(f*(1d0+f))
+                                end if
 
-                !kappa_J_a = kappa_J_a + HIT_kappa_tot_g_approx(l,i,:) * w_gauss_ck(l)*(plus_val_j+neg_val_j)/2d0
-                !kappa_H_a = kappa_H_a + HIT_kappa_tot_g_approx(l,i,:) * w_gauss_ck(l)*(plus_val_h+neg_val_h)/2d0
+                                Q = u * r(range_int_use - k + 2) + v * r(range_int_use - k + 1) &
+                                    + w * r(range_int_use - k)
+                                Q_max = 0.5d0*(r(range_int_use-k+2)*HIT_kappa_tot_g_approx(l,i,range_int_use-k+2)+ &
+                                    r(range_int_use-k+1)*HIT_kappa_tot_g_approx(l,i,range_int_use-k+1))* &
+                                    (press(range_int_use-k+2)-press(range_int_use-k+1))/gravity/mu(j)
+                                Q = max(min(Q,Q_max),0d0)
+                                I_minus(range_int_use-k+1,j) = I_minus(range_int_use-k+2,j)&
+                                    * atten_factors(range_int_use-k+1) + Q
+                            else
+                                I_minus(range_int_use-k+1,j) = I_minus(range_int_use-k+2,j)*atten_factors(range_int_use-k+1)+ &
+                                    (1d0-atten_factors(range_int_use-k+1))*mean_source(range_int_use-k+1)
+                            end if
+                        end do
 
-                kappa_J_a = kappa_J_a + HIT_kappa_tot_g_approx(l,i,:) * w_gauss_ck(l)*(plus_val_j)
-                kappa_H_a = kappa_H_a + HIT_kappa_tot_g_approx(l,i,:) * w_gauss_ck(l)*(plus_val_h)
+                        I_J_out_Feautrier(j,l,i) = 0.5d0*(I_minus(bord_ind_1dm6,j)+I_plus(bord_ind_1dm6,j))
+                    end do
 
-                kappa_out_test(:,i) = kappa_out_test(:,i) + HIT_kappa_tot_g_approx(l,i,:)*w_gauss_ck(l)
+                    ! OLD NON FEAUTRIER PART
 
-                !!$        write(*,*) 'HIT_kappa_tot_g_approx(l,i,:), (plus_val_j)'
-                !!$        write(*,*) HIT_kappa_tot_g_approx(l,i,1), (plus_val_j(1))
-                !!$        write(*,*) HIT_kappa_tot_g_approx(l,i,2), (plus_val_j(2))
+                    plus_val_j = 0d0 ! flux going in
+                    plus_val_h = 0d0 ! flux going in
+                    plus_val_k = 0d0 ! flux going in
 
+                    do j = 1, N_mu
+                        !plus_val_j = plus_val_j + I_plus(:,j) * w_gauss_mu(j)
+                        plus_val_j = plus_val_j + (I_plus(:,j)+I_minus(:,j))/2d0 * w_gauss_mu(j)
+                        !neg_val_j = neg_val_j + I_minus(:,j) * w_gauss_mu(j)
 
-                !!$        ! BACK IN
-                !!$        J_bol_g = 0d0
-                !!$        H_bol_g = 0d0
-                !!$
-                !!$        do j = 1, N_mu
-                !!$
-                !!$           J_bol_g = J_bol_g + I_J(:,j) * w_gauss_mu(j)
-                !!$           H_bol_g = H_bol_g + I_H(:,j) * mu(j) * w_gauss_mu(j)
-                !!$           K_bol_a = K_bol_a + I_J(:,j)*mu(j)**2d0 &
-                !!$                * w_gauss_ck(l) * w_gauss_mu(j)
-                !!$
-                !!$        end do
-                !!$
-                !!$        J_bol_a = J_bol_a + J_bol_g * w_gauss_ck(l)
-                !!$        H_bol_a = H_bol_a + H_bol_g * w_gauss_ck(l)
-                !!$
-                !!$        j_for_zbrent(l,i,:) = J_bol_g
-                !!$
-                !!$        kappa_J_a = kappa_J_a + HIT_kappa_tot_g_approx(l,i,:) * J_bol_g * w_gauss_ck(l)
-                !!$        kappa_H_a = kappa_H_a + HIT_kappa_tot_g_approx(l,i,:) * H_bol_g * w_gauss_ck(l)
-                !!$        ! BACK IN
+                        !plus_val_h = plus_val_h + I_plus(:,j) * mu(j) * w_gauss_mu(j)
+                        plus_val_h = plus_val_h + (I_plus(:,j)-I_minus(:,j))/2d0 * mu(j) * w_gauss_mu(j)
+                        !neg_val_h = neg_val_h - I_minus(:,j) * mu(j) * w_gauss_mu(j)
+
+                        !plus_val_k = plus_val_k + I_plus(:,j) * mu(j)**2d0 * w_gauss_mu(j)
+                        plus_val_k = plus_val_k + (I_plus(:,j)+I_minus(:,j))/2d0 * mu(j)**2d0 * w_gauss_mu(j)
+                        !neg_val_k = neg_val_k + I_minus(:,j) * mu(j)**2d0 * w_gauss_mu(j)
+                    end do
+
+                    J_bol_a = J_bol_a + w_gauss_ck(l) * plus_val_j
+                    H_bol_a = H_bol_a + w_gauss_ck(l) * plus_val_h
+                    K_bol_a = K_bol_a + w_gauss_ck(l) * plus_val_k
+
+                    if (range_write_use == struc_len) then
+                        j_for_zbrent(l,i,1:range_write_use) = plus_val_j(1:range_write_use)
+                    else
+                        j_for_zbrent(l,i,1:range_write_use-1) = plus_val_j(1:range_write_use-1)
+                    end if
+
+                    kappa_J_a = kappa_J_a + HIT_kappa_tot_g_approx(l,i,:) * w_gauss_ck(l) * plus_val_j
+                    kappa_H_a = kappa_H_a + HIT_kappa_tot_g_approx(l,i,:) * w_gauss_ck(l) * plus_val_h
+
+                    kappa_out_test(:,i) = kappa_out_test(:,i) + HIT_kappa_tot_g_approx(l,i,:) * w_gauss_ck(l)
                 end do
 
                 j_out_test(:,i) = J_bol_a
@@ -2592,7 +2527,7 @@ module fort_spec
                     j_deep(i) = J_bol_a(struc_len-1)
                 end if
 
-                flux(i) = H_bol_a(1)* 4d0* pi
+                flux(i) = H_bol_a(1) * 4d0* pi
 
                 if (range_write_use == struc_len) then
                     J_bol(1:range_write_use) = J_bol(1:range_write_use) + &
@@ -2630,12 +2565,7 @@ module fort_spec
             end if
 
             eddington_Psi = H_bol(1)/J_bol(1)
-            
-            !!$  write(*,*) 'rad quant from 1st layer = rad quant from 2nd layer (j_for_zbrent, kappa_J, kappa_H)'
-            !!$  j_for_zbrent(:,:,1) = j_for_zbrent(:,:,2)
-            !!$  kappa_J(1) = kappa_J(2)
-            !!$  kappa_H(1) = kappa_H(2)
-            
+
             ! Use that we are optically thick at the bottom (hopefully)
             if (range_int_use == struc_len) then
                 call calc_rosse_opa(&
@@ -2647,27 +2577,342 @@ module fort_spec
                     w_gauss_ck&
                 )
             end if
-            
-            !!$  if (i_iter .EQ. iter_tot) then
-            !!$     do l = range_int_use,struc_len
-            !!$
-            !!$        write(x1,fmt) l
-            !!$        
-            !!$        open(unit=123,file='res_files/spec_files/j_spec_'//trim(x1)//'.dat')
-            !!$        write(123,*) '# lambda microns, Jnu (cgs), kappa_nu (cgs), H_star'
-            !!$
-            !!$        do i = 1, HIT_coarse_borders-1
-            !!$           !write(123,*) c_l*(1d0/HIT_border_freqs(i)+1d0/HIT_border_freqs(i+1))/2d0, j_out_test(l,i), kappa_out_test(l,i), &                                                                                                                                                                                         
-            !!$           !      H_star(i,l), kappa_S_nu(l,i), kappa_j_out_corr(l,i)                                                                                                                                                                                                                                                 
-            !!$           write(123,*) c_l*(1d0/HIT_border_freqs(i)+1d0/HIT_border_freqs(i+1))/2d0, j_out_test(l,i), kappa_out_test(l,i), &
-            !!$                H_star(i,l)
-            !!$        end do
-            !!$
-            !!$        close(123)
-            !!$
-            !!$     end do
-            !!$  end if
         end subroutine corr_k_LBL_RT_tot_olson_kunasz
+
+
+!        subroutine olson_kunasz_radiative_transfer_ck(&
+!            border_freqs, &
+!                 tau_approx_scat, &
+!                 temp, &
+!                 mu, &
+!                 w_gauss_mu, &
+!                 w_gauss_ck, &
+!                 surf_refl, &
+!                 surf_emi, &
+!                 I_star_0, &
+!                 geom, &
+!                 mu_star, &
+!                 flux, &
+!                 contribution,&
+!                 contr_em, &
+!                 freq_len_p_1, &
+!                 struc_len, &
+!                 N_mu, &
+!                 N_g, &
+!                 press,&
+!                kappa_H,kappa_J,eddington_F,eddington_Psi,H_star, &
+!                abs_S,t_irr,J_bol,H_bol,K_bol, &
+!                gravity,j_for_zbrent,jstar_for_zbrent, &
+!                range_write,bord_ind_1dm6,I_J_out_Feautrier)
+!            ! """Calculate the radiance from a planetary atmosphere, based on the method of Olson and Kunasz 1987.
+!            ! """
+!            use constants_block
+!
+!            implicit none
+!
+!            logical, intent(in)             :: contribution
+!            character(len=*)                :: geom
+!            integer, intent(in)             :: freq_len_p_1, struc_len, N_g, bord_ind_1dm6
+!            integer, intent(in)             :: N_mu, range_write
+!            double precision, intent(in)    :: border_freqs(freq_len_p_1), gravity, &
+!                                               surf_refl(freq_len_p_1-1),surf_emi(freq_len_p_1-1)
+!            double precision, intent(in)    :: press(struc_len), temp(struc_len)
+!            double precision, intent(in)    :: tau_approx_scat(N_g,freq_len_p_1-1,struc_len)
+!            double precision, intent(in)    :: mu(N_mu), w_gauss_mu(N_mu),w_gauss_ck(N_g)
+!            double precision, intent(in)    :: I_star_0(freq_len_p_1-1), t_irr
+!            double precision, intent(inout) :: J_bol(struc_len), H_bol(struc_len), K_bol(struc_len)
+!            double precision, intent(inout) :: kappa_J(struc_len), kappa_H(struc_len)
+!            double precision, intent(inout) :: jstar_for_zbrent(N_g,freq_len_p_1-1,struc_len)
+!            double precision, intent(out)   :: eddington_F(struc_len), eddington_Psi
+!            double precision, intent(out)   :: flux(freq_len_p_1-1), &
+!                                               I_J_out_Feautrier(N_mu,N_g,freq_len_p_1-1), &
+!                                               abs_S(struc_len), &
+!                                               j_for_zbrent(N_g,freq_len_p_1-1,struc_len), &
+!                                               contr_em(struc_len,freq_len_p_1-1)
+!            double precision, intent(out)   :: H_star(freq_len_p_1-1,struc_len), mu_star
+!
+!            double precision                :: del_tau(struc_len-1), atten_factors(struc_len-1), &
+!                                               mean_source(struc_len-1), atten_factors_no_exp(struc_len-1), &
+!                                               atten_factors_no_exp_p1(struc_len-2)
+!            double precision                :: plus_val_j(struc_len), plus_val_h(struc_len), &
+!                                               plus_val_k(struc_len), &
+!                                            HIT_kappa_tot_g_approx(N_g,freq_len_p_1-1,struc_len)
+!            double precision                :: Q, Q_max, u, v, w, f, dt1, edt1,&
+!                                               dt2, e0, e1, e2, r(struc_len)
+!            double precision                :: &
+!                                               kappa_out_test(struc_len,freq_len_p_1-1), &
+!                                               kappa_S(struc_len), kappa_S_nu(struc_len,freq_len_p_1-1), &
+!                                               H_tot_layer(struc_len), I_star_calc(N_g,N_mu,struc_len,freq_len_p_1-1)
+!
+!            double precision                :: J_bol_a(struc_len), H_bol_a(struc_len), K_bol_a(struc_len)
+!            double precision                :: kappa_J_a(struc_len), kappa_H_a(struc_len)
+!            double precision                :: abs_S_nu(struc_len)
+!            double precision                :: H_star_calc(N_g,struc_len)
+!            double precision                :: J_star_ini(N_g,freq_len_p_1-1,struc_len)
+!
+!            character(len=8)                :: fmt
+!            integer                         :: j,i,k,l
+!            integer                         :: i_mu, range_write_use
+!            double precision                :: I_plus(struc_len,N_mu), I_minus(struc_len,N_mu), &
+!                I_surface_emission, I_surface_reflection, I_surface_no_scattering(N_g, freq_len_p_1 - 1), &
+!                surf_refl_2(freq_len_p_1-1), mu_weight(N_mu), planck(struc_len, freq_len_p_1-1)
+!
+!            fmt = '(I5.5)'
+!
+!            if (range_write < 0) then
+!                range_write_use = struc_len
+!            else
+!                range_write_use = range_write
+!            end if
+!
+!            ! calculate how the stellar light is attenuated
+!            abs_S = 0d0
+!
+!            kappa_out_test = 0d0
+!            I_star_calc = 0d0
+!
+!            surf_refl_2 = 2d0 * surf_refl
+!            mu_weight = mu * w_gauss_mu
+!
+!            do i = 1, freq_len_p_1-1
+!                call planck_f_lr(&
+!                    struc_len,temp(1:struc_len), border_freqs(i), border_freqs(i + 1), planck(:, i)&
+!                )
+!
+!                ! Irradiation treatment
+!                ! Dayside ave: multiply flux by 1/2.
+!                ! Planet ave: multiply flux by 1/4
+!                do i_mu = 1, N_mu
+!                    if (trim(adjustl(geom)) == 'dayside_ave') then
+!                        I_star_calc(:,i_mu,:,i) = 0.5* abs(I_star_0(i))*exp(-tau_approx_scat(:,i,:)/mu(i_mu))
+!                        J_star_ini(:,i,:) = J_star_ini(:,i,:)+0.5d0*I_star_calc(:,i_mu,:,i)*w_gauss_mu(i_mu)
+!                    else if (trim(adjustl(geom)) == 'planetary_ave') then
+!                        I_star_calc(:,i_mu,:,i) = 0.25* abs(I_star_0(i))*exp(-tau_approx_scat(:,i,:)/mu(i_mu))
+!                        J_star_ini(:,i,:) = J_star_ini(:,i,:)+0.5d0*I_star_calc(:,i_mu,:,i)*w_gauss_mu(i_mu)
+!                    else if (trim(adjustl(geom)) == 'non-isotropic') then
+!                        J_star_ini(:,i,:) = abs(I_star_0(i)/4.*exp(-tau_approx_scat(:,i,:)/mu_star))
+!                    else
+!                        write(*,*) 'Invalid geometry'
+!                    end if
+!                end do
+!            end do
+!
+!            do i = 1, freq_len_p_1 - 1
+!                I_surface_emission = surf_emi(i) * planck(struc_len, i)
+!
+!                do l = 1, N_g
+!                    if  (trim(adjustl(geom)) /= 'non-isotropic') then
+!                        I_surface_reflection = surf_refl_2(i) &
+!                            * sum(I_star_calc(l, :, struc_len, i) * mu_weight)
+!                    else
+!                        I_surface_reflection = surf_refl(i) &
+!                            * J_star_ini(l, i, struc_len) * 4d0 * mu_star
+!                    end if
+!
+!                    I_surface_no_scattering(l, i) = I_surface_emission + I_surface_reflection
+!                end do
+!            end do
+!
+!            ! do the full RT step
+!            K_bol = 0d0
+!
+!            do i = 1, freq_len_p_1 - 1
+!                flux(i) = 0d0
+!                J_bol_a = 0d0
+!                H_bol_a = 0d0
+!                K_bol_a = 0d0
+!                kappa_J_a = 0d0
+!                kappa_H_a = 0d0
+!
+!                r = planck(:, i)
+!
+!                do l = 1, N_g
+!                    ! Calculate the optical thickness of a layer
+!                    del_tau = 0d0
+!                    mean_source = 0d0
+!
+!                    do k = 2, struc_len
+!                        del_tau(k - 1) = tau_approx_scat(l,i,k) - tau_approx_scat(l,i,k - 1)
+!                        mean_source(k - 1) = (r(k - 1) + r(k)) * 0.5d0
+!                    end do
+!
+!                    do j = 1, N_mu
+!                        ! Calculate the attenuation factors
+!                        atten_factors_no_exp = del_tau / mu(j)
+!                        atten_factors_no_exp_p1 = atten_factors_no_exp(2:struc_len-1)
+!                        atten_factors = exp(-atten_factors_no_exp)
+!
+!                        ! Boundary conditions
+!                        I_plus(1, j) = 0d0
+!                        I_minus(struc_len, j) = I_surface_no_scattering(l, i)  ! TODO add scattering part
+!
+!                        ! integrate
+!                        do k = 2, struc_len
+!                            ! I_plus calculation
+!                            if (k < struc_len) then
+!                                dt1 = atten_factors_no_exp(k - 1)
+!                                f = atten_factors_no_exp(k) / dt1
+!
+!                                edt1 = exp(-dt1)
+!                                e0 = 1d0 - edt1
+!                                e1 = dt1 - e0
+!                                e2 = dt1 ** 2d0 - 2d0 * e1
+!                                dt2 = f * dt1
+!
+!                                if (dt1 > 1d-4) then
+!                                    u = e0 + (e2 - (2d0 * dt1 + dt2) * e1) / (dt1 * (dt1 + dt2))
+!                                    v = ((dt1 + dt2) * e1 - e2) / (dt1 * dt2)
+!                                    w = (e2-dt1*e1)/(dt2*(dt1+dt2))
+!                                else
+!                                    u = -(1d0/24d0)*dt1*(-8d0-12d0*f+6d0*dt1+8d0*f*dt1-2d0*dt1**2d0- &
+!                                        3d0*f*dt1**2+dt1**3d0+f*dt1**3d0)/(1d0+f)
+!                                    v = (1d0/24d0)*dt1*(4d0-2d0*dt1+dt1**2d0+12d0*f-4d0*f*dt1+f*dt1**2d0)/f
+!                                    w = (1d0/120d0)*dt1*(-20d0+10d0*dt1-3d0*dt1**2d0+dt1**3d0)/(f*(1d0+f))
+!                                end if
+!
+!                                Q = u * r(k - 1) + v * r(k) + w * r(k + 1)
+!                                Q_max = 0.5d0 * (r(k - 1) * HIT_kappa_tot_g_approx(l, i, k - 1) &
+!                                    + r(k) * HIT_kappa_tot_g_approx(l, i, k)) * (press(k) - press(k - 1)) &
+!                                    / gravity / mu(j)  ! use MP/RT for rho?
+!                                Q = max(min(Q, Q_max), 0d0)
+!                                I_plus(k, j) = I_plus(k - 1, j)*atten_factors(k - 1) + Q
+!                            else
+!                                I_plus(k,j) = I_plus(k-1,j)*atten_factors(k-1)+(1d0-atten_factors(k-1))*mean_source(k-1)
+!                            end if
+!
+!                            ! I_minus calculation
+!                            if (k < struc_len) then  ! 2 times the same thing?
+!                                dt1 = atten_factors_no_exp(struc_len - k + 1)
+!                                f = atten_factors_no_exp(struc_len - k) / dt1
+!
+!                                edt1 = exp(-dt1)
+!                                e0 = 1d0-edt1
+!                                e1 = dt1 -e0
+!                                e2 = dt1**2d0 - 2d0*e1
+!                                dt2 = f * dt1
+!
+!                                if (dt1 > 1d-4) then
+!                                    u = e0 + (e2 - (2d0 * dt1 + dt2) * e1) / (dt1 * (dt1 + dt2))
+!                                    v = ((dt1+dt2)*e1-e2)/(dt1*dt2)
+!                                    w = (e2-dt1*e1)/(dt2*(dt1+dt2))
+!                                else
+!                                    u = -(1d0/24d0)*dt1*(-8d0-12d0*f+6d0*dt1+8d0*f*dt1-2d0*dt1**2d0- &
+!                                        3d0*f*dt1**2+dt1**3d0+f*dt1**3d0)/(1d0+f)
+!                                    v = (1d0/24d0)*dt1*(4d0-2d0*dt1+dt1**2d0+12d0*f-4d0*f*dt1+f*dt1**2d0)/f
+!                                    w = (1d0/120d0)*dt1*(-20d0+10d0*dt1-3d0*dt1**2d0+dt1**3d0)/(f*(1d0+f))
+!                                end if
+!
+!                                Q = u * r(struc_len - k + 2) + v * r(struc_len - k + 1) &
+!                                    + w * r(struc_len - k)
+!                                Q_max = 0.5d0*(r(struc_len-k+2)*HIT_kappa_tot_g_approx(l,i,struc_len-k+2)+ &
+!                                    r(struc_len-k+1)*HIT_kappa_tot_g_approx(l,i,struc_len-k+1))* &
+!                                    (press(struc_len-k+2)-press(struc_len-k+1))/gravity/mu(j)
+!                                Q = max(min(Q,Q_max),0d0)
+!                                I_minus(struc_len-k+1,j) = I_minus(struc_len-k+2,j)&
+!                                    * atten_factors(struc_len-k+1) + Q
+!                            else
+!                                I_minus(struc_len-k+1,j) = I_minus(struc_len-k+2,j)*atten_factors(struc_len-k+1)+ &
+!                                    (1d0-atten_factors(struc_len-k+1))*mean_source(struc_len-k+1)
+!                            end if
+!                        end do
+!
+!                        I_J_out_Feautrier(j,l,i) = 0.5d0*(I_minus(bord_ind_1dm6,j)+I_plus(bord_ind_1dm6,j))
+!                    end do
+!
+!                    ! OLD NON FEAUTRIER PART
+!
+!                    plus_val_j = 0d0 ! flux going in
+!                    plus_val_h = 0d0 ! flux going in
+!                    plus_val_k = 0d0 ! flux going in
+!
+!                    do j = 1, N_mu
+!                        !plus_val_j = plus_val_j + I_plus(:,j) * w_gauss_mu(j)
+!                        plus_val_j = plus_val_j + (I_plus(:,j)+I_minus(:,j))/2d0 * w_gauss_mu(j)
+!                        !neg_val_j = neg_val_j + I_minus(:,j) * w_gauss_mu(j)
+!
+!                        !plus_val_h = plus_val_h + I_plus(:,j) * mu(j) * w_gauss_mu(j)
+!                        plus_val_h = plus_val_h + (I_plus(:,j)-I_minus(:,j))/2d0 * mu(j) * w_gauss_mu(j)
+!                        !neg_val_h = neg_val_h - I_minus(:,j) * mu(j) * w_gauss_mu(j)
+!
+!                        !plus_val_k = plus_val_k + I_plus(:,j) * mu(j)**2d0 * w_gauss_mu(j)
+!                        plus_val_k = plus_val_k + (I_plus(:,j)+I_minus(:,j))/2d0 * mu(j)**2d0 * w_gauss_mu(j)
+!                        !neg_val_k = neg_val_k + I_minus(:,j) * mu(j)**2d0 * w_gauss_mu(j)
+!                    end do
+!
+!                    J_bol_a = J_bol_a + w_gauss_ck(l) * plus_val_j
+!                    H_bol_a = H_bol_a + w_gauss_ck(l) * plus_val_h
+!                    K_bol_a = K_bol_a + w_gauss_ck(l) * plus_val_k
+!
+!                    if (range_write_use == struc_len) then
+!                        j_for_zbrent(l,i,1:range_write_use) = plus_val_j(1:range_write_use)
+!                    else
+!                        j_for_zbrent(l,i,1:range_write_use-1) = plus_val_j(1:range_write_use-1)
+!                    end if
+!
+!                    kappa_J_a = kappa_J_a + HIT_kappa_tot_g_approx(l,i,:) * w_gauss_ck(l) * plus_val_j
+!                    kappa_H_a = kappa_H_a + HIT_kappa_tot_g_approx(l,i,:) * w_gauss_ck(l) * plus_val_h
+!
+!                    kappa_out_test(:,i) = kappa_out_test(:,i) + HIT_kappa_tot_g_approx(l,i,:) * w_gauss_ck(l)
+!                end do
+!
+!                flux(i) = H_bol_a(1) * 4d0 * pi
+!
+!                if (range_write_use == struc_len) then
+!                    J_bol(1:range_write_use) = J_bol(1:range_write_use) + &
+!                        J_bol_a(1:range_write_use)*(border_freqs(i)-border_freqs(i+1))
+!                    H_bol(1:range_write_use) = H_bol(1:range_write_use) + &
+!                        H_bol_a(1:range_write_use)*(border_freqs(i)-border_freqs(i+1))
+!
+!                    K_bol = K_bol + K_bol_a*(border_freqs(i)-border_freqs(i+1))
+!                    kappa_J(1:range_write_use) = kappa_J(1:range_write_use) + kappa_J_a(1:range_write_use)* &
+!                        (border_freqs(i)-border_freqs(i+1))
+!                    kappa_H(1:range_write_use) = kappa_H(1:range_write_use) + kappa_H_a(1:range_write_use)* &
+!                        (border_freqs(i)-border_freqs(i+1))
+!                else
+!                    J_bol(1:range_write_use-1) = J_bol(1:range_write_use-1) + &
+!                        J_bol_a(1:range_write_use-1)*(border_freqs(i)-border_freqs(i+1))
+!                    H_bol(1:range_write_use-1) = H_bol(1:range_write_use-1) + &
+!                        H_bol_a(1:range_write_use-1)*(border_freqs(i)-border_freqs(i+1))
+!
+!                    K_bol = K_bol + K_bol_a*(border_freqs(i)-border_freqs(i+1))
+!                    kappa_J(1:range_write_use-1) = kappa_J(1:range_write_use-1) + kappa_J_a(1:range_write_use-1)* &
+!                        (border_freqs(i)-border_freqs(i+1))
+!                    kappa_H(1:range_write_use-1) = kappa_H(1:range_write_use-1) + kappa_H_a(1:range_write_use-1)* &
+!                        (border_freqs(i)-border_freqs(i+1))
+!                end if
+!            end do
+!
+!            if (range_write_use == struc_len) then
+!                kappa_J(1:range_write_use) = kappa_J(1:range_write_use) / J_bol(1:range_write_use)
+!                kappa_H(1:range_write_use) = kappa_H(1:range_write_use) / H_bol(1:range_write_use)
+!                eddington_F(1:range_write_use) = K_bol(1:range_write_use)/J_bol(1:range_write_use)
+!            else
+!                kappa_J(1:range_write_use-1) = kappa_J(1:range_write_use-1) / J_bol(1:range_write_use-1)
+!                kappa_H(1:range_write_use-1) = kappa_H(1:range_write_use-1) / H_bol(1:range_write_use-1)
+!                eddington_F(1:range_write_use-1) = K_bol(1:range_write_use-1)/J_bol(1:range_write_use-1)
+!            end if
+!
+!            eddington_Psi = H_bol(1)/J_bol(1)
+!
+!            ! Use that we are optically thick at the bottom (hopefully)
+!            call calc_rosse_opa(&
+!                HIT_kappa_tot_g_approx(:,:,struc_len), &
+!                border_freqs,temp(struc_len), &
+!                N_g, &
+!                freq_len_p_1, &
+!                kappa_H(struc_len), &
+!                w_gauss_ck&
+!            )
+!
+!            contains
+!                subroutine olson_kunasz_integration(intensity_0, source, delta_tau, intensity, u, v, w)
+!                    implicit none
+!
+!                    double precision :: x
+!
+!                end subroutine olson_kunasz_integration
+!        end subroutine olson_kunasz_radiative_transfer_ck
+
 
         subroutine feautrier_rad_trans(border_freqs, &
              tau_approx_scat, &
@@ -2824,7 +3069,7 @@ module fort_spec
 
                 do l = 1, N_g
                     if  (trim(adjustl(geom)) /= 'non-isotropic') then
-                        I_surface_reflection= surf_refl_2(i) &
+                        I_surface_reflection = surf_refl_2(i) &
                             * sum(I_star_calc(l, :, struc_len, i) * mu_weight)
                     else
                         I_surface_reflection = surf_refl(i) &
@@ -2895,7 +3140,6 @@ module fort_spec
                             I_H(1, j) = -I_J(1, j)
 
                             do k = 2, struc_len - 1
-                                !if(i_iter_scat >= 76 .and. i >1780) print*,i,l,j,k,I_J(k + 1, j), I_J(k, j), f2_struct(k)
                                 deriv1 = f2_struct(k, j, l, i) * (I_J(k + 1, j) - I_J(k, j))
                                 deriv2 = f3_struct(k, j, l, i) * (I_J(k, j) - I_J(k - 1, j))
                                 I_H(k, j) = -(deriv1 + deriv2) * 0.5d0
@@ -2946,7 +3190,7 @@ module fort_spec
                 end do
 
                 do i = 1, freq_len_p_1-1
-                    call planck_f_lr(struc_len,temp(1:struc_len), border_freqs(i), border_freqs(i + 1), r)
+                    call planck_f_lr(struc_len, temp(1:struc_len), border_freqs(i), border_freqs(i + 1), r)
 
                     do l = 1, N_g
                         source(:, l, i) = (&

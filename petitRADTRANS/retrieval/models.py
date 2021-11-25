@@ -140,7 +140,6 @@ def emission_model_diseq(pRT_object,
 
     gravity = -np.inf
     R_pl = -np.inf
-
     if 'log_g' in parameters.keys() and 'mass' in parameters.keys():
         gravity = 10 ** parameters['log_g'].value
         r_pl = np.sqrt(nc.G * parameters['mass'].value / gravity)

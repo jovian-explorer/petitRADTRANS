@@ -2586,5 +2586,112 @@ def plot_mmr(mmr, pressure, **kwargs):
     plt.ylim([1e7, 1e-3])
 
 
+def plot_tsm_esm_metis(percentile=95):
+    planets = Planet.from_tab_file('./divs/PSCompPars_2021.11.22_02.24.50.tab')
+
+    tsm = {}
+    esm = {}
+    t_eq = {}
+    log_g = {}
+    mass = {}
+
+    for planet in planets.values():
+        if planet.system_apparent_magnitude_j > 0:
+            mag_j = planet.system_apparent_magnitude_j
+        else:
+            mag_j = None
+
+        if planet.system_apparent_magnitude_k > 0:
+            mag_k = planet.system_apparent_magnitude_k
+        else:
+            mag_k = None
+
+        # TODO TSM uncertainty
+
+        if planet.equilibrium_temperature == 0\
+                or planet.radius < 2\
+                or planet.star_radius == 0\
+                or planet.star_effective_temperature == 0\
+                or planet.orbital_period > 40 * nc.snc.day:
+            continue
+
+        t_eq[planet.name] = planet.equilibrium_temperature
+        log_g[planet.name] = np.log10(planet.surface_gravity)
+        mass[planet.name] = planet.mass
+
+        if planet.transit_duration > 0 and planet.mass > 0:
+            if planet.radius < 1.5 * nc.r_earth:
+                scale_factor = 0.19
+            elif planet.radius < 2.75 * nc.r_earth:
+                scale_factor = 1.26
+            elif planet.radius < 4 * nc.r_earth:
+                scale_factor = 1.28
+            elif planet.radius < 10 * nc.r_earth:
+                scale_factor = 1.15
+            else:
+                scale_factor = 1.0
+
+            tsm[planet.name] = calculate_tsm(
+                wavelength_boundaries=np.array([1.07, 1.4]) * 1e-4,
+                planet_radius=planet.radius,
+                planet_mass=planet.mass,
+                planet_equilibrium_temperature=planet.equilibrium_temperature,
+                star_radius=planet.star_radius,
+                star_effective_temperature=planet.star_effective_temperature,
+                star_distance=planet.system_distance,
+                star_apparent_magnitude=mag_j,
+                scale_factor=scale_factor
+            )
+        else:
+            tsm[planet.name] = 0
+
+        if tsm[planet.name] > 0 and 0 < planet.transit_duration < 10 * nc.snc.hour:
+            esm[planet.name] = calculate_esm(
+                wavelength_boundaries=np.array([2.00, 2.4]) * 1e-4,
+                planet_radius=planet.radius,
+                planet_equilibrium_temperature=planet.equilibrium_temperature,
+                star_radius=planet.star_radius,
+                star_effective_temperature=planet.star_effective_temperature,
+                star_distance=planet.system_distance,
+                star_apparent_magnitude=mag_k
+            )
+        else:
+            esm[planet.name] = 0
+
+    wh = np.where(list(tsm.values()) > np.percentile(list(tsm.values()), percentile))
+    tsms = np.asarray(list(tsm.values()))[wh[0]]
+    esms = np.asarray(list(esm.values()))[wh[0]]
+    isort = tsms.argsort()
+    isort = isort[::-1]
+    bc = np.asarray(list(tsm.keys()))[wh]
+
+    t_eqs = np.asarray(list(t_eq.values()))[wh[0]]
+    log_gs = np.asarray(list(log_g.values()))[wh[0]]
+    log_m = np.log10(np.asarray(list(mass.values()))[wh[0]])
+
+    t_ranges = [0, 373, 500, 1000, 1500, 1e10]  # K
+    m_ranges = [5, 10, 30, 100, 10000]  # M_earth
+
+    n_max = 15
+
+    for j, t in enumerate(t_ranges[:-1]):
+        for k, m in enumerate(m_ranges[:-1]):
+            print(f'----\n{m}--{m_ranges[k + 1]} M_+, {t}--{t_ranges[j + 1]} K')
+            n = 0
+            for i, c in enumerate(bc[isort]):
+                if m < 10 ** log_m[isort][i] / nc.m_earth < m_ranges[k + 1] and t < t_eqs[isort][i] < t_ranges[j + 1]:
+                    n += 1
+                    print(
+                        f"{c}: TSM = {tsms[isort][i]}, ESM = {esms[isort][i]}, T_eq = {t_eqs[isort][i]} K , "
+                        f"mass = {10 ** log_m[isort][i] / nc.m_earth} M_+, "
+                        f"log_g = {log_gs[isort][i]} [cm.s-2]")
+                    if n == n_max:
+                        break
+
+    plt.scatter(esms, tsms, c=t_eqs, cmap='viridis')
+
+    return planets, tsm, esm
+
+
 if __name__ == '__main__':
     main()
