@@ -256,7 +256,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             self.absorbers_present = False
 
         # Line species present? If yes: define wavelength array
-        if len(line_species) > 0:
+        if len(line_species) > 0:  # TODO init Radtrans even if there is no opacity
             self.line_absorbers_present = True
         else:
             self.line_absorbers_present = False

@@ -49,14 +49,20 @@ def __phoenix_spec_dat2h5():
         )
         mass.attrs['units'] = 'M_sun'
 
+        spectral_type = f.create_dataset(
+            name='spectral_type',
+            data=description[:, -1]
+        )
+        spectral_type.attrs['units'] = 'None'
+
         wavelength = f.create_dataset(
             name='wavelength',
             data=np.asarray(spec_dats)[0, :, 0]
         )
         wavelength.attrs['units'] = 'cm'
 
-        intensity = f.create_dataset(
-            name='spectral_radiance',
+        spectral_radiosity = f.create_dataset(
+            name='spectral_radiosity',
             data=np.asarray(spec_dats)[:, :, 1]
         )
-        intensity.attrs['units'] = 'erg/s/sr/cm^2/Hz'
+        spectral_radiosity.attrs['units'] = 'erg/s/cm^2/Hz'

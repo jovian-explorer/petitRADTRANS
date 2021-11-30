@@ -13,7 +13,7 @@ def __load_stellar_spectra():
     with h5py.File(spec_path + os.path.sep + "stellar_spectra.h5", "r") as f:
         log_temp_grid = f['log10_effective_temperature'][()]
         star_rad_grid = f['radius'][()]
-        spec_dats = f['spectral_radiance'][()]
+        spec_dats = f['spectral_radiosity'][()]
         wavelength = f['wavelength'][()]
 
     return log_temp_grid, star_rad_grid, spec_dats, wavelength
