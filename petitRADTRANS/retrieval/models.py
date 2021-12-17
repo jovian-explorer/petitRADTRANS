@@ -80,8 +80,8 @@ def emission_model_diseq(pRT_object,
             Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
 
     Returns:
-        wlen_model : np.array
-            Wavlength array of computed model, not binned to data [um]
+        wavelength_model : np.array
+            Wavelength array of computed model, not binned to data [um]
         spectrum_model : np.array
             Computed emission spectrum [W/m2/micron]
     """
@@ -185,7 +185,7 @@ def emission_model_diseq(pRT_object,
     f_lambda = f_lambda * 1e-7
     spectrum_model = surf_to_meas(f_lambda,
                                   r_pl,
-                                  parameters['D_pl'].value)  # print(wlen_model,spectrum_model)
+                                  parameters['D_pl'].value)  # print(wavelength_model,spectrum_model)
 
     return wlen_model, spectrum_model
 
@@ -225,8 +225,8 @@ def guillot_free_emission(pRT_object,
             Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
 
     Returns:
-        wlen_model : np.array
-            Wavlength array of computed model, not binned to data [um]
+        wavelength_model : np.array
+            Wavelength array of computed model, not binned to data [um]
         spectrum_model : np.array
             Computed emission spectrum [W/m2/micron]
     """
@@ -369,8 +369,8 @@ def guillot_eqchem_transmission(pRT_object,
             Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
 
     Returns:
-        wlen_model : np.array
-            Wavlength array of computed model, not binned to data [um]
+        wavelength_model : np.array
+            Wavelength array of computed model, not binned to data [um]
         spectrum_model : np.array
             Computed transmission spectrum R_pl**2/Rstar**2
     """
@@ -463,8 +463,8 @@ def isothermal_eqchem_transmission(pRT_object,
             Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
 
     Returns:
-        wlen_model : np.array
-            Wavlength array of computed model, not binned to data [um]
+        wavelength_model : np.array
+            Wavelength array of computed model, not binned to data [um]
         spectrum_model : np.array
             Computed transmission spectrum R_pl**2/Rstar**2
     """
@@ -554,8 +554,8 @@ def isothermal_free_transmission(pRT_object,
             Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
 
     Returns:
-        wlen_model : np.array
-            Wavlength array of computed model, not binned to data [um]
+        wavelength_model : np.array
+            Wavelength array of computed model, not binned to data [um]
         spectrum_model : np.array
             Computed transmission spectrum R_pl**2/Rstar**2
     """

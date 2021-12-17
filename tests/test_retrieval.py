@@ -170,7 +170,7 @@ def retrieval_model_spec_iso(prt_object, parameters, pt_plot_mode=None, AMR=Fals
             Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base. Mandatory.
 
     Returns:
-        wlen_model : np.array
+        wavelength_model : np.array
             Wavlength array of computed model, not binned to data [um]
         spectrum_model : np.array
             Computed transmission spectrum R_pl**2/Rstar**2

@@ -465,6 +465,9 @@ class Retrieval:
         exo_k_check = False
 
         for name, dd in self.data.items():
+            if dd.pRT_object is not None:
+                continue
+
             # Only create if there's no other data
             # object using the same pRT object
             if dd.external_pRT_reference is None:
@@ -602,9 +605,23 @@ class Retrieval:
                     if np.isnan(spectrum_model).any():
                         return -1e99
 
-                    log_likelihood += dd.get_chisq(wlen_model,
-                                                   spectrum_model,
-                                                   self.plotting)
+                    # TODO uniformize convolve/rebin handling
+                    if np.ndim(dd.flux) == 1:
+                        # Convolution and rebin are cared of in get_chisq
+                        log_likelihood += dd.get_chisq(wlen_model,
+                                                       spectrum_model,
+                                                       self.plotting)
+                    elif np.ndim(dd.flux) == 2:
+                        # Convolution and rebin are *not* cared of in get_log_likelihood
+                        # Second dimension of data must be wavelength
+                        for i, data in enumerate(dd.flux):
+                            log_likelihood += dd.log_likelihood_gibson(
+                                spectrum_model[i], data, dd.flux_error[i],
+                                alpha=1.0,
+                                beta=1.0
+                            )
+                    else:
+                        raise ValueError(f"observations have {np.ndim(dd.flux)} dimensions, but must have 1 or 2")
                 else:
                     # Get the PT profile
                     if name == self.rd.plot_kwargs["take_PTs_from"]:

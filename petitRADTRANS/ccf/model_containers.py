@@ -1,4 +1,3 @@
-import copy
 import os
 import pickle
 
@@ -6,10 +5,10 @@ import h5py
 import numpy as np
 import pyvo
 from astropy.table.table import Table
-from petitRADTRANS.fort_rebin import fort_rebin as fr
 
 from petitRADTRANS import nat_cst as nc
 from petitRADTRANS.ccf.utils import calculate_uncertainty, module_dir
+from petitRADTRANS.fort_rebin import fort_rebin as fr
 from petitRADTRANS.phoenix import get_PHOENIX_spec
 from petitRADTRANS.physics import guillot_global
 from petitRADTRANS.radtrans import Radtrans
@@ -931,6 +930,27 @@ class Planet:
         return value, key
 
     @staticmethod
+    def calculate_planet_radial_velocity(planet_max_radial_orbital_velocity, planet_orbital_inclination,
+                                         orbital_phases):
+        kp = planet_max_radial_orbital_velocity * np.sin(np.deg2rad(planet_orbital_inclination))  # (cm.s-1)
+
+        return kp * np.sin(2 * np.pi * orbital_phases)
+
+    @staticmethod
+    def calculate_orbital_velocity(star_mass, semi_major_axis):
+        """Calculate an approximation of the orbital velocity.
+        This equation is valid if the mass of the object is negligible compared to the mass of the star, and if the
+        eccentricity of the object is close to 0.
+        
+        Args:
+            star_mass: (g) mass of the star
+            semi_major_axis: (cm) semi-major axis of the orbit of the object
+
+        Returns: (cm.s-1) the mean orbital velocity, assuming 0 eccentricity and mass_object << mass_star
+        """
+        return np.sqrt(nc.G * star_mass / semi_major_axis)
+
+    @staticmethod
     def generate_filename(name):
         return f"{planet_models_directory}{os.path.sep}planet_{name.replace(' ', '_')}.h5"
 
@@ -1147,8 +1167,11 @@ class SpectralModel:
         if filename is None:
             self.filename = self.get_filename()
 
-    def calculate_eclipse_depth(self, atmosphere: Radtrans, planet: Planet):
-        star_radiosity_filename = self.get_star_radiosity_filename(planet.star_effective_temperature, path=module_dir)
+    def calculate_eclipse_depth(self, atmosphere: Radtrans, planet: Planet, star_radiosity_filename=None):
+        if star_radiosity_filename is None:
+            star_radiosity_filename = self.get_star_radiosity_filename(
+                planet.star_effective_temperature, path=module_dir
+            )
 
         if not os.path.isfile(star_radiosity_filename):
             self.generate_phoenix_star_spectrum_file(star_radiosity_filename, planet.star_effective_temperature)
@@ -1181,13 +1204,14 @@ class SpectralModel:
         )
 
         flux = self.radiosity_erg_hz2radiosity_erg_cm(atmosphere.flux, atmosphere.freq)
-        wavelengths = nc.c / atmosphere.freq * 1e4  # m to um
+        wavelengths = nc.c / atmosphere.freq * 1e4  # cm to um
 
         return wavelengths, flux
 
     def calculate_transmission_spectrum(self, atmosphere: Radtrans, planet: Planet):
         print('Calculating transmission spectrum...')
-
+        # TODO better transmission spectrum with Doppler shift, RM effect, limb-darkening effect (?)
+        # Doppler shift should be low, RM effect and limb-darkening might be removed by the pipeline
         atmosphere.calc_transm(
             self.temperature,
             self.mass_fractions,

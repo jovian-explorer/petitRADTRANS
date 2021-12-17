@@ -6,7 +6,7 @@ import numpy as np
 import petitRADTRANS.nat_cst as nc
 
 
-def ccf_analysis(wavelengths, observed_spectrum, modelled_spectrum, velocity_range=2000.):
+def ccf_analysis(wavelengths, observed_spectrum, modelled_spectrum, velocity_range=2000., get_snr=True):
     """
     Calculate the cross-correlation between an observed spectrum and a modelled spectrum.
     The modelled spectrum can be a spectrum with e.g. the contribution of a single molecule. In that case e.g. log_l_ccf
@@ -18,6 +18,7 @@ def ccf_analysis(wavelengths, observed_spectrum, modelled_spectrum, velocity_ran
         observed_spectrum: observed spectrum
         modelled_spectrum: modelled spectrum
         velocity_range: (km.s-1) velocity range of the cross-correlation
+        get_snr: if True, calculate the SNR fo the CCF
 
     Returns:
         snr: the signal-to-noise ratio of the CCF
@@ -31,40 +32,47 @@ def ccf_analysis(wavelengths, observed_spectrum, modelled_spectrum, velocity_ran
 
     ccf = correlate(corrected_observed_spectrum, corrected_modelled_spectrum, mode='same', method='fft')
 
-    # Get S/N of detection, the 1e-5 coefficient is to convert from cm.s-1 to km.s-1
-    velocities = np.linspace(
-        -(np.max(wavelengths) - np.min(wavelengths)) / np.mean(wavelengths) * nc.c * 1e-5,
-        (np.max(wavelengths) - np.min(wavelengths)) / np.mean(wavelengths) * nc.c * 1e-5,
-        np.size(ccf, axis=1)
-    )
-
-    wh = np.where(np.abs(velocities) < velocity_range)
-    velocities = velocities[wh]
-
-    snr = np.zeros(np.size(ccf, axis=0))
-    mu = np.zeros(np.size(ccf, axis=0))
-    std = np.zeros(np.size(ccf, axis=0))
-
-    for i, ccf_ in enumerate(ccf):  # TODO this can be made more efficient
-        snr[i], mu[i], std[i] = calculate_ccf_snr(velocities, ccf_[wh])
-
-    log_l = -np.size(corrected_observed_spectrum) / 2. * np.log(
-        1. / np.size(corrected_observed_spectrum) * np.sum(
-            (corrected_observed_spectrum - corrected_modelled_spectrum) ** 2.,
-            axis=1
+    if get_snr:
+        # Get S/N of detection, the 1e-5 coefficient is to convert from cm.s-1 to km.s-1
+        velocities = np.linspace(
+            -(np.max(wavelengths) - np.min(wavelengths)) / np.mean(wavelengths) * nc.c * 1e-5,
+            (np.max(wavelengths) - np.min(wavelengths)) / np.mean(wavelengths) * nc.c * 1e-5,
+            np.size(ccf, axis=1)
         )
-    )
 
-    log_l_ccf = -np.size(corrected_observed_spectrum, axis=1) / 2. * np.log(
-        np.std(corrected_observed_spectrum, axis=1) ** 2.
-        - 2. * np.max(ccf[:, wh[0]][:, np.argmin(np.abs(velocities))], axis=0)
-        / np.size(corrected_observed_spectrum, axis=1)
-        + np.std(corrected_modelled_spectrum, axis=1) ** 2.
-    )
+        wh = np.where(np.abs(velocities) < velocity_range)
+        velocities = velocities[wh]
 
-    cross_correlation = (np.transpose(ccf[:, wh[0]]) - mu) / std
+        snr = np.zeros(np.size(ccf, axis=0))
+        mu = np.zeros(np.size(ccf, axis=0))
+        std = np.zeros(np.size(ccf, axis=0))
 
-    return snr, velocities, np.transpose(cross_correlation), log_l, log_l_ccf
+        for i, ccf_ in enumerate(ccf):  # TODO this can be made more efficient
+            snr[i], mu[i], std[i] = calculate_ccf_snr(velocities, ccf_[wh])
+
+        log_l = -np.size(corrected_observed_spectrum) / 2. * np.log(
+            1. / np.size(corrected_observed_spectrum) * np.sum(
+                (corrected_observed_spectrum - corrected_modelled_spectrum) ** 2.,
+                axis=1
+            )
+        )
+
+        log_l_ccf = -np.size(corrected_observed_spectrum, axis=1) / 2. * np.log(
+            np.std(corrected_observed_spectrum, axis=1) ** 2.
+            - 2. * np.max(ccf[:, wh[0]][:, np.argmin(np.abs(velocities))], axis=0)
+            / np.size(corrected_observed_spectrum, axis=1)
+            + np.std(corrected_modelled_spectrum, axis=1) ** 2.
+        )
+
+        cross_correlation = np.transpose((np.transpose(ccf[:, wh[0]]) - mu) / std)
+    else:
+        snr = None
+        velocities = None
+        cross_correlation = np.sum(ccf)
+        log_l = None
+        log_l_ccf = None
+
+    return snr, velocities, cross_correlation, log_l, log_l_ccf
 
 
 def calculate_ccf_snr(xval, signal):

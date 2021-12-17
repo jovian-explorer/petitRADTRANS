@@ -41,6 +41,22 @@ def d_b_d_temperature(temperature, nu):
     return planck_function
 
 
+def doppler_shift(wavelength_0, velocity):
+    """Calculate the Doppler-shifted wavelength for electromagnetic waves.
+
+    A negative velocity means that the source is going toward the observer. A positive velocity means the source is
+    going away from the observer.
+
+    Args:
+        wavelength_0: (cm) wavelength of the wave in the referential of the source
+        velocity: (cm.s-1) velocity of the source relative to the observer
+
+    Returns:
+        (cm) the wavelength of the source as measured by the observer
+    """
+    return wavelength_0 * np.sqrt((1 + velocity / nc.c) / (1 - velocity / nc.c))
+
+
 def get_dist(t_irr, dist, t_star, r_star, mode, mode_what):
     # TODO rework/replace this function
     mu_star = 0.

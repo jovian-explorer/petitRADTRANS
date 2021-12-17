@@ -48,7 +48,7 @@ class Data:
             Note the difference between this parameter and the lbl_opacity_sampling
             parameter in the RadTrans class - the actual desired resolution should
             be set here.
-        external_pRT_instance : object
+        external_pRT_reference : object
             An existing RadTrans object. Leave as none unless you're sure of what you're doing.
         model_generating_function : method
             A function, typically defined in run_definition.py that returns the model wavelength and spectrum (emission
@@ -92,21 +92,21 @@ class Data:
                  photometry=False,
                  photometric_transformation_function=None,
                  photometric_bin_edges=None,
-                 opacity_mode='c-k'):
+                 opacity_mode='c-k',
+                 pRT_object=None,
+                 wlen=None,
+                 flux=None,
+                 flux_error=None
+                 ):
 
         self.name = name
         self.path_to_observations = path_to_observations
 
         # To be filled later
-        self.pRT_object = None
-        self.wlen = None  #: The wavelength bin centers
-        self.flux = None  #: The flux or transit depth
-        self.flux_error = None  #: The error on the flux or transit depth
-
-        # Data file
-        if not os.path.exists(path_to_observations):
-            logging.error(path_to_observations + " Does not exist!")
-            sys.exit(7)
+        self.pRT_object = pRT_object
+        self.wlen = wlen  #: The wavelength bin centers
+        self.flux = flux  #: The flux or transit depth
+        self.flux_error = flux_error  #: The error on the flux or transit depth
 
         # Sanity check distance
         self.distance = distance
@@ -120,6 +120,7 @@ class Data:
         self.external_pRT_reference = external_pRT_reference
         self.model_generating_function = model_generating_function
         self.opacity_mode = opacity_mode
+
         if opacity_mode not in ['c-k', 'lbl']:
             logging.error("opacity_mode must be either 'c-k' or 'lbl'!")
             sys.exit(10)
@@ -127,6 +128,7 @@ class Data:
         if not model_generating_function and not external_pRT_reference:
             logging.error("Please provide a model generating function or external reference for " + name + "!")
             sys.exit(8)
+
         if model_resolution is not None:
             if opacity_mode == 'c_k' and model_resolution > 1000:
                 logging.warning("The maximum opacity for c-k mode is 1000!")
@@ -137,7 +139,6 @@ class Data:
         # Optional, covariance and scaling
         self.covariance = None
         self.inv_cov = None
-        self.flux_error = None
         self.scale = scale
         self.scale_factor = 1.0
 
@@ -146,18 +147,26 @@ class Data:
         self.photometry = photometry
         self.photometric_transformation_function = \
             photometric_transformation_function
+
         if photometry:
             if photometric_transformation_function is None:
                 logging.error("Please provide a photometry transformation function for " + name + "!")
                 sys.exit(9)
+
             if photometric_bin_edges is None:
                 logging.error("You must include the photometric bin size if photometry is True!")
                 sys.exit(9)
+
         self.photometry_range = wlen_range_micron
         self.width_photometry = photometric_bin_edges
 
         # Read in data
         if path_to_observations is not None:
+            # Check if data exists
+            if not os.path.exists(path_to_observations):
+                logging.error(path_to_observations + " Does not exist!")
+                sys.exit(7)
+
             if not photometry:
                 if path_to_observations.endswith('.fits'):
                     self.loadfits(path_to_observations)
@@ -350,6 +359,87 @@ class Data:
                 plt.show()
 
         return log_l
+
+    def get_log_likelihood(self, spectrum_model, alpha=1.0):
+        """Calculate the log-likelihood between the model and the data.
+
+        The spectrum model must be on the same wavelength grid than the data.
+
+        Args:
+            spectrum_model: numpy.ndarray
+                The model flux in the same units as the data.
+            alpha: float, optional
+                Model scaling coefficient.
+
+        Returns:
+            logL : float
+                The log likelihood of the model given the data.
+        """
+        return self.log_likelihood_gibson(
+            model=spectrum_model,
+            data=self.flux,
+            uncertainties=self.flux_error,
+            alpha=alpha,
+            beta=self.scale_factor
+        )
+
+    @staticmethod
+    def log_likelihood_gibson(model, data, uncertainties, alpha=1.0, beta=None):
+        """Calculate the log-likelihood between the model and the data.
+
+        The spectrum model must be on the same wavelength grid than the data.
+
+        From Gibson et al. 2020 (https://doi.org/10.1093/mnras/staa228). Constant terms are dropped and constant
+        coefficients are set to 1.
+
+        Set:
+            chi2(A, B) = sum(((f_i - A * m_i) / (B * sig_i)) ** 2),  implicit sum on i
+        with f_i the data, m_i the model, and sig_i the uncertainty; i denotes wavelength/time variation.
+        Starting from (implicit product on i):
+            L        = prod(1 / sqrt(2 * pi * B * sig_i ** 2) * exp(-1/2 * sum(((f_i - A * m_i) / (B * sig_i)) ** 2))),
+            => L     = prod( 1 / sqrt(2 * pi * B * sig_i ** 2) * exp(-1/2 * chi2(A, B)) ),
+            => ln(L) = -N/2 * ln(2 * pi) - N * ln(B) - sum(ln(sig_i)) - 1/2 * chi2(A, B).
+        Dropping constant terms:
+            ln(L)^* = - N * ln(B) - 1/2 * chi2(A, B).
+
+        B can be automatically optimised by nulling the ln(L) partial derivative with respect to B.
+        Using the best estimator of B instead of the true value:
+            d_ln(L) / d_B = - N / B + 1 / B ** 3 * chi2(A, B=1) = 0,
+            => B = sqrt( 1/N *  chi2(A, B=1)).
+        Replacing:
+            ln(L)^**= - N * ln(B) - 1/2 * chi2(A, B),
+                    = - N * ln(sqrt(1/N * chi2(A, B=1))) - 1/2 * sum(((f_i - A * m_i) / (B * sig_i)) ** 2),
+                    = - N/2 * ln(1/N * chi2(A, B=1)) - 1/2 / B ** 2 * sum(((f_i - A * m_i) / sig_i) ** 2),  B cst with i
+                    = - N/2 * ln(1/N * chi2(A, B=1)) - 1/2 * N / chi2(A, B=1) * chi2(A, B=1),
+                    = - N/2 * ln(1/N * chi2(A, B=1)) - N/2.
+        Dropping constant terms:
+            ln(L)^*** = - N/2 * ln(1/N * chi2(A, B=1)).
+
+        Args:
+            model: numpy.ndarray
+                The model flux in the same units as the data.
+            data: numpy.ndarray
+                The data.
+            uncertainties: numpy.ndarray
+                The uncertainties on the data.
+            alpha: float, optional
+                Model scaling coefficient.
+            beta: float, optional
+                Noise scaling coefficient. If None,
+
+        Returns:
+            logL : float
+                The log likelihood of the model given the data.
+        """
+        length = np.size(data)
+
+        if beta is None:
+            # Automatically optimise for beta
+            return - 0.5 * length * np.log(np.sum(((data - alpha * model) / uncertainties) ** 2) / length)
+        else:
+            # Classical log-likelihood
+            return - length * np.log(beta) \
+                   - 0.5 * np.sum(((data - alpha * model) / (beta * uncertainties)) ** 2)
 
     @staticmethod
     def convolve(input_wavelength,

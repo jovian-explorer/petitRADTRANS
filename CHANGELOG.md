@@ -4,13 +4,25 @@ All notable changes to the CCF module will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com)
 and this project adheres to [Semantic Versioning](http://semver.org).
 
-## [2.4.0-a9] - 2021-11-25
+## [2.4.0-a10] - 2021-12-17
 ### Added
+- [WIP] High-resolution retrieval.
+- Possibility to initialize a `retrieval.Data` class without needing a file.
+- Possibility to initialize a `retrieval.Data` class with a Radtrans object, without the need to re-create one.
+- Gibson et al. 2021 log-likelihood calculation.
+- Better high-resolution mock observation function.
 - Module `phoenix` for PHOENIX stellar models.
 - Module `physics` to store useful physical functions.
 - Module `utils` to store generic useful functions.
+- [WIP] Module `ccf.pipeline` to reduce ground-based high-resolution data.
 - Function `get_guillot_2010_temperature_profile`, a more general Guillot 2010 temperature profile.
 - Function to calculate the ESM of a planet.
+- Function to calculate the orbital phase of a planet.
+- Function to calculate the radial velocity of a planet.
+- Function to calculate the orbital velocity of a planet.
+- Function to calculate the Doppler shift.
+- Function to convolve, Doppler shift, and rebin a spectrum.
+- Noise estimation for eclipse spectra in addition to transit spectra.
 - System apparent magnitude in the K-band default attribute in object `Planet`.
 - Method to generate a `Planet` using a NASA Exoplanet Archive tab file.
 - Function to calculate the radius of a planet from its surface gravity and mass.
@@ -33,7 +45,7 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 
 ### Fixed
 - Hansen cloud particle distribution returning NaN if `b_hansen` set too low.
-- [?]Retrieval not converging when using correlated-k.
+- Retrieval not converging when using correlated-k.
 - Function `contour_corner` not working when not giving optional arguments `parameter_ranges` and `parameter_plot_indices`.
 
 ---

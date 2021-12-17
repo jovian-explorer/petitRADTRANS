@@ -1,13 +1,20 @@
 """
 Useful functions for pre/post-processing CCF analysis.
 """
-from petitRADTRANS.ccf.ccf import *
-from petitRADTRANS.ccf.etc_cli_module import *
-from petitRADTRANS.ccf.mock_observation import *
-from petitRADTRANS.ccf.model_containers import *
+import json
+import os
 
+import numpy as np
+from scipy.interpolate import interp1d
+from scipy.stats import norm
+
+import petitRADTRANS.nat_cst as nc
 from petitRADTRANS import phoenix
 from petitRADTRANS import physics
+from petitRADTRANS.ccf.ccf import calculate_ccf_snr, ccf_analysis
+from petitRADTRANS.ccf.etc_cli_module import download_snr_data, get_snr_data_file_name, output
+from petitRADTRANS.ccf.mock_observation import convolve_rebin, simple_mock_observation
+from petitRADTRANS.ccf.model_containers import module_dir, ParametersDict, SpectralModel
 
 
 def calculate_star_snr(wavelengths, star_effective_temperature, star_radius, star_distance, exposure_time,
@@ -234,7 +241,7 @@ def get_ccf_results(band, star_snr, settings, models, instrument_resolving_power
 
                 # Observed spectrum
                 observed_spectrum, full_lsf_ed, wlen_out, full_model_rebinned, snr_obs = \
-                    generate_mock_observation(
+                    simple_mock_observation(
                         wavelengths=models['all'].wavelengths * 1e-4,
                         flux=flux['all'],
                         snr_per_res_element=snr_per_res_element,

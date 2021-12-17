@@ -1107,7 +1107,6 @@ class Radtrans(_read_opacities.ReadOpacities):
                                                       contribution)
 
             else:
-
                 self.flux, self.contr_em = fs.flux_ck(self.freq,
                                                       self.total_tau, self.temp,
                                                       self.mu, self.w_gauss_mu,
@@ -1253,7 +1252,7 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         if self.mu_star <= 0.:
             self.mu_star = 1e-8
-
+        # TODO add option to input any stellar spectrum
         self.get_star_spectrum(Tstar, semimajoraxis, Rstar)
         self.interpolate_species_opa(temp)
         self.mix_opa_tot(abunds, mmw, gravity, sigma_lnorm, fsed, Kzz, radius,
@@ -1275,7 +1274,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     self.kappa_rosseland.reshape(1, 1, 1, len(self.press))
                 ).reshape(len(self.press))
 
-    def get_star_spectrum(self, Tstar, distance, Rstar):
+    def get_star_spectrum(self, Tstar, distance, Rstar=None):
         """Method to get the PHOENIX spectrum of the star and rebin it
         to the wavelength points. If Tstar is not explicitly written, the
         spectrum will be 0. If the distance is not explicitly written,
@@ -1293,8 +1292,8 @@ class Radtrans(_read_opacities.ReadOpacities):
         """
 
         if Tstar is not None:
-
             spec, rad = phoenix.get_PHOENIX_spec_rad(Tstar)
+
             if Rstar is not None:
                 print('Using Rstar value input by user.')
                 rad = Rstar
@@ -1322,7 +1321,6 @@ class Radtrans(_read_opacities.ReadOpacities):
                           'of the stellar spectrum by removing Tstar. ********************************'
                 raise Exception(message) from e
         else:
-
             self.stellar_intensity = np.zeros_like(self.freq)
 
     def calc_transm(self, temp, abunds, gravity, mmw, P0_bar, R_pl,
