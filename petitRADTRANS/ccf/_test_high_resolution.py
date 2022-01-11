@@ -418,7 +418,7 @@ def simple_log_l(wavelength_data, spectral_data_earth_corrected, wavelength_mode
                  star_spectral_radiosity, parameters,
                  lsf_fwhm, pixels_per_resolution_element, instrument_resolving_power, radial_velocity, kp, error,
                  extra_factor=0.25):
-    n_detectors, n_integrations, n_spectral_pixels = np.shape(spectral_data_earth_corrected)
+    n_detectors, n_integrations, n_spectral_pixels = spectral_data_earth_corrected.shape
 
     radial_velocity_lag = get_radial_velocity_lag(
         radial_velocity, kp, lsf_fwhm, pixels_per_resolution_element, extra_factor
@@ -463,7 +463,9 @@ def simple_log_l(wavelength_data, spectral_data_earth_corrected, wavelength_mode
         for k in range(np.size(radial_velocity_lag)):
             eclipse_depth_shift[i, :, k, :] = 1 + (eclipse_depth_shift[i, :, k, :] * parameters['R_pl'].value ** 2) \
                                               / (star_radiosity * parameters['Rstar'].value ** 2)
-            eclipse_depth_shift[i, :, k, :] = remove_throughput(eclipse_depth_shift[i, :, k, :])
+
+    for k in range(np.size(radial_velocity_lag)):
+        eclipse_depth_shift[:, :, k, :] = remove_throughput(eclipse_depth_shift[:, :, k, :])
 
     eclipse_depth_shift = np.transpose(
         np.transpose(eclipse_depth_shift) / np.transpose(np.mean(eclipse_depth_shift, axis=3))

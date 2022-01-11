@@ -115,8 +115,6 @@ def remove_throughput(spectral_data,
     spectral_data_corrected = np.zeros(spectral_data.shape)
 
     for i, data in enumerate(spectral_data):
-        print(i)
-
         if isinstance(spectral_data, np.ndarray):
             spectral_data_corrected[i, :, :] = \
                 __remove_throughput(
@@ -146,7 +144,6 @@ def remove_telluric_lines(spectral_data, airmass=None, remove_standard_deviation
         Spectral data corrected from the telluric transmittance
     """
     for j, data in enumerate(spectral_data):
-        print(j)
         # Remove the mean of the telluric lines
         if airmass is not None:
             exp_airmass = np.exp(-airmass[j])
