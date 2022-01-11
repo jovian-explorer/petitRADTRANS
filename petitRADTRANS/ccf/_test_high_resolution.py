@@ -16,7 +16,6 @@ from petitRADTRANS.radtrans import Radtrans
 from petitRADTRANS.retrieval import RetrievalConfig
 from petitRADTRANS.retrieval.util import calc_MMW, uniform_prior
 
-
 module_dir = os.path.abspath(os.path.dirname(__file__))
 
 
@@ -188,23 +187,16 @@ def simple_ccf(wavelength_data, spectral_data_earth_corrected, wavelength_model,
     )
 
     ccf = np.zeros((n_detectors, n_integrations, np.size(radial_velocity_lag)))
-    log_l_brogi = np.zeros((n_detectors, n_integrations, np.size(radial_velocity_lag)))
-    log_l = np.zeros((n_detectors, n_integrations, np.size(radial_velocity_lag)))
 
     # Shift the wavelengths by
     wavelength_shift = np.zeros((np.size(radial_velocity_lag), np.size(wavelength_model)))
     eclipse_depth_shift = np.zeros((n_detectors, np.size(radial_velocity_lag), n_spectral_pixels))
-    eclipse_depth_no_shift = np.zeros((n_detectors, n_spectral_pixels))
 
     for j in range(np.size(radial_velocity_lag)):
         wavelength_shift[j, :] = wavelength_model \
-            * np.sqrt((1 + radial_velocity_lag[j] / nc.c) / (1 - radial_velocity_lag[j] / nc.c))
+                                 * np.sqrt((1 + radial_velocity_lag[j] / nc.c) / (1 - radial_velocity_lag[j] / nc.c))
 
     for i in range(n_detectors):
-        eclipse_depth_no_shift[i, :] = fr.rebin_spectrum(
-            wavelength_model, spectral_radiosity, wavelength_data[i, :]
-        )
-
         for k in range(np.size(radial_velocity_lag)):
             eclipse_depth_shift[i, k, :] = \
                 fr.rebin_spectrum(wavelength_shift[k, :], spectral_radiosity, wavelength_data[i, :])
@@ -223,27 +215,11 @@ def simple_ccf(wavelength_data, spectral_data_earth_corrected, wavelength_model,
 
         return r / np.sqrt(sf2 * sg2), np.sqrt(sf2), np.sqrt(sg2)  # Data-model cross-correlation
 
-    def get_log_l(model, data, uncertainties, alpha=1.0, beta=1.0):
-        model -= np.mean(model)
-
-        return - np.size(data) * np.log(beta) \
-               - 0.5 * np.ma.sum(((data - alpha * model) / (beta * uncertainties)) ** 2)
-
     for i in range(n_detectors):
         for k in range(len(radial_velocity_lag)):
             for j in range(n_integrations):
                 ccf[i, j, k], sf, sg = xcorr(
                     spectral_data_earth_corrected[i, j, :], eclipse_depth_shift[i, k, :], n_spectral_pixels
-                )
-                log_l_brogi[i, j, k] = - 0.5 * n_spectral_pixels \
-                    * (
-                        np.log(sf[i, j, k] * sg[i, j, k])
-                        + np.log(sf[i, j, k] / sg[i, j, k] + sg[i, j, k] / sf[i, j, k] - 2 * ccf[i, j, k])
-                    )
-                log_l[i, j, k] = get_log_l(
-                    eclipse_depth_shift[i, k, :],
-                    spectral_data_earth_corrected[i, j, :],
-                    error
                 )
 
     return ccf
@@ -332,7 +308,72 @@ def retrieval_model_eclipse_grey_cloud(prt_object, parameters, pt_plot_mode=None
     return wlen_model, spectrum_model
 
 
-def simple_co_added_ccf(ccf, orbital_phases, radial_velocity, kp, lsf_fwhm, pixels_per_resolution_element):
+def get_radial_velocity_lag(radial_velocity, kp, lsf_fwhm, pixels_per_resolution_element, extra_factor=0.25):
+    # Calculate radial velocity lag interval, add extra coefficient just to be sure
+    # Effectively, we are moving along the spectral pixels
+    radial_velocity_lag_min = (np.min(radial_velocity) - kp)
+    radial_velocity_lag_max = (np.max(radial_velocity) + kp)
+    radial_velocity_interval = radial_velocity_lag_max - radial_velocity_lag_min
+
+    # Add a bit more to the interval, just to be sure
+    radial_velocity_lag_min -= extra_factor * radial_velocity_interval
+    radial_velocity_lag_max += extra_factor * radial_velocity_interval
+
+    # Ensure that a lag of 0 km.s-1 is within the lag array, in order to avoid inaccuracies
+    # Set interval bounds as multiple of lag step
+    lag_step = lsf_fwhm / pixels_per_resolution_element
+
+    radial_velocity_lag_min = np.floor(radial_velocity_lag_min / lag_step) * lag_step
+    radial_velocity_lag_max = np.ceil(radial_velocity_lag_max / lag_step) * lag_step
+
+    radial_velocity_lag = np.arange(
+        radial_velocity_lag_min,
+        radial_velocity_lag_max + lag_step,  # include radial_velocity_lag_max in array
+        lag_step
+    )
+
+    return radial_velocity_lag
+
+
+def simple_co_added_ccf(
+        ccf, orbital_phases, radial_velocity, kp, planet_orbital_inclination, lsf_fwhm, pixels_per_resolution_element,
+        extra_factor=0.25
+):
+    radial_velocity_lag = get_radial_velocity_lag(
+        radial_velocity, kp, lsf_fwhm, pixels_per_resolution_element, extra_factor
+    )
+
+    radial_velocity_interval = np.min((np.abs(radial_velocity_lag[0]), np.abs(radial_velocity_lag[-1]))) * 0.5
+
+    v_rest = np.arange(
+        0.0, radial_velocity_interval, lsf_fwhm / pixels_per_resolution_element
+    )
+    v_rest = np.concatenate((-v_rest[:0:-1], v_rest))
+
+    ccf_size = np.size(v_rest)
+
+    kps = np.linspace(
+        kp * (1 - 0.3), kp * (1 + 0.3), ccf_size
+    )
+
+    # Defining matrix containing the co-added CCFs
+    ccf_tot = np.zeros((ccf_size, ccf_size))
+
+    for ikp in range(ccf_size):
+        rv_pl = radial_velocity + Planet.calculate_planet_radial_velocity(
+            kps[ikp], planet_orbital_inclination, orbital_phases
+        )
+
+        for j in range(np.size(radial_velocity)):
+            out_rv = v_rest + rv_pl[j]
+            ccf_tot[ikp, :] += fr.rebin_spectrum(radial_velocity_lag, ccf[j, :], out_rv)
+
+    return ccf_tot, v_rest, kps
+
+
+def simple_co_added_ccf_old(
+        ccf, orbital_phases, radial_velocity, kp, planet_orbital_inclination, lsf_fwhm, pixels_per_resolution_element
+):
     # Calculate star_radial_velocity interval, add extra coefficient just to be sure
     # Effectively, we are moving along the spectral pixels
     radial_velocity_lag_min = (np.min(radial_velocity) - kp)
@@ -348,8 +389,9 @@ def simple_co_added_ccf(ccf, orbital_phases, radial_velocity, kp, lsf_fwhm, pixe
     radial_velocity_interval = np.min((np.abs(radial_velocity_lag_min * 0.5), np.abs(radial_velocity_lag_max * 0.5)))
 
     v_rest = np.arange(
-        -radial_velocity_interval, radial_velocity_interval, lsf_fwhm / pixels_per_resolution_element
+        0.0, radial_velocity_interval, lsf_fwhm / pixels_per_resolution_element
     )
+    v_rest = np.concatenate((-v_rest[:0:-1], v_rest))
 
     ccf_size = np.size(v_rest)
 
@@ -361,31 +403,25 @@ def simple_co_added_ccf(ccf, orbital_phases, radial_velocity, kp, lsf_fwhm, pixe
     ccf_tot = np.zeros((ccf_size, ccf_size))
 
     for ikp in range(ccf_size):
-        rv_pl = radial_velocity + kps[ikp] * np.sin(2.0 * np.pi * orbital_phases)
+        rv_pl = radial_velocity + Planet.calculate_planet_radial_velocity(
+            kps[ikp], planet_orbital_inclination, orbital_phases
+        )
 
         for j in range(np.size(radial_velocity)):
             out_rv = v_rest + rv_pl[j]
-            fit = interp1d(radial_velocity_lag, ccf[j, :])
-            ccf_tot[ikp, :] += fit(out_rv)
+            ccf_tot[ikp, :] += fr.rebin_spectrum(radial_velocity_lag, ccf[j, :], out_rv)
 
     return ccf_tot, v_rest, kps
 
 
 def simple_log_l(wavelength_data, spectral_data_earth_corrected, wavelength_model, spectral_radiosity,
                  star_spectral_radiosity, parameters,
-                 lsf_fwhm, pixels_per_resolution_element, instrument_resolving_power, radial_velocity, kp, error):
+                 lsf_fwhm, pixels_per_resolution_element, instrument_resolving_power, radial_velocity, kp, error,
+                 extra_factor=0.25):
     n_detectors, n_integrations, n_spectral_pixels = np.shape(spectral_data_earth_corrected)
 
-    # Calculate star_radial_velocity interval, add extra coefficient just to be sure
-    # Effectively, we are moving along the spectral pixels
-    radial_velocity_lag_min = (np.min(radial_velocity) - kp)
-    radial_velocity_lag_max = (np.max(radial_velocity) + kp)
-    radial_velocity_interval = radial_velocity_lag_max - radial_velocity_lag_min
-    radial_velocity_lag_min -= 0.25 * radial_velocity_interval
-    radial_velocity_lag_max += 0.25 * radial_velocity_interval
-
-    radial_velocity_lag = np.arange(
-        radial_velocity_lag_min, radial_velocity_lag_max, lsf_fwhm / pixels_per_resolution_element
+    radial_velocity_lag = get_radial_velocity_lag(
+        radial_velocity, kp, lsf_fwhm, pixels_per_resolution_element, extra_factor
     )
 
     ccf_ = np.zeros((n_detectors, n_integrations, np.size(radial_velocity_lag)))
@@ -403,7 +439,7 @@ def simple_log_l(wavelength_data, spectral_data_earth_corrected, wavelength_mode
 
     for j in range(np.size(radial_velocity_lag)):
         wavelength_shift[j, :] = wavelength_model \
-            * np.sqrt((1 + radial_velocity_lag[j] / nc.c) / (1 - radial_velocity_lag[j] / nc.c))
+                                 * np.sqrt((1 + radial_velocity_lag[j] / nc.c) / (1 - radial_velocity_lag[j] / nc.c))
 
     for i in range(n_detectors):
         star_radiosity[i, :, :] = convolve_shift_rebin(
@@ -415,19 +451,19 @@ def simple_log_l(wavelength_data, spectral_data_earth_corrected, wavelength_mode
         )
 
     for i in range(n_detectors):
-        for k in range(np.size(radial_velocity_lag)):
-            eclipse_depth_shift[i, :, k, :] = convolve_shift_rebin(
-                wavelength_model,
-                spectral_radiosity,
-                instrument_resolving_power,
-                wavelength_data[i, :],
-                radial_velocity  # only system velocity
-            )
+        eclipse_depth_shift[i, :, :, :] = convolve_shift_rebin(
+            wavelength_model,
+            spectral_radiosity,
+            instrument_resolving_power,
+            wavelength_data[i, :],
+            radial_velocity_lag
+        )
 
-    for k in range(np.size(radial_velocity_lag)):
-        eclipse_depth_shift[:, :, k, :] = 1 + (eclipse_depth_shift[:, :, k, :] * parameters['R_pl'].value ** 2) \
-                     / (star_radiosity * parameters['Rstar'].value ** 2)
-        eclipse_depth_shift[:, :, k, :] = remove_throughput(eclipse_depth_shift[:, :, k, :])
+    for i in range(n_detectors):
+        for k in range(np.size(radial_velocity_lag)):
+            eclipse_depth_shift[i, :, k, :] = 1 + (eclipse_depth_shift[i, :, k, :] * parameters['R_pl'].value ** 2) \
+                                              / (star_radiosity * parameters['Rstar'].value ** 2)
+            eclipse_depth_shift[i, :, k, :] = remove_throughput(eclipse_depth_shift[i, :, k, :])
 
     eclipse_depth_shift = np.transpose(
         np.transpose(eclipse_depth_shift) / np.transpose(np.mean(eclipse_depth_shift, axis=3))
@@ -435,11 +471,28 @@ def simple_log_l(wavelength_data, spectral_data_earth_corrected, wavelength_mode
 
     # this is faster than correlate, because we are looking only at the velocity interval we are interested into
     def log_l_(model, data, uncertainties, alpha=1.0, beta=1.0):
-        model -= np.mean(model)
-        return - np.size(data) * np.log(beta) \
-               - 0.5 * np.ma.sum(((data - alpha * model) / (beta * uncertainties)) ** 2)
+        model -= model.mean()
+        model = alpha * model
+        uncertainties = beta * uncertainties
+        chi2 = data - model
+        chi2 /= uncertainties
+        chi2 *= chi2
+        chi2 = chi2.sum()
+
+        return - data.size * np.log(beta) - 0.5 * chi2
 
     def xcorr2(data, model):
+        # The data (data) is already mean-subtracted but the model (model) is not
+        model -= np.mean(model)  # np.mean is faster for very large arrays
+        # Compute variances of model and data (will skip dividing by N because it
+        # will cancels out when computing the cross-covariance)
+        sf2 = np.sum(data ** 2)  # np.sum(fvec ** 2) is faster
+        sg2 = np.sum(model ** 2)  # np.sum(gvec ** 2) is faster
+        r = np.sum(data * model)  # Data-model cross-covariance, np.sum(fvec * gvec) is faster
+
+        return r / np.sqrt(sf2 * sg2), np.sqrt(sf2), np.sqrt(sg2)  # Data-model cross-correlation
+
+    def xcorr2_ma(data, model):
         # The data (data) is already mean-subtracted but the model (model) is not
         model -= np.ma.mean(model)  # np.mean is faster for very large arrays
         # Compute variances of model and data (will skip dividing by N because it
@@ -450,19 +503,81 @@ def simple_log_l(wavelength_data, spectral_data_earth_corrected, wavelength_mode
 
         return r / np.ma.sqrt(sf2 * sg2), np.sqrt(sf2), np.sqrt(sg2)  # Data-model cross-correlation
 
-    for i in range(n_detectors):
-        for k in range(len(radial_velocity_lag)):
-            for j in range(n_integrations):
-                ccf_[i, j, k], sf[i, j, k], sg[i, j, k] = xcorr2(
-                    spectral_data_earth_corrected[i, j, :], eclipse_depth_shift[i, k, :]
-                )
-                log_l__[i, j, k] = - 0.5 * n_spectral_pixels \
+    def xcorr(data, model, length):
+        # Initialise identity matrix for fast computation
+        identity = np.ones(length)
+        # The data (data) is already mean-subtracted but the model (model) is not
+        model -= (model @ identity) / length  # np.mean is faster for very large arrays
+        # Compute variances of model and data (will skip dividing by length because it
+        # will cancels out when computing the cross-covariance)
+        sf2 = (data @ data)  # np.sum(fvec ** 2) is faster
+        sg2 = (model @ model)  # np.sum(gvec ** 2) is faster
+        r = (data @ model)  # Data-model cross-covariance, np.sum(fvec * gvec) is faster
+
+        return r / np.sqrt(sf2 * sg2), np.sqrt(sf2), np.sqrt(sg2)  # Data-model cross-correlation
+
+    def xcorr_(data, model):
+        # Initialise identity matrix for fast computation
+        identity = np.ones(model.size)
+        # The data (data) is already mean-subtracted but the model (model) is not
+        model -= (model @ identity) / model.size  # np.mean is faster for very large arrays
+        # Compute variances of model and data (will skip dividing by length because it
+        # will cancels out when computing the cross-covariance)
+        sf2 = (data @ data)  # np.sum(fvec ** 2) is faster
+        sg2 = (model @ model)  # np.sum(gvec ** 2) is faster
+        r = (data @ model)  # Data-model cross-covariance, np.sum(fvec * gvec) is faster
+
+        return r / np.sqrt(sf2 * sg2), np.sqrt(sf2), np.sqrt(sg2)  # Data-model cross-correlation
+
+    def xcorrma(data, model, length):
+        # Initialise identity matrix for fast computation
+        identity = np.ones(length)
+        # The data (data) is already mean-subtracted but the model (model) is not
+        model -= (model @ identity) / length  # np.mean is faster for very large arrays
+        # Compute variances of model and data (will skip dividing by length because it
+        # will cancels out when computing the cross-covariance)
+        sf2 = np.ma.sum(data ** 2)  # np.sum(fvec ** 2) is faster
+        sg2 = (model @ model)  # np.sum(gvec ** 2) is faster
+        r = np.ma.sum(data * model)  # Data-model cross-covariance, np.sum(fvec * gvec) is faster
+
+        return r / np.sqrt(sf2 * sg2), np.sqrt(sf2), np.sqrt(sg2)  # Data-model cross-correlation
+
+    def log_l_b():
+        return - 0.5 * n_spectral_pixels \
                     * (
                         np.log(sf[i, j, k] * sg[i, j, k])
                         + np.log(sf[i, j, k] / sg[i, j, k] + sg[i, j, k] / sf[i, j, k] - 2 * ccf_[i, j, k])
+                    )
+
+    # Keep only the non-masked values in order to gain time
+    # Using lists instead of arrays because spectra won't necessarily be of the same size
+    data_ = []
+    error_ = []
+
+    for i in range(n_detectors):
+        data_.append([])
+        error_.append([])
+
+        for j in range(n_integrations):
+            data_[i].append(np.array(
+                    spectral_data_earth_corrected[i, j, ~spectral_data_earth_corrected.mask[i, j, :]]
+            ))
+            error_[i].append(np.array(error[~spectral_data_earth_corrected.mask[i, j, :]]))
+
+    for i in range(n_detectors):
+        for j in range(n_integrations):
+            for k in range(len(radial_velocity_lag)):
+                # Convert masked array into array to gain time
+                model_ = eclipse_depth_shift[i, j, k, ~spectral_data_earth_corrected.mask[i, j, :]]
+
+                log_l__2[i, j, k] = log_l_(
+                    model_, data_[i][j], error_[i][j]
                 )
-                log_l__2[i, j, k] = log_l_(eclipse_depth_shift[i, k, :], spectral_data_earth_corrected[i, j, :],
-                                           error)
+                ccf_[i, j, k], sf[i, j, k], sg[i, j, k] = xcorr_(
+                    data_[i][j], model_
+                )
+                log_l__[i, j, k] = log_l_b()
+
     return ccf_, log_l__, sf, sg, log_l__2
 
 
@@ -620,7 +735,8 @@ def main(apply_noise=True):
             star_radius=true_parameters['Rstar'].value,
             star_spectral_radiosity=star_radiosity,
             orbital_phases=orbital_phases,
-            system_observer_radial_velocities=np.zeros(ndit_half),  # TODO set to 0 for now since SNR data from Roy is at 0, but find RV source eventually
+            system_observer_radial_velocities=np.zeros(ndit_half),
+            # TODO set to 0 for now since SNR data from Roy is at 0, but find RV source eventually
             planet_max_radial_orbital_velocity=true_parameters['planet_max_radial_orbital_velocity'].value,
             planet_orbital_inclination=planet.orbital_inclination,
             mode='eclipse',
@@ -628,7 +744,7 @@ def main(apply_noise=True):
             number=1
         )
 
-        reduced_mock_observations = simple_pipeline(mock_observations[0], airmass, remove_standard_deviation=True)
+        reduced_mock_observations = simple_pipeline(mock_observations[0], airmass, remove_standard_deviation=False)
 
         ccf = simple_ccf(
             np.asarray([wavelength_instrument]),
@@ -642,7 +758,9 @@ def main(apply_noise=True):
             error=1 / instrument_snr
         )
 
-        ccf_tot = simple_co_added_ccf(ccf[0], orbital_phases, np.zeros(ndit_half), kp, 3e5, 2)
+        ccf_tot = simple_co_added_ccf(
+            ccf[0], orbital_phases, np.zeros(ndit_half), kp, true_parameters['planet_orbital_inclination'].value, 3e5, 2
+        )
 
         i_peak = np.where(ccf_tot == np.max(ccf_tot))
         i_peak_s = (np.linspace(i_peak[0][0] - 3, i_peak[0][0] + 3, 7, dtype=int),

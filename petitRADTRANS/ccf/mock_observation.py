@@ -339,11 +339,11 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
 
         # Mask invalid columns
         mock_observation = np.ma.masked_where(
-            np.asarray([noise_per_pixel.mask * np.ones(np.shape(mock_observation[0, :, :]))]),
+            np.asarray(noise_per_pixel.mask * np.ones(mock_observation.shape)),
             mock_observation
         )
     else:
-        mock_observation = np.asarray([mock_observation])  # add a third dimension for output consistency
+        mock_observation = np.ma.asarray([mock_observation])  # add a third dimension for output consistency
         noise_per_pixel = np.zeros_like(mock_observation)
 
     return mock_observation, noise_per_pixel
