@@ -431,15 +431,27 @@ class Data:
             logL : float
                 The log likelihood of the model given the data.
         """
-        length = np.size(data)
-
         if beta is None:
-            # Automatically optimise for beta
-            return - 0.5 * length * np.log(np.sum(((data - alpha * model) / uncertainties) ** 2) / length)
+            # "Automatically optimise" for beta
+            model -= model.mean()
+            model = alpha * model
+            chi2 = data - model
+            chi2 /= uncertainties
+            chi2 *= chi2
+            chi2 = chi2.sum()
+
+            return - 0.5 * data.size * np.log(chi2 / data.size)
         else:
             # Classical log-likelihood
-            return - length * np.log(beta) \
-                   - 0.5 * np.sum(((data - alpha * model) / (beta * uncertainties)) ** 2)
+            model -= model.mean()
+            model = alpha * model
+            uncertainties = beta * uncertainties
+            chi2 = data - model
+            chi2 /= uncertainties
+            chi2 *= chi2
+            chi2 = chi2.sum()
+
+            return - data.size * np.log(beta) - 0.5 * chi2
 
     @staticmethod
     def convolve(input_wavelength,

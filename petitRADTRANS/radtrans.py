@@ -1148,7 +1148,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                   Tstar=None, Rstar=None, semimajoraxis=None,
                   geometry='dayside_ave', theta_star=0,
                   hack_cloud_photospheric_tau=None,
-                  dist="lognormal", a_hans=None, b_hans=None):
+                  dist="lognormal", a_hans=None, b_hans=None,
+                  stellar_intensity=None):
         """ Method to calculate the atmosphere's emitted flux
         (emission spectrum).
 
@@ -1239,6 +1240,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                     included cloud species and for each atmospheric layer,
                     formatted as the kzz argument. This is the width of the hansen
                     distribution normalized by the particle area (1/a_hans^2)
+                stellar_intensity (Optional[array]):
+                    The stellar intensity to use. If None, it will be calculated using a PHOENIX model.
         """
 
         self.__hack_cloud_photospheric_tau = hack_cloud_photospheric_tau
@@ -1252,8 +1255,8 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         if self.mu_star <= 0.:
             self.mu_star = 1e-8
-        # TODO add option to input any stellar spectrum
-        self.get_star_spectrum(Tstar, semimajoraxis, Rstar)
+
+        self.get_star_spectrum(Tstar, semimajoraxis, Rstar, stellar_intensity)
         self.interpolate_species_opa(temp)
         self.mix_opa_tot(abunds, mmw, gravity, sigma_lnorm, fsed, Kzz, radius,
                          add_cloud_scat_as_abs=add_cloud_scat_as_abs,
@@ -1274,7 +1277,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     self.kappa_rosseland.reshape(1, 1, 1, len(self.press))
                 ).reshape(len(self.press))
 
-    def get_star_spectrum(self, Tstar, distance, Rstar=None):
+    def get_star_spectrum(self, Tstar, distance, Rstar=None, stellar_intensity=None):
         """Method to get the PHOENIX spectrum of the star and rebin it
         to the wavelength points. If Tstar is not explicitly written, the
         spectrum will be 0. If the distance is not explicitly written,
@@ -1289,39 +1292,43 @@ class Radtrans(_read_opacities.ReadOpacities):
                 Rstar (float):
                     if specified, uses this radius in Solar radii
                     to scale the flux, otherwise it uses PHOENIX radius.
+                stellar_intensity (array):
+                    if specified, it will be used directly as the stellar intensity
         """
+        if stellar_intensity is None:
+            if Tstar is not None:
+                spec, rad = phoenix.get_PHOENIX_spec_rad(Tstar)
 
-        if Tstar is not None:
-            spec, rad = phoenix.get_PHOENIX_spec_rad(Tstar)
+                if Rstar is not None:
+                    print('Using Rstar value input by user.')
+                    rad = Rstar
 
-            if Rstar is not None:
-                print('Using Rstar value input by user.')
-                rad = Rstar
+                add_stellar_flux = np.zeros(100)
+                add_wavelengths = np.logspace(np.log10(1.0000002e-02), 2, 100)
 
-            add_stellar_flux = np.zeros(100)
-            add_wavelengths = np.logspace(np.log10(1.0000002e-02), 2, 100)
+                # import pdb
+                # pdb.set_trace()
 
-            # import pdb
-            # pdb.set_trace()
+                interpwavelengths = np.append(spec[:, 0], add_wavelengths)
+                interpfluxes = np.append(spec[:, 1], add_stellar_flux)
 
-            interpwavelengths = np.append(spec[:, 0], add_wavelengths)
-            interpfluxes = np.append(spec[:, 1], add_stellar_flux)
+                self.stellar_intensity = fr.rebin_spectrum(interpwavelengths,
+                                                           interpfluxes,
+                                                           nc.c / self.freq)
 
-            self.stellar_intensity = fr.rebin_spectrum(interpwavelengths,
-                                                       interpfluxes,
-                                                       nc.c / self.freq)
-
-            try:
-                # SCALED INTENSITY (Flux/pi)
-                self.stellar_intensity = self.stellar_intensity / np.pi * \
-                                         (rad / distance) ** 2
-            except TypeError as e:
-                message = '********************************' + \
-                          ' Error! Please set the semi-major axis or turn off the calculation ' + \
-                          'of the stellar spectrum by removing Tstar. ********************************'
-                raise Exception(message) from e
+                try:
+                    # SCALED INTENSITY (Flux/pi)
+                    self.stellar_intensity = self.stellar_intensity / np.pi * \
+                                             (rad / distance) ** 2
+                except TypeError as e:
+                    message = '********************************' + \
+                              ' Error! Please set the semi-major axis or turn off the calculation ' + \
+                              'of the stellar spectrum by removing Tstar. ********************************'
+                    raise Exception(message) from e
+            else:
+                self.stellar_intensity = np.zeros_like(self.freq)
         else:
-            self.stellar_intensity = np.zeros_like(self.freq)
+            self.stellar_intensity = stellar_intensity
 
     def calc_transm(self, temp, abunds, gravity, mmw, P0_bar, R_pl,
                     sigma_lnorm=None,

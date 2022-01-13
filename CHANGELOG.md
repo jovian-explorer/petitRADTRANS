@@ -4,11 +4,14 @@ All notable changes to the CCF module will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com)
 and this project adheres to [Semantic Versioning](http://semver.org).
 
-## [2.4.0-a10] - 2021-12-17
+## [2.4.0-a11] - 2021-01-13
 ### Added
 - [WIP] High-resolution retrieval.
 - Possibility to initialize a `retrieval.Data` class without needing a file.
-- Possibility to initialize a `retrieval.Data` class with a Radtrans object, without the need to re-create one.
+- Possibility to initialize a `retrieval.Data` class with a `Radtrans` object, without the need to re-create one.
+- Possibility to initialize a `retrieval.Retrieval` class with a stellar spectrum, without the need to recalculate it.
+- Support for 2D and 3D spectral array in retrievals.
+- Static function `retrieval.Retrieval._get_samples`, to get retrieval outputs without the need to initialize a `Retrieval`.
 - Gibson et al. 2021 log-likelihood calculation.
 - Better high-resolution mock observation function.
 - Module `phoenix` for PHOENIX stellar models.
@@ -47,6 +50,7 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 - Hansen cloud particle distribution returning NaN if `b_hansen` set too low.
 - Retrieval not converging when using correlated-k.
 - Function `contour_corner` not working when not giving optional arguments `parameter_ranges` and `parameter_plot_indices`.
+- True values not plotted in function `contour_corner`.
 
 ---
 No changelog before version 2.4.0.

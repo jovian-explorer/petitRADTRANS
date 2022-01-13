@@ -222,12 +222,15 @@ def contour_corner(sampledict,
             else:
                 range_take = (parameter_ranges[key][i][0], parameter_ranges[key][i][1])
                 range_list.append(range_take)
-        try:
+
+        if parameter_plot_indices is not None and true_values is not None:
             truths_list = []
+
             for i in parameter_plot_indices[key]:
                 truths_list.append(true_values[key][i])
-        except:
-            pass
+        else:
+            truths_list = None
+
         # fig = plt.figure(figsize = (60,60),dpi=80)
         label_kwargs = None
         title_kwargs = None
@@ -258,6 +261,8 @@ def contour_corner(sampledict,
                                 quantiles=[0.16, 0.5, 0.84],
                                 hist2d_kwargs=hist2d_kwargs,
                                 plot_contours=True,
+                                truths=truths_list,
+                                truth_color='r',
                                 contour_kwargs=contour_kwargs,
                                 hist_kwargs=hist_kwargs,
                                 levels=[1 - np.exp(-0.5), 1 - np.exp(-2), 1 - np.exp(-4.5)]
@@ -277,6 +282,8 @@ def contour_corner(sampledict,
                           hist2d_kwargs=hist2d_kwargs,
                           plot_contours=True,
                           contour_kwargs=contour_kwargs,
+                          truths=truths_list,
+                          truth_color='r',
                           hist_kwargs=hist_kwargs,
                           levels=[1 - np.exp(-0.5), 1 - np.exp(-2), 1 - np.exp(-4.5)]
                           )

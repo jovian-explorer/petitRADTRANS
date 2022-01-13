@@ -112,17 +112,20 @@ def remove_throughput(spectral_data,
     Returns:
         Spectral data corrected from throughput
     """
-    spectral_data_corrected = np.zeros(spectral_data.shape)
+    if isinstance(spectral_data, np.ma.core.MaskedArray):
+        spectral_data_corrected = np.ma.zeros(spectral_data.shape)
+    else:
+        spectral_data_corrected = np.zeros(spectral_data.shape)
 
     for i, data in enumerate(spectral_data):
-        if isinstance(spectral_data, np.ndarray):
-            spectral_data_corrected[i, :, :] = \
-                __remove_throughput(
-                    data, throughput_correction_lower_bound, throughput_correction_upper_bound
-                )
-        elif isinstance(spectral_data, np.ma.core.MaskedArray):
+        if isinstance(spectral_data, np.ma.core.MaskedArray):
             spectral_data_corrected[i, :, :] = \
                 __remove_throughput_masked(
+                    data, throughput_correction_lower_bound, throughput_correction_upper_bound
+                )
+        elif isinstance(spectral_data, np.ndarray):
+            spectral_data_corrected[i, :, :] = \
+                __remove_throughput(
                     data, throughput_correction_lower_bound, throughput_correction_upper_bound
                 )
         else:

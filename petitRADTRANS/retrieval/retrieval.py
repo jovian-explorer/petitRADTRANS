@@ -353,11 +353,13 @@ class Retrieval:
             summary.write("Fixed Parameters\n")
 
             for key, value in self.parameters.items():
-                print(key, value.value)
                 if key in ['pressure_simple', 'pressure_width', 'pressure_scaling']:
                     continue
                 if not value.is_free_parameter:
-                    summary.write("    " + key + " = " + str(round(value.value, 3)) + '\n')
+                    if np.size(value) > 1:
+                        summary.write("    " + key + " = " + str(value.value) + '\n')
+                    else:
+                        summary.write("    " + key + " = " + str(np.round(value.value, 3)) + '\n')
 
             summary.write('\n')
             summary.write("Free Parameters, Prior^-1(0), Prior^-1(1)\n")
@@ -378,15 +380,21 @@ class Retrieval:
 
             for name, dd in self.data.items():
                 summary.write(name + '\n')
-                summary.write("    " + dd.path_to_observations + '\n')
+                if dd.path_to_observations is not None:
+                    summary.write("    " + dd.path_to_observations + '\n')
+
                 if dd.model_generating_function is not None:
                     summary.write("    Model Function = " + dd.model_generating_function.__name__ + '\n')
+
                 if dd.scale:
                     summary.write("    scale factor = " + str(round(dd.scale_factor, 2)) + '\n')
+
                 if dd.data_resolution is not None:
                     summary.write("    data resolution = " + str(int(dd.data_resolution)) + '\n')
+
                 if dd.model_resolution is not None:
                     summary.write("    model resolution = " + str(int(dd.model_resolution)) + '\n')
+
                 if dd.photometry:
                     summary.write(
                         "    photometric width = " + str(round(dd.photometry_range[0], 4)) + "--"
@@ -445,8 +453,7 @@ class Retrieval:
                     if out is None:
                         continue
 
-                    fmt = '%.3f' % out
-                    summary.write("    " + key + " = " + fmt + '\n')
+                    summary.write("    " + key + f" = {out}" + '\n')
 
     def setup_data(self, scaling=10, width=3):
         """
@@ -613,15 +620,25 @@ class Retrieval:
                                                        self.plotting)
                     elif np.ndim(dd.flux) == 2:
                         # Convolution and rebin are *not* cared of in get_log_likelihood
-                        # Second dimension of data must be wavelength
+                        # Second dimension of data must be a function of wavelength
                         for i, data in enumerate(dd.flux):
                             log_likelihood += dd.log_likelihood_gibson(
                                 spectrum_model[i], data, dd.flux_error[i],
                                 alpha=1.0,
                                 beta=1.0
                             )
+                    elif np.ndim(dd.flux) == 3:
+                        # Convolution and rebin are *not* cared of in get_log_likelihood
+                        # Third dimension of data must be a function of wavelength
+                        for i, detector in enumerate(dd.flux):
+                            for j, data in enumerate(detector):
+                                log_likelihood += dd.log_likelihood_gibson(
+                                    spectrum_model[i, j, :], data, dd.flux_error[i, j, :],
+                                    alpha=1.0,
+                                    beta=1.0
+                                )
                     else:
-                        raise ValueError(f"observations have {np.ndim(dd.flux)} dimensions, but must have 1 or 2")
+                        raise ValueError(f"observations have {np.ndim(dd.flux)} dimensions, but must have 1 to 3")
                 else:
                     # Get the PT profile
                     if name == self.rd.plot_kwargs["take_PTs_from"]:
@@ -670,6 +687,50 @@ class Retrieval:
             return -1e99
 
         return log_likelihood + log_prior
+
+    @staticmethod
+    def _get_samples(ultranest, names, output_dir=None, ret_names=None):
+        if ret_names is None:
+            ret_names = []
+
+        param_dict = {}
+        samples = {}
+
+        if ultranest:
+            for name in names:
+                samples_ = np.genfromtxt(output_dir + 'out_' + name + '/chains/equal_weighted_post.txt')
+                parameters_read = open(output_dir + 'out_' + name + '/chains/weighted_post.paramnames')
+                samples[name] = samples_
+                param_dict[name] = parameters_read
+
+            for name in ret_names:
+                samples_ = np.genfromtxt(output_dir + 'out_' + name + '/chains/qual_weighted_post.txt')
+                parameters_read = open(output_dir + 'out_' + name + '/chains/weighted_post.paramnames')
+                samples[name] = samples_
+                param_dict[name] = parameters_read
+
+            return samples, param_dict
+
+        # pymultinest
+        for name in names:
+            samples_ = np.genfromtxt(output_dir + 'out_PMN/' + name + '_post_equal_weights.dat')
+
+            with open(output_dir + 'out_PMN/' + name + '_params.json', 'r') as f:
+                parameters_read = json.load(f)
+
+            samples[name] = samples_
+            param_dict[name] = parameters_read
+
+        for name in ret_names:
+            samples_ = np.genfromtxt(output_dir + 'out_PMN/' + name + '_post_equal_weights.dat')
+
+            with open(output_dir + 'out_PMN/' + name + '_params.json', 'r') as f:
+                parameters_read = json.load(f)
+
+            samples[name] = samples_
+            param_dict[name] = parameters_read
+
+        return samples, param_dict
 
     def get_samples(self, output_dir=None, ret_names=None):
         """
