@@ -10,12 +10,13 @@ from petitRADTRANS.ccf.ccf_utils import radiosity_erg_hz2radiosity_erg_cm
 from petitRADTRANS.ccf.mock_observation import convolve_shift_rebin, generate_mock_observations, get_orbital_phases
 from petitRADTRANS.ccf.model_containers import Planet
 from petitRADTRANS.ccf.model_containers import SpectralModel
-from petitRADTRANS.ccf.pipeline import remove_throughput, simple_pipeline
+from petitRADTRANS.ccf.pipeline import remove_throughput, remove_telluric_lines, simple_pipeline
 from petitRADTRANS.fort_rebin import fort_rebin as fr
 from petitRADTRANS.phoenix import get_PHOENIX_spec
 from petitRADTRANS.physics import guillot_global, doppler_shift
 from petitRADTRANS.radtrans import Radtrans
 from petitRADTRANS.retrieval import RetrievalConfig, Retrieval
+from petitRADTRANS.retrieval.data import Data
 from petitRADTRANS.retrieval.plotting import contour_corner
 from petitRADTRANS.retrieval.util import calc_MMW, uniform_prior
 
@@ -154,6 +155,30 @@ def init_run(retrieval_name, prt_object, pressures, parameters, line_species, ra
         )
     )
 
+    # Remove masked values if necessary
+    if hasattr(observed_spectra, 'mask'):
+        print('Taking care of mask...')
+        data_ = []
+        error_ = []
+        mask_ = copy.copy(observed_spectra.mask)
+
+        for i in range(observed_spectra.shape[0]):
+            data_.append([])
+            error_.append([])
+
+            for j in range(observed_spectra.shape[1]):
+                data_[i].append(np.array(
+                        observed_spectra[i, j, ~mask_[i, j, :]]
+                ))
+                error_[i].append(np.array(observations_uncertainties[i, j, ~mask_[i, j, :]]))
+
+        data_ = np.asarray(data_, dtype=object)
+        error_ = np.asarray(error_, dtype=object)
+    else:
+        data_ = observed_spectra
+        error_ = observations_uncertainties
+        mask_ = None
+
     # Load data
     run_definition_simple.add_data(
         name='test',
@@ -162,8 +187,9 @@ def init_run(retrieval_name, prt_object, pressures, parameters, line_species, ra
         opacity_mode='lbl',
         pRT_object=prt_object,
         wlen=wavelength_instrument,
-        flux=observed_spectra,
-        flux_error=observations_uncertainties
+        flux=data_,
+        flux_error=error_,
+        mask=mask_
     )
 
     return run_definition_simple
@@ -479,7 +505,7 @@ def simple_log_l(wavelength_data, spectral_data_earth_corrected, wavelength_mode
             eclipse_depth_shift[i, :, k, :] = 1 + (eclipse_depth_shift[i, :, k, :] * parameters['R_pl'].value ** 2) \
                                               / (star_radiosity * parameters['Rstar'].value ** 2)
 
-    # Remove the throughput
+    # Remove throughput
     for k in range(np.size(radial_velocity_lag)):
         eclipse_depth_shift[:, :, k, :] = remove_throughput(eclipse_depth_shift[:, :, k, :])
 
@@ -624,8 +650,6 @@ def retrieval_run(retrieval_name, n_live_points, model, pressures, true_paramete
                   retrieval_model,
                   wavelength_instrument, reduced_mock_observations, error, plot=False, output_dir=None):
     # Initialize run
-    # TODO fix kp offset
-
     run_definitions = init_run(
         retrieval_name,
         model, pressures, true_parameters, line_species, rayleigh_species, continuum_species,
@@ -674,33 +698,58 @@ def retrieval_run(retrieval_name, n_live_points, model, pressures, true_paramete
 
 def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, instrument_snr,
                      true_parameters=None, radial_velocity=None, plot=False, output_dir=None):
-    def log_l_(model_, data_, uncertainties, alpha=1.0, beta=1.0):
-        model_ -= model_.mean()
-        model_ = alpha * model_
-        uncertainties = beta * uncertainties
-        chi2 = data_ - model_
-        chi2 /= uncertainties
-        chi2 *= chi2
-        chi2 = chi2.sum()
-
-        return - data_.size * np.log(beta) - 0.5 * chi2
-
     ppp = copy.deepcopy(parameters)
     logls = []
+    wavelengths = []
+    retrieval_models = []
+    error = 1 / instrument_snr
+
+    if hasattr(reduced_mock_observations, 'mask'):
+        print('Taking care of mask...')
+        data_ = []
+        error_ = []
+        mask_ = copy.copy(reduced_mock_observations.mask)
+
+        for i in range(reduced_mock_observations.shape[0]):
+            data_.append([])
+            error_.append([])
+
+            for j in range(reduced_mock_observations.shape[1]):
+                data_[i].append(np.array(
+                        reduced_mock_observations[i, j, ~mask_[i, j, :]]
+                ))
+                error_[i].append(np.array(error[~mask_[i, j, :]]))
+
+        data_ = np.asarray(data_, dtype=object)
+        error_ = np.asarray(error_, dtype=object)
+    else:
+        data_ = reduced_mock_observations
+        error_ = error
+        mask_ = np.zeros(reduced_mock_observations.shape, dtype=bool)
 
     for lag in v_rest:
         ppp['planet_rest_frame_shift'].value = lag
         logls.append([])
+        wavelengths.append([])
+        retrieval_models.append([])
 
         for kp_ in kps:
             ppp['planet_max_radial_orbital_velocity'].value = kp_
 
             w, s = get_retrieval_model(model, ppp)
+            wavelengths[-1].append(w)
+            retrieval_models[-1].append(s)
+
             logl = 0
 
-            for i, det in enumerate(reduced_mock_observations):
+            for i, det in enumerate(data_):
                 for j, data in enumerate(det):
-                    logl += log_l_(s[i, j, :], data, 1 / instrument_snr)
+                    logl += Data.log_likelihood_gibson(
+                        s[i, j, ~mask_[i, j, :]],
+                        data,
+                        error_[i, j],
+                        1.0, 1.0
+                    )
 
             logls[-1].append(logl)
 
@@ -721,7 +770,7 @@ def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, 
         plt.ylabel('K_p (cm.s-1)')
         plt.savefig(os.path.join(output_dir, 'pseudo_retrieval.png'))
 
-    return logls
+    return logls, wavelengths, retrieval_models
 
 
 def co_added_retrieval(wavelength_instrument, reduced_mock_observations, true_wavelength, true_spectrum, star_radiosity,
@@ -884,7 +933,7 @@ def main():
     )
 
     true_parameters['star_spectral_radiosity'] = Param(star_radiosity)
-
+    print('Mock obs...')
     mock_observations, noise = generate_mock_observations(
         true_wavelength, true_spectrum,
         telluric_transmittance=telluric_transmittance,
@@ -907,25 +956,28 @@ def main():
         number=1
     )
 
+    print('Red...')
     reduced_mock_observations = simple_pipeline(mock_observations, airmass, remove_standard_deviation=False)
     error = np.ones(reduced_mock_observations.shape) / instrument_snr
 
+    print('Coadd...')
     log_l_tot, v_rest, kps, i_peak = co_added_retrieval(
         wavelength_instrument, reduced_mock_observations, true_wavelength,
         true_spectrum, star_radiosity, true_parameters, np.zeros(ndit_half), error, orbital_phases,
         plot=True, output_dir=retrieval_directory
     )
 
-    kps_pseudo_retrieval = np.linspace(kps[i_peak[0][0] - 10], kps[i_peak[0][0] + 10], 7)
-    v_rest_pseudo_retrieval = np.linspace(v_rest[i_peak[1][0] - 10], v_rest[i_peak[1][0] + 10], 7)
+    kps_pseudo_retrieval = np.linspace(kps[i_peak[0][0] - 5], kps[i_peak[0][0] + 5], 7)
+    v_rest_pseudo_retrieval = np.linspace(v_rest[i_peak[1][0] - 5], v_rest[i_peak[1][0] + 5], 7)
 
-    log_l_pseudo_retrieval = pseudo_retrieval(
+    log_l_pseudo_retrieval, wvl_pseudo_retrieval, models_pseudo_retrieval = pseudo_retrieval(
         true_parameters, kps_pseudo_retrieval, v_rest_pseudo_retrieval,
         model, reduced_mock_observations, instrument_snr,
         true_parameters, np.zeros(ndit_half),
         plot=True, output_dir=retrieval_directory
     )
 
+    print('Starting retrieval...')
     retrieval_run(
         retrieval_name, n_live_points, model, pressures, true_parameters,
         line_species, rayleigh_species, continuum_species,

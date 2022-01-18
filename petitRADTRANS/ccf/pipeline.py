@@ -135,12 +135,14 @@ def remove_throughput(spectral_data,
     return spectral_data_corrected
 
 
-def remove_telluric_lines(spectral_data, airmass=None, remove_standard_deviation=False):
+def remove_telluric_lines(spectral_data, airmass=None, remove_outliers=True, remove_standard_deviation=False):
     """Correct for Earth's atmospheric absorptions.
 
     Args:
         spectral_data: spectral data to correct
         airmass: airmass of the data
+        remove_outliers: if True, remove the pixels that are 3 times away from the median of the standard deviation of
+            the data over time.
         remove_standard_deviation: if True, remove the standard deviation on time of the data (not recommended)
 
     Returns:
@@ -164,18 +166,21 @@ def remove_telluric_lines(spectral_data, airmass=None, remove_standard_deviation
         data -= 1
         #spectral_data = np.transpose(np.transpose(spectral_data) - np.ma.mean(spectral_data, axis=1))
 
+        # Get standard deviation over time for each wavelength
         standard_deviation_integration = np.asarray([np.std(data, axis=0)] * np.size(data, axis=0))
 
         # Remove telluric lines standard deviation
         if remove_standard_deviation:
             # Not recommended
             data /= standard_deviation_integration
-        else:
+
+        if remove_outliers:
             # TODO this might work when adding telluric transmittance
             #spectral_data = np.ma.masked_where(np.abs(spectral_data) > 3 * np.ma.std(spectral_data), spectral_data)
             # TODO this gives results, but is probably too restrictive, this is a very important step for log_l calc!
             data = np.ma.masked_where(
-                np.abs(data) > 3 * np.ma.median(standard_deviation_integration), data)
+                np.abs(data) > 3 * np.ma.median(standard_deviation_integration), data
+            )
 
         spectral_data[j, :, :] = data
 

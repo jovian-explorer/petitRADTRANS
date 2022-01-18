@@ -609,31 +609,34 @@ class Retrieval:
                     # print(spectrum_model)
                     if spectrum_model is None:
                         return -1e99
+
                     if np.isnan(spectrum_model).any():
                         return -1e99
 
                     # TODO uniformize convolve/rebin handling
-                    if np.ndim(dd.flux) == 1:
+                    if np.ndim(dd.flux) == 1 and np.all(~dd.mask):
                         # Convolution and rebin are cared of in get_chisq
                         log_likelihood += dd.get_chisq(wlen_model,
-                                                       spectrum_model,
+                                                       spectrum_model[~dd.mask],
                                                        self.plotting)
-                    elif np.ndim(dd.flux) == 2:
+                    elif (np.ndim(dd.flux) == 2 and np.all(~dd.mask)) \
+                            or (np.ndim(dd.flux) == 1 and not np.all(~dd.mask)):
                         # Convolution and rebin are *not* cared of in get_log_likelihood
                         # Second dimension of data must be a function of wavelength
                         for i, data in enumerate(dd.flux):
                             log_likelihood += dd.log_likelihood_gibson(
-                                spectrum_model[i], data, dd.flux_error[i],
+                                spectrum_model[i, ~dd.mask[i, :]], data, dd.flux_error[i],
                                 alpha=1.0,
                                 beta=1.0
                             )
-                    elif np.ndim(dd.flux) == 3:
+                    elif (np.ndim(dd.flux) == 3 and np.all(~dd.mask)) \
+                            or (np.ndim(dd.flux) == 2 and not np.all(~dd.mask)):
                         # Convolution and rebin are *not* cared of in get_log_likelihood
                         # Third dimension of data must be a function of wavelength
                         for i, detector in enumerate(dd.flux):
                             for j, data in enumerate(detector):
                                 log_likelihood += dd.log_likelihood_gibson(
-                                    spectrum_model[i, j, :], data, dd.flux_error[i, j, :],
+                                    spectrum_model[i, j, ~dd.mask[i, j, :]], data, dd.flux_error[i, j],
                                     alpha=1.0,
                                     beta=1.0
                                 )

@@ -376,7 +376,8 @@ class RetrievalConfig:
                  pRT_object=None,
                  wlen=None,
                  flux=None,
-                 flux_error=None
+                 flux_error=None,
+                 mask=None
                  ):
         """
         Create a Data class object.
@@ -428,7 +429,8 @@ class RetrievalConfig:
                                pRT_object=pRT_object,
                                wlen=wlen,
                                flux=flux,
-                               flux_error=flux_error
+                               flux_error=flux_error,
+                               mask=mask
                                )
 
     def add_photometry(self, path,

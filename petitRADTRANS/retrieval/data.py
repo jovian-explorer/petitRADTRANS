@@ -96,7 +96,8 @@ class Data:
                  pRT_object=None,
                  wlen=None,
                  flux=None,
-                 flux_error=None
+                 flux_error=None,
+                 mask=None
                  ):
 
         self.name = name
@@ -107,6 +108,12 @@ class Data:
         self.wlen = wlen  #: The wavelength bin centers
         self.flux = flux  #: The flux or transit depth
         self.flux_error = flux_error  #: The error on the flux or transit depth
+
+        # Add a mask with that will be used in retrievals
+        if mask is None:
+            self.mask = np.zeros(np.shape(self.flux), dtype=bool)
+        else:
+            self.mask = mask
 
         # Sanity check distance
         self.distance = distance
