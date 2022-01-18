@@ -1,8 +1,9 @@
 import copy
 import os
+import time
 
+import matplotlib.pyplot as plt
 import numpy as np
-from scipy.interpolate import interp1d
 
 import petitRADTRANS.nat_cst as nc
 from petitRADTRANS.ccf.ccf_utils import radiosity_erg_hz2radiosity_erg_cm
@@ -15,8 +16,8 @@ from petitRADTRANS.phoenix import get_PHOENIX_spec
 from petitRADTRANS.physics import guillot_global, doppler_shift
 from petitRADTRANS.radtrans import Radtrans
 from petitRADTRANS.retrieval import RetrievalConfig, Retrieval
-from petitRADTRANS.retrieval.util import calc_MMW, uniform_prior
 from petitRADTRANS.retrieval.plotting import contour_corner
+from petitRADTRANS.retrieval.util import calc_MMW, uniform_prior
 
 module_dir = os.path.abspath(os.path.dirname(__file__))
 
@@ -85,7 +86,7 @@ def init_model(planet, w_bords, p0=1e-2):
         line_species_str, atmosphere
 
 
-def init_run(retrieval_name, prt_object, pressures, parameters, rayleigh_species, continuum_species,
+def init_run(retrieval_name, prt_object, pressures, parameters, line_species, rayleigh_species, continuum_species,
              ret_model, wavelength_instrument, observed_spectra, observations_uncertainties):
     run_definition_simple = RetrievalConfig(
         retrieval_name=retrieval_name,
@@ -121,8 +122,8 @@ def init_run(retrieval_name, prt_object, pressures, parameters, rayleigh_species
     def prior_vr(x):
         return uniform_prior(
             cube=x,
-            x1=-100*1.5e5,
-            x2=100*1.5e5
+            x1=-100 * 1.5e5,
+            x2=100 * 1.5e5
         )
 
     # Add parameters
@@ -144,14 +145,14 @@ def init_run(retrieval_name, prt_object, pressures, parameters, rayleigh_species
     run_definition_simple.set_continuum_opacities(continuum_species)
 
     # Retrieved
-    # run_definition_simple.set_line_species(
-    #     line_species,
-    #     eq=False,
-    #     abund_lim=(
-    #         -6,  # min = abund_lim[0]
-    #         6  # max = min + abund_lim[1]
-    #     )
-    # )
+    run_definition_simple.set_line_species(
+        line_species,
+        eq=False,
+        abund_lim=(
+            -6,  # min = abund_lim[0]
+            6  # max = min + abund_lim[1]
+        )
+    )
 
     # Load data
     run_definition_simple.add_data(
@@ -335,8 +336,9 @@ def get_radial_velocity_lag(radial_velocity, kp, lsf_fwhm, pixels_per_resolution
 
 
 def simple_co_added_ccf(
-        ccf, orbital_phases, radial_velocity, kp, planet_orbital_inclination, lsf_fwhm, pixels_per_resolution_element,
-        extra_factor=0.25
+        evaluation, orbital_phases, radial_velocity, kp, planet_orbital_inclination, lsf_fwhm,
+        pixels_per_resolution_element,
+        extra_factor=0.25, n_kp=None
 ):
     radial_velocity_lag = get_radial_velocity_lag(
         radial_velocity, kp, lsf_fwhm, pixels_per_resolution_element, extra_factor
@@ -349,23 +351,33 @@ def simple_co_added_ccf(
     )
     v_rest = np.concatenate((-v_rest[:0:-1], v_rest))
 
-    ccf_size = np.size(v_rest)
+    ccf_size = v_rest.size
 
-    kps = np.linspace(
-        kp * (1 - 0.3), kp * (1 + 0.3), ccf_size
-    )
+    if n_kp is None:
+        n_kp = ccf_size
 
-    # Defining matrix containing the co-added CCFs
-    ccf_tot = np.zeros((ccf_size, ccf_size))
-
-    for ikp in range(ccf_size):
-        rv_pl = radial_velocity + Planet.calculate_planet_radial_velocity(
-            kps[ikp], planet_orbital_inclination, orbital_phases
+        kps = np.linspace(
+            kp * (1 - 0.3), kp * (1 + 0.3), n_kp
+        )
+    elif n_kp == 1:
+        kps = np.asarray([kp])
+    else:
+        kps = np.linspace(
+            kp * (1 - 0.3), kp * (1 + 0.3), n_kp
         )
 
-        for j in range(np.size(radial_velocity)):
-            out_rv = v_rest + rv_pl[j]
-            ccf_tot[ikp, :] += fr.rebin_spectrum(radial_velocity_lag, ccf[j, :], out_rv)
+    # Defining matrix containing the co-added CCFs
+    ccf_tot = np.zeros((evaluation.shape[0], ccf_size, ccf_size))
+
+    for i in range(evaluation.shape[0]):
+        for ikp in range(n_kp):
+            rv_pl = radial_velocity + Planet.calculate_planet_radial_velocity(
+                kps[ikp], planet_orbital_inclination, orbital_phases
+            )
+
+            for j in range(np.size(radial_velocity)):
+                out_rv = v_rest + rv_pl[j]
+                ccf_tot[i, ikp, :] += fr.rebin_spectrum(radial_velocity_lag, evaluation[i, j, :], out_rv)
 
     return ccf_tot, v_rest, kps
 
@@ -607,26 +619,24 @@ def true_model(prt_object, parameters):
     return wlen_model, spectrum_model - 1
 
 
-def retrieval_run(n_live_points, model, pressures, true_parameters, rayleigh_species, continuum_species,
+def retrieval_run(retrieval_name, n_live_points, model, pressures, true_parameters,
+                  line_species, rayleigh_species, continuum_species,
                   retrieval_model,
-                  wavelength_instrument, reduced_mock_observations, error, plot=False):
+                  wavelength_instrument, reduced_mock_observations, error, plot=False, output_dir=None):
     # Initialize run
     # TODO fix kp offset
-    retrieval_name = 'test'
 
     run_definitions = init_run(
         retrieval_name,
-        model, pressures, true_parameters, rayleigh_species, continuum_species,
+        model, pressures, true_parameters, line_species, rayleigh_species, continuum_species,
         retrieval_model,
         wavelength_instrument, reduced_mock_observations, error
     )
 
     # Retrieval
-    retrieval_directory = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval'))
-
     retrieval = Retrieval(
         run_definitions,
-        output_dir=retrieval_directory,
+        output_dir=output_dir,
         sample_spec=False,
         ultranest=False,
         pRT_plot_style=False
@@ -641,19 +651,19 @@ def retrieval_run(n_live_points, model, pressures, true_parameters, rayleigh_spe
 
     if plot:
         sample_dict, parameter_dict = retrieval.get_samples(
-            output_dir=retrieval_directory + os.path.sep,
+            output_dir=output_dir + os.path.sep,
             ret_names=[retrieval_name]
         )
 
         n_param = len(parameter_dict[retrieval_name])
         parameter_plot_indices = {retrieval_name: np.arange(0, n_param)}
 
-        true_values = {retrieval_name: {}}
+        true_values = {retrieval_name: []}
 
         for p in parameter_dict[retrieval_name]:
-            true_values[retrieval_name][p] = true_parameters[p].value
+            true_values[retrieval_name].append(np.mean(true_parameters[p].value))
 
-        fig = contour_corner(sample_dict, parameter_dict, 'test_corner.png',
+        fig = contour_corner(sample_dict, parameter_dict, os.path.join(output_dir, 'test_corner.png'),
                              parameter_plot_indices=parameter_plot_indices,
                              true_values=true_values, prt_plot_style=False)
 
@@ -662,7 +672,8 @@ def retrieval_run(n_live_points, model, pressures, true_parameters, rayleigh_spe
     return retrieval
 
 
-def pseudo_retrieval(parameters, kps, lags, model, reduced_mock_observations, instrument_snr):
+def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, instrument_snr,
+                     true_parameters=None, radial_velocity=None, plot=False, output_dir=None):
     def log_l_(model_, data_, uncertainties, alpha=1.0, beta=1.0):
         model_ -= model_.mean()
         model_ = alpha * model_
@@ -674,10 +685,10 @@ def pseudo_retrieval(parameters, kps, lags, model, reduced_mock_observations, in
 
         return - data_.size * np.log(beta) - 0.5 * chi2
 
-    ppp = copy.copy(parameters)
+    ppp = copy.deepcopy(parameters)
     logls = []
 
-    for lag in lags:
+    for lag in v_rest:
         ppp['planet_rest_frame_shift'].value = lag
         logls.append([])
 
@@ -693,7 +704,64 @@ def pseudo_retrieval(parameters, kps, lags, model, reduced_mock_observations, in
 
             logls[-1].append(logl)
 
+    logls = np.transpose(logls)
+
+    i_peak = np.where(logls == np.max(logls))
+
+    if plot:
+        plt.figure()
+        plt.imshow(logls, origin='lower', extent=[v_rest[0], v_rest[-1], kps[0], kps[-1]], aspect='auto')
+        plt.plot([v_rest[0], v_rest[-1]], [kps[i_peak[0]], kps[i_peak[0]]], color='r')
+        plt.vlines([v_rest[i_peak[1]]], ymin=[kps[0]], ymax=[kps[-1]], color='r')
+        plt.title(f"Best Kp = {kps[i_peak[0]][0]:.3e} "
+                  f"(true = {true_parameters['planet_max_radial_orbital_velocity'].value:.3e}), "
+                  f"best V_rest = {v_rest[i_peak[1]][0]:.3e} "
+                  f"(true = {np.mean(radial_velocity):.3e})")
+        plt.xlabel('V_rest (cm.s-1)')
+        plt.ylabel('K_p (cm.s-1)')
+        plt.savefig(os.path.join(output_dir, 'pseudo_retrieval.png'))
+
     return logls
+
+
+def co_added_retrieval(wavelength_instrument, reduced_mock_observations, true_wavelength, true_spectrum, star_radiosity,
+                       true_parameters, radial_velocity, error, orbital_phases, plot=False, output_dir=None):
+    ccfs, log_l_bs, _, _, log_ls = simple_log_l(
+        np.asarray([wavelength_instrument] * reduced_mock_observations.shape[0]),
+        np.ma.asarray(reduced_mock_observations),
+        true_wavelength,
+        true_spectrum,
+        star_radiosity,
+        true_parameters,
+        lsf_fwhm=3e5,  # cm.s-1
+        pixels_per_resolution_element=2,
+        instrument_resolving_power=true_parameters['instrument_resolving_power'].value,
+        radial_velocity=radial_velocity,
+        kp=true_parameters['planet_max_radial_orbital_velocity'].value,
+        error=error[0, 0, :]
+    )
+
+    log_l_tot, v_rest, kps = simple_co_added_ccf(
+        log_ls, orbital_phases, radial_velocity, true_parameters['planet_max_radial_orbital_velocity'].value,
+        true_parameters['planet_orbital_inclination'].value, 3e5, 2
+    )
+
+    i_peak = np.where(log_l_tot[0] == np.max(log_l_tot[0]))
+
+    if plot:
+        plt.figure()
+        plt.imshow(log_l_tot[0], origin='lower', extent=[v_rest[0], v_rest[-1], kps[0], kps[-1]], aspect='auto')
+        plt.plot([v_rest[0], v_rest[-1]], [kps[i_peak[0]], kps[i_peak[0]]], color='r')
+        plt.vlines([v_rest[i_peak[1]]], ymin=[kps[0]], ymax=[kps[-1]], color='r')
+        plt.title(f"Best Kp = {kps[i_peak[0]][0]:.3e} "
+                  f"(true = {true_parameters['planet_max_radial_orbital_velocity'].value:.3e}), "
+                  f"best V_rest = {v_rest[i_peak[1]][0]:.3e} "
+                  f"(true = {np.mean(radial_velocity):.3e})")
+        plt.xlabel('V_rest (cm.s-1)')
+        plt.ylabel('K_p (cm.s-1)')
+        plt.savefig(os.path.join(output_dir, 'co_added_log_l.png'))
+
+    return log_l_tot, v_rest, kps, i_peak
 
 
 def main():
@@ -763,6 +831,12 @@ def main():
         p0, p_cloud, mean_molar_mass, mass_fractions, \
         line_species, rayleigh_species, continuum_species, \
         line_species_str, model = init_model(planet, model_wavelengths_border[band])
+
+    retrieval_name = 'test_kp_vrest_200lp_H2O'
+    retrieval_directory = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval', retrieval_name))
+
+    if not os.path.isdir(retrieval_directory):
+        os.mkdir(retrieval_directory)
 
     n_live_points = 200
 
@@ -834,26 +908,34 @@ def main():
     )
 
     reduced_mock_observations = simple_pipeline(mock_observations, airmass, remove_standard_deviation=False)
-
-    # ccfs, log_l_bs, _, _, log_ls = simple_log_l(
-    #     np.asarray([wavelength_instrument] * mock_observations.shape[0]),
-    #     np.ma.asarray(reduced_mock_observations),
-    #     true_wavelength,
-    #     true_spectrum,
-    #     star_radiosity,
-    #     true_parameters,
-    #     lsf_fwhm=3e5,  # cm.s-1
-    #     pixels_per_resolution_element=2,
-    #     instrument_resolving_power=1e5,
-    #     radial_velocity=np.zeros(ndit_half),
-    #     kp=kp,
-    #     error=1 / instrument_snr
-    # )
     error = np.ones(reduced_mock_observations.shape) / instrument_snr
-    retrieval_run(n_live_points, model, pressures, true_parameters, rayleigh_species, continuum_species,
-                  retrieval_model,
-                  wavelength_instrument, reduced_mock_observations, error, plot=True)
+
+    log_l_tot, v_rest, kps, i_peak = co_added_retrieval(
+        wavelength_instrument, reduced_mock_observations, true_wavelength,
+        true_spectrum, star_radiosity, true_parameters, np.zeros(ndit_half), error, orbital_phases,
+        plot=True, output_dir=retrieval_directory
+    )
+
+    kps_pseudo_retrieval = np.linspace(kps[i_peak[0][0] - 10], kps[i_peak[0][0] + 10], 7)
+    v_rest_pseudo_retrieval = np.linspace(v_rest[i_peak[1][0] - 10], v_rest[i_peak[1][0] + 10], 7)
+
+    log_l_pseudo_retrieval = pseudo_retrieval(
+        true_parameters, kps_pseudo_retrieval, v_rest_pseudo_retrieval,
+        model, reduced_mock_observations, instrument_snr,
+        true_parameters, np.zeros(ndit_half),
+        plot=True, output_dir=retrieval_directory
+    )
+
+    retrieval_run(
+        retrieval_name, n_live_points, model, pressures, true_parameters,
+        line_species, rayleigh_species, continuum_species,
+        retrieval_model,
+        wavelength_instrument, reduced_mock_observations, error,
+        plot=True, output_dir=retrieval_directory
+    )
 
 
 if __name__ == '__main__':
+    t0 = time.time()
     main()
+    print(f"Done in {time.time() - t0} s.")

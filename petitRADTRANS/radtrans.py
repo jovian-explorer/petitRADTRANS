@@ -20,6 +20,7 @@ from petitRADTRANS.fort_spec import fort_spec as fs
 
 
 class Radtrans(_read_opacities.ReadOpacities):
+    # TODO remove all re-definitions of attributes inside functions
     r""" Class defining objects for carrying out spectral calculations for a
     given set of opacities
 
@@ -153,18 +154,18 @@ class Radtrans(_read_opacities.ReadOpacities):
             continuum_opacities = []
 
         if wlen_bords_micron is None:
-            wlen_bords_micron = [0.05, 300.]  # um
+            wlen_bords_micron = np.array([0.05, 300.])  # um
 
         if pressures is None:
             pressures = np.array([1.0])  # bar
 
         if temperatures is None:
             temperatures = 300.0 * np.ones_like(pressures)  # K
-        elif len(temperatures) != len(pressures):
-            print(f"The size of the temperature array ({len(temperatures)}) "
-                  f"must be equal to the size of the pressure array ({len(pressures)}), "
+        elif np.size(temperatures) != np.size(pressures):
+            print(f"The size of the temperature array ({np.size(temperatures)}) "
+                  f"must be equal to the size of the pressure array ({np.size(pressures)}), "
                   f"log-interpolating temperatures on the pressure array...")
-            pressure_tmp = np.logspace(np.log10(np.min(pressures)), np.log10(np.max(pressures)), len(temperatures))
+            pressure_tmp = np.logspace(np.log10(np.min(pressures)), np.log10(np.max(pressures)), np.size(temperatures))
             temperatures = np.interp(pressures, pressure_tmp, temperatures)
 
         self.path_input_data = path_input_data
@@ -742,11 +743,10 @@ class Radtrans(_read_opacities.ReadOpacities):
                 * (wlen_micron / 0.35) ** self.gamma_scat
             add_term = np.repeat(scattering_add[None],
                                  int(len(self.press)), axis=0).transpose()
-            self.continuum_opa_scat += \
-                add_term
+            self.continuum_opa_scat += add_term
+
             if self.do_scat_emis:
-                self.continuum_opa_scat_emis += \
-                    add_term
+                self.continuum_opa_scat_emis += add_term
 
         # Interpolate line opacities, combine with continuum oacities
         self.line_struc_kappas = fi.mix_opas_ck(self.line_abundances,
@@ -1256,6 +1256,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         if self.mu_star <= 0.:
             self.mu_star = 1e-8
 
+        # TODO add condition to avoid re-calculation of star spectrum if not needed
         self.get_star_spectrum(Tstar, semimajoraxis, Rstar, stellar_intensity)
         self.interpolate_species_opa(temp)
         self.mix_opa_tot(abunds, mmw, gravity, sigma_lnorm, fsed, Kzz, radius,
