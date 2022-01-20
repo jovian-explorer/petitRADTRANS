@@ -1,6 +1,8 @@
 """
 Useful functions to generate mock observations.
 """
+import copy
+
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter1d
 
@@ -113,21 +115,31 @@ def convolve_shift_rebin(input_wavelengths, input_flux,
     return flux_rebin
 
 
-def get_orbital_phases(phase_start, orbital_period, dit, ndit):
-    """Calculate orbital phases assuming low eccentricity.
+def get_mock_secondary_eclipse_spectra(wavelength_model, spectrum_model, star_spectral_radiosity,
+                                       planet_radius, star_radius,
+                                       wavelength_instrument, instrument_resolving_power,
+                                       planet_velocities, system_observer_radial_velocities,
+                                       planet_rest_frame_shift=0.0):
+    planet_radiosity = convolve_shift_rebin(
+        wavelength_model,
+        spectrum_model,
+        instrument_resolving_power,
+        wavelength_instrument,
+        planet_velocities=planet_velocities
+            + system_observer_radial_velocities
+            + planet_rest_frame_shift  # planet + system velocity
+    )
 
-    Args:
-        phase_start: planet phase at the start of observations
-        orbital_period: (s) orbital period of the planet
-        dit: (s) integration duration
-        ndit: number of integrations
+    star_spectral_radiosity = convolve_shift_rebin(
+        wavelength_model,
+        star_spectral_radiosity,
+        instrument_resolving_power,
+        wavelength_instrument,
+        planet_velocities=system_observer_radial_velocities + planet_rest_frame_shift
+    )
 
-    Returns:
-        ndit phases from start_phase at t=0 to the phase at t=dit * ndit
-    """
-    times = np.linspace(0, dit * ndit, ndit)
-
-    return np.mod(phase_start + times / orbital_period, 1.0)  # the 2 * pi factors cancel out
+    # TODO add stellar reflection, dayside/nightside model ?
+    return 1 + (planet_radiosity * planet_radius ** 2) / (star_spectral_radiosity * star_radius ** 2)
 
 
 def get_noise(mock_observation, instrument_snr, observing_duration, planet_visible_duration, mode='eclipse', number=1):
@@ -182,6 +194,23 @@ def get_noise(mock_observation, instrument_snr, observing_duration, planet_visib
     )
 
     return mock_observation, noise_per_pixel
+
+
+def get_orbital_phases(phase_start, orbital_period, dit, ndit):
+    """Calculate orbital phases assuming low eccentricity.
+
+    Args:
+        phase_start: planet phase at the start of observations
+        orbital_period: (s) orbital period of the planet
+        dit: (s) integration duration
+        ndit: number of integrations
+
+    Returns:
+        ndit phases from start_phase at t=0 to the phase at t=dit * ndit
+    """
+    times = np.linspace(0, dit * ndit, ndit)
+
+    return np.mod(phase_start + times / orbital_period, 1.0)  # the 2 * pi factors cancel out
 
 
 def generate_mock_observations(wavelength_model, planet_spectrum_model,
@@ -293,18 +322,18 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
                              f"and planet spectral radiosity (size {np.size(planet_spectrum_model)}) "
                              f"must be on the same spectral grid")
 
-        mock_observation = convolve_shift_rebin(
-            wavelength_model, planet_spectrum_model, instrument_resolving_power, wavelength_instrument,
-            planet_velocities + system_observer_radial_velocities  # planet + system velocity
+        mock_observation = get_mock_secondary_eclipse_spectra(
+            wavelength_model=wavelength_model,
+            spectrum_model=planet_spectrum_model,
+            star_spectral_radiosity=star_spectral_radiosity,
+            planet_radius=planet_radius,
+            star_radius=star_radius,
+            wavelength_instrument=wavelength_instrument,
+            instrument_resolving_power=instrument_resolving_power,
+            planet_velocities=planet_velocities,
+            system_observer_radial_velocities=system_observer_radial_velocities,
+            planet_rest_frame_shift=0.0
         )
-
-        star_spectral_radiosity = convolve_shift_rebin(
-            wavelength_model, star_spectral_radiosity, instrument_resolving_power, wavelength_instrument,
-            system_observer_radial_velocities  # only system velocity
-        )
-
-        # TODO add stellar reflection, dayside/nightside model ?
-        mock_observation = 1 + (mock_observation * planet_radius ** 2) / (star_spectral_radiosity * star_radius ** 2)
     elif mode == 'transit':
         mock_observation = convolve_shift_rebin(
             wavelength_model, planet_spectrum_model, instrument_resolving_power, wavelength_instrument,
@@ -320,6 +349,9 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
 
     # Apply variable throughput
     mock_observation = np.transpose(variable_throughput * np.transpose(mock_observation))
+
+    # Save no noise observations
+    mock_observation_without_noise = copy.deepcopy(mock_observation)
 
     # Add noise to the model
     if add_noise:
@@ -355,7 +387,7 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
             mock_observation.mask = np.zeros(mock_observation.shape, dtype=bool)  # add full-fledged mask
             noise_per_pixel = np.zeros_like(mock_observation)
 
-    return mock_observation, noise_per_pixel
+    return mock_observation, noise_per_pixel, mock_observation_without_noise
 
 
 def simple_mock_observation(wavelengths, flux, snr_per_res_element, observing_time, transit_duration,

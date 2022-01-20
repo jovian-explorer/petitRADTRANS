@@ -356,10 +356,7 @@ class Retrieval:
                 if key in ['pressure_simple', 'pressure_width', 'pressure_scaling']:
                     continue
                 if not value.is_free_parameter:
-                    if np.size(value) > 1:
-                        summary.write("    " + key + " = " + str(value.value) + '\n')
-                    else:
-                        summary.write("    " + key + " = " + str(np.round(value.value, 3)) + '\n')
+                    summary.write("    " + key + " = " + str(value.value) + '\n')
 
             summary.write('\n')
             summary.write("Free Parameters, Prior^-1(0), Prior^-1(1)\n")

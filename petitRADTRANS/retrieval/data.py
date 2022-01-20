@@ -439,7 +439,7 @@ class Data:
         """
         if beta is None:
             # "Automatically optimise" for beta
-            model -= model.mean()
+            model -= model.mean()  # TODO put that in the pipeline!
             model = alpha * model
             chi2 = data - model
             chi2 /= uncertainties

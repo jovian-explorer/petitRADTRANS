@@ -1,3 +1,12 @@
+"""
+Run with:
+    mpiexec -n N --use-hwthread-cpus python3 _test_high_resolution.py
+N is the number of processes.
+Try:
+    sudo mpiexec -n N --allow-run-as-root ...
+If for some reason the script crashes.
+"""
+
 import copy
 import os
 import time
@@ -7,7 +16,8 @@ import numpy as np
 
 import petitRADTRANS.nat_cst as nc
 from petitRADTRANS.ccf.ccf_utils import radiosity_erg_hz2radiosity_erg_cm
-from petitRADTRANS.ccf.mock_observation import convolve_shift_rebin, generate_mock_observations, get_orbital_phases
+from petitRADTRANS.ccf.mock_observation import convolve_shift_rebin, generate_mock_observations, get_orbital_phases, \
+    get_mock_secondary_eclipse_spectra
 from petitRADTRANS.ccf.model_containers import Planet
 from petitRADTRANS.ccf.model_containers import SpectralModel
 from petitRADTRANS.ccf.pipeline import remove_throughput, remove_telluric_lines, simple_pipeline
@@ -105,31 +115,30 @@ def get_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=False):
         parameters['orbital_phases'].value
     )
 
-    planet_radiosity = convolve_shift_rebin(
-        wlen_model,
-        planet_radiosity,
-        parameters['instrument_resolving_power'].value,
-        parameters['wavelength_instrument'].value,
-        planet_velocities + parameters['planet_rest_frame_shift'].value  # planet + system velocity
+    spectrum_model = get_mock_secondary_eclipse_spectra(
+        wavelength_model=wlen_model,
+        spectrum_model=planet_radiosity,
+        star_spectral_radiosity=parameters['star_spectral_radiosity'].value,
+        planet_radius=parameters['R_pl'].value,
+        star_radius=parameters['Rstar'].value,
+        wavelength_instrument=parameters['wavelength_instrument'].value,
+        instrument_resolving_power=parameters['instrument_resolving_power'].value,
+        planet_velocities=planet_velocities,
+        system_observer_radial_velocities=parameters['system_observer_radial_velocities'].value,
+        planet_rest_frame_shift=parameters['planet_rest_frame_shift'].value
     )
-
-    star_spectral_radiosity = convolve_shift_rebin(
-        wlen_model,
-        parameters['star_spectral_radiosity'].value,
-        parameters['instrument_resolving_power'].value,
-        parameters['wavelength_instrument'].value,
-        parameters['planet_rest_frame_shift'].value * np.ones(parameters['orbital_phases'].value.shape)  # only system velocity
-    )
-
-    spectrum_model = 1 + (planet_radiosity * parameters['R_pl'].value ** 2) \
-        / (star_spectral_radiosity * parameters['Rstar'].value ** 2)
 
     # TODO add telluric transmittance (probably)
     # TODO add throughput variations? (maybe take raw data spectrum and multiply by mean(max(flux), axis=time))
+    # TODO generation of multiple-detector models
 
-    spectrum_model = simple_pipeline(np.array([spectrum_model]))
+    if parameters['apply_pipeline'].value:
+        spectrum_model = simple_pipeline(np.array([spectrum_model]))
+    else:
+        spectrum_model = np.array([spectrum_model])
+        spectrum_model -= 1
 
-    return wlen_model, spectrum_model
+    return parameters['wavelength_instrument'].value, spectrum_model
 
 
 def init_model(planet, w_bords, p0=1e-2):
@@ -191,10 +200,14 @@ def init_model(planet, w_bords, p0=1e-2):
         line_species_str, atmosphere
 
 
-def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref):
+def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
+                    apply_pipeline=True):
     star_name = planet.host_name.replace(' ', '_')
 
     retrieval_name += f'_{n_live_points}lp'
+
+    if not apply_pipeline:
+        retrieval_name += '_np'
 
     if not add_noise:
         retrieval_name += '_nn'
@@ -228,6 +241,7 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
 
     # Get models
     kp = planet.calculate_orbital_velocity(planet.star_mass, planet.orbit_semi_major_axis)
+    v_sys = np.zeros_like(orbital_phases)
 
     model_wavelengths_border = {
         band: [
@@ -266,11 +280,13 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
         'Rstar': Param(star_radius),
         'semi_major_axis': Param(planet.orbit_semi_major_axis),
         'planet_max_radial_orbital_velocity': Param(kp),
-        'planet_rest_frame_shift': Param(np.zeros_like(orbital_phases)),
+        'system_observer_radial_velocities': Param(v_sys),
+        'planet_rest_frame_shift': Param(0.0),
         'planet_orbital_inclination': Param(planet.orbital_inclination),
         'orbital_phases': Param(orbital_phases),
         'instrument_resolving_power': Param(instrument_resolving_power),
-        'wavelength_instrument': Param(wavelength_instrument)
+        'wavelength_instrument': Param(wavelength_instrument),
+        'apply_pipeline': Param(apply_pipeline)
     }
 
     for species in line_species:
@@ -279,10 +295,7 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
     # Initialize strings
     model_name = 'test_model_H2O'
 
-    observation_model_name = model_name
-    force_observation_str = ''
-
-    print('----\n', model_name, force_observation_str)
+    print('----\n', model_name)
 
     # Select which model to use
     retrieval_model = get_retrieval_model
@@ -298,8 +311,9 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
     )
 
     true_parameters['star_spectral_radiosity'] = Param(star_radiosity)
+
     print('Mock obs...')
-    mock_observations, noise = generate_mock_observations(
+    mock_observations, noise, mock_observations_without_noise = generate_mock_observations(
         true_wavelength, true_spectrum,
         telluric_transmittance=telluric_transmittance,
         variable_throughput=None,
@@ -322,12 +336,45 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
         number=1
     )
 
-    print('Data reduction...')
-    reduced_mock_observations = simple_pipeline(
-        mock_observations, airmass,
-        remove_standard_deviation=False,
-        remove_outliers=add_noise  # no need to remove outliers if no noise
-    )
+    if apply_pipeline:
+        print('Data reduction...')
+        reduced_mock_observations = simple_pipeline(
+            mock_observations, airmass,
+            remove_standard_deviation=False,
+            remove_outliers=add_noise  # no need to remove outliers if no noise
+        )
+
+        if add_noise:
+            reduced_mock_observations_without_noise = simple_pipeline(
+                mock_observations_without_noise, airmass,
+                remove_standard_deviation=False,
+                remove_outliers=False  # no need to remove outliers if no noise
+            )
+        else:
+            reduced_mock_observations_without_noise = copy.deepcopy(reduced_mock_observations)
+    else:
+        reduced_mock_observations = copy.deepcopy(mock_observations) - 1
+
+        if add_noise:
+            reduced_mock_observations_without_noise = copy.deepcopy(mock_observations_without_noise) - 1
+        else:
+            reduced_mock_observations_without_noise = copy.deepcopy(reduced_mock_observations)
+
+    w, r = retrieval_model(model, true_parameters)
+
+    if not np.all(w == wavelength_instrument):
+        raise ValueError('wrong wvl')
+
+    if not np.all(r == reduced_mock_observations_without_noise):
+        raise ValueError('wrong model')
+
+    print("Consistency check OK")
+
+    if not apply_pipeline:
+        for i, detector in enumerate(reduced_mock_observations):
+            for j, data in enumerate(detector):
+                reduced_mock_observations[i, j, :] -= data.mean()
+
     error = np.ones(reduced_mock_observations.shape) / instrument_snr
 
     print('Co-addition of log L...')
@@ -369,10 +416,10 @@ def init_run(retrieval_name, prt_object, pressures, parameters, line_species, ra
     )
 
     retrieved_parameters = []
-    # retrieved_parameters = [
-    #     'planet_max_radial_orbital_velocity',
-    #     'planet_rest_frame_shift'
-    # ]
+    retrieved_parameters = [
+        'planet_max_radial_orbital_velocity',
+        'planet_rest_frame_shift'
+    ]
 
     # Fixed parameters
     for p in parameters:
@@ -400,17 +447,17 @@ def init_run(retrieval_name, prt_object, pressures, parameters, line_species, ra
         )
 
     # # Add parameters
-    # run_definition_simple.add_parameter(
-    #     retrieved_parameters[0],
-    #     True,
-    #     transform_prior_cube_coordinate=prior_kp
-    # )
-    #
-    # run_definition_simple.add_parameter(
-    #     retrieved_parameters[1],
-    #     True,
-    #     transform_prior_cube_coordinate=prior_vr
-    # )
+    run_definition_simple.add_parameter(
+        retrieved_parameters[0],
+        True,
+        transform_prior_cube_coordinate=prior_kp
+    )
+
+    run_definition_simple.add_parameter(
+        retrieved_parameters[1],
+        True,
+        transform_prior_cube_coordinate=prior_vr
+    )
 
     # Spectrum parameters
     # Fixed
@@ -447,10 +494,11 @@ def init_run(retrieval_name, prt_object, pressures, parameters, line_species, ra
                 lengths.append(data_[i][j].size)
 
         # Handle jagged arrays
-        if np.all(lengths == lengths[0]):
+        if np.all(np.asarray(lengths) == lengths[0]):
             data_ = np.asarray(data_)
             error_ = np.asarray(error_)
         else:
+            print("Array is jagged, generating object array...")
             data_ = np.asarray(data_, dtype=object)
             error_ = np.asarray(error_, dtype=object)
     else:
@@ -515,9 +563,10 @@ def main():
     planet_name = 'HD 209458 b'
     planet = Planet.get(planet_name)
 
-    retrieval_name = 't_H2O_78-79'
+    retrieval_name = 't_kp_vr_H2O_78-79'
     n_live_points = 200
     add_noise = False
+    apply_pipeline = False
 
     band = 'M'
 
@@ -538,7 +587,8 @@ def main():
             retrieval_model, \
             wavelength_instrument, reduced_mock_observations, error \
             = init_parameters(
-                planet, retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref
+                planet, retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
+                apply_pipeline=apply_pipeline
             )
 
         retrieval_parameters = {
@@ -902,49 +952,6 @@ def simple_co_added_ccf(
             for j in range(np.size(radial_velocity)):
                 out_rv = v_rest + rv_pl[j]
                 ccf_tot[i, ikp, :] += fr.rebin_spectrum(radial_velocity_lag, evaluation[i, j, :], out_rv)
-
-    return ccf_tot, v_rest, kps
-
-
-def simple_co_added_ccf_old(
-        ccf, orbital_phases, radial_velocity, kp, planet_orbital_inclination, lsf_fwhm, pixels_per_resolution_element
-):
-    # Calculate star_radial_velocity interval, add extra coefficient just to be sure
-    # Effectively, we are moving along the spectral pixels
-    radial_velocity_lag_min = (np.min(radial_velocity) - kp)
-    radial_velocity_lag_max = (np.max(radial_velocity) + kp)
-    radial_velocity_interval = radial_velocity_lag_max - radial_velocity_lag_min
-    radial_velocity_lag_min -= 0.25 * radial_velocity_interval
-    radial_velocity_lag_max += 0.25 * radial_velocity_interval
-
-    radial_velocity_lag = np.arange(
-        radial_velocity_lag_min, radial_velocity_lag_max, lsf_fwhm / pixels_per_resolution_element
-    )
-
-    radial_velocity_interval = np.min((np.abs(radial_velocity_lag_min * 0.5), np.abs(radial_velocity_lag_max * 0.5)))
-
-    v_rest = np.arange(
-        0.0, radial_velocity_interval, lsf_fwhm / pixels_per_resolution_element
-    )
-    v_rest = np.concatenate((-v_rest[:0:-1], v_rest))
-
-    ccf_size = np.size(v_rest)
-
-    kps = np.linspace(
-        kp * (1 - 0.3), kp * (1 + 0.3), ccf_size
-    )
-
-    # Defining matrix containing the co-added CCFs
-    ccf_tot = np.zeros((ccf_size, ccf_size))
-
-    for ikp in range(ccf_size):
-        rv_pl = radial_velocity + Planet.calculate_planet_radial_velocity(
-            kps[ikp], planet_orbital_inclination, orbital_phases
-        )
-
-        for j in range(np.size(radial_velocity)):
-            out_rv = v_rest + rv_pl[j]
-            ccf_tot[ikp, :] += fr.rebin_spectrum(radial_velocity_lag, ccf[j, :], out_rv)
 
     return ccf_tot, v_rest, kps
 
