@@ -614,34 +614,57 @@ class Retrieval:
                         return -1e99
 
                     # TODO uniformize convolve/rebin handling
-                    if np.ndim(dd.flux) == 1 and np.all(~dd.mask):
-                        # Convolution and rebin are cared of in get_chisq
-                        log_likelihood += dd.get_chisq(wlen_model,
-                                                       spectrum_model[~dd.mask],
-                                                       self.plotting)
-                    elif (np.ndim(dd.flux) == 2 and np.all(~dd.mask)) \
-                            or (np.ndim(dd.flux) == 1 and not np.all(~dd.mask)):
-                        # Convolution and rebin are *not* cared of in get_log_likelihood
-                        # Second dimension of data must be a function of wavelength
-                        for i, data in enumerate(dd.flux):
-                            log_likelihood += dd.log_likelihood_gibson(
-                                spectrum_model[i, ~dd.mask[i, :]], data, dd.flux_error[i],
-                                alpha=1.0,
-                                beta=1.0
-                            )
-                    elif (np.ndim(dd.flux) == 3 and np.all(~dd.mask)) \
-                            or (np.ndim(dd.flux) == 2 and not np.all(~dd.mask)):
-                        # Convolution and rebin are *not* cared of in get_log_likelihood
-                        # Third dimension of data must be a function of wavelength
-                        for i, detector in enumerate(dd.flux):
-                            for j, data in enumerate(detector):
+                    if dd.flux.dtype == 'O':
+                        if np.ndim(dd.flux) == 1:
+                            # Convolution and rebin are *not* cared of in get_log_likelihood
+                            # Second dimension of data must be a function of wavelength
+                            for i, data in enumerate(dd.flux):
                                 log_likelihood += dd.log_likelihood_gibson(
-                                    spectrum_model[i, j, ~dd.mask[i, j, :]], data, dd.flux_error[i, j],
+                                    spectrum_model[i, ~dd.mask[i, :]], data, dd.flux_error[i],
                                     alpha=1.0,
                                     beta=1.0
                                 )
+                        elif np.ndim(dd.flux) == 2:
+                            # Convolution and rebin are *not* cared of in get_log_likelihood
+                            # Third dimension of data must be a function of wavelength
+                            for i, detector in enumerate(dd.flux):
+                                for j, data in enumerate(detector):
+                                    log_likelihood += dd.log_likelihood_gibson(
+                                        spectrum_model[i, j, ~dd.mask[i, j, :]], data, dd.flux_error[i, j],
+                                        alpha=1.0,
+                                        beta=1.0
+                                    )
+                        else:
+                            raise ValueError(f"observation is an array containing object, "
+                                             f"and have {np.ndim(dd.flux)} dimensions, "
+                                             f"but must have 1 to 2")
                     else:
-                        raise ValueError(f"observations have {np.ndim(dd.flux)} dimensions, but must have 1 to 3")
+                        if np.ndim(dd.flux) == 1:
+                            # Convolution and rebin are cared of in get_chisq
+                            log_likelihood += dd.get_chisq(wlen_model,
+                                                           spectrum_model[~dd.mask],
+                                                           self.plotting)
+                        elif np.ndim(dd.flux) == 2:
+                            # Convolution and rebin are *not* cared of in get_log_likelihood
+                            # Second dimension of data must be a function of wavelength
+                            for i, data in enumerate(dd.flux):
+                                log_likelihood += dd.log_likelihood_gibson(
+                                    spectrum_model[i, ~dd.mask[i, :]], data, dd.flux_error[i],
+                                    alpha=1.0,
+                                    beta=1.0
+                                )
+                        elif np.ndim(dd.flux) == 3:
+                            # Convolution and rebin are *not* cared of in get_log_likelihood
+                            # Third dimension of data must be a function of wavelength
+                            for i, detector in enumerate(dd.flux):
+                                for j, data in enumerate(detector):
+                                    log_likelihood += dd.log_likelihood_gibson(
+                                        spectrum_model[i, j, ~dd.mask[i, j, :]], data, dd.flux_error[i, j],
+                                        alpha=1.0,
+                                        beta=1.0
+                                    )
+                        else:
+                            raise ValueError(f"observations have {np.ndim(dd.flux)} dimensions, but must have 1 to 3")
                 else:
                     # Get the PT profile
                     if name == self.rd.plot_kwargs["take_PTs_from"]:

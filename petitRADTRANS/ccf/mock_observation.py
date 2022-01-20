@@ -190,7 +190,7 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
                                planet_radius=None, star_radius=None, star_spectral_radiosity=None,
                                orbital_phases=None, system_observer_radial_velocities=None,
                                planet_max_radial_orbital_velocity=0.0, planet_orbital_inclination=0.0,
-                               mode='eclipse', add_noise=True, number=1):
+                               mode='eclipse', add_noise=True, apply_snr_mask=False, number=1):
     """Generate mock observations from model spectra.
 
     Args:
@@ -235,6 +235,8 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
             'eclipse' or 'transit', mode on which to make the mock observation
         add_noise:
             If True, add a random Gaussian noise to the spectrum
+        apply_snr_mask:
+            If True, and add_noise is False, the SNR mask will be applied to the data
         number:
             if add_noise is True, number of time to generate mock observations, re-rolling noise each time
 
@@ -344,7 +346,14 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
         )
     else:
         mock_observation = np.ma.asarray([mock_observation])  # add a third dimension for output consistency
-        noise_per_pixel = np.zeros_like(mock_observation)
+        mock_observation.mask = np.zeros(mock_observation.shape, dtype=bool)
+
+        if apply_snr_mask:
+            mock_observation.mask[:, :, :] = instrument_snr.mask
+            noise_per_pixel = 1 / instrument_snr * np.sqrt(integration_time / integration_time_ref)
+        else:
+            mock_observation.mask = np.zeros(mock_observation.shape, dtype=bool)  # add full-fledged mask
+            noise_per_pixel = np.zeros_like(mock_observation)
 
     return mock_observation, noise_per_pixel
 

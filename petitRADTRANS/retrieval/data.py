@@ -75,7 +75,6 @@ class Data:
             recommended to set the model_resolution parameter. In general,
             'c-k' mode is recommended for retrievals of everything other than
             high-resolution (R>40000) spectra.
-
     """
 
     def __init__(self,

@@ -1,6 +1,7 @@
 """
 Useful functions for data reduction.
 """
+import copy
 from warnings import warn
 
 import numpy as np
@@ -92,7 +93,8 @@ def __remove_throughput_masked(spectral_data,
 
     brightest_data_wavelength = np.ma.median(spectral_data[:, brightest_pixels[0]], axis=1)
 
-    spectral_data_corrected = np.zeros(spectral_data.shape)
+    spectral_data_corrected = np.ma.zeros(spectral_data.shape)
+    spectral_data_corrected.mask = copy.copy(spectral_data.mask)
 
     for i, correction_coefficient in enumerate(brightest_data_wavelength):
         spectral_data_corrected[i, :] = spectral_data[i, :] / correction_coefficient
@@ -114,6 +116,7 @@ def remove_throughput(spectral_data,
     """
     if isinstance(spectral_data, np.ma.core.MaskedArray):
         spectral_data_corrected = np.ma.zeros(spectral_data.shape)
+        spectral_data_corrected.mask = copy.copy(spectral_data.mask)
     else:
         spectral_data_corrected = np.zeros(spectral_data.shape)
 
@@ -189,7 +192,7 @@ def remove_telluric_lines(spectral_data, airmass=None, remove_outliers=True, rem
 
 def simple_pipeline(spectral_data, airmass=None,
                     throughput_correction_lower_bound=0.70, throughput_correction_upper_bound=None,
-                    remove_standard_deviation=False):
+                    remove_outliers=True, remove_standard_deviation=False):
     """Removes the telluric lines and variable throughput of some data.
 
     Args:
@@ -197,6 +200,7 @@ def simple_pipeline(spectral_data, airmass=None,
         airmass: airmass of the data
         throughput_correction_lower_bound: [0-1] quantile lower bound on throughput correction
         throughput_correction_upper_bound: [0-1] quantile upper bound on throughput correction
+        remove_outliers: if True, remove the pixels 3 standard deviations away from the mean value
         remove_standard_deviation: if True, remove the standard deviation on time of the data (not recommended)
 
     Returns:
@@ -206,6 +210,10 @@ def simple_pipeline(spectral_data, airmass=None,
         spectral_data, throughput_correction_lower_bound, throughput_correction_upper_bound
     )
 
-    spectral_data_corrected = remove_telluric_lines(spectral_data_corrected, airmass, remove_standard_deviation)
+    spectral_data_corrected = remove_telluric_lines(
+        spectral_data_corrected, airmass,
+        remove_standard_deviation=remove_standard_deviation,
+        remove_outliers=remove_outliers
+    )
 
     return spectral_data_corrected
