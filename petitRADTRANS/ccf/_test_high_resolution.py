@@ -28,6 +28,110 @@ class Param:
         self.value = value
 
 
+def co_added_retrieval(wavelength_instrument, reduced_mock_observations, true_wavelength, true_spectrum, star_radiosity,
+                       true_parameters, radial_velocity, error, orbital_phases, plot=False, output_dir=None):
+    ccfs, log_l_bs, _, _, log_ls = simple_log_l(
+        np.asarray([wavelength_instrument] * reduced_mock_observations.shape[0]),
+        np.ma.asarray(reduced_mock_observations),
+        true_wavelength,
+        true_spectrum,
+        star_radiosity,
+        true_parameters,
+        lsf_fwhm=3e5,  # cm.s-1
+        pixels_per_resolution_element=2,
+        instrument_resolving_power=true_parameters['instrument_resolving_power'].value,
+        radial_velocity=radial_velocity,
+        kp=true_parameters['planet_max_radial_orbital_velocity'].value,
+        error=error[0, 0, :]
+    )
+
+    log_l_tot, v_rest, kps = simple_co_added_ccf(
+        log_ls, orbital_phases, radial_velocity, true_parameters['planet_max_radial_orbital_velocity'].value,
+        true_parameters['planet_orbital_inclination'].value, 3e5, 2
+    )
+
+    i_peak = np.where(log_l_tot[0] == np.max(log_l_tot[0]))
+
+    if plot:
+        plt.figure()
+        plt.imshow(log_l_tot[0], origin='lower', extent=[v_rest[0], v_rest[-1], kps[0], kps[-1]], aspect='auto')
+        plt.plot([v_rest[0], v_rest[-1]], [kps[i_peak[0]], kps[i_peak[0]]], color='r')
+        plt.vlines([v_rest[i_peak[1]]], ymin=[kps[0]], ymax=[kps[-1]], color='r')
+        plt.title(f"Best Kp = {kps[i_peak[0]][0]:.3e} "
+                  f"(true = {true_parameters['planet_max_radial_orbital_velocity'].value:.3e}), "
+                  f"best V_rest = {v_rest[i_peak[1]][0]:.3e} "
+                  f"(true = {np.mean(radial_velocity):.3e})")
+        plt.xlabel('V_rest (cm.s-1)')
+        plt.ylabel('K_p (cm.s-1)')
+        plt.savefig(os.path.join(output_dir, 'co_added_log_l.png'))
+
+    return log_l_tot, v_rest, kps, i_peak
+
+
+def get_radial_velocity_lag(radial_velocity, kp, lsf_fwhm, pixels_per_resolution_element, extra_factor=0.25):
+    # Calculate radial velocity lag interval, add extra coefficient just to be sure
+    # Effectively, we are moving along the spectral pixels
+    radial_velocity_lag_min = (np.min(radial_velocity) - kp)
+    radial_velocity_lag_max = (np.max(radial_velocity) + kp)
+    radial_velocity_interval = radial_velocity_lag_max - radial_velocity_lag_min
+
+    # Add a bit more to the interval, just to be sure
+    radial_velocity_lag_min -= extra_factor * radial_velocity_interval
+    radial_velocity_lag_max += extra_factor * radial_velocity_interval
+
+    # Ensure that a lag of 0 km.s-1 is within the lag array, in order to avoid inaccuracies
+    # Set interval bounds as multiple of lag step
+    lag_step = lsf_fwhm / pixels_per_resolution_element
+
+    radial_velocity_lag_min = np.floor(radial_velocity_lag_min / lag_step) * lag_step
+    radial_velocity_lag_max = np.ceil(radial_velocity_lag_max / lag_step) * lag_step
+
+    radial_velocity_lag = np.arange(
+        radial_velocity_lag_min,
+        radial_velocity_lag_max + lag_step,  # include radial_velocity_lag_max in array
+        lag_step
+    )
+
+    return radial_velocity_lag
+
+
+def get_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=False):
+    wlen_model, planet_radiosity = radiosity_model(prt_object, parameters)
+
+    # TODO make these steps as a function common with generate_mock_observations
+    planet_velocities = Planet.calculate_planet_radial_velocity(
+        parameters['planet_max_radial_orbital_velocity'].value,
+        parameters['planet_orbital_inclination'].value,
+        parameters['orbital_phases'].value
+    )
+
+    planet_radiosity = convolve_shift_rebin(
+        wlen_model,
+        planet_radiosity,
+        parameters['instrument_resolving_power'].value,
+        parameters['wavelength_instrument'].value,
+        planet_velocities + parameters['planet_rest_frame_shift'].value  # planet + system velocity
+    )
+
+    star_spectral_radiosity = convolve_shift_rebin(
+        wlen_model,
+        parameters['star_spectral_radiosity'].value,
+        parameters['instrument_resolving_power'].value,
+        parameters['wavelength_instrument'].value,
+        parameters['planet_rest_frame_shift'].value * np.ones(parameters['orbital_phases'].value.shape)  # only system velocity
+    )
+
+    spectrum_model = 1 + (planet_radiosity * parameters['R_pl'].value ** 2) \
+        / (star_spectral_radiosity * parameters['Rstar'].value ** 2)
+
+    # TODO add telluric transmittance (probably)
+    # TODO add throughput variations? (maybe take raw data spectrum and multiply by mean(max(flux), axis=time))
+
+    spectrum_model = simple_pipeline(np.array([spectrum_model]))
+
+    return wlen_model, spectrum_model
+
+
 def init_model(planet, w_bords, p0=1e-2):
     print('Initialization...')
     line_species_str = 'H2O_main_iso'  # 'H2O_Exomol'
@@ -85,122 +189,6 @@ def init_model(planet, w_bords, p0=1e-2):
         mean_molar_mass, mass_fractions, \
         line_species, rayleigh_species, continuum_species, \
         line_species_str, atmosphere
-
-
-def init_run(retrieval_name, prt_object, pressures, parameters, line_species, rayleigh_species, continuum_species,
-             retrieval_model, wavelength_instrument, observed_spectra, observations_uncertainties):
-    run_definition_simple = RetrievalConfig(
-        retrieval_name=retrieval_name,
-        run_mode="retrieval",
-        AMR=False,
-        pressures=pressures,
-        scattering=False  # scattering is automatically included for transmission spectra
-    )
-
-    retrieved_parameters = []
-    # retrieved_parameters = [
-    #     'planet_max_radial_orbital_velocity',
-    #     'planet_rest_frame_shift'
-    # ]
-
-    # Fixed parameters
-    for p in parameters:
-        if p not in retrieved_parameters:
-            run_definition_simple.add_parameter(
-                p,
-                False,
-                value=parameters[p].value
-            )
-
-    # Retrieved parameters
-    # Prior functions
-    def prior_kp(x):
-        return uniform_prior(
-            cube=x,
-            x1=0.75 * parameters['planet_max_radial_orbital_velocity'].value,
-            x2=1.25 * parameters['planet_max_radial_orbital_velocity'].value,
-        )
-
-    def prior_vr(x):
-        return uniform_prior(
-            cube=x,
-            x1=-1e7,
-            x2=1e7
-        )
-
-    # # Add parameters
-    # run_definition_simple.add_parameter(
-    #     retrieved_parameters[0],
-    #     True,
-    #     transform_prior_cube_coordinate=prior_kp
-    # )
-    #
-    # run_definition_simple.add_parameter(
-    #     retrieved_parameters[1],
-    #     True,
-    #     transform_prior_cube_coordinate=prior_vr
-    # )
-
-    # Spectrum parameters
-    # Fixed
-    run_definition_simple.set_rayleigh_species(rayleigh_species)
-    run_definition_simple.set_continuum_opacities(continuum_species)
-
-    # Retrieved
-    run_definition_simple.set_line_species(
-        line_species,
-        eq=False,
-        abund_lim=(
-            -6,  # min = abund_lim[0]
-            6  # max = min + abund_lim[1]
-        )
-    )
-
-    # Remove masked values if necessary
-    if hasattr(observed_spectra, 'mask'):
-        print('Taking care of mask...')
-        data_ = []
-        error_ = []
-        mask_ = copy.copy(observed_spectra.mask)
-        lengths = []
-
-        for i in range(observed_spectra.shape[0]):
-            data_.append([])
-            error_.append([])
-
-            for j in range(observed_spectra.shape[1]):
-                data_[i].append(np.array(
-                        observed_spectra[i, j, ~mask_[i, j, :]]
-                ))
-                error_[i].append(np.array(observations_uncertainties[i, j, ~mask_[i, j, :]]))
-                lengths.append(data_[i][j].size)
-
-        # Handle jagged arrays
-        if np.all(lengths == lengths[0]):
-            data_ = np.asarray(data_)
-            error_ = np.asarray(error_)
-        else:
-            data_ = np.asarray(data_, dtype=object)
-            error_ = np.asarray(error_, dtype=object)
-    else:
-        data_ = observed_spectra
-        error_ = observations_uncertainties
-        mask_ = None
-
-    # Load data
-    run_definition_simple.add_data(
-        name='test',
-        path=None,
-        model_generating_function=retrieval_model,
-        opacity_mode='lbl',
-        pRT_object=prt_object,
-        wlen=wavelength_instrument,
-        flux=data_,
-        flux_error=error_,
-        mask=mask_
-    )
-
-    return run_definition_simple
 
 
 def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref):
@@ -370,6 +358,452 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
         wavelength_instrument, reduced_mock_observations, error
 
 
+def init_run(retrieval_name, prt_object, pressures, parameters, line_species, rayleigh_species, continuum_species,
+             retrieval_model, wavelength_instrument, observed_spectra, observations_uncertainties):
+    run_definition_simple = RetrievalConfig(
+        retrieval_name=retrieval_name,
+        run_mode="retrieval",
+        AMR=False,
+        pressures=pressures,
+        scattering=False  # scattering is automatically included for transmission spectra
+    )
+
+    retrieved_parameters = []
+    # retrieved_parameters = [
+    #     'planet_max_radial_orbital_velocity',
+    #     'planet_rest_frame_shift'
+    # ]
+
+    # Fixed parameters
+    for p in parameters:
+        if p not in retrieved_parameters:
+            run_definition_simple.add_parameter(
+                p,
+                False,
+                value=parameters[p].value
+            )
+
+    # Retrieved parameters
+    # Prior functions
+    def prior_kp(x):
+        return uniform_prior(
+            cube=x,
+            x1=0.75 * parameters['planet_max_radial_orbital_velocity'].value,
+            x2=1.25 * parameters['planet_max_radial_orbital_velocity'].value,
+        )
+
+    def prior_vr(x):
+        return uniform_prior(
+            cube=x,
+            x1=-1e7,
+            x2=1e7
+        )
+
+    # # Add parameters
+    # run_definition_simple.add_parameter(
+    #     retrieved_parameters[0],
+    #     True,
+    #     transform_prior_cube_coordinate=prior_kp
+    # )
+    #
+    # run_definition_simple.add_parameter(
+    #     retrieved_parameters[1],
+    #     True,
+    #     transform_prior_cube_coordinate=prior_vr
+    # )
+
+    # Spectrum parameters
+    # Fixed
+    run_definition_simple.set_rayleigh_species(rayleigh_species)
+    run_definition_simple.set_continuum_opacities(continuum_species)
+
+    # Retrieved
+    run_definition_simple.set_line_species(
+        line_species,
+        eq=False,
+        abund_lim=(
+            -6,  # min = abund_lim[0]
+            6  # max = min + abund_lim[1]
+        )
+    )
+
+    # Remove masked values if necessary
+    if hasattr(observed_spectra, 'mask'):
+        print('Taking care of mask...')
+        data_ = []
+        error_ = []
+        mask_ = copy.copy(observed_spectra.mask)
+        lengths = []
+
+        for i in range(observed_spectra.shape[0]):
+            data_.append([])
+            error_.append([])
+
+            for j in range(observed_spectra.shape[1]):
+                data_[i].append(np.array(
+                        observed_spectra[i, j, ~mask_[i, j, :]]
+                ))
+                error_[i].append(np.array(observations_uncertainties[i, j, ~mask_[i, j, :]]))
+                lengths.append(data_[i][j].size)
+
+        # Handle jagged arrays
+        if np.all(lengths == lengths[0]):
+            data_ = np.asarray(data_)
+            error_ = np.asarray(error_)
+        else:
+            data_ = np.asarray(data_, dtype=object)
+            error_ = np.asarray(error_, dtype=object)
+    else:
+        data_ = observed_spectra
+        error_ = observations_uncertainties
+        mask_ = None
+
+    # Load data
+    run_definition_simple.add_data(
+        name='test',
+        path=None,
+        model_generating_function=retrieval_model,
+        opacity_mode='lbl',
+        pRT_object=prt_object,
+        wlen=wavelength_instrument,
+        flux=data_,
+        flux_error=error_,
+        mask=mask_
+    )
+
+    return run_definition_simple
+
+
+def load_all(directory):
+    print('Loading...')
+
+    load_dict = np.load(os.path.join(directory, 'run_parameters.npz'))
+
+    mock_observations = load_dict['mock_observations']
+    noise = load_dict['noise']
+    reduced_mock_observations = load_dict['reduced_mock_observations']
+    log_l_tot = load_dict['log_l_tot']
+    v_rest = load_dict['v_rest']
+    kps = load_dict['kps']
+    log_l_pseudo_retrieval = load_dict['log_l_pseudo_retrieval']
+    wvl_pseudo_retrieval = load_dict['wvl_pseudo_retrieval']
+    models_pseudo_retrieval = load_dict['mock_observations_mask']
+    #true_parameters = load_dict['true_parameters']
+    instrument_snr = load_dict['instrument_snr']
+
+    mock_observations = np.ma.asarray(mock_observations)
+    mock_observations.mask = load_dict['mock_observations_mask']
+
+    reduced_mock_observations = np.ma.asarray(reduced_mock_observations)
+    reduced_mock_observations.mask = load_dict['reduced_mock_observations_mask']
+
+    instrument_snr = np.ma.asarray(instrument_snr)
+    instrument_snr.mask = load_dict['instrument_snr_mask']
+
+    return mock_observations, noise, \
+        reduced_mock_observations, log_l_tot, v_rest, kps, log_l_pseudo_retrieval, \
+        wvl_pseudo_retrieval, models_pseudo_retrieval, \
+        instrument_snr
+
+
+def main():
+    from mpi4py import MPI
+
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+
+    planet_name = 'HD 209458 b'
+    planet = Planet.get(planet_name)
+
+    retrieval_name = 't_H2O_78-79'
+    n_live_points = 200
+    add_noise = False
+
+    band = 'M'
+
+    wavelengths_borders = {
+        'L': [2.85, 4.20],
+        'M': [4.78, 4.79]  # [4.5, 5.5],
+    }
+
+    integration_times_ref = {
+        'L': 20.83,
+        'M': 76.89
+    }
+
+    if rank == 0:
+        # Initialize parameters
+        retrieval_name, retrieval_directory, \
+            model, pressures, true_parameters, line_species, rayleigh_species, continuum_species, \
+            retrieval_model, \
+            wavelength_instrument, reduced_mock_observations, error \
+            = init_parameters(
+                planet, retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref
+            )
+
+        retrieval_parameters = {
+            'retrieval_name': retrieval_name,
+            'prt_object': model,
+            'pressures': pressures,
+            'parameters': true_parameters,
+            'line_species': line_species,
+            'rayleigh_species': rayleigh_species,
+            'continuum_species': continuum_species,
+            'retrieval_model': retrieval_model,
+            'wavelength_instrument': wavelength_instrument,
+            'observed_spectra': reduced_mock_observations,
+            'observations_uncertainties': error
+        }
+
+        retrieval_directory = retrieval_directory
+    else:
+        print(f"Rank {rank} waiting for main process to finish...")
+        retrieval_parameters = None
+        retrieval_directory = ''
+
+    retrieval_parameters = comm.bcast(retrieval_parameters, root=0)
+    retrieval_directory = comm.bcast(retrieval_directory, root=0)
+
+    # Initialize retrieval
+    run_definitions = init_run(**retrieval_parameters)
+
+    retrieval = Retrieval(
+        run_definitions,
+        output_dir=retrieval_directory,
+        sample_spec=False,
+        ultranest=False,
+        pRT_plot_style=False
+    )
+
+    retrieval.run(
+        sampling_efficiency=0.8,
+        n_live_points=n_live_points,
+        const_efficiency_mode=False,
+        resume=False
+    )
+
+    if rank == 0:
+        sample_dict, parameter_dict = retrieval.get_samples(
+            output_dir=retrieval_directory + os.path.sep,
+            ret_names=[retrieval_name]
+        )
+
+        n_param = len(parameter_dict[retrieval_name])
+        parameter_plot_indices = {retrieval_name: np.arange(0, n_param)}
+
+        true_values = {retrieval_name: []}
+
+        for p in parameter_dict[retrieval_name]:
+            true_values[retrieval_name].append(np.mean(retrieval_parameters['parameters'][p].value))
+
+        fig = contour_corner(sample_dict, parameter_dict, os.path.join(retrieval_directory, 'test_corner.png'),
+                             parameter_plot_indices=parameter_plot_indices,
+                             true_values=true_values, prt_plot_style=False)
+
+        fig.show()
+
+
+def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, instrument_snr,
+                     true_parameters=None, radial_velocity=None, plot=False, output_dir=None):
+    ppp = copy.deepcopy(parameters)
+    logls = []
+    wavelengths = []
+    retrieval_models = []
+    error = 1 / instrument_snr
+
+    if hasattr(reduced_mock_observations, 'mask'):
+        print('Taking care of mask...')
+        data_ = []
+        error_ = []
+        mask_ = copy.copy(reduced_mock_observations.mask)
+
+        for i in range(reduced_mock_observations.shape[0]):
+            data_.append([])
+            error_.append([])
+
+            for j in range(reduced_mock_observations.shape[1]):
+                data_[i].append(np.array(
+                        reduced_mock_observations[i, j, ~mask_[i, j, :]]
+                ))
+                error_[i].append(np.array(error[~mask_[i, j, :]]))
+
+        data_ = np.asarray(data_, dtype=object)
+        error_ = np.asarray(error_, dtype=object)
+    else:
+        data_ = reduced_mock_observations
+        error_ = error
+        mask_ = np.zeros(reduced_mock_observations.shape, dtype=bool)
+
+    for lag in v_rest:
+        ppp['planet_rest_frame_shift'].value = lag
+        logls.append([])
+        wavelengths.append([])
+        retrieval_models.append([])
+
+        for kp_ in kps:
+            ppp['planet_max_radial_orbital_velocity'].value = kp_
+
+            w, s = get_retrieval_model(model, ppp)
+            wavelengths[-1].append(w)
+            retrieval_models[-1].append(s)
+
+            logl = 0
+
+            for i, det in enumerate(data_):
+                for j, data in enumerate(det):
+                    logl += Data.log_likelihood_gibson(
+                        s[i, j, ~mask_[i, j, :]],
+                        data,
+                        error_[i, j],
+                        1.0, 1.0
+                    )
+
+            logls[-1].append(logl)
+
+    logls = np.transpose(logls)
+
+    i_peak = np.where(logls == np.max(logls))
+
+    if plot:
+        plt.figure()
+        plt.imshow(logls, origin='lower', extent=[v_rest[0], v_rest[-1], kps[0], kps[-1]], aspect='auto')
+        plt.plot([v_rest[0], v_rest[-1]], [kps[i_peak[0]], kps[i_peak[0]]], color='r')
+        plt.vlines([v_rest[i_peak[1]]], ymin=[kps[0]], ymax=[kps[-1]], color='r')
+        plt.title(f"Best Kp = {kps[i_peak[0]][0]:.3e} "
+                  f"(true = {true_parameters['planet_max_radial_orbital_velocity'].value:.3e}), "
+                  f"best V_rest = {v_rest[i_peak[1]][0]:.3e} "
+                  f"(true = {np.mean(radial_velocity):.3e})")
+        plt.xlabel('V_rest (cm.s-1)')
+        plt.ylabel('K_p (cm.s-1)')
+        plt.savefig(os.path.join(output_dir, 'pseudo_retrieval.png'))
+
+    return logls, wavelengths, retrieval_models
+
+
+def radiosity_model(prt_object, parameters):
+    # Make the P-T profile
+    pressures = prt_object.press * 1e-6  # bar to cgs
+    temperatures = guillot_global(
+        pressure=pressures,
+        kappa_ir=0.01,
+        gamma=0.4,
+        grav=10 ** parameters['log_g'].value,
+        t_int=200,
+        t_equ=parameters['Temperature'].value
+    )
+
+    # Make the abundance profiles
+    abundances = {}
+    m_sum = 0.0  # Check that the total mass fraction of all species is <1
+
+    for species in prt_object.line_species:
+        spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities (see below)
+        abundances[species] = 10 ** parameters[spec].value * np.ones_like(pressures)
+        m_sum += 10 ** parameters[spec].value
+
+    abundances['H2'] = 0.74 * (1.0 - m_sum) * np.ones_like(pressures)
+    abundances['He'] = 0.24 * (1.0 - m_sum) * np.ones_like(pressures)
+
+    # Find the mean molecular weight in each layer
+    mmw = calc_MMW(abundances)
+
+    # Calculate the spectrum
+    prt_object.calc_flux(
+        temperatures,
+        abundances,
+        10 ** parameters['log_g'].value,
+        mmw,
+        Tstar=parameters['star_effective_temperature'].value,
+        Rstar=parameters['Rstar'].value / nc.r_sun,
+        semimajoraxis=parameters['semi_major_axis'].value / nc.AU,
+        Pcloud=10 ** parameters['log_Pcloud'].value,
+        #stellar_intensity=parameters['star_spectral_radiosity'].value
+    )
+
+    # Transform the outputs into the units of our data.
+    planet_radiosity = radiosity_erg_hz2radiosity_erg_cm(prt_object.flux, prt_object.freq)
+    wlen_model = nc.c / prt_object.freq * 1e4  # wlen in micron
+
+    return wlen_model, planet_radiosity
+
+
+def retrieval_run(retrieval_name, n_live_points, model, pressures, true_parameters,
+                  line_species, rayleigh_species, continuum_species,
+                  retrieval_model,
+                  wavelength_instrument, reduced_mock_observations, error, plot=False, output_dir=None):
+    # Initialize run
+    run_definitions = init_run(
+        retrieval_name,
+        model, pressures, true_parameters, line_species, rayleigh_species, continuum_species,
+        retrieval_model,
+        wavelength_instrument, reduced_mock_observations, error
+    )
+
+    # Retrieval
+    retrieval = Retrieval(
+        run_definitions,
+        output_dir=output_dir,
+        sample_spec=False,
+        ultranest=False,
+        pRT_plot_style=False
+    )
+
+    retrieval.run(
+        sampling_efficiency=0.8,
+        n_live_points=n_live_points,
+        const_efficiency_mode=False,
+        resume=False
+    )
+
+    if plot:
+        sample_dict, parameter_dict = retrieval.get_samples(
+            output_dir=output_dir + os.path.sep,
+            ret_names=[retrieval_name]
+        )
+
+        n_param = len(parameter_dict[retrieval_name])
+        parameter_plot_indices = {retrieval_name: np.arange(0, n_param)}
+
+        true_values = {retrieval_name: []}
+
+        for p in parameter_dict[retrieval_name]:
+            true_values[retrieval_name].append(np.mean(true_parameters[p].value))
+
+        fig = contour_corner(sample_dict, parameter_dict, os.path.join(output_dir, 'test_corner.png'),
+                             parameter_plot_indices=parameter_plot_indices,
+                             true_values=true_values, prt_plot_style=False)
+
+        fig.show()
+
+    return retrieval
+
+
+def save_all(directory, mock_observations, noise, reduced_mock_observations, log_l_tot, v_rest, kps,
+             log_l_pseudo_retrieval,
+             wvl_pseudo_retrieval, models_pseudo_retrieval, true_parameters, instrument_snr):
+    print('Saving...')
+
+    fname = os.path.join(directory, 'run_parameters.npz')
+
+    np.savez_compressed(
+        file=fname,
+        mock_observations=mock_observations,
+        mock_observations_mask=mock_observations.mask,
+        noise=noise,
+        reduced_mock_observations=reduced_mock_observations,
+        reduced_mock_observations_mask=reduced_mock_observations.mask,
+        log_l_tot=log_l_tot,
+        v_rest=v_rest,
+        kps=kps,
+        log_l_pseudo_retrieval=log_l_pseudo_retrieval,
+        wvl_pseudo_retrieval=wvl_pseudo_retrieval,
+        models_pseudo_retrieval=models_pseudo_retrieval,
+        instrument_snr=instrument_snr,
+        instrument_snr_mask=instrument_snr.mask,
+        # true_parameters=true_parameters
+    )
+
+
 def simple_ccf(wavelength_data, spectral_data_earth_corrected, wavelength_model, spectral_radiosity,
                lsf_fwhm, pixels_per_resolution_element, radial_velocity, kp, error):
     n_detectors, n_integrations, n_spectral_pixels = np.shape(spectral_data_earth_corrected)
@@ -423,117 +857,6 @@ def simple_ccf(wavelength_data, spectral_data_earth_corrected, wavelength_model,
                 )
 
     return ccf
-
-
-def radiosity_model(prt_object, parameters):
-    # Make the P-T profile
-    pressures = prt_object.press * 1e-6  # bar to cgs
-    temperatures = guillot_global(
-        pressure=pressures,
-        kappa_ir=0.01,
-        gamma=0.4,
-        grav=10 ** parameters['log_g'].value,
-        t_int=200,
-        t_equ=parameters['Temperature'].value
-    )
-
-    # Make the abundance profiles
-    abundances = {}
-    m_sum = 0.0  # Check that the total mass fraction of all species is <1
-
-    for species in prt_object.line_species:
-        spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities (see below)
-        abundances[species] = 10 ** parameters[spec].value * np.ones_like(pressures)
-        m_sum += 10 ** parameters[spec].value
-
-    abundances['H2'] = 0.74 * (1.0 - m_sum) * np.ones_like(pressures)
-    abundances['He'] = 0.24 * (1.0 - m_sum) * np.ones_like(pressures)
-
-    # Find the mean molecular weight in each layer
-    mmw = calc_MMW(abundances)
-
-    # Calculate the spectrum
-    prt_object.calc_flux(
-        temperatures,
-        abundances,
-        10 ** parameters['log_g'].value,
-        mmw,
-        Tstar=parameters['star_effective_temperature'].value,
-        Rstar=parameters['Rstar'].value / nc.r_sun,
-        semimajoraxis=parameters['semi_major_axis'].value / nc.AU,
-        Pcloud=10 ** parameters['log_Pcloud'].value,
-        #stellar_intensity=parameters['star_spectral_radiosity'].value
-    )
-
-    # Transform the outputs into the units of our data.
-    planet_radiosity = radiosity_erg_hz2radiosity_erg_cm(prt_object.flux, prt_object.freq)
-    wlen_model = nc.c / prt_object.freq * 1e4  # wlen in micron
-
-    return wlen_model, planet_radiosity
-
-
-def get_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=False):
-    wlen_model, planet_radiosity = radiosity_model(prt_object, parameters)
-
-    # TODO make these steps as a function common with generate_mock_observations
-    planet_velocities = Planet.calculate_planet_radial_velocity(
-        parameters['planet_max_radial_orbital_velocity'].value,
-        parameters['planet_orbital_inclination'].value,
-        parameters['orbital_phases'].value
-    )
-
-    planet_radiosity = convolve_shift_rebin(
-        wlen_model,
-        planet_radiosity,
-        parameters['instrument_resolving_power'].value,
-        parameters['wavelength_instrument'].value,
-        planet_velocities + parameters['planet_rest_frame_shift'].value  # planet + system velocity
-    )
-
-    star_spectral_radiosity = convolve_shift_rebin(
-        wlen_model,
-        parameters['star_spectral_radiosity'].value,
-        parameters['instrument_resolving_power'].value,
-        parameters['wavelength_instrument'].value,
-        parameters['planet_rest_frame_shift'].value * np.ones(parameters['orbital_phases'].value.shape)  # only system velocity
-    )
-
-    spectrum_model = 1 + (planet_radiosity * parameters['R_pl'].value ** 2) \
-        / (star_spectral_radiosity * parameters['Rstar'].value ** 2)
-
-    # TODO add telluric transmittance (probably)
-    # TODO add throughput variations? (maybe take raw data spectrum and multiply by mean(max(flux), axis=time))
-
-    spectrum_model = simple_pipeline(np.array([spectrum_model]))
-
-    return wlen_model, spectrum_model
-
-
-def get_radial_velocity_lag(radial_velocity, kp, lsf_fwhm, pixels_per_resolution_element, extra_factor=0.25):
-    # Calculate radial velocity lag interval, add extra coefficient just to be sure
-    # Effectively, we are moving along the spectral pixels
-    radial_velocity_lag_min = (np.min(radial_velocity) - kp)
-    radial_velocity_lag_max = (np.max(radial_velocity) + kp)
-    radial_velocity_interval = radial_velocity_lag_max - radial_velocity_lag_min
-
-    # Add a bit more to the interval, just to be sure
-    radial_velocity_lag_min -= extra_factor * radial_velocity_interval
-    radial_velocity_lag_max += extra_factor * radial_velocity_interval
-
-    # Ensure that a lag of 0 km.s-1 is within the lag array, in order to avoid inaccuracies
-    # Set interval bounds as multiple of lag step
-    lag_step = lsf_fwhm / pixels_per_resolution_element
-
-    radial_velocity_lag_min = np.floor(radial_velocity_lag_min / lag_step) * lag_step
-    radial_velocity_lag_max = np.ceil(radial_velocity_lag_max / lag_step) * lag_step
-
-    radial_velocity_lag = np.arange(
-        radial_velocity_lag_min,
-        radial_velocity_lag_max + lag_step,  # include radial_velocity_lag_max in array
-        lag_step
-    )
-
-    return radial_velocity_lag
 
 
 def simple_co_added_ccf(
@@ -818,329 +1141,6 @@ def true_model(prt_object, parameters):
     spectrum_model /= np.mean(spectrum_model)
 
     return wlen_model, spectrum_model - 1
-
-
-def retrieval_run(retrieval_name, n_live_points, model, pressures, true_parameters,
-                  line_species, rayleigh_species, continuum_species,
-                  retrieval_model,
-                  wavelength_instrument, reduced_mock_observations, error, plot=False, output_dir=None):
-    # Initialize run
-    run_definitions = init_run(
-        retrieval_name,
-        model, pressures, true_parameters, line_species, rayleigh_species, continuum_species,
-        retrieval_model,
-        wavelength_instrument, reduced_mock_observations, error
-    )
-
-    # Retrieval
-    retrieval = Retrieval(
-        run_definitions,
-        output_dir=output_dir,
-        sample_spec=False,
-        ultranest=False,
-        pRT_plot_style=False
-    )
-
-    retrieval.run(
-        sampling_efficiency=0.8,
-        n_live_points=n_live_points,
-        const_efficiency_mode=False,
-        resume=False
-    )
-
-    if plot:
-        sample_dict, parameter_dict = retrieval.get_samples(
-            output_dir=output_dir + os.path.sep,
-            ret_names=[retrieval_name]
-        )
-
-        n_param = len(parameter_dict[retrieval_name])
-        parameter_plot_indices = {retrieval_name: np.arange(0, n_param)}
-
-        true_values = {retrieval_name: []}
-
-        for p in parameter_dict[retrieval_name]:
-            true_values[retrieval_name].append(np.mean(true_parameters[p].value))
-
-        fig = contour_corner(sample_dict, parameter_dict, os.path.join(output_dir, 'test_corner.png'),
-                             parameter_plot_indices=parameter_plot_indices,
-                             true_values=true_values, prt_plot_style=False)
-
-        fig.show()
-
-    return retrieval
-
-
-def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, instrument_snr,
-                     true_parameters=None, radial_velocity=None, plot=False, output_dir=None):
-    ppp = copy.deepcopy(parameters)
-    logls = []
-    wavelengths = []
-    retrieval_models = []
-    error = 1 / instrument_snr
-
-    if hasattr(reduced_mock_observations, 'mask'):
-        print('Taking care of mask...')
-        data_ = []
-        error_ = []
-        mask_ = copy.copy(reduced_mock_observations.mask)
-
-        for i in range(reduced_mock_observations.shape[0]):
-            data_.append([])
-            error_.append([])
-
-            for j in range(reduced_mock_observations.shape[1]):
-                data_[i].append(np.array(
-                        reduced_mock_observations[i, j, ~mask_[i, j, :]]
-                ))
-                error_[i].append(np.array(error[~mask_[i, j, :]]))
-
-        data_ = np.asarray(data_, dtype=object)
-        error_ = np.asarray(error_, dtype=object)
-    else:
-        data_ = reduced_mock_observations
-        error_ = error
-        mask_ = np.zeros(reduced_mock_observations.shape, dtype=bool)
-
-    for lag in v_rest:
-        ppp['planet_rest_frame_shift'].value = lag
-        logls.append([])
-        wavelengths.append([])
-        retrieval_models.append([])
-
-        for kp_ in kps:
-            ppp['planet_max_radial_orbital_velocity'].value = kp_
-
-            w, s = get_retrieval_model(model, ppp)
-            wavelengths[-1].append(w)
-            retrieval_models[-1].append(s)
-
-            logl = 0
-
-            for i, det in enumerate(data_):
-                for j, data in enumerate(det):
-                    logl += Data.log_likelihood_gibson(
-                        s[i, j, ~mask_[i, j, :]],
-                        data,
-                        error_[i, j],
-                        1.0, 1.0
-                    )
-
-            logls[-1].append(logl)
-
-    logls = np.transpose(logls)
-
-    i_peak = np.where(logls == np.max(logls))
-
-    if plot:
-        plt.figure()
-        plt.imshow(logls, origin='lower', extent=[v_rest[0], v_rest[-1], kps[0], kps[-1]], aspect='auto')
-        plt.plot([v_rest[0], v_rest[-1]], [kps[i_peak[0]], kps[i_peak[0]]], color='r')
-        plt.vlines([v_rest[i_peak[1]]], ymin=[kps[0]], ymax=[kps[-1]], color='r')
-        plt.title(f"Best Kp = {kps[i_peak[0]][0]:.3e} "
-                  f"(true = {true_parameters['planet_max_radial_orbital_velocity'].value:.3e}), "
-                  f"best V_rest = {v_rest[i_peak[1]][0]:.3e} "
-                  f"(true = {np.mean(radial_velocity):.3e})")
-        plt.xlabel('V_rest (cm.s-1)')
-        plt.ylabel('K_p (cm.s-1)')
-        plt.savefig(os.path.join(output_dir, 'pseudo_retrieval.png'))
-
-    return logls, wavelengths, retrieval_models
-
-
-def co_added_retrieval(wavelength_instrument, reduced_mock_observations, true_wavelength, true_spectrum, star_radiosity,
-                       true_parameters, radial_velocity, error, orbital_phases, plot=False, output_dir=None):
-    ccfs, log_l_bs, _, _, log_ls = simple_log_l(
-        np.asarray([wavelength_instrument] * reduced_mock_observations.shape[0]),
-        np.ma.asarray(reduced_mock_observations),
-        true_wavelength,
-        true_spectrum,
-        star_radiosity,
-        true_parameters,
-        lsf_fwhm=3e5,  # cm.s-1
-        pixels_per_resolution_element=2,
-        instrument_resolving_power=true_parameters['instrument_resolving_power'].value,
-        radial_velocity=radial_velocity,
-        kp=true_parameters['planet_max_radial_orbital_velocity'].value,
-        error=error[0, 0, :]
-    )
-
-    log_l_tot, v_rest, kps = simple_co_added_ccf(
-        log_ls, orbital_phases, radial_velocity, true_parameters['planet_max_radial_orbital_velocity'].value,
-        true_parameters['planet_orbital_inclination'].value, 3e5, 2
-    )
-
-    i_peak = np.where(log_l_tot[0] == np.max(log_l_tot[0]))
-
-    if plot:
-        plt.figure()
-        plt.imshow(log_l_tot[0], origin='lower', extent=[v_rest[0], v_rest[-1], kps[0], kps[-1]], aspect='auto')
-        plt.plot([v_rest[0], v_rest[-1]], [kps[i_peak[0]], kps[i_peak[0]]], color='r')
-        plt.vlines([v_rest[i_peak[1]]], ymin=[kps[0]], ymax=[kps[-1]], color='r')
-        plt.title(f"Best Kp = {kps[i_peak[0]][0]:.3e} "
-                  f"(true = {true_parameters['planet_max_radial_orbital_velocity'].value:.3e}), "
-                  f"best V_rest = {v_rest[i_peak[1]][0]:.3e} "
-                  f"(true = {np.mean(radial_velocity):.3e})")
-        plt.xlabel('V_rest (cm.s-1)')
-        plt.ylabel('K_p (cm.s-1)')
-        plt.savefig(os.path.join(output_dir, 'co_added_log_l.png'))
-
-    return log_l_tot, v_rest, kps, i_peak
-
-
-def save_all(directory, mock_observations, noise, reduced_mock_observations, log_l_tot, v_rest, kps,
-             log_l_pseudo_retrieval,
-             wvl_pseudo_retrieval, models_pseudo_retrieval, true_parameters, instrument_snr):
-    print('Saving...')
-
-    fname = os.path.join(directory, 'run_parameters.npz')
-
-    np.savez_compressed(
-        file=fname,
-        mock_observations=mock_observations,
-        mock_observations_mask=mock_observations.mask,
-        noise=noise,
-        reduced_mock_observations=reduced_mock_observations,
-        reduced_mock_observations_mask=reduced_mock_observations.mask,
-        log_l_tot=log_l_tot,
-        v_rest=v_rest,
-        kps=kps,
-        log_l_pseudo_retrieval=log_l_pseudo_retrieval,
-        wvl_pseudo_retrieval=wvl_pseudo_retrieval,
-        models_pseudo_retrieval=models_pseudo_retrieval,
-        instrument_snr=instrument_snr,
-        instrument_snr_mask=instrument_snr.mask,
-        # true_parameters=true_parameters
-    )
-
-
-def load_all(directory):
-    print('Loading...')
-
-    load_dict = np.load(os.path.join(directory, 'run_parameters.npz'))
-
-    mock_observations = load_dict['mock_observations']
-    noise = load_dict['noise']
-    reduced_mock_observations = load_dict['reduced_mock_observations']
-    log_l_tot = load_dict['log_l_tot']
-    v_rest = load_dict['v_rest']
-    kps = load_dict['kps']
-    log_l_pseudo_retrieval = load_dict['log_l_pseudo_retrieval']
-    wvl_pseudo_retrieval = load_dict['wvl_pseudo_retrieval']
-    models_pseudo_retrieval = load_dict['mock_observations_mask']
-    #true_parameters = load_dict['true_parameters']
-    instrument_snr = load_dict['instrument_snr']
-
-    mock_observations = np.ma.asarray(mock_observations)
-    mock_observations.mask = load_dict['mock_observations_mask']
-
-    reduced_mock_observations = np.ma.asarray(reduced_mock_observations)
-    reduced_mock_observations.mask = load_dict['reduced_mock_observations_mask']
-
-    instrument_snr = np.ma.asarray(instrument_snr)
-    instrument_snr.mask = load_dict['instrument_snr_mask']
-
-    return mock_observations, noise, \
-        reduced_mock_observations, log_l_tot, v_rest, kps, log_l_pseudo_retrieval, \
-        wvl_pseudo_retrieval, models_pseudo_retrieval, \
-        instrument_snr
-
-
-def main():
-    from mpi4py import MPI
-
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-
-    planet_name = 'HD 209458 b'
-    planet = Planet.get(planet_name)
-
-    retrieval_name = 't_H2O_78-79'
-    n_live_points = 200
-    add_noise = False
-
-    band = 'M'
-
-    wavelengths_borders = {
-        'L': [2.85, 4.20],
-        'M': [4.78, 4.79]  # [4.5, 5.5],
-    }
-
-    integration_times_ref = {
-        'L': 20.83,
-        'M': 76.89
-    }
-
-    if rank == 0:
-        # Initialize parameters
-        retrieval_name, retrieval_directory, \
-            model, pressures, true_parameters, line_species, rayleigh_species, continuum_species, \
-            retrieval_model, \
-            wavelength_instrument, reduced_mock_observations, error \
-            = init_parameters(
-                planet, retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref
-            )
-
-        retrieval_parameters = {
-            'retrieval_name': retrieval_name,
-            'prt_object': model,
-            'pressures': pressures,
-            'parameters': true_parameters,
-            'line_species': line_species,
-            'rayleigh_species': rayleigh_species,
-            'continuum_species': continuum_species,
-            'retrieval_model': retrieval_model,
-            'wavelength_instrument': wavelength_instrument,
-            'observed_spectra': reduced_mock_observations,
-            'observations_uncertainties': error
-        }
-
-        retrieval_directory = retrieval_directory
-    else:
-        print(f"Rank {rank} waiting for main process to finish...")
-        retrieval_parameters = None
-        retrieval_directory = ''
-
-    retrieval_parameters = comm.bcast(retrieval_parameters, root=0)
-    retrieval_directory = comm.bcast(retrieval_directory, root=0)
-
-    # Initialize retrieval
-    run_definitions = init_run(**retrieval_parameters)
-
-    retrieval = Retrieval(
-        run_definitions,
-        output_dir=retrieval_directory,
-        sample_spec=False,
-        ultranest=False,
-        pRT_plot_style=False
-    )
-
-    retrieval.run(
-        sampling_efficiency=0.8,
-        n_live_points=n_live_points,
-        const_efficiency_mode=False,
-        resume=False
-    )
-
-    if rank == 0:
-        sample_dict, parameter_dict = retrieval.get_samples(
-            output_dir=retrieval_directory + os.path.sep,
-            ret_names=[retrieval_name]
-        )
-
-        n_param = len(parameter_dict[retrieval_name])
-        parameter_plot_indices = {retrieval_name: np.arange(0, n_param)}
-
-        true_values = {retrieval_name: []}
-
-        for p in parameter_dict[retrieval_name]:
-            true_values[retrieval_name].append(np.mean(retrieval_parameters['parameters'][p].value))
-
-        fig = contour_corner(sample_dict, parameter_dict, os.path.join(retrieval_directory, 'test_corner.png'),
-                             parameter_plot_indices=parameter_plot_indices,
-                             true_values=true_values, prt_plot_style=False)
-
-        fig.show()
 
 
 if __name__ == '__main__':
