@@ -439,7 +439,6 @@ class Data:
         """
         if beta is None:
             # "Automatically optimise" for beta
-            model -= model.mean()  # TODO put that in the pipeline!
             model = alpha * model
             chi2 = data - model
             chi2 /= uncertainties
@@ -449,7 +448,6 @@ class Data:
             return - 0.5 * data.size * np.log(chi2 / data.size)
         else:
             # Classical log-likelihood
-            model -= model.mean()
             model = alpha * model
             uncertainties = beta * uncertainties
             chi2 = data - model

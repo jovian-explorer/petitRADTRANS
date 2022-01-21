@@ -320,7 +320,7 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
         integration_time=integration_times_ref[band],
         integration_time_ref=integration_times_ref[band],
         wavelength_instrument=true_parameters['wavelength_instrument'].value,
-        instrument_snr=300 * np.ma.ones(wavelength_instrument.shape),#instrument_snr,
+        instrument_snr=instrument_snr,
         instrument_resolving_power=true_parameters['instrument_resolving_power'].value,
         planet_radius=true_parameters['R_pl'].value,
         star_radius=true_parameters['Rstar'].value,
@@ -415,7 +415,7 @@ def init_run(retrieval_name, prt_object, pressures, parameters, line_species, ra
         scattering=False  # scattering is automatically included for transmission spectra
     )
 
-    retrieved_parameters = []
+    # retrieved_parameters = []
     retrieved_parameters = [
         'planet_max_radial_orbital_velocity',
         'planet_rest_frame_shift'
@@ -563,16 +563,16 @@ def main():
     planet_name = 'HD 209458 b'
     planet = Planet.get(planet_name)
 
-    retrieval_name = 't_kp_vr_H2O_78-79'
+    retrieval_name = 't_kp_vr_H2O_79-80'
     n_live_points = 200
-    add_noise = False
-    apply_pipeline = False
+    add_noise = True
+    apply_pipeline = True
 
     band = 'M'
 
     wavelengths_borders = {
         'L': [2.85, 4.20],
-        'M': [4.78, 4.79]  # [4.5, 5.5],
+        'M': [4.79, 4.80]  # [4.5, 5.5],
     }
 
     integration_times_ref = {

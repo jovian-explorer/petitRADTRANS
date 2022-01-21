@@ -352,6 +352,7 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
 
     # Save no noise observations
     mock_observation_without_noise = copy.deepcopy(mock_observation)
+    mock_observation_without_noise = np.asarray([mock_observation_without_noise])
 
     # Add noise to the model
     if add_noise:
@@ -376,6 +377,10 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
             np.asarray(noise_per_pixel.mask * np.ones(mock_observation.shape)),
             mock_observation
         )
+
+        if mock_observation.mask.size == 1:  # no masked values in noise
+            mock_observation.mask = np.zeros(mock_observation.shape, dtype=bool)  # add full-fledged mask
+
     else:
         mock_observation = np.ma.asarray([mock_observation])  # add a third dimension for output consistency
         mock_observation.mask = np.zeros(mock_observation.shape, dtype=bool)
