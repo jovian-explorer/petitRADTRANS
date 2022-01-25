@@ -142,6 +142,25 @@ def get_mock_secondary_eclipse_spectra(wavelength_model, spectrum_model, star_sp
     return 1 + (planet_radiosity * planet_radius ** 2) / (star_spectral_radiosity * star_radius ** 2)
 
 
+def get_mock_transit_spectra(wavelength_model, transit_radius_model,
+                             star_radius,
+                             wavelength_instrument, instrument_resolving_power,
+                             planet_velocities, system_observer_radial_velocities,
+                             planet_rest_frame_shift=0.0):
+    planet_transit_radius = convolve_shift_rebin(
+        wavelength_model,
+        transit_radius_model,
+        instrument_resolving_power,
+        wavelength_instrument,
+        planet_velocities=planet_velocities
+            + system_observer_radial_velocities
+            + planet_rest_frame_shift  # planet + system velocity
+    )
+
+    # TODO add star spot/flare, planet self-emission?
+    return 1 - (planet_transit_radius ** 2) / (star_radius ** 2)
+
+
 def get_noise(mock_observation, instrument_snr, observing_duration, planet_visible_duration, mode='eclipse', number=1):
     """
 
@@ -335,12 +354,16 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
             planet_rest_frame_shift=0.0
         )
     elif mode == 'transit':
-        mock_observation = convolve_shift_rebin(
-            wavelength_model, planet_spectrum_model, instrument_resolving_power, wavelength_instrument,
-            planet_velocities + system_observer_radial_velocities  # planet + system velocity
+        mock_observation = get_mock_transit_spectra(
+            wavelength_model=wavelength_model,
+            transit_radius_model=planet_spectrum_model,
+            star_radius=star_radius,
+            wavelength_instrument=wavelength_instrument,
+            instrument_resolving_power=instrument_resolving_power,
+            planet_velocities=planet_velocities,
+            system_observer_radial_velocities=system_observer_radial_velocities,
+            planet_rest_frame_shift=0.0
         )
-
-        mock_observation = np.asarray([1 - mock_observation])
     else:
         raise ValueError(f"Unknown mode '{mode}', must be 'transit' or 'eclipse'")
 

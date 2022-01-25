@@ -17,7 +17,7 @@ import numpy as np
 import petitRADTRANS.nat_cst as nc
 from petitRADTRANS.ccf.ccf_utils import radiosity_erg_hz2radiosity_erg_cm
 from petitRADTRANS.ccf.mock_observation import convolve_shift_rebin, generate_mock_observations, get_orbital_phases, \
-    get_mock_secondary_eclipse_spectra
+    get_mock_secondary_eclipse_spectra, get_mock_transit_spectra
 from petitRADTRANS.ccf.model_containers import Planet
 from petitRADTRANS.ccf.model_containers import SpectralModel
 from petitRADTRANS.ccf.pipeline import remove_throughput, remove_telluric_lines, simple_pipeline
@@ -105,7 +105,7 @@ def get_radial_velocity_lag(radial_velocity, kp, lsf_fwhm, pixels_per_resolution
     return radial_velocity_lag
 
 
-def get_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=False):
+def get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=False):
     wlen_model, planet_radiosity = radiosity_model(prt_object, parameters)
 
     # TODO make these steps as a function common with generate_mock_observations
@@ -133,7 +133,7 @@ def get_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=False):
     # TODO generation of multiple-detector models
 
     if parameters['apply_pipeline'].value:
-        spectrum_model = simple_pipeline(np.array([spectrum_model]))
+        spectrum_model = simple_pipeline(np.array([spectrum_model]), remove_outliers=False)
     else:
         spectrum_model = np.array([spectrum_model])
         spectrum_model -= 1
@@ -141,9 +141,43 @@ def get_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=False):
     return parameters['wavelength_instrument'].value, spectrum_model
 
 
-def init_model(planet, w_bords, p0=1e-2):
+def get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=False):
+    wlen_model, transit_radius = transit_radius_model(prt_object, parameters)
+
+    # TODO make these steps as a function common with generate_mock_observations
+    planet_velocities = Planet.calculate_planet_radial_velocity(
+        parameters['planet_max_radial_orbital_velocity'].value,
+        parameters['planet_orbital_inclination'].value,
+        parameters['orbital_phases'].value
+    )
+
+    spectrum_model = get_mock_transit_spectra(
+        wavelength_model=wlen_model,
+        transit_radius_model=transit_radius,
+        star_radius=parameters['Rstar'].value,
+        wavelength_instrument=parameters['wavelength_instrument'].value,
+        instrument_resolving_power=parameters['instrument_resolving_power'].value,
+        planet_velocities=planet_velocities,
+        system_observer_radial_velocities=parameters['system_observer_radial_velocities'].value,
+        planet_rest_frame_shift=parameters['planet_rest_frame_shift'].value
+    )
+
+    # TODO add telluric transmittance (probably)
+    # TODO add throughput variations? (maybe take raw data spectrum and multiply by mean(max(flux), axis=time))
+    # TODO generation of multiple-detector models
+
+    if parameters['apply_pipeline'].value:
+        spectrum_model = simple_pipeline(np.array([spectrum_model]), remove_outliers=False)
+    else:
+        spectrum_model = np.array([spectrum_model])
+        spectrum_model = 1 - spectrum_model
+
+    return parameters['wavelength_instrument'].value, spectrum_model
+
+
+def init_model(planet, w_bords, line_species_str, p0=1e-2):
     print('Initialization...')
-    line_species_str = 'H2O_main_iso'  # 'H2O_Exomol'
+    #line_species_str = ['H2O_main_iso']  # ['H2O_main_iso', 'CO_all_iso']  # 'H2O_Exomol'
 
     pressures = np.logspace(-6, 2, 100)
     temperature = guillot_global(
@@ -159,15 +193,17 @@ def init_model(planet, w_bords, p0=1e-2):
     star_radius = planet.star_radius
     star_effective_temperature = planet.star_effective_temperature
     p_cloud = 1e2
-    line_species = [line_species_str]
+    line_species = line_species_str
     rayleigh_species = ['H2', 'He']
     continuum_species = ['H2-H2', 'H2-He']
 
     mass_fractions = {
         'H2': 0.74,
         'He': 0.24,
-        line_species_str: 1e-3
+       # line_species_str: 1e-3
     }
+    for species in line_species_str:
+        mass_fractions[species] = 1e-3
 
     m_sum = 0.0  # Check that the total mass fraction of all species is <1
 
@@ -184,7 +220,7 @@ def init_model(planet, w_bords, p0=1e-2):
 
     print('Setting up models...')
     atmosphere = Radtrans(
-        line_species=[line_species_str],
+        line_species=line_species_str,
         rayleigh_species=['H2', 'He'],
         continuum_opacities=['H2-H2', 'H2-He'],
         wlen_bords_micron=w_bords,
@@ -197,13 +233,15 @@ def init_model(planet, w_bords, p0=1e-2):
     return pressures, temperature, gravity, radius, star_radius, star_effective_temperature, p0, p_cloud, \
         mean_molar_mass, mass_fractions, \
         line_species, rayleigh_species, continuum_species, \
-        line_species_str, atmosphere
+        atmosphere
 
 
-def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
+def init_parameters(planet, line_species_str, mode,
+                    retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
                     apply_pipeline=True):
     star_name = planet.host_name.replace(' ', '_')
 
+    retrieval_name += f'_{mode}'
     retrieval_name += f'_{n_live_points}lp'
 
     if not apply_pipeline:
@@ -231,8 +269,15 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
     instrument_snr = np.ma.masked_invalid(data[wh, 1] / data[wh, 2])
     instrument_snr = np.ma.masked_less_equal(instrument_snr, 1.0)
 
-    phase_start = 0.507  # just after secondary eclipse
-    orbital_phases = get_orbital_phases(phase_start, planet.orbital_period, integration_times_ref[band], ndit_half)
+    if mode == 'eclipse':
+        phase_start = 0.507  # just after secondary eclipse
+        orbital_phases = get_orbital_phases(phase_start, planet.orbital_period, integration_times_ref[band], ndit_half)
+    elif mode == 'transit':
+        orbital_phases = get_orbital_phases(0.0, planet.orbital_period, integration_times_ref[band], ndit_half)
+        orbital_phases -= np.max(orbital_phases) / 2
+    else:
+        raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
+
     airmass = None
     telluric_transmittance = None  # TODO get telluric transmittance
 
@@ -261,7 +306,7 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
     pressures, temperature, gravity, radius, star_radius, star_effective_temperature, \
         p0, p_cloud, mean_molar_mass, mass_fractions, \
         line_species, rayleigh_species, continuum_species, \
-        line_species_str, model = init_model(planet, model_wavelengths_border[band])
+        model = init_model(planet, model_wavelengths_border[band], line_species_str)
 
     retrieval_directory = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval', retrieval_name))
 
@@ -275,7 +320,6 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
         'log_Pcloud': Param(np.log10(p_cloud)),
         'log_g': Param(np.log10(gravity)),
         'reference_pressure': Param(p0),
-        'H2O_main_iso': Param(mass_fractions['H2O_main_iso']),
         'star_effective_temperature': Param(star_effective_temperature),
         'Rstar': Param(star_radius),
         'semi_major_axis': Param(planet.orbit_semi_major_axis),
@@ -298,11 +342,21 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
     print('----\n', model_name)
 
     # Select which model to use
-    retrieval_model = get_retrieval_model
+    if mode == 'eclipse':
+        retrieval_model = get_secondary_eclipse_retrieval_model
+    elif mode == 'transit':
+        retrieval_model = get_transit_retrieval_model
+    else:
+        raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
 
     # Generate and save mock observations
     print('True spectrum calculation...')
-    true_wavelength, true_spectrum = radiosity_model(model, true_parameters)
+    if mode == 'eclipse':
+        true_wavelength, true_spectrum = radiosity_model(model, true_parameters)
+    elif mode == 'transit':
+        true_wavelength, true_spectrum = transit_radius_model(model, true_parameters)
+    else:
+        raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
 
     star_radiosity = fr.rebin_spectrum(
         star_data[:, 0],
@@ -330,7 +384,7 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
         # TODO set to 0 for now since SNR data from Roy is at 0, but find RV source eventually
         planet_max_radial_orbital_velocity=true_parameters['planet_max_radial_orbital_velocity'].value,
         planet_orbital_inclination=true_parameters['planet_orbital_inclination'].value,
-        mode='eclipse',
+        mode=mode,
         add_noise=add_noise,
         apply_snr_mask=True,
         number=1
@@ -341,7 +395,7 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
         reduced_mock_observations = simple_pipeline(
             mock_observations, airmass,
             remove_standard_deviation=False,
-            remove_outliers=add_noise  # no need to remove outliers if no noise
+            remove_outliers=False  # no need to remove outliers if no noise
         )
 
         if add_noise:
@@ -353,27 +407,34 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
         else:
             reduced_mock_observations_without_noise = copy.deepcopy(reduced_mock_observations)
     else:
-        reduced_mock_observations = copy.deepcopy(mock_observations) - 1
+        print('Pipeline not applied!')
+        if mode == 'eclipse':
+            reduced_mock_observations = copy.deepcopy(mock_observations) - 1
+        elif mode == 'transit':
+            reduced_mock_observations = 1 - copy.deepcopy(mock_observations)
+        else:
+            raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
 
         if add_noise:
-            reduced_mock_observations_without_noise = copy.deepcopy(mock_observations_without_noise) - 1
+            if mode == 'eclipse':
+                reduced_mock_observations_without_noise = copy.deepcopy(mock_observations_without_noise) - 1
+            elif mode == 'transit':
+                reduced_mock_observations_without_noise = 1 - copy.deepcopy(mock_observations_without_noise)
+            else:
+                raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
         else:
             reduced_mock_observations_without_noise = copy.deepcopy(reduced_mock_observations)
 
+    # Check if the retrieval model with the true parameters is the same as the reduced mock observations without noise
     w, r = retrieval_model(model, true_parameters)
 
     if not np.all(w == wavelength_instrument):
         raise ValueError('wrong wvl')
 
     if not np.all(r == reduced_mock_observations_without_noise):
-        raise ValueError('wrong model')
-
-    print("Consistency check OK")
-
-    if not apply_pipeline:
-        for i, detector in enumerate(reduced_mock_observations):
-            for j, data in enumerate(detector):
-                reduced_mock_observations[i, j, :] -= data.mean()
+        print("Warning: wrong model")
+    else:
+        print("True model vs observations consistency check OK")
 
     error = np.ones(reduced_mock_observations.shape) / instrument_snr
 
@@ -384,16 +445,19 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
         plot=True, output_dir=retrieval_directory
     )
 
-    print('Running pseudo-retrieval...')
-    kps_pseudo_retrieval = np.linspace(kps[i_peak[0][0] - 5], kps[i_peak[0][0] + 5], 7)
-    v_rest_pseudo_retrieval = np.linspace(v_rest[i_peak[1][0] - 5], v_rest[i_peak[1][0] + 5], 7)
-
-    log_l_pseudo_retrieval, wvl_pseudo_retrieval, models_pseudo_retrieval = pseudo_retrieval(
-        true_parameters, kps_pseudo_retrieval, v_rest_pseudo_retrieval,
-        model, reduced_mock_observations, instrument_snr,
-        true_parameters, np.zeros(ndit_half),
-        plot=True, output_dir=retrieval_directory
-    )
+    # print('Running pseudo-retrieval...')
+    # kps_pseudo_retrieval = np.linspace(kps[i_peak[0][0] - 5], kps[i_peak[0][0] + 5], 7)
+    # v_rest_pseudo_retrieval = np.linspace(v_rest[i_peak[1][0] - 5], v_rest[i_peak[1][0] + 5], 7)
+    #
+    # log_l_pseudo_retrieval, wvl_pseudo_retrieval, models_pseudo_retrieval = pseudo_retrieval(
+    #     true_parameters, kps_pseudo_retrieval, v_rest_pseudo_retrieval,
+    #     model, reduced_mock_observations, instrument_snr,
+    #     true_parameters, np.zeros(ndit_half),
+    #     plot=True, output_dir=retrieval_directory
+    # )
+    log_l_pseudo_retrieval = None
+    wvl_pseudo_retrieval = None
+    models_pseudo_retrieval = None
 
     save_all(retrieval_directory, mock_observations, error, reduced_mock_observations, log_l_tot, v_rest, kps,
              log_l_pseudo_retrieval,
@@ -403,6 +467,36 @@ def init_parameters(planet, retrieval_name, n_live_points, add_noise, band, wave
         model, pressures, true_parameters, line_species, rayleigh_species, continuum_species, \
         retrieval_model, \
         wavelength_instrument, reduced_mock_observations, error
+
+
+def init_retrieval_model(prt_object, parameters):
+    # Make the P-T profile
+    pressures = prt_object.press * 1e-6  # bar to cgs
+    temperatures = guillot_global(
+        pressure=pressures,
+        kappa_ir=0.01,
+        gamma=0.4,
+        grav=10 ** parameters['log_g'].value,
+        t_int=200,
+        t_equ=parameters['Temperature'].value
+    )
+
+    # Make the abundance profiles
+    abundances = {}
+    m_sum = 0.0  # Check that the total mass fraction of all species is <1
+
+    for species in prt_object.line_species:
+        spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities (see below)
+        abundances[species] = 10 ** parameters[spec].value * np.ones_like(pressures)
+        m_sum += 10 ** parameters[spec].value
+
+    abundances['H2'] = 0.74 * (1.0 - m_sum) * np.ones_like(pressures)
+    abundances['He'] = 0.24 * (1.0 - m_sum) * np.ones_like(pressures)
+
+    # Find the mean molecular weight in each layer
+    mmw = calc_MMW(abundances)
+
+    return temperatures, abundances, mmw
 
 
 def init_run(retrieval_name, prt_object, pressures, parameters, line_species, rayleigh_species, continuum_species,
@@ -563,10 +657,13 @@ def main():
     planet_name = 'HD 209458 b'
     planet = Planet.get(planet_name)
 
-    retrieval_name = 't_kp_vr_H2O_79-80'
+    line_species_str = ['CO_all_iso', 'H2O_main_iso']
+
+    retrieval_name = 't_kp_vr_CO_H2O_79-80'
+    mode = 'eclipse'
     n_live_points = 200
     add_noise = True
-    apply_pipeline = True
+    apply_pipeline = False
 
     band = 'M'
 
@@ -582,12 +679,18 @@ def main():
 
     if rank == 0:
         # Initialize parameters
+        '''
+        For retrievals: the pipeline must be exactly the same, step-by-step, for both the data and the model.
+        It is probable that any perturbation (telluric lines, variable throughput) must be mimicked in the model as 
+        well, or very well removed by the pipeline.
+        '''
         retrieval_name, retrieval_directory, \
             model, pressures, true_parameters, line_species, rayleigh_species, continuum_species, \
             retrieval_model, \
             wavelength_instrument, reduced_mock_observations, error \
             = init_parameters(
-                planet, retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
+                planet, line_species_str, mode,
+                retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
                 apply_pipeline=apply_pipeline
             )
 
@@ -613,6 +716,14 @@ def main():
 
     retrieval_parameters = comm.bcast(retrieval_parameters, root=0)
     retrieval_directory = comm.bcast(retrieval_directory, root=0)
+
+    # Check if all observations are the same
+    obs_tmp = comm.allgather(retrieval_parameters['observed_spectra'])
+
+    for obs_tmp_proc in obs_tmp[1:]:
+        assert np.allclose(obs_tmp_proc, obs_tmp[0], atol=0, rtol=1e-15)
+
+    print(f"Shared observations consistency check OK")
 
     # Initialize retrieval
     run_definitions = init_run(**retrieval_parameters)
@@ -693,7 +804,7 @@ def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, 
         for kp_ in kps:
             ppp['planet_max_radial_orbital_velocity'].value = kp_
 
-            w, s = get_retrieval_model(model, ppp)
+            w, s = get_secondary_eclipse_retrieval_model(model, ppp)
             wavelengths[-1].append(w)
             retrieval_models[-1].append(s)
 
@@ -731,31 +842,7 @@ def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, 
 
 
 def radiosity_model(prt_object, parameters):
-    # Make the P-T profile
-    pressures = prt_object.press * 1e-6  # bar to cgs
-    temperatures = guillot_global(
-        pressure=pressures,
-        kappa_ir=0.01,
-        gamma=0.4,
-        grav=10 ** parameters['log_g'].value,
-        t_int=200,
-        t_equ=parameters['Temperature'].value
-    )
-
-    # Make the abundance profiles
-    abundances = {}
-    m_sum = 0.0  # Check that the total mass fraction of all species is <1
-
-    for species in prt_object.line_species:
-        spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities (see below)
-        abundances[species] = 10 ** parameters[spec].value * np.ones_like(pressures)
-        m_sum += 10 ** parameters[spec].value
-
-    abundances['H2'] = 0.74 * (1.0 - m_sum) * np.ones_like(pressures)
-    abundances['He'] = 0.24 * (1.0 - m_sum) * np.ones_like(pressures)
-
-    # Find the mean molecular weight in each layer
-    mmw = calc_MMW(abundances)
+    temperatures, abundances, mmw = init_retrieval_model(prt_object, parameters)
 
     # Calculate the spectrum
     prt_object.calc_flux(
@@ -775,6 +862,26 @@ def radiosity_model(prt_object, parameters):
     wlen_model = nc.c / prt_object.freq * 1e4  # wlen in micron
 
     return wlen_model, planet_radiosity
+
+
+def transit_radius_model(prt_object, parameters):
+    temperatures, abundances, mmw = init_retrieval_model(prt_object, parameters)
+
+    # Calculate the spectrum
+    prt_object.calc_transm(
+        temp=temperatures,
+        abunds=abundances,
+        gravity=10 ** parameters['log_g'].value,
+        mmw=mmw,
+        P0_bar=parameters['reference_pressure'].value,
+        R_pl=parameters['R_pl'].value
+    )
+
+    # Transform the outputs into the units of our data.
+    planet_transit_radius = prt_object.transm_rad
+    wlen_model = nc.c / prt_object.freq * 1e4  # wlen in micron
+
+    return wlen_model, planet_transit_radius
 
 
 def retrieval_run(retrieval_name, n_live_points, model, pressures, true_parameters,

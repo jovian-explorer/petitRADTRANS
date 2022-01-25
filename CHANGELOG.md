@@ -4,7 +4,7 @@ All notable changes to the CCF module will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com)
 and this project adheres to [Semantic Versioning](http://semver.org).
 
-## [2.4.0-a11] - 2021-01-13
+## [2.4.0-a12] - 2021-01-25
 ### Added
 - [WIP] High-resolution retrieval.
 - Possibility to initialize a `retrieval.Data` class without needing a file.
@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 - Package structure.
 - Running mean now uses the faster `scipy.ndimage.filters.uniform_filter1d` implementation.
 - Tutorial updated.
+- Character limit in retrieval output directory increased from 100 to 200.
 - Code clean-up.
 
 ### Removed

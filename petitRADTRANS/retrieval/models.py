@@ -185,7 +185,7 @@ def emission_model_diseq(pRT_object,
     f_lambda = f_lambda * 1e-7
     spectrum_model = surf_to_meas(f_lambda,
                                   r_pl,
-                                  parameters['D_pl'].value)  # print(wavelength_model,spectrum_model)
+                                  parameters['D_pl'].value)
 
     return wlen_model, spectrum_model
 

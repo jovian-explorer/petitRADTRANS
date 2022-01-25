@@ -201,8 +201,8 @@ class Retrieval:
 
         prefix = self.output_dir + 'out_PMN/' + self.retrieval_name + '_'
 
-        if len(self.output_dir + 'out_PMN/') > 100:
-            logging.error("PyMultinest requires output directory names to be <100 characters.")
+        if len(self.output_dir + 'out_PMN/') > 200:
+            logging.error("PyMultinest requires output directory names to be <200 characters.")
             sys.exit(3)
 
         # How many free parameters?
@@ -603,7 +603,6 @@ class Retrieval:
                                                      self.PT_plot_mode,
                                                      AMR=self.rd.AMR)
                     # Sanity checks on outputs
-                    # print(spectrum_model)
                     if spectrum_model is None:
                         return -1e99
 
