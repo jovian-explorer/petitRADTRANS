@@ -11,6 +11,14 @@ from petitRADTRANS.fort_rebin import fort_rebin as fr
 from petitRADTRANS.physics import doppler_shift
 
 
+def add_telluric_lines(mock_observation, telluric_transmittance):
+    return mock_observation * telluric_transmittance
+
+
+def add_variable_throughput(mock_observation, telluric_transmittance):
+    return np.transpose(telluric_transmittance * np.transpose(mock_observation))
+
+
 def convolve_rebin(input_wavelengths, input_flux,
                    instrument_resolving_power, pixel_sampling, instrument_wavelength_range):
     """
@@ -126,8 +134,8 @@ def get_mock_secondary_eclipse_spectra(wavelength_model, spectrum_model, star_sp
         instrument_resolving_power,
         wavelength_instrument,
         planet_velocities=planet_velocities
-            + system_observer_radial_velocities
-            + planet_rest_frame_shift  # planet + system velocity
+        + system_observer_radial_velocities
+        + planet_rest_frame_shift  # planet + system velocity
     )
 
     star_spectral_radiosity = convolve_shift_rebin(
@@ -158,7 +166,7 @@ def get_mock_transit_spectra(wavelength_model, transit_radius_model,
     )
 
     # TODO add star spot/flare, planet self-emission?
-    return 1 - (planet_transit_radius ** 2) / (star_radius ** 2)
+    return 1 - (planet_transit_radius / star_radius) ** 2
 
 
 def get_noise(mock_observation, instrument_snr, observing_duration, planet_visible_duration, mode='eclipse', number=1):
@@ -229,7 +237,7 @@ def get_orbital_phases(phase_start, orbital_period, dit, ndit):
     """
     times = np.linspace(0, dit * ndit, ndit)
 
-    return np.mod(phase_start + times / orbital_period, 1.0)  # the 2 * pi factors cancel out
+    return np.mod(phase_start + times / orbital_period, 1.0), times  # the 2 * pi factors cancel out
 
 
 def generate_mock_observations(wavelength_model, planet_spectrum_model,
@@ -368,10 +376,10 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
         raise ValueError(f"Unknown mode '{mode}', must be 'transit' or 'eclipse'")
 
     # Apply Earth's atmospheric effect
-    mock_observation *= telluric_transmittance
+    mock_observation = add_telluric_lines(mock_observation, telluric_transmittance)
 
     # Apply variable throughput
-    mock_observation = np.transpose(variable_throughput * np.transpose(mock_observation))
+    mock_observation = add_variable_throughput(mock_observation, variable_throughput)
 
     # Save no noise observations
     mock_observation_without_noise = copy.deepcopy(mock_observation)
@@ -389,11 +397,13 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
 
         rng = np.random.default_rng()
 
-        mock_observation = mock_observation + rng.normal(
+        noise = rng.normal(
             loc=0.,
             scale=noise_per_pixel,
             size=(number, np.size(mock_observation, axis=0), np.size(mock_observation, axis=1))
         )
+
+        mock_observation = mock_observation + noise
 
         # Mask invalid columns
         mock_observation = np.ma.masked_where(
@@ -407,15 +417,14 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
     else:
         mock_observation = np.ma.asarray([mock_observation])  # add a third dimension for output consistency
         mock_observation.mask = np.zeros(mock_observation.shape, dtype=bool)
+        noise = np.zeros(mock_observation.shape)
 
         if apply_snr_mask:
             mock_observation.mask[:, :, :] = instrument_snr.mask
-            noise_per_pixel = 1 / instrument_snr * np.sqrt(integration_time / integration_time_ref)
         else:
             mock_observation.mask = np.zeros(mock_observation.shape, dtype=bool)  # add full-fledged mask
-            noise_per_pixel = np.zeros_like(mock_observation)
 
-    return mock_observation, noise_per_pixel, mock_observation_without_noise
+    return mock_observation, noise, mock_observation_without_noise
 
 
 def simple_mock_observation(wavelengths, flux, snr_per_res_element, observing_time, transit_duration,

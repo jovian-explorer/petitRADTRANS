@@ -7,7 +7,7 @@ from warnings import warn
 import numpy as np
 
 
-def __remove_throughput(spectral_data,
+def __remove_throughput(spectral_data, reduction_matrix,
                         throughput_correction_lower_bound=0.70, throughput_correction_upper_bound=None):
     if throughput_correction_upper_bound is None:
         # Ensure that at least the brightest pixel is removed, and that the upper bound is greater than the lower bound
@@ -50,11 +50,12 @@ def __remove_throughput(spectral_data,
 
     for i, correction_coefficient in enumerate(brightest_data_wavelength):
         spectral_data_corrected[i, :] = spectral_data[i, :] / correction_coefficient
+        reduction_matrix[i, :] /= correction_coefficient
 
-    return spectral_data_corrected
+    return spectral_data_corrected, reduction_matrix
 
 
-def __remove_throughput_masked(spectral_data,
+def __remove_throughput_masked(spectral_data, reduction_matrix,
                                throughput_correction_lower_bound=0.70, throughput_correction_upper_bound=None):
     if throughput_correction_upper_bound is None:
         # Ensure that at least the brightest pixel is removed, and that the upper bound is greater than the lower bound
@@ -98,16 +99,18 @@ def __remove_throughput_masked(spectral_data,
 
     for i, correction_coefficient in enumerate(brightest_data_wavelength):
         spectral_data_corrected[i, :] = spectral_data[i, :] / correction_coefficient
+        reduction_matrix[i, :] /= correction_coefficient
 
-    return spectral_data_corrected
+    return spectral_data_corrected, reduction_matrix
 
 
-def remove_throughput(spectral_data,
+def remove_throughput(spectral_data, reduction_matrix,
                       throughput_correction_lower_bound=0.70, throughput_correction_upper_bound=None):
     """Correct for the variable throughput.
 
     Args:
         spectral_data: spectral data to correct
+        reduction_matrix: matrix storing all the operations made to reduce the data
         throughput_correction_lower_bound: [0-1] quantile lower bound on throughput correction
         throughput_correction_upper_bound: [0-1] quantile upper bound on throughput correction
 
@@ -122,23 +125,63 @@ def remove_throughput(spectral_data,
 
     for i, data in enumerate(spectral_data):
         if isinstance(spectral_data, np.ma.core.MaskedArray):
-            spectral_data_corrected[i, :, :] = \
+            spectral_data_corrected[i, :, :], reduction_matrix[i, :, :] = \
                 __remove_throughput_masked(
-                    data, throughput_correction_lower_bound, throughput_correction_upper_bound
+                    data, reduction_matrix[i, :, :],
+                    throughput_correction_lower_bound, throughput_correction_upper_bound
                 )
         elif isinstance(spectral_data, np.ndarray):
-            spectral_data_corrected[i, :, :] = \
+            spectral_data_corrected[i, :, :], reduction_matrix[i, :, :] = \
                 __remove_throughput(
-                    data, throughput_correction_lower_bound, throughput_correction_upper_bound
+                    data, reduction_matrix[i, :, :],
+                    throughput_correction_lower_bound, throughput_correction_upper_bound
                 )
         else:
             raise ValueError(f"spectral_data must be a numpy.ndarray or a numpy.ma.core.MaskedArray, "
                              f"but is of type '{type(spectral_data)}'")
 
-    return spectral_data_corrected
+    return spectral_data_corrected, reduction_matrix
 
 
-def remove_telluric_lines(spectral_data, airmass=None, remove_outliers=True, remove_standard_deviation=False):
+def remove_telluric_lines(spectral_data, reduction_matrix, airmass=None, times=None):
+    """Correct for Earth's atmospheric absorptions.
+
+    Args:
+        spectral_data: spectral data to correct
+        reduction_matrix: matrix storing all the operations made to reduce the data
+        airmass: airmass of the data
+        times: (s) time after first observation: t(i) = dit * (ndit(i) - 1)
+
+    Returns:
+        Spectral data corrected from the telluric transmittance
+    """
+    for j, data in enumerate(spectral_data):
+        # Remove the mean of the telluric lines
+        if airmass is not None:
+            exp_airmass = np.exp(-airmass[j])
+
+            for i in range(np.size(data, axis=1)):
+                # Fit the telluric lines change over time with a 2nd order polynomial
+                # The telluric lines opacity depends on airmass (tau = alpha / cos(theta)), so the telluric lines
+                # transmittance (T = exp(-tau)) depend on exp(airmass)
+                # Using a 1st order polynomial is not enough, as the atm. composition will change slowly over time
+                fit_parameters = np.polyfit(x=exp_airmass, y=data[:, i], deg=2)
+                fit_function = np.poly1d(fit_parameters)
+                fit = fit_function(exp_airmass)  # might be necessary to mask 0 here
+                data[:, i] = data[:, i] / fit
+                reduction_matrix[j, :, i] /= fit
+        else:
+            for i in range(np.size(data, axis=1)):
+                fit_parameters = np.polyfit(x=times, y=data[:, i], deg=2)
+                fit_function = np.poly1d(fit_parameters)
+                fit = fit_function(times)
+                data[:, i] = data[:, i] / fit
+                reduction_matrix[j, :, i] /= fit
+
+    return spectral_data, reduction_matrix
+
+
+def remove_telluric_lines_old(spectral_data, airmass=None, remove_outliers=True, remove_standard_deviation=False):
     """Correct for Earth's atmospheric absorptions.
 
     Args:
@@ -190,30 +233,56 @@ def remove_telluric_lines(spectral_data, airmass=None, remove_outliers=True, rem
     return spectral_data
 
 
-def simple_pipeline(spectral_data, airmass=None,
+def remove_noisy_wavelength_channels(spectral_data, reduction_matrix, mean_subtract=False):
+    for i, data in enumerate(spectral_data):
+        # Get standard deviation over time, for each wavelength channel
+        time_standard_deviation = np.asarray([np.std(data, axis=0)] * np.size(data, axis=0))
+
+        # Mask channels where the standard deviation is greater than the total standard deviation
+        data = np.ma.masked_where(
+            time_standard_deviation > 3 * np.std(data), data
+        )
+
+        spectral_data[i, :, :] = data
+
+    if mean_subtract:
+        mean_spectra = np.mean(spectral_data, axis=2)  # mean over wavelengths of each individual spectrum
+        spectral_data -= mean_spectra
+        reduction_matrix -= mean_spectra
+
+    return spectral_data, reduction_matrix
+
+
+def simple_pipeline(spectral_data, airmass=None, times=None,
                     throughput_correction_lower_bound=0.70, throughput_correction_upper_bound=None,
-                    remove_outliers=True, remove_standard_deviation=False):
+                    mean_subtract=False):
     """Removes the telluric lines and variable throughput of some data.
 
     Args:
         spectral_data: spectral data to correct
         airmass: airmass of the data
+        times: (s) time after first observation: t(i) = dit * (ndit(i) - 1)
         throughput_correction_lower_bound: [0-1] quantile lower bound on throughput correction
         throughput_correction_upper_bound: [0-1] quantile upper bound on throughput correction
-        remove_outliers: if True, remove the pixels 3 standard deviations away from the mean value
-        remove_standard_deviation: if True, remove the standard deviation on time of the data (not recommended)
+        mean_subtract: if True, the data corresponding to each spectrum are mean subtracted
 
     Returns:
         Spectral data corrected from variable throughput
     """
-    spectral_data_corrected = remove_throughput(
-        spectral_data, throughput_correction_lower_bound, throughput_correction_upper_bound
+    reduction_matrix = np.ones(spectral_data.shape)
+
+    spectral_data_corrected, reduction_matrix = remove_throughput(
+        spectral_data, reduction_matrix, throughput_correction_lower_bound, throughput_correction_upper_bound
     )
 
-    spectral_data_corrected = remove_telluric_lines(
-        spectral_data_corrected, airmass,
-        remove_standard_deviation=remove_standard_deviation,
-        remove_outliers=remove_outliers
+    #return spectral_data_corrected, reduction_matrix
+
+    spectral_data_corrected, reduction_matrix = remove_telluric_lines(
+        spectral_data_corrected, airmass, times
     )
 
-    return spectral_data_corrected
+    spectral_data_corrected, reduction_matrix = remove_noisy_wavelength_channels(
+        spectral_data_corrected, reduction_matrix, mean_subtract
+    )
+
+    return spectral_data_corrected, reduction_matrix

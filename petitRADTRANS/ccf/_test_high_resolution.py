@@ -16,7 +16,8 @@ import numpy as np
 
 import petitRADTRANS.nat_cst as nc
 from petitRADTRANS.ccf.ccf_utils import radiosity_erg_hz2radiosity_erg_cm
-from petitRADTRANS.ccf.mock_observation import convolve_shift_rebin, generate_mock_observations, get_orbital_phases, \
+from petitRADTRANS.ccf.mock_observation import add_telluric_lines, add_variable_throughput, \
+    convolve_shift_rebin, generate_mock_observations, get_orbital_phases, \
     get_mock_secondary_eclipse_spectra, get_mock_transit_spectra
 from petitRADTRANS.ccf.model_containers import Planet
 from petitRADTRANS.ccf.model_containers import SpectralModel
@@ -133,10 +134,11 @@ def get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=N
     # TODO generation of multiple-detector models
 
     if parameters['apply_pipeline'].value:
-        spectrum_model = simple_pipeline(np.array([spectrum_model]), remove_outliers=False)
+        spectrum_model, _ = simple_pipeline(np.array([spectrum_model]) / parameters['reduction_matrix'].value)  # thomx
+        #spectrum_model = np.array([spectrum_model]) * parameters['reduction_matrix'].value  # tho
+        spectrum_model = np.array([spectrum_model]) * parameters['reduction_matrix'].value  # thom
     else:
         spectrum_model = np.array([spectrum_model])
-        spectrum_model -= 1
 
     return parameters['wavelength_instrument'].value, spectrum_model
 
@@ -167,10 +169,19 @@ def get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=F
     # TODO generation of multiple-detector models
 
     if parameters['apply_pipeline'].value:
-        spectrum_model = simple_pipeline(np.array([spectrum_model]), remove_outliers=False)
+        impact_parameter = np.mean(2 - spectrum_model, axis=1)
+        #print(impact_parameter.shape, np.mean(impact_parameter))
+        #spectrum_model = np.array([spectrum_model]) * parameters['reduction_matrix'].value  # tho
+        #spectrum_model, _ = simple_pipeline(np.array([spectrum_model]) / parameters['reduction_matrix'].value)  # thomx
+        spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value)]) * parameters['reduction_matrix'].value  # thom
+        #spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value * 1.0001)]) * parameters['reduction_matrix'].value  # thomp
+        #spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value * 0.9999)]) * parameters['reduction_matrix'].value  # thomm
+        #spectrum_model = np.array([add_variable_throughput(spectrum_model, impact_parameter / parameters['reduction_matrix'].value[0, :, 0])]) * parameters['reduction_matrix'].value  # thomi
+        #spectrum_model, _ = simple_pipeline(np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value)]))  # thoma
+        #print(np.mean(impact_parameter / parameters['reduction_matrix'].value[0, :, 0] - parameters['variable_throughput'].value))
+
     else:
         spectrum_model = np.array([spectrum_model])
-        spectrum_model = 1 - spectrum_model
 
     return parameters['wavelength_instrument'].value, spectrum_model
 
@@ -238,7 +249,7 @@ def init_model(planet, w_bords, line_species_str, p0=1e-2):
 
 def init_parameters(planet, line_species_str, mode,
                     retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
-                    apply_pipeline=True):
+                    apply_pipeline=True, load_from=None):
     star_name = planet.host_name.replace(' ', '_')
 
     retrieval_name += f'_{mode}'
@@ -271,9 +282,10 @@ def init_parameters(planet, line_species_str, mode,
 
     if mode == 'eclipse':
         phase_start = 0.507  # just after secondary eclipse
-        orbital_phases = get_orbital_phases(phase_start, planet.orbital_period, integration_times_ref[band], ndit_half)
+        orbital_phases, times = \
+            get_orbital_phases(phase_start, planet.orbital_period, integration_times_ref[band], ndit_half)
     elif mode == 'transit':
-        orbital_phases = get_orbital_phases(0.0, planet.orbital_period, integration_times_ref[band], ndit_half)
+        orbital_phases, times = get_orbital_phases(0.0, planet.orbital_period, integration_times_ref[band], ndit_half)
         orbital_phases -= np.max(orbital_phases) / 2
     else:
         raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
@@ -281,8 +293,19 @@ def init_parameters(planet, line_species_str, mode,
     airmass = None
     telluric_transmittance = None  # TODO get telluric transmittance
 
+    # Simple variable_throughput
     variable_throughput = -(np.linspace(-1, 1, np.size(orbital_phases)) - 0.1) ** 2
     variable_throughput += 0.5 - np.min(variable_throughput)
+    # Brogi variable_throughput
+    data_dir = os.path.abspath(os.path.join(module_dir, 'metis', 'brogi_crires_test'))
+    variable_throughput = np.load(os.path.join(data_dir, 'algn.npy'))
+    variable_throughput = np.max(variable_throughput[0], axis=1)
+    variable_throughput = variable_throughput / np.max(variable_throughput)
+    xp = np.linspace(0, 1, np.size(variable_throughput))
+    x = np.linspace(0, 1, np.size(orbital_phases))
+    variable_throughput = np.interp(x, xp, variable_throughput)
+    # No variable_throughput
+    #variable_throughput = None
 
     # Get models
     kp = planet.calculate_orbital_velocity(planet.star_mass, planet.orbit_semi_major_axis)
@@ -302,6 +325,17 @@ def init_parameters(planet, line_species_str, mode,
 
     star_data[:, 0] *= 1e4  # cm to um
 
+    # Nice terminal output
+    print('----\n', retrieval_name)
+
+    # Select which model to use
+    if mode == 'eclipse':
+        retrieval_model = get_secondary_eclipse_retrieval_model
+    elif mode == 'transit':
+        retrieval_model = get_transit_retrieval_model
+    else:
+        raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
+
     # Initialization
     pressures, temperature, gravity, radius, star_radius, star_effective_temperature, \
         p0, p_cloud, mean_molar_mass, mass_fractions, \
@@ -313,137 +347,149 @@ def init_parameters(planet, line_species_str, mode,
     if not os.path.isdir(retrieval_directory):
         os.mkdir(retrieval_directory)
 
-    # Initialize true parameters
-    true_parameters = {
-        'R_pl': Param(radius),
-        'Temperature': Param(planet.equilibrium_temperature),
-        'log_Pcloud': Param(np.log10(p_cloud)),
-        'log_g': Param(np.log10(gravity)),
-        'reference_pressure': Param(p0),
-        'star_effective_temperature': Param(star_effective_temperature),
-        'Rstar': Param(star_radius),
-        'semi_major_axis': Param(planet.orbit_semi_major_axis),
-        'planet_max_radial_orbital_velocity': Param(kp),
-        'system_observer_radial_velocities': Param(v_sys),
-        'planet_rest_frame_shift': Param(0.0),
-        'planet_orbital_inclination': Param(planet.orbital_inclination),
-        'orbital_phases': Param(orbital_phases),
-        'instrument_resolving_power': Param(instrument_resolving_power),
-        'wavelength_instrument': Param(wavelength_instrument),
-        'apply_pipeline': Param(apply_pipeline)
-    }
+    if load_from is None:
+        # Initialize true parameters
+        true_parameters = {
+            'R_pl': Param(radius),
+            'Temperature': Param(planet.equilibrium_temperature),
+            'log_Pcloud': Param(np.log10(p_cloud)),
+            'log_g': Param(np.log10(gravity)),
+            'reference_pressure': Param(p0),
+            'star_effective_temperature': Param(star_effective_temperature),
+            'Rstar': Param(star_radius),
+            'semi_major_axis': Param(planet.orbit_semi_major_axis),
+            'planet_max_radial_orbital_velocity': Param(kp),
+            'system_observer_radial_velocities': Param(v_sys),
+            'planet_rest_frame_shift': Param(0.0),
+            'planet_orbital_inclination': Param(planet.orbital_inclination),
+            'orbital_phases': Param(orbital_phases),
+            'times': Param(times),
+            'instrument_resolving_power': Param(instrument_resolving_power),
+            'wavelength_instrument': Param(wavelength_instrument),
+            'apply_pipeline': Param(apply_pipeline),
+            'variable_throughput': Param(variable_throughput)
+        }
 
-    for species in line_species:
-        true_parameters[species] = Param(np.log10(mass_fractions[species]))
+        for species in line_species:
+            true_parameters[species] = Param(np.log10(mass_fractions[species]))
 
-    # Initialize strings
-    model_name = 'test_model_H2O'
+        # Generate and save mock observations
+        print('True spectrum calculation...')
+        if mode == 'eclipse':
+            true_wavelength, true_spectrum = radiosity_model(model, true_parameters)
+        elif mode == 'transit':
+            true_wavelength, true_spectrum = transit_radius_model(model, true_parameters)
+        else:
+            raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
 
-    print('----\n', model_name)
+        star_radiosity = fr.rebin_spectrum(
+            star_data[:, 0],
+            star_data[:, 1],
+            true_wavelength
+        )
 
-    # Select which model to use
-    if mode == 'eclipse':
-        retrieval_model = get_secondary_eclipse_retrieval_model
-    elif mode == 'transit':
-        retrieval_model = get_transit_retrieval_model
+        true_parameters['star_spectral_radiosity'] = Param(star_radiosity)
+
+        print('Mock obs...')
+        mock_observations, noise, mock_observations_without_noise = generate_mock_observations(
+            true_wavelength, true_spectrum,
+            telluric_transmittance=telluric_transmittance,
+            variable_throughput=variable_throughput,
+            integration_time=integration_times_ref[band],
+            integration_time_ref=integration_times_ref[band],
+            wavelength_instrument=true_parameters['wavelength_instrument'].value,
+            instrument_snr=instrument_snr,
+            instrument_resolving_power=true_parameters['instrument_resolving_power'].value,
+            planet_radius=true_parameters['R_pl'].value,
+            star_radius=true_parameters['Rstar'].value,
+            star_spectral_radiosity=true_parameters['star_spectral_radiosity'].value,
+            orbital_phases=true_parameters['orbital_phases'].value,
+            system_observer_radial_velocities=np.zeros(ndit_half),  # TODO put that in true_parameters
+            # TODO set to 0 for now since SNR data from Roy is at 0, but find RV source eventually
+            planet_max_radial_orbital_velocity=true_parameters['planet_max_radial_orbital_velocity'].value,
+            planet_orbital_inclination=true_parameters['planet_orbital_inclination'].value,
+            mode=mode,
+            add_noise=add_noise,
+            apply_snr_mask=True,
+            number=1
+        )
     else:
-        raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
+        mock_observations_, noise, mock_observations_without_noise, \
+            reduced_mock_observations, reduced_mock_observations_without_noise, \
+            log_l_tot, v_rest, kps, log_l_pseudo_retrieval, \
+            wvl_pseudo_retrieval, models_pseudo_retrieval, \
+            true_parameters, instrument_snr = load_all(load_from)
 
-    # Generate and save mock observations
-    print('True spectrum calculation...')
-    if mode == 'eclipse':
-        true_wavelength, true_spectrum = radiosity_model(model, true_parameters)
-    elif mode == 'transit':
-        true_wavelength, true_spectrum = transit_radius_model(model, true_parameters)
-    else:
-        raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
+        # Check noise consistency
+        assert np.allclose(mock_observations_, mock_observations_without_noise + noise, atol=0.0, rtol=1e-15)
 
-    star_radiosity = fr.rebin_spectrum(
-        star_data[:, 0],
-        star_data[:, 1],
-        true_wavelength
-    )
+        print("Mock observations noise consistency check OK")
 
-    true_parameters['star_spectral_radiosity'] = Param(star_radiosity)
+        true_parameters['apply_pipeline'] = Param(apply_pipeline)
+        true_parameters['variable_throughput'] = Param(variable_throughput)
 
-    print('Mock obs...')
-    mock_observations, noise, mock_observations_without_noise = generate_mock_observations(
-        true_wavelength, true_spectrum,
-        telluric_transmittance=telluric_transmittance,
-        variable_throughput=None,
-        integration_time=integration_times_ref[band],
-        integration_time_ref=integration_times_ref[band],
-        wavelength_instrument=true_parameters['wavelength_instrument'].value,
-        instrument_snr=instrument_snr,
-        instrument_resolving_power=true_parameters['instrument_resolving_power'].value,
-        planet_radius=true_parameters['R_pl'].value,
-        star_radius=true_parameters['Rstar'].value,
-        star_spectral_radiosity=true_parameters['star_spectral_radiosity'].value,
-        orbital_phases=true_parameters['orbital_phases'].value,
-        system_observer_radial_velocities=np.zeros(ndit_half),  # TODO put that in true_parameters
-        # TODO set to 0 for now since SNR data from Roy is at 0, but find RV source eventually
-        planet_max_radial_orbital_velocity=true_parameters['planet_max_radial_orbital_velocity'].value,
-        planet_orbital_inclination=true_parameters['planet_orbital_inclination'].value,
-        mode=mode,
-        add_noise=add_noise,
-        apply_snr_mask=True,
-        number=1
-    )
+        mock_observations = np.ma.asarray(copy.deepcopy(mock_observations_without_noise))
+        mock_observations.mask = copy.deepcopy(mock_observations_.mask)
+
+        if telluric_transmittance is not None:
+            print('Add telluric lines')
+            mock_observations = add_telluric_lines(mock_observations_without_noise, telluric_transmittance)
+
+        if variable_throughput is not None:
+            print('Add variable throughput')
+            for data in mock_observations:
+                mock_observations = add_variable_throughput(data, variable_throughput)
+
+        mock_observations = mock_observations + noise
 
     if apply_pipeline:
         print('Data reduction...')
-        reduced_mock_observations = simple_pipeline(
+        reduced_mock_observations, reduction_matrix = simple_pipeline(
             mock_observations, airmass,
-            remove_standard_deviation=False,
-            remove_outliers=False  # no need to remove outliers if no noise
+            mean_subtract=False
         )
 
         if add_noise:
-            reduced_mock_observations_without_noise = simple_pipeline(
-                mock_observations_without_noise, airmass,
-                remove_standard_deviation=False,
-                remove_outliers=False  # no need to remove outliers if no noise
-            )
+            reduced_mock_observations_without_noise = copy.deepcopy(mock_observations_without_noise) * reduction_matrix
         else:
             reduced_mock_observations_without_noise = copy.deepcopy(reduced_mock_observations)
     else:
         print('Pipeline not applied!')
-        if mode == 'eclipse':
-            reduced_mock_observations = copy.deepcopy(mock_observations) - 1
-        elif mode == 'transit':
-            reduced_mock_observations = 1 - copy.deepcopy(mock_observations)
-        else:
-            raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
+        reduced_mock_observations = copy.deepcopy(mock_observations)
+        reduction_matrix = np.ones(reduced_mock_observations.shape)
 
         if add_noise:
-            if mode == 'eclipse':
-                reduced_mock_observations_without_noise = copy.deepcopy(mock_observations_without_noise) - 1
-            elif mode == 'transit':
-                reduced_mock_observations_without_noise = 1 - copy.deepcopy(mock_observations_without_noise)
-            else:
-                raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
+            reduced_mock_observations_without_noise = copy.deepcopy(mock_observations_without_noise)
         else:
             reduced_mock_observations_without_noise = copy.deepcopy(reduced_mock_observations)
+
+    true_parameters['reduction_matrix'] = Param(reduction_matrix)
 
     # Check if the retrieval model with the true parameters is the same as the reduced mock observations without noise
     w, r = retrieval_model(model, true_parameters)
 
-    if not np.all(w == wavelength_instrument):
-        raise ValueError('wrong wvl')
+    assert np.all(w == wavelength_instrument)
 
-    if not np.all(r == reduced_mock_observations_without_noise):
-        print("Warning: wrong model")
+    if not np.allclose(r, reduced_mock_observations_without_noise, atol=0.0, rtol=1e-15):
+        print("Warning: model is different from observations")
     else:
         print("True model vs observations consistency check OK")
 
     error = np.ones(reduced_mock_observations.shape) / instrument_snr
 
-    print('Co-addition of log L...')
-    log_l_tot, v_rest, kps, i_peak = co_added_retrieval(
-        wavelength_instrument, reduced_mock_observations, true_wavelength,
-        true_spectrum, star_radiosity, true_parameters, np.zeros(ndit_half), error, orbital_phases,
-        plot=True, output_dir=retrieval_directory
-    )
+    log_l_tot = None
+    v_rest = None
+    kps = None
+    i_peak = None
+    log_l_pseudo_retrieval = None
+    wvl_pseudo_retrieval = None
+    models_pseudo_retrieval = None
+    # print('Co-addition of log L...')
+    # log_l_tot, v_rest, kps, i_peak = co_added_retrieval(
+    #     wavelength_instrument, reduced_mock_observations, true_wavelength,
+    #     true_spectrum, star_radiosity, true_parameters, np.zeros(ndit_half), error, orbital_phases,
+    #     plot=True, output_dir=retrieval_directory
+    # )
 
     # print('Running pseudo-retrieval...')
     # kps_pseudo_retrieval = np.linspace(kps[i_peak[0][0] - 5], kps[i_peak[0][0] + 5], 7)
@@ -455,13 +501,23 @@ def init_parameters(planet, line_species_str, mode,
     #     true_parameters, np.zeros(ndit_half),
     #     plot=True, output_dir=retrieval_directory
     # )
-    log_l_pseudo_retrieval = None
-    wvl_pseudo_retrieval = None
-    models_pseudo_retrieval = None
 
-    save_all(retrieval_directory, mock_observations, error, reduced_mock_observations, log_l_tot, v_rest, kps,
-             log_l_pseudo_retrieval,
-             wvl_pseudo_retrieval, models_pseudo_retrieval, true_parameters, instrument_snr)
+    save_all(
+        directory=retrieval_directory,
+        mock_observations=mock_observations,
+        mock_observations_without_noise=mock_observations_without_noise,
+        noise=noise,
+        reduced_mock_observations=reduced_mock_observations,
+        reduced_mock_observations_without_noise=reduced_mock_observations_without_noise,
+        log_l_tot=log_l_tot,
+        v_rest=v_rest,
+        kps=kps,
+        log_l_pseudo_retrieval=log_l_pseudo_retrieval,
+        wvl_pseudo_retrieval=wvl_pseudo_retrieval,
+        models_pseudo_retrieval=models_pseudo_retrieval,
+        true_parameters=true_parameters,
+        instrument_snr=instrument_snr
+    )
 
     return retrieval_name, retrieval_directory, \
         model, pressures, true_parameters, line_species, rayleigh_species, continuum_species, \
@@ -617,20 +673,22 @@ def init_run(retrieval_name, prt_object, pressures, parameters, line_species, ra
 
 
 def load_all(directory):
-    print('Loading...')
+    print(f'Loading run parameters from {directory}...')
 
-    load_dict = np.load(os.path.join(directory, 'run_parameters.npz'))
+    load_dict = np.load(os.path.join(directory, 'run_parameters.npz'), allow_pickle=True)
 
     mock_observations = load_dict['mock_observations']
+    mock_observations_without_noise = load_dict['mock_observations_without_noise']
     noise = load_dict['noise']
     reduced_mock_observations = load_dict['reduced_mock_observations']
+    reduced_mock_observations_without_noise = load_dict['reduced_mock_observations_without_noise']
     log_l_tot = load_dict['log_l_tot']
     v_rest = load_dict['v_rest']
     kps = load_dict['kps']
     log_l_pseudo_retrieval = load_dict['log_l_pseudo_retrieval']
     wvl_pseudo_retrieval = load_dict['wvl_pseudo_retrieval']
     models_pseudo_retrieval = load_dict['mock_observations_mask']
-    #true_parameters = load_dict['true_parameters']
+    true_parameters = load_dict['true_parameters'][()]
     instrument_snr = load_dict['instrument_snr']
 
     mock_observations = np.ma.asarray(mock_observations)
@@ -642,10 +700,11 @@ def load_all(directory):
     instrument_snr = np.ma.asarray(instrument_snr)
     instrument_snr.mask = load_dict['instrument_snr_mask']
 
-    return mock_observations, noise, \
-        reduced_mock_observations, log_l_tot, v_rest, kps, log_l_pseudo_retrieval, \
+    return mock_observations, noise, mock_observations_without_noise, \
+        reduced_mock_observations, reduced_mock_observations_without_noise, \
+        log_l_tot, v_rest, kps, log_l_pseudo_retrieval, \
         wvl_pseudo_retrieval, models_pseudo_retrieval, \
-        instrument_snr
+        true_parameters, instrument_snr
 
 
 def main():
@@ -659,11 +718,15 @@ def main():
 
     line_species_str = ['CO_all_iso', 'H2O_main_iso']
 
-    retrieval_name = 't_kp_vr_CO_H2O_79-80'
-    mode = 'eclipse'
+    retrieval_name = 't0l_thomm_kp_vr_CO_H2O_79-80'
+    mode = 'transit'
     n_live_points = 200
     add_noise = True
-    apply_pipeline = False
+    apply_pipeline = True
+
+    retrieval_directories = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval'))
+
+    load_from = os.path.join(retrieval_directories, 't0_kp_vr_CO_H2O_79-80_transit_200lp_np')
 
     band = 'M'
 
@@ -691,7 +754,7 @@ def main():
             = init_parameters(
                 planet, line_species_str, mode,
                 retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
-                apply_pipeline=apply_pipeline
+                apply_pipeline=apply_pipeline, load_from=load_from
             )
 
         retrieval_parameters = {
@@ -713,6 +776,8 @@ def main():
         print(f"Rank {rank} waiting for main process to finish...")
         retrieval_parameters = None
         retrieval_directory = ''
+
+    #return 0
 
     retrieval_parameters = comm.bcast(retrieval_parameters, root=0)
     retrieval_directory = comm.bcast(retrieval_directory, root=0)
@@ -935,10 +1000,13 @@ def retrieval_run(retrieval_name, n_live_points, model, pressures, true_paramete
     return retrieval
 
 
-def save_all(directory, mock_observations, noise, reduced_mock_observations, log_l_tot, v_rest, kps,
+def save_all(directory, mock_observations, mock_observations_without_noise,
+             noise, reduced_mock_observations, reduced_mock_observations_without_noise,
+             log_l_tot, v_rest, kps,
              log_l_pseudo_retrieval,
              wvl_pseudo_retrieval, models_pseudo_retrieval, true_parameters, instrument_snr):
     print('Saving...')
+    # TODO save into HDF5, and better handling of runs (make a class, etc.)
 
     fname = os.path.join(directory, 'run_parameters.npz')
 
@@ -946,9 +1014,11 @@ def save_all(directory, mock_observations, noise, reduced_mock_observations, log
         file=fname,
         mock_observations=mock_observations,
         mock_observations_mask=mock_observations.mask,
+        mock_observations_without_noise=mock_observations_without_noise,
         noise=noise,
         reduced_mock_observations=reduced_mock_observations,
         reduced_mock_observations_mask=reduced_mock_observations.mask,
+        reduced_mock_observations_without_noise=reduced_mock_observations_without_noise,
         log_l_tot=log_l_tot,
         v_rest=v_rest,
         kps=kps,
@@ -957,7 +1027,7 @@ def save_all(directory, mock_observations, noise, reduced_mock_observations, log
         models_pseudo_retrieval=models_pseudo_retrieval,
         instrument_snr=instrument_snr,
         instrument_snr_mask=instrument_snr.mask,
-        # true_parameters=true_parameters
+        true_parameters=true_parameters
     )
 
 
