@@ -347,7 +347,7 @@ class Data:
                              yerr = f_err,
                              fmt = '+')
                 plt.show()
-        # print(self.name,logL)
+        #print(self.name,logL)
         return logL
 
     def convolve(self, \
