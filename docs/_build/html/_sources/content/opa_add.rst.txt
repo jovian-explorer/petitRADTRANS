@@ -45,6 +45,8 @@ Converting cross-section grids from `DACE`_
 Pre-computed opacities are also available from `DACE`_,
 which have been generated using the method presented in `Grimm & Heng
 (2015) <https://iopscience.iop.org/article/10.1088/0004-637X/808/2/182>`_ .
+The DACE opacity database itself is described in
+`Grimm et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021ApJS..253...30G/abstract>`_.
 The website allows to download the cross-section tables as a function
 of pressure and temperature.
 
