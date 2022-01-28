@@ -123,6 +123,7 @@ def emission_model_diseq(pRT_object,
     pressures = p_use
     #print(PGLOBAL.shape, pressures.shape, pressures[small_index].shape, pRT_object.press.shape)
     if AMR:
+        #pRT_object.setup_opa_structure(PGLOBAL[small_index])
         temperatures = temperatures[small_index]
         pressures = PGLOBAL[small_index]
         MMW = MMW[small_index]
@@ -224,18 +225,34 @@ def guillot_free_emission(pRT_object, \
 
     #for key, val in parameters.items():
     #    print(key,val.value)
-
     pglobal_check(pRT_object.press/1e6,
                   parameters['pressure_simple'].value,
                   parameters['pressure_scaling'].value)
+
     if AMR:
         p_use = PGLOBAL
     else:
         p_use = pRT_object.press/1e6
+
+    gravity = -np.inf
+    R_pl = -np.inf
+    if 'log_g' in parameters.keys() and 'mass' in parameters.keys():
+        gravity = 10**parameters['log_g'].value
+        R_pl = np.sqrt(nc.G*parameters['mass'].value/gravity)
+    elif 'log_g' in parameters.keys():
+        gravity= 10**parameters['log_g'].value
+        R_pl = parameters['R_pl'].value
+    elif 'mass' in parameters.keys():
+        R_pl = parameters['R_pl'].value
+        gravity = nc.G * parameters['mass'].value/R_pl**2
+    else:
+        print("Pick two of log_g, R_pl and mass priors!")
+        sys.exit(5)
+
     temperatures = nc.guillot_global(p_use, \
                                 10**parameters['log_kappa_IR'].value,
                                 parameters['gamma'].value, \
-                                10**parameters['log_g'].value, \
+                                gravity, \
                                 parameters['T_int'].value, \
                                 parameters['T_equ'].value)
     Pbases = {}
@@ -257,11 +274,15 @@ def guillot_free_emission(pRT_object, \
                                                  p_use,
                                                  parameters['pressure_scaling'].value,
                                                  parameters['pressure_width'].value)
+        if pressures.shape[0] != pRT_object.press.shape[0]:
+            print("Shapes ",pressures.shape[0],pRT_object.press.shape[0])
+            print("Pbase ",Pbases)
+            return None,None
+
         pRT_object.press = pressures * 1e6
         temperatures = temperatures[small_index]
     else:
         pressures = pRT_object.press/1e6
-    print(Pbases)
     # If in evaluation mode, and PTs are supposed to be plotted
     if PT_plot_mode:
         return pressures, temperatures
@@ -289,20 +310,7 @@ def guillot_free_emission(pRT_object, \
     # This is bad for some reason...
     #if msum > 1.0:
     #    return None, None
-    gravity = 2.0
-    R_pl = 1.0
-    if 'log_g' in parameters.keys() and 'mass' in parameters.keys():
-        gravity = 10**parameters['log_g'].value
-        R_pl = np.sqrt(nc.G*parameters['mass'].value/gravity)
-    elif 'log_g' in parameters.keys():
-        gravity= 10**parameters['log_g'].value
-        R_pl = parameters['R_pl'].value
-    elif 'mass' in parameters.keys():
-        R_pl = parameters['R_pl'].value
-        gravity = nc.G * parameters['mass'].value/R_pl**2
-    else:
-        print("Pick two of log_g, R_pl and mass priors!")
-        sys.exit(5)
+
     pRT_object.calc_flux(temperatures, \
                      abundances, \
                      gravity, \
@@ -801,7 +809,7 @@ def _make_half_pressure_better(P_clouds, press):
     indexes_small = press_small[:,0] > 0.
     indexes       = press_plus_index[:,0] > 0.
 
-    for cname,P_cloud in P_clouds.items():
+    for P_cloud in P_clouds:
         indexes_small = indexes_small & \
             ((np.log10(press_small[:,0]/P_cloud) > 0.05) | \
             (np.log10(press_small[:,0]/P_cloud) < -0.3))
@@ -900,7 +908,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
             ind = 0
             done = 0
             while len(total_inds) < sl+int(scaling*width):
-                if (start+ind) >= (len(press_plus_index)-1):
+                if (start+ind) > (len(press_plus_index)-1):
                     start = start - len(uselist)
                     ind = done
                     continue
@@ -920,7 +928,7 @@ def fixed_length_amr(P_clouds, press, scaling = 10, width = 3):
             ind = 0
             done = 0
             while len(total_inds) < sl+int(scaling*width):
-                if (start+ind) >= (len(press_plus_index)-1):
+                if (start+ind) > (len(press_plus_index)-1):
                     start = start - len(uselist)
                     ind = done
                     continue
@@ -1022,6 +1030,7 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
                                                   pressures,
                                                   parameters['pressure_scaling'].value,
                                                   parameters['pressure_width'].value)
+        #press_use, small_index = _make_half_pressure_better(p_clouds, pressures)
     else :
         #TODO: Test
         press_use = pressures
