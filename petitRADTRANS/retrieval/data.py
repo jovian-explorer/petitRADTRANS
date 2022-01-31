@@ -84,7 +84,7 @@ class Data:
                  model_generating_function = None,
                  wlen_range_micron = None,
                  scale = False,
-                 scale_err = False
+                 scale_err = False,
                  wlen_bins = None,
                  photometry = False,
                  photometric_transformation_function = None,
