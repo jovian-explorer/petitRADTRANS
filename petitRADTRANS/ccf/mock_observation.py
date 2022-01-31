@@ -15,8 +15,8 @@ def add_telluric_lines(mock_observation, telluric_transmittance):
     return mock_observation * telluric_transmittance
 
 
-def add_variable_throughput(mock_observation, telluric_transmittance):
-    return np.transpose(telluric_transmittance * np.transpose(mock_observation))
+def add_variable_throughput(mock_observation, variable_throughput):
+    return np.transpose(variable_throughput * np.transpose(mock_observation))
 
 
 def convolve_rebin(input_wavelengths, input_flux,
@@ -161,8 +161,8 @@ def get_mock_transit_spectra(wavelength_model, transit_radius_model,
         instrument_resolving_power,
         wavelength_instrument,
         planet_velocities=planet_velocities
-            + system_observer_radial_velocities
-            + planet_rest_frame_shift  # planet + system velocity
+        + system_observer_radial_velocities
+        + planet_rest_frame_shift  # planet + system velocity
     )
 
     # TODO add star spot/flare, planet self-emission?

@@ -134,9 +134,9 @@ def get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=N
     # TODO generation of multiple-detector models
 
     if parameters['apply_pipeline'].value:
-        spectrum_model, _ = simple_pipeline(np.array([spectrum_model]) / parameters['reduction_matrix'].value)  # thomx
+        #spectrum_model, _ = simple_pipeline(np.array([spectrum_model]) / parameters['reduction_matrix'].value)  # thomx
         #spectrum_model = np.array([spectrum_model]) * parameters['reduction_matrix'].value  # tho
-        spectrum_model = np.array([spectrum_model]) * parameters['reduction_matrix'].value  # thom
+        spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value)])  # thom
     else:
         spectrum_model = np.array([spectrum_model])
 
@@ -146,7 +146,6 @@ def get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=N
 def get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=False):
     wlen_model, transit_radius = transit_radius_model(prt_object, parameters)
 
-    # TODO make these steps as a function common with generate_mock_observations
     planet_velocities = Planet.calculate_planet_radial_velocity(
         parameters['planet_max_radial_orbital_velocity'].value,
         parameters['planet_orbital_inclination'].value,
@@ -165,20 +164,26 @@ def get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=F
     )
 
     # TODO add telluric transmittance (probably)
-    # TODO add throughput variations? (maybe take raw data spectrum and multiply by mean(max(flux), axis=time))
     # TODO generation of multiple-detector models
 
     if parameters['apply_pipeline'].value:
-        impact_parameter = np.mean(2 - spectrum_model, axis=1)
-        #print(impact_parameter.shape, np.mean(impact_parameter))
+        # impact_parameter = np.mean(2 - spectrum_model, axis=1)
+        impact_parameter = 1 / np.mean(spectrum_model, axis=1)
+        # print('i1', impact_parameter.shape, np.mean(impact_parameter))
+        # s, m = simple_pipeline(np.array([spectrum_model]))
+        # impact_parameter *= (0.995 + 10 ** parameters['variable_throughput_coefficient'].value)
+        #impact_parameter = m[0, :, 0] #* (0.995 + 10 ** parameters['variable_throughput_coefficient'].value)
         #spectrum_model = np.array([spectrum_model]) * parameters['reduction_matrix'].value  # tho
         #spectrum_model, _ = simple_pipeline(np.array([spectrum_model]) / parameters['reduction_matrix'].value)  # thomx
-        spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value)]) * parameters['reduction_matrix'].value  # thom
+        #spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value)]) * parameters['reduction_matrix'].value  # thom
         #spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value * 1.0001)]) * parameters['reduction_matrix'].value  # thomp
         #spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value * 0.9999)]) * parameters['reduction_matrix'].value  # thomm
-        #spectrum_model = np.array([add_variable_throughput(spectrum_model, impact_parameter / parameters['reduction_matrix'].value[0, :, 0])]) * parameters['reduction_matrix'].value  # thomi
+        # s = np.array([add_variable_throughput(spectrum_model, impact_parameter / parameters['reduction_matrix'].value[0, :, 0])]) * parameters['reduction_matrix'].value  # thomi
+        spectrum_model = np.array([add_variable_throughput(spectrum_model, impact_parameter)])  # thomi3
         #spectrum_model, _ = simple_pipeline(np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value)]))  # thoma
-        #print(np.mean(impact_parameter / parameters['reduction_matrix'].value[0, :, 0] - parameters['variable_throughput'].value))
+        # print(np.mean(impact_parameter[0, :, 0] / parameters['reduction_matrix'].value[0, :, 0] - parameters['variable_throughput'].value))
+        print(f"{np.mean(impact_parameter / parameters['reduction_matrix'].value[0, :, 0] - parameters['variable_throughput'].value):+.3e}", parameters['variable_throughput_coefficient'].value, np.mean(impact_parameter))
+        #print(np.mean(parameters['variable_throughput'].value / (1 / parameters['reduction_matrix'].value[0, :, 0])))
 
     else:
         spectrum_model = np.array([spectrum_model])
@@ -367,7 +372,8 @@ def init_parameters(planet, line_species_str, mode,
             'instrument_resolving_power': Param(instrument_resolving_power),
             'wavelength_instrument': Param(wavelength_instrument),
             'apply_pipeline': Param(apply_pipeline),
-            'variable_throughput': Param(variable_throughput)
+            'variable_throughput': Param(variable_throughput),
+            'variable_throughput_coefficient': Param(np.log10(5e-3))#Param(1.0),
         }
 
         for species in line_species:
@@ -427,6 +433,7 @@ def init_parameters(planet, line_species_str, mode,
 
         true_parameters['apply_pipeline'] = Param(apply_pipeline)
         true_parameters['variable_throughput'] = Param(variable_throughput)
+        true_parameters['variable_throughput_coefficient'] = Param(np.log10(5e-3))
 
         mock_observations = np.ma.asarray(copy.deepcopy(mock_observations_without_noise))
         mock_observations.mask = copy.deepcopy(mock_observations_.mask)
@@ -442,15 +449,31 @@ def init_parameters(planet, line_species_str, mode,
 
         mock_observations = mock_observations + noise
 
+    error = np.ones(mock_observations.shape) / instrument_snr
+
     if apply_pipeline:
         print('Data reduction...')
-        reduced_mock_observations, reduction_matrix = simple_pipeline(
-            mock_observations, airmass,
+        reduced_mock_observations, reduction_matrix, error = simple_pipeline(  # TODO better way of changing noise when data_noise=None
+            spectral_data=mock_observations,
+            data_noise=error,
+            airmass=airmass,
             mean_subtract=False
         )
 
         if add_noise:
-            reduced_mock_observations_without_noise = copy.deepcopy(mock_observations_without_noise) * reduction_matrix
+            reduced_mock_observations_without_noise = copy.deepcopy(mock_observations_without_noise)
+
+            if telluric_transmittance is not None:
+                reduced_mock_observations_without_noise = add_telluric_lines(
+                    reduced_mock_observations_without_noise, telluric_transmittance
+                )
+
+            if variable_throughput is not None:
+                reduced_mock_observations_without_noise = add_variable_throughput(
+                    reduced_mock_observations_without_noise, variable_throughput
+                )
+
+            reduced_mock_observations_without_noise *= reduction_matrix
         else:
             reduced_mock_observations_without_noise = copy.deepcopy(reduced_mock_observations)
     else:
@@ -474,8 +497,6 @@ def init_parameters(planet, line_species_str, mode,
         print("Warning: model is different from observations")
     else:
         print("True model vs observations consistency check OK")
-
-    error = np.ones(reduced_mock_observations.shape) / instrument_snr
 
     log_l_tot = None
     v_rest = None
@@ -568,7 +589,8 @@ def init_run(retrieval_name, prt_object, pressures, parameters, line_species, ra
     # retrieved_parameters = []
     retrieved_parameters = [
         'planet_max_radial_orbital_velocity',
-        'planet_rest_frame_shift'
+        'planet_rest_frame_shift',
+        # 'variable_throughput_coefficient'
     ]
 
     # Fixed parameters
@@ -596,6 +618,25 @@ def init_run(retrieval_name, prt_object, pressures, parameters, line_species, ra
             x2=1e7
         )
 
+    def prior_vtc(x):
+        return uniform_prior(
+            cube=x,
+            x1=0.995,
+            x2=1.005
+        )
+
+    def log_prior(cube, abund_lim):
+        return abund_lim[0] + abund_lim[1] * cube
+
+    # def prior_lvtc(x):
+    #     return log_prior(
+    #         cube=x,
+    #         abund_lim=(
+    #             -15,
+    #             15
+    #         )
+    #     )
+
     # # Add parameters
     run_definition_simple.add_parameter(
         retrieved_parameters[0],
@@ -608,6 +649,12 @@ def init_run(retrieval_name, prt_object, pressures, parameters, line_species, ra
         True,
         transform_prior_cube_coordinate=prior_vr
     )
+
+    # run_definition_simple.add_parameter(
+    #     retrieved_parameters[2],
+    #     True,
+    #     transform_prior_cube_coordinate=prior_lvtc
+    # )
 
     # Spectrum parameters
     # Fixed
@@ -718,7 +765,7 @@ def main():
 
     line_species_str = ['CO_all_iso', 'H2O_main_iso']
 
-    retrieval_name = 't0l_thomm_kp_vr_CO_H2O_79-80'
+    retrieval_name = 't0l_thomi3mn2_kp_vr_CO_H2O_79-80'
     mode = 'transit'
     n_live_points = 200
     add_noise = True

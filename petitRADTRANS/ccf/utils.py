@@ -39,9 +39,9 @@ def calculate_uncertainty(derivatives, uncertainties, covariance_matrix=None):
     Asymmetric uncertainties are handled **the wrong way** (see source 2), but it is better than nothing.
 
     Sources:
-        - https://en.wikipedia.org/wiki/Propagation_of_uncertainty
-        - https://phas.ubc.ca/~oser/p509/Lec_10.pdf
-        - http://math.jacobs-university.de/oliver/teaching/jacobs/fall2015/esm106/handouts/error-propagation.pdf
+        1. https://en.wikipedia.org/wiki/Propagation_of_uncertainty
+        2. https://phas.ubc.ca/~oser/p509/Lec_10.pdf
+        3. http://math.jacobs-university.de/oliver/teaching/jacobs/fall2015/esm106/handouts/error-propagation.pdf
     Args:
         derivatives: partial derivatives of the function with respect to each variables (df/dx, df/dy, ...)
         uncertainties: uncertainties of each variables (either a 1D-array or a 2D-array containing - and + unc.)
@@ -56,7 +56,7 @@ def calculate_uncertainty(derivatives, uncertainties, covariance_matrix=None):
     if np.ndim(uncertainties) == 1:
         sigmas = derivatives * uncertainties
 
-        return np.matmul(sigmas, np.matmul(covariance_matrix, np.transpose(sigmas)))
+        return np.sqrt(np.matmul(sigmas, np.matmul(covariance_matrix, np.transpose(sigmas))))
     elif np.ndim(uncertainties) == 2:
         sigma_less = derivatives * uncertainties[:, 0]
         sigma_more = derivatives * uncertainties[:, 1]
@@ -65,3 +65,37 @@ def calculate_uncertainty(derivatives, uncertainties, covariance_matrix=None):
             np.matmul(sigma_less, np.matmul(covariance_matrix, np.transpose(sigma_less))),
             np.matmul(sigma_more, np.matmul(covariance_matrix, np.transpose(sigma_more)))
         ]))
+
+
+def mean_uncertainty(uncertainties):
+    """Calculate the uncertainty of the mean of an array.
+
+    Args:
+        uncertainties: individual uncertainties of the averaged array
+
+    Returns:
+        The uncertainty of the mean of the array
+    """
+    return np.sqrt(np.sum(uncertainties ** 2)) / np.size(uncertainties)
+
+
+def median_uncertainties(uncertainties):
+    """Calculate the uncertainty of the median of an array.
+
+    Demonstration:
+        uncertainty ~ standard deviation = sqrt(variance) = sqrt(V)
+        V_mean / V_median = 2 * (N - 1) / (pi * N); (see source)
+        => V_median = V_mean * pi * N / (2 * (N - 1))
+        => uncertainty_median = uncertainty_mean * sqrt(pi * N / (2 * (N - 1)))
+
+    Source:
+        https://mathworld.wolfram.com/StatisticalMedian.html
+
+    Args:
+        uncertainties: individual uncertainties of the median of the array
+
+    Returns:
+        The uncertainty of the median of the array
+    """
+    return mean_uncertainty(uncertainties) \
+        * np.sqrt(np.pi * np.size(uncertainties) / (2 * (np.size(uncertainties) - 1)))
