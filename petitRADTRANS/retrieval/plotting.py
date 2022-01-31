@@ -96,6 +96,7 @@ def contour_corner(sampledict, \
                 short_name = None,
                 legend = False,
                 prt_plot_style = True,
+                plot_best_fit = False,
                 **kwargs):
     """
     Use the corner package to plot the posterior distributions produced by pymultinest.
@@ -186,6 +187,12 @@ def contour_corner(sampledict, \
 
         data_list = []
         labels_list = []
+        best_fit = None
+        if plot_best_fit:
+            best_fit = []
+            best_fit_ind = np.argmax(samples[:,-1])
+            for i in parameter_plot_indices[key]:
+                best_fit.append(samples[best_fit_ind][i])
         for i in parameter_plot_indices[key]:
             data_list.append(samples[len(samples)-S:,i])
             labels_list.append(parameter_names[key][i])
@@ -246,7 +253,9 @@ def contour_corner(sampledict, \
                                 plot_contours = True,
                                 contour_kwargs = contour_kwargs,
                                 hist_kwargs = hist_kwargs,
-                                levels=[1-np.exp(-0.5),1-np.exp(-2),1-np.exp(-4.5)]
+                                levels=[1-np.exp(-0.5),1-np.exp(-2),1-np.exp(-4.5)],
+                                truths=best_fit,
+                                truth_color='k'
                                 )
             count +=1
         else:
@@ -264,7 +273,9 @@ def contour_corner(sampledict, \
                           plot_contours = True,
                           contour_kwargs = contour_kwargs,
                           hist_kwargs = hist_kwargs,
-                          levels=[1-np.exp(-0.5),1-np.exp(-2),1-np.exp(-4.5)]
+                          levels=[1-np.exp(-0.5),1-np.exp(-2),1-np.exp(-4.5)],
+                          truths=best_fit,
+                          truth_color='red'
                           )
             count += 1
         #if dimensions == 1:

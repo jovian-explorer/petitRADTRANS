@@ -147,6 +147,7 @@ class Retrieval:
             log_z_convergence = 0.5,
             step_sampler = False,
             warmstart_max_tau=0.5,
+            n_iter_before_update=50,
             resume = True,
             max_iter = 0):
         """
@@ -221,7 +222,7 @@ class Retrieval:
                             const_efficiency_mode = const_efficiency_mode,
                             evidence_tolerance = log_z_convergence,
                             n_live_points = n_live_points,
-                            n_iter_before_update = 50,
+                            n_iter_before_update = n_iter_before_update,
                             max_iter = max_iter)
         self.analyzer = pymultinest.Analyzer(n_params = n_params,
                                              outputfiles_basename = prefix)
@@ -1414,14 +1415,14 @@ class Retrieval:
         plt.savefig(self.output_dir + 'evaluate_'+self.retrieval_name +'/PT_envelopes.pdf')
         return fig, ax
 
-    def plot_corner(self,sample_dict,parameter_dict,parameters_read,**kwargs):
+    def plot_corner(self,sample_dict,parameter_dict,parameters_read, plot_best_fit = True, **kwargs):
         """
         Make the corner plots
 
         Args:
             samples_dict : Dict
                 Dictionary of samples from PMN outputs, with keys being retrieval names
-            parameter_dict : Dict
+            paramete`   1   1`  Qar_dict : Dict
                 Dictionary of parameters for each of the retrievals to be plotted.
             parameters_read : List
                 Used to plot correct parameters, as some in self.parameters are not free, and
@@ -1440,6 +1441,10 @@ class Retrieval:
         p_plot_inds = {}
         p_ranges = {}
         p_use_dict = {}
+        bf_index = None
+        if plot_best_fit:
+            bf_index = {}
+
         for name,params in parameter_dict.items():
             samples_use = cp.copy(sample_dict[name])
             parameters_use = cp.copy(params)
@@ -1473,5 +1478,6 @@ class Retrieval:
                              parameter_ranges = p_ranges, \
                              true_values = None,
                              prt_plot_style=self.prt_plot_style,
+                             plot_best_fit = plot_best_fit,
                              **kwargs)
         return fig
