@@ -84,6 +84,7 @@ class Data:
                  model_generating_function = None,
                  wlen_range_micron = None,
                  scale = False,
+                 scale_err = False
                  wlen_bins = None,
                  photometry = False,
                  photometric_transformation_function = None,
@@ -136,6 +137,8 @@ class Data:
         self.inv_cov = None
         self.flux_error = None
         self.scale = scale
+        self.scale_err = scale_err
+
         self.scale_factor = 1.0
 
         # Bins and photometry
@@ -333,7 +336,9 @@ class Data:
 
 
         diff = (flux_rebinned - self.flux*self.scale_factor)
-        f_err = self.flux_error#*self.scale_factor
+        f_err = self.flux_error
+        if self.scale_err:
+            f_err = self.flux_error*self.scale_factor
         logL=0.0
         if self.covariance is not None:
             logL += -1*np.dot(diff, np.dot(self.inv_cov, diff))/2.
