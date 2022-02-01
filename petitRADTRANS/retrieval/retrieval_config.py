@@ -375,6 +375,7 @@ class RetrievalConfig:
                  model_resolution = None,
                  distance = None,
                  scale = False,
+                 scale_err = False,
                  wlen_range_micron = None,
                  external_pRT_reference = None,
                  opacity_mode = 'c-k'):
@@ -422,6 +423,7 @@ class RetrievalConfig:
                                 model_resolution = model_resolution,
                                 distance = distance,
                                 scale = scale,
+                                scale_err = scale_err,
                                 wlen_range_micron = wlen_range_micron,
                                 external_pRT_reference=external_pRT_reference,
                                 opacity_mode = opacity_mode)
