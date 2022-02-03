@@ -933,7 +933,7 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
     clouds = {}
     for cloud in cloud_species:
         # equilibrium cloud abundance
-        Xcloud= fc.return_cloud_mass_fraction(name,parameters['Fe/H'].value, parameters['C/O'].value)
+        Xcloud= fc.return_cloud_mass_fraction(cloud,parameters['Fe/H'].value, parameters['C/O'].value)
 
         # Scaled by a constant factor
         clouds[cloud.split("_")[0]] = 10**parameters['log_X_cb_'+cloud.split("_")[0]].value*Xcloud
