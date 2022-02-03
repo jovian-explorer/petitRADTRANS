@@ -1,7 +1,7 @@
 import numpy as np
 import copy as cp
 from scipy.interpolate import interp1d
-
+import logging
 plotting = False
 if plotting:
     import pylab as plt
@@ -64,6 +64,18 @@ masses['V'] = 51.
 masses['Fe'] = 55.8
 masses['Ni'] = 58.7
 
+def return_cloud_mass_fraction(name,FeH,CO):
+    if "Fe(c)" in name:
+        return return_XFe(FeH,CO)
+    if "MgSiO3(c)" in name:
+        return return_XMgSiO3(FeH,CO)
+    if "Na2S(c)" in name:
+        return return_XNa2S(FeH,CO)
+    if "KCL(c)" in name:
+        return return_XKCL(FeH,CO)
+    else:
+        logging.warn(f"The cloud {name} is not currently implemented.")
+        return np.zeros_like(FeH)
 def return_XFe(FeH, CO):
 
     nfracs_use = cp.copy(nfracs)

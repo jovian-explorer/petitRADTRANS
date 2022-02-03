@@ -253,7 +253,7 @@ def contour_corner(sampledict, \
                                 plot_contours = True,
                                 contour_kwargs = contour_kwargs,
                                 hist_kwargs = hist_kwargs,
-                                levels=[1-np.exp(-0.5),1-np.exp(-2),1-np.exp(-4.5)],
+                                levels=[1-np.exp(-0.5),1-np.exp(-1.5),1-np.exp(-2.5)],
                                 truths=best_fit,
                                 truth_color='k'
                                 )
@@ -273,7 +273,7 @@ def contour_corner(sampledict, \
                           plot_contours = True,
                           contour_kwargs = contour_kwargs,
                           hist_kwargs = hist_kwargs,
-                          levels=[1-np.exp(-0.5),1-np.exp(-2),1-np.exp(-4.5)],
+                          levels=[1-np.exp(-0.5),1-np.exp(-1.5),1-np.exp(-2.5)],
                           truths=best_fit,
                           truth_color='red'
                           )

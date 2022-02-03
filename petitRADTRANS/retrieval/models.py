@@ -7,6 +7,7 @@ import numpy as np
 from scipy.interpolate import interp1d,CubicSpline
 from petitRADTRANS import nat_cst as nc
 from petitRADTRANS.retrieval import cloud_cond as fc
+from typing import Tuple
 from .util import surf_to_meas, calc_MMW
 """
 Models Module
@@ -852,42 +853,29 @@ def fixed_length_amr(p_clouds, pressures, scaling = 10, width = 3):
     cloud_indices = np.searchsorted(pressures, np.asarray(p_clouds))
 
     # High resolution intervals
-    intervals = []
+    def bounds(center: int, width: int) -> Tuple[int, int]:
+        upper = min(center + width // 2, length)
+        lower = max(upper - width, 0)
+        return lower, lower + width
 
-    for idx in cloud_indices:
-        lower = max(idx - (scaling * width) // 2, 0)
-        upper = min(lower + scaling * width, length)
-        lower = min(upper - scaling * width, lower)
-
-        intervals.append((lower, upper))
+    intervals = [bounds(idx, scaling * width) for idx in cloud_indices]
 
     # Merge intervals
-    merged = False
-    while not merged:
-        intervals = sorted(intervals)
-        stack = []
+    while True:
+        intervals, stack = sorted(intervals), []
 
         for interval in intervals:
             if stack and stack[-1][1] >= interval[0]:
                 last = stack.pop()
-                total_width = last[1] - last[0] + interval[1] - interval[0]
-                lower, upper = last[0], max(last[1], interval[1])
+                interval = bounds(
+                    (last[0] + max(last[1], interval[1]) + 1) // 2,
+                    last[1] - last[0] + interval[1] - interval[0],
+                )
 
-                ## Keep constant width
-                left = False
-                while upper - lower < total_width:
-                    left = not left
-                    if left and lower > 0:
-                        lower = lower - 1
-                    elif not left and upper < length:
-                        upper = upper + 1
-
-                stack.append((lower, upper))
-            else:
-                stack.append(interval)
+            stack.append(interval)
 
         if len(intervals) == len(stack):
-            merged = True
+            break
         intervals = stack
 
     # Intervals to indices
@@ -942,13 +930,13 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
     FeHs = parameters['Fe/H'].value * np.ones_like(pressures)
 
     # Prior check all input params
-    XFe = fc.return_XFe(parameters['Fe/H'].value, parameters['C/O'].value)
-    XMgSiO3 = fc.return_XMgSiO3(parameters['Fe/H'].value, parameters['C/O'].value)
-
     clouds = {}
-    clouds['Fe(c)'] = 10**parameters['log_X_cb_Fe(c)'].value*XFe
-    clouds['MgSiO3(c)'] = 10**parameters['log_X_cb_MgSiO3(c)'].value*XMgSiO3
+    for cloud in cloud_species:
+        # equilibrium cloud abundance
+        Xcloud= fc.return_cloud_mass_fraction(name,parameters['Fe/H'].value, parameters['C/O'].value)
 
+        # Scaled by a constant factor
+        clouds[cloud.split("_")[0]] = 10**parameters['log_X_cb_'+cloud.split("_")[0]].value*Xcloud
     pquench_C = None
     if 'log_pquench' in parameters.keys():
         pquench_C = 10**parameters['log_pquench'].value
@@ -960,14 +948,18 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
     MMW = abundances_interp['MMW']
 
     Pbases = {}
-    Pbases['Fe(c)'] = fc.simple_cdf_Fe(pressures, temperatures,
-                                parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
-    Pbases['MgSiO3(c)'] = fc.simple_cdf_MgSiO3(pressures, temperatures,
-                                parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
-    #Pbases['KCL(c)'] = fc.simple_cdf_KCL(pressures, temperatures,
-    #                            parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
-    #Pbases['Na2S(c)'] = fc.simple_cdf_Na2S(pressures, temperatures,
-    #                            parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
+    if 'log_X_cb_Fe(c)' in parameters.keys():
+        Pbases['Fe(c)'] = fc.simple_cdf_Fe(pressures, temperatures,
+                                    parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
+    if 'log_X_cb_MgSiO3(c)' in parameters.keys():
+        Pbases['MgSiO3(c)'] = fc.simple_cdf_MgSiO3(pressures, temperatures,
+                                   parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
+    if 'log_X_cb_KCL(c)' in parameters.keys():
+        Pbases['KCL(c)'] = fc.simple_cdf_KCL(pressures, temperatures,
+                                    parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
+    if 'log_X_cb_Na2S(c)' in parameters.keys():
+        Pbases['Na2S(c)'] = fc.simple_cdf_Na2S(pressures, temperatures,
+                                    parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
     fseds = {}
     abundances = {}
     # Clouds
@@ -997,10 +989,9 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
                         (pressures[pressures <= Pbases[cname]]/\
                         Pbases[cname])**parameters['fsed'].value
         fseds[cname] = parameters['fsed'].value
-
+        if AMR:
+            abundances[cname] = abundances[cname][small_index]
     if AMR:
-        abundances['Fe(c)'] = abundances['Fe(c)'][small_index]
-        abundances['MgSiO3(c)'] = abundances['MgSiO3(c)'][small_index]
         for species in line_species:
             abundances[species] = abundances_interp[species.split('_')[0]][small_index]
         abundances['H2'] = abundances_interp['H2'][small_index]
@@ -1011,6 +1002,9 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
             abundances[species] = abundances_interp[species.split('_')[0]]
         abundances['H2'] = abundances_interp['H2']
         abundances['He'] = abundances_interp['He']
+
+    # Magic factor for FeH abundances
+    # Ask Paul to explain this
     if 'FeH' in abundances.keys():
         abundances['FeH'] = abundances['FeH']/2.
     return abundances,MMW,small_index
