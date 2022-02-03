@@ -134,9 +134,8 @@ def get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=N
     # TODO generation of multiple-detector models
 
     if parameters['apply_pipeline'].value:
-        #spectrum_model, _ = simple_pipeline(np.array([spectrum_model]) / parameters['reduction_matrix'].value)  # thomx
-        #spectrum_model = np.array([spectrum_model]) * parameters['reduction_matrix'].value  # tho
-        spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value)])  # thom
+        impact_parameter = 1 / np.mean(spectrum_model, axis=1)
+        spectrum_model = np.array([add_variable_throughput(spectrum_model, impact_parameter)])
     else:
         spectrum_model = np.array([spectrum_model])
 
@@ -175,16 +174,31 @@ def get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=F
         #impact_parameter = m[0, :, 0] #* (0.995 + 10 ** parameters['variable_throughput_coefficient'].value)
         #spectrum_model = np.array([spectrum_model]) * parameters['reduction_matrix'].value  # tho
         #spectrum_model, _ = simple_pipeline(np.array([spectrum_model]) / parameters['reduction_matrix'].value)  # thomx
-        #spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value)]) * parameters['reduction_matrix'].value  # thom
+
+        # if parameters['telluric_transmittance'].value is not None:
+        #     spectrum_model = add_telluric_lines(spectrum_model, parameters['telluric_transmittance'].value)
+        #
+        # if parameters['variable_throughput'] is not None:
+        #     spectrum_model = add_variable_throughput(spectrum_model, parameters['variable_throughput'].value)
+        #
+        # spectrum_model = np.array([spectrum_model]) * parameters['reduction_matrix'].value  # thom
+
+        # spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput_approximation'].value)]) * parameters['reduction_matrix'].value  # thomap
+        # spectrum_model = np.array([add_variable_throughput(spectrum_model, impact_parameter * parameters['variable_throughput_approximation'].value)]) * parameters['reduction_matrix'].value  # thomap3
+        # spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput_approximation'].value * impact_parameter)]) * parameters['reduction_matrix'].value  # thomi63
         #spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value * 1.0001)]) * parameters['reduction_matrix'].value  # thomp
         #spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value * 0.9999)]) * parameters['reduction_matrix'].value  # thomm
-        # s = np.array([add_variable_throughput(spectrum_model, impact_parameter / parameters['reduction_matrix'].value[0, :, 0])]) * parameters['reduction_matrix'].value  # thomi
+        # spectrum_model = np.array([add_variable_throughput(spectrum_model, impact_parameter / parameters['reduction_matrix'].value[0, :, 0])]) * parameters['reduction_matrix'].value  # thomi
         spectrum_model = np.array([add_variable_throughput(spectrum_model, impact_parameter)])  # thomi3
+        # spectrum_model = np.array([add_variable_throughput(spectrum_model, impact_parameter / parameters['reduction_matrix'].value[0, :, 0])])  # thomi4
+        # spectrum_model, _, _ = simple_pipeline(spectrum_model)  # thomi4
+        # spectrum_model = add_variable_throughput(spectrum_model, impact_parameter)  # thomi4
+        # spectrum_model = np.transpose(np.transpose(spectrum_model) - np.mean(spectrum_model, axis=1))  # thomi5
         #spectrum_model, _ = simple_pipeline(np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value)]))  # thoma
         # print(np.mean(impact_parameter[0, :, 0] / parameters['reduction_matrix'].value[0, :, 0] - parameters['variable_throughput'].value))
-        print(f"{np.mean(impact_parameter / parameters['reduction_matrix'].value[0, :, 0] - parameters['variable_throughput'].value):+.3e}", parameters['variable_throughput_coefficient'].value, np.mean(impact_parameter))
+        # print(f"{np.mean(impact_parameter / parameters['reduction_matrix'].value[0, :, 0] - parameters['variable_throughput'].value):+.3e}", parameters['variable_throughput_coefficient'].value, np.mean(impact_parameter))
         #print(np.mean(parameters['variable_throughput'].value / (1 / parameters['reduction_matrix'].value[0, :, 0])))
-
+        # spectrum_model = np.array([spectrum_model])
     else:
         spectrum_model = np.array([spectrum_model])
 
@@ -254,7 +268,8 @@ def init_model(planet, w_bords, line_species_str, p0=1e-2):
 
 def init_parameters(planet, line_species_str, mode,
                     retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
-                    apply_pipeline=True, load_from=None):
+                    apply_variable_throughput=True, apply_telluric_transmittance=True,
+                    apply_pipeline=True, load_from=None, median=False):
     star_name = planet.host_name.replace(' ', '_')
 
     retrieval_name += f'_{mode}'
@@ -296,21 +311,34 @@ def init_parameters(planet, line_species_str, mode,
         raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
 
     airmass = None
-    telluric_transmittance = None  # TODO get telluric transmittance
 
-    # Simple variable_throughput
-    variable_throughput = -(np.linspace(-1, 1, np.size(orbital_phases)) - 0.1) ** 2
-    variable_throughput += 0.5 - np.min(variable_throughput)
-    # Brogi variable_throughput
-    data_dir = os.path.abspath(os.path.join(module_dir, 'metis', 'brogi_crires_test'))
-    variable_throughput = np.load(os.path.join(data_dir, 'algn.npy'))
-    variable_throughput = np.max(variable_throughput[0], axis=1)
-    variable_throughput = variable_throughput / np.max(variable_throughput)
-    xp = np.linspace(0, 1, np.size(variable_throughput))
-    x = np.linspace(0, 1, np.size(orbital_phases))
-    variable_throughput = np.interp(x, xp, variable_throughput)
-    # No variable_throughput
-    #variable_throughput = None
+    if apply_telluric_transmittance:
+        print('Add TT')
+        telluric_data = np.loadtxt(
+            os.path.join(module_dir, 'metis', 'skycalc', 'transmission_3060m_4750-4850nm_R150k_FWHM1.5_default.dat')
+        )
+        telluric_wavelengths = telluric_data[:, 0] * 1e-3  # nm to um
+        telluric_transmittance = fr.rebin_spectrum(telluric_wavelengths, telluric_data[:, 1], wavelength_instrument)
+    else:
+        print('No TT')
+        telluric_transmittance = None
+
+    if apply_variable_throughput:
+        print('Add VT')
+        # Simple variable_throughput
+        variable_throughput = -(np.linspace(-1, 1, np.size(orbital_phases)) - 0.1) ** 2
+        variable_throughput += 0.5 - np.min(variable_throughput)
+        # Brogi variable_throughput
+        data_dir = os.path.abspath(os.path.join(module_dir, 'metis', 'brogi_crires_test'))
+        variable_throughput = np.load(os.path.join(data_dir, 'algn.npy'))
+        variable_throughput = np.max(variable_throughput[0], axis=1)
+        variable_throughput = variable_throughput / np.max(variable_throughput)
+        xp = np.linspace(0, 1, np.size(variable_throughput))
+        x = np.linspace(0, 1, np.size(orbital_phases))
+        variable_throughput = np.interp(x, xp, variable_throughput)
+    else:
+        print('No VT')
+        variable_throughput = None
 
     # Get models
     kp = planet.calculate_orbital_velocity(planet.star_mass, planet.orbit_semi_major_axis)
@@ -398,7 +426,8 @@ def init_parameters(planet, line_species_str, mode,
 
         print('Mock obs...')
         mock_observations, noise, mock_observations_without_noise = generate_mock_observations(
-            true_wavelength, true_spectrum,
+            wavelength_model=true_wavelength,
+            planet_spectrum_model=true_spectrum,
             telluric_transmittance=telluric_transmittance,
             variable_throughput=variable_throughput,
             integration_time=integration_times_ref[band],
@@ -410,7 +439,7 @@ def init_parameters(planet, line_species_str, mode,
             star_radius=true_parameters['Rstar'].value,
             star_spectral_radiosity=true_parameters['star_spectral_radiosity'].value,
             orbital_phases=true_parameters['orbital_phases'].value,
-            system_observer_radial_velocities=np.zeros(ndit_half),  # TODO put that in true_parameters
+            system_observer_radial_velocities=true_parameters['system_observer_radial_velocities'].value,
             # TODO set to 0 for now since SNR data from Roy is at 0, but find RV source eventually
             planet_max_radial_orbital_velocity=true_parameters['planet_max_radial_orbital_velocity'].value,
             planet_orbital_inclination=true_parameters['planet_orbital_inclination'].value,
@@ -434,31 +463,75 @@ def init_parameters(planet, line_species_str, mode,
         true_parameters['apply_pipeline'] = Param(apply_pipeline)
         true_parameters['variable_throughput'] = Param(variable_throughput)
         true_parameters['variable_throughput_coefficient'] = Param(np.log10(5e-3))
+        true_parameters['telluric_transmittance'] = Param(telluric_transmittance)
 
         mock_observations = np.ma.asarray(copy.deepcopy(mock_observations_without_noise))
         mock_observations.mask = copy.deepcopy(mock_observations_.mask)
 
         if telluric_transmittance is not None:
             print('Add telluric lines')
-            mock_observations = add_telluric_lines(mock_observations_without_noise, telluric_transmittance)
+            mock_observations = add_telluric_lines(mock_observations, telluric_transmittance)
 
         if variable_throughput is not None:
             print('Add variable throughput')
-            for data in mock_observations:
-                mock_observations = add_variable_throughput(data, variable_throughput)
+            for i, data in enumerate(mock_observations):
+                mock_observations[i] = add_variable_throughput(data, variable_throughput)
 
-        mock_observations = mock_observations + noise
+        mock_observations += noise
+
+        # Generate and save mock observations
+        print('True spectrum calculation...')
+        if mode == 'eclipse':
+            true_wavelength, true_spectrum = radiosity_model(model, true_parameters)
+        elif mode == 'transit':
+            true_wavelength, true_spectrum = transit_radius_model(model, true_parameters)
+        else:
+            raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
+
+        _, _, mock_observations_without_noise_tmp = generate_mock_observations(
+            wavelength_model=true_wavelength,
+            planet_spectrum_model=true_spectrum,
+            telluric_transmittance=telluric_transmittance,
+            variable_throughput=variable_throughput,
+            integration_time=integration_times_ref[band],
+            integration_time_ref=integration_times_ref[band],
+            wavelength_instrument=true_parameters['wavelength_instrument'].value,
+            instrument_snr=instrument_snr,
+            instrument_resolving_power=true_parameters['instrument_resolving_power'].value,
+            planet_radius=true_parameters['R_pl'].value,
+            star_radius=true_parameters['Rstar'].value,
+            star_spectral_radiosity=true_parameters['star_spectral_radiosity'].value,
+            orbital_phases=true_parameters['orbital_phases'].value,
+            system_observer_radial_velocities=true_parameters['system_observer_radial_velocities'].value,
+            # TODO set to 0 for now since SNR data from Roy is at 0, but find RV source eventually
+            planet_max_radial_orbital_velocity=true_parameters['planet_max_radial_orbital_velocity'].value,
+            planet_orbital_inclination=true_parameters['planet_orbital_inclination'].value,
+            mode=mode,
+            add_noise=add_noise,
+            apply_snr_mask=True,
+            number=1
+        )
+
+        # Check loaded data and re-generated data without noise consistency
+        assert np.allclose(mock_observations_without_noise_tmp, mock_observations - noise, atol=1e-14, rtol=1e-14)
+
+        print("Mock observations consistency check OK")
 
     error = np.ones(mock_observations.shape) / instrument_snr
 
     if apply_pipeline:
         print('Data reduction...')
-        reduced_mock_observations, reduction_matrix, error = simple_pipeline(  # TODO better way of changing noise when data_noise=None
+        reduced_mock_observations, reduction_matrix, pipeline_noise = simple_pipeline(
             spectral_data=mock_observations,
             data_noise=error,
             airmass=airmass,
-            mean_subtract=False
+            times=times,
+            mean_subtract=False,
+            median=median
         )
+
+        if not np.all(pipeline_noise == 0):
+            error = pipeline_noise
 
         if add_noise:
             reduced_mock_observations_without_noise = copy.deepcopy(mock_observations_without_noise)
@@ -469,13 +542,23 @@ def init_parameters(planet, line_species_str, mode,
                 )
 
             if variable_throughput is not None:
-                reduced_mock_observations_without_noise = add_variable_throughput(
-                    reduced_mock_observations_without_noise, variable_throughput
-                )
+                for i in range(reduced_mock_observations_without_noise.shape[0]):
+                    reduced_mock_observations_without_noise[i] = add_variable_throughput(
+                        reduced_mock_observations_without_noise[i], variable_throughput
+                    )
 
             reduced_mock_observations_without_noise *= reduction_matrix
         else:
             reduced_mock_observations_without_noise = copy.deepcopy(reduced_mock_observations)
+
+        # print('Remove spikes!!!!')
+        # mask_tmp = np.zeros(reduced_mock_observations.shape, dtype=bool)
+        # diff_vt = (true_parameters['variable_throughput'].value - np.ma.median(mock_observations[0], axis=1)) \
+        #     / true_parameters['variable_throughput'].value
+        # wh = np.where(np.abs(diff_vt - np.mean(diff_vt)) > 2 * np.std(diff_vt))
+        # mask_tmp[:, wh, :] = True
+        # reduced_mock_observations = np.ma.masked_where(mask_tmp, reduced_mock_observations)
+        # print(wh)
     else:
         print('Pipeline not applied!')
         reduced_mock_observations = copy.deepcopy(mock_observations)
@@ -488,13 +571,42 @@ def init_parameters(planet, line_species_str, mode,
 
     true_parameters['reduction_matrix'] = Param(reduction_matrix)
 
+    if telluric_transmittance is not None:
+        true_parameters['telluric_transmittance_approximation'] = Param(telluric_transmittance)
+
+    if variable_throughput is not None:
+        n = np.random.default_rng().normal(loc=0.0, scale=1.5e-4, size=true_parameters['variable_throughput'].value.size)
+        v_approx = true_parameters['variable_throughput'].value + n
+        v_approx2 = 1 / (reduction_matrix[0, :, 0] * np.mean(mock_observations_without_noise[0], axis=1))
+        v_approx3 = 1 / (reduction_matrix[0, :, 0])
+        true_parameters['variable_throughput_approximation'] = Param(v_approx3)
+
+        print('v_approx dif', np.mean((v_approx - v_approx2) / v_approx))
+        print('v_approx dif2',
+              np.mean((v_approx2 - v_approx3 / np.mean(mock_observations_without_noise[0], axis=1)) / v_approx2))
+
     # Check if the retrieval model with the true parameters is the same as the reduced mock observations without noise
     w, r = retrieval_model(model, true_parameters)
 
+    print('mob', np.max(np.abs(np.transpose(mock_observations_without_noise[0, :, :]) / np.mean(mock_observations_without_noise[0], axis=1) - np.transpose(r[0, :, :]))))
+    print('error', np.mean(error))
+
     assert np.all(w == wavelength_instrument)
 
-    if not np.allclose(r, reduced_mock_observations_without_noise, atol=0.0, rtol=1e-15):
-        print("Warning: model is different from observations")
+    if not np.allclose(r, reduced_mock_observations_without_noise, atol=0.0, rtol=1e-14):
+        rmown_mean_normalized = copy.deepcopy(reduced_mock_observations_without_noise)
+
+        for i in range(reduced_mock_observations_without_noise.shape[0]):
+            rmown_mean_normalized[i, :, :] = np.transpose(
+                np.transpose(
+                    reduced_mock_observations_without_noise[i, :, :])
+                    / np.mean(reduced_mock_observations_without_noise[i, :, :], axis=1)
+            )
+
+        if not np.allclose(r, rmown_mean_normalized, atol=0.0, rtol=1e-14):
+            print("Warning: model is different from observations")
+        else:
+            print("True model vs observations / mean consistency check OK")
     else:
         print("True model vs observations consistency check OK")
 
@@ -522,6 +634,20 @@ def init_parameters(planet, line_species_str, mode,
     #     true_parameters, np.zeros(ndit_half),
     #     plot=True, output_dir=retrieval_directory
     # )
+    print('Calculating true log L...')
+    true_log_l, w2, r2 = pseudo_retrieval(
+        parameters=true_parameters,
+        kps=[true_parameters['planet_max_radial_orbital_velocity'].value],
+        v_rest=[true_parameters['planet_rest_frame_shift'].value],
+        model=model, reduced_mock_observations=reduced_mock_observations, error=error,
+        true_parameters=true_parameters, radial_velocity=true_parameters['system_observer_radial_velocities'].value,
+        plot=False, output_dir=retrieval_directory, mode=mode
+    )
+
+    # Check if true spectra are the same
+    assert np.allclose(r2[0][0], r, atol=0.0, rtol=1e-14)
+
+    print(f'True log L = {true_log_l[0][0]}')
 
     save_all(
         directory=retrieval_directory,
@@ -765,15 +891,18 @@ def main():
 
     line_species_str = ['CO_all_iso', 'H2O_main_iso']
 
-    retrieval_name = 't0l_thomi3mn2_kp_vr_CO_H2O_79-80'
+    retrieval_name = 't0l2_thomi3_kp_vr_CO_H2O_79-80'
     mode = 'transit'
     n_live_points = 200
     add_noise = True
+    apply_variable_throughput = True
+    apply_telluric_transmittance = False
     apply_pipeline = True
+    median = False
 
     retrieval_directories = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval'))
 
-    load_from = os.path.join(retrieval_directories, 't0_kp_vr_CO_H2O_79-80_transit_200lp_np')
+    load_from = os.path.join(retrieval_directories, f't0_kp_vr_CO_H2O_79-80_{mode}_200lp_np')
 
     band = 'M'
 
@@ -801,7 +930,9 @@ def main():
             = init_parameters(
                 planet, line_species_str, mode,
                 retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
-                apply_pipeline=apply_pipeline, load_from=load_from
+                apply_variable_throughput=apply_variable_throughput,
+                apply_telluric_transmittance=apply_telluric_transmittance,
+                apply_pipeline=apply_pipeline, load_from=load_from, median=median
             )
 
         retrieval_parameters = {
@@ -869,20 +1000,36 @@ def main():
         for p in parameter_dict[retrieval_name]:
             true_values[retrieval_name].append(np.mean(retrieval_parameters['parameters'][p].value))
 
-        fig = contour_corner(sample_dict, parameter_dict, os.path.join(retrieval_directory, 'test_corner.png'),
-                             parameter_plot_indices=parameter_plot_indices,
-                             true_values=true_values, prt_plot_style=False)
+        fig = contour_corner(
+            sample_dict, parameter_dict, os.path.join(retrieval_directory, f'corner_{retrieval_name}.png'),
+            parameter_plot_indices=parameter_plot_indices,
+            true_values=true_values, prt_plot_style=False
+        )
 
         fig.show()
 
 
-def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, instrument_snr,
-                     true_parameters=None, radial_velocity=None, plot=False, output_dir=None):
+def plot_observations(observations, wmin, wmax, phase_min, phase_max, v_min=None, v_max=None, title=None,
+                      cbar=False, clabel=None, cmap='viridis'):
+    plt.imshow(
+        observations, origin='lower', extent=[wmin, wmax, phase_min, phase_max], aspect='auto', vmin=v_min, vmax=v_max,
+        cmap=cmap
+    )
+    plt.xlabel(rf'Wavelength ($\mu$m)')
+    plt.ylabel(rf'Orbital phases')
+    plt.title(title)
+
+    if cbar:
+        cbar = plt.colorbar()
+        cbar.set_label(clabel)
+
+
+def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, error,
+                     true_parameters=None, radial_velocity=None, plot=False, output_dir=None, mode='eclipse'):
     ppp = copy.deepcopy(parameters)
     logls = []
     wavelengths = []
     retrieval_models = []
-    error = 1 / instrument_snr
 
     if hasattr(reduced_mock_observations, 'mask'):
         print('Taking care of mask...')
@@ -898,7 +1045,7 @@ def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, 
                 data_[i].append(np.array(
                         reduced_mock_observations[i, j, ~mask_[i, j, :]]
                 ))
-                error_[i].append(np.array(error[~mask_[i, j, :]]))
+                error_[i].append(np.array(error[i, j, ~mask_[i, j, :]]))
 
         data_ = np.asarray(data_, dtype=object)
         error_ = np.asarray(error_, dtype=object)
@@ -906,6 +1053,13 @@ def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, 
         data_ = reduced_mock_observations
         error_ = error
         mask_ = np.zeros(reduced_mock_observations.shape, dtype=bool)
+
+    if mode == 'eclipse':
+        retrieval_model = get_secondary_eclipse_retrieval_model
+    elif mode == 'transit':
+        retrieval_model = get_transit_retrieval_model
+    else:
+        raise ValueError(f"mode must be 'eclipse' or 'transit', but is '{mode}'")
 
     for lag in v_rest:
         ppp['planet_rest_frame_shift'].value = lag
@@ -916,7 +1070,7 @@ def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, 
         for kp_ in kps:
             ppp['planet_max_radial_orbital_velocity'].value = kp_
 
-            w, s = get_secondary_eclipse_retrieval_model(model, ppp)
+            w, s = retrieval_model(model, ppp)
             wavelengths[-1].append(w)
             retrieval_models[-1].append(s)
 
@@ -925,10 +1079,11 @@ def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, 
             for i, det in enumerate(data_):
                 for j, data in enumerate(det):
                     logl += Data.log_likelihood_gibson(
-                        s[i, j, ~mask_[i, j, :]],
-                        data,
-                        error_[i, j],
-                        1.0, 1.0
+                        model=s[i, j, ~mask_[i, j, :]],
+                        data=data,
+                        uncertainties=error_[i, j],
+                        alpha=1.0,
+                        beta=1.0
                     )
 
             logls[-1].append(logl)
@@ -974,26 +1129,6 @@ def radiosity_model(prt_object, parameters):
     wlen_model = nc.c / prt_object.freq * 1e4  # wlen in micron
 
     return wlen_model, planet_radiosity
-
-
-def transit_radius_model(prt_object, parameters):
-    temperatures, abundances, mmw = init_retrieval_model(prt_object, parameters)
-
-    # Calculate the spectrum
-    prt_object.calc_transm(
-        temp=temperatures,
-        abunds=abundances,
-        gravity=10 ** parameters['log_g'].value,
-        mmw=mmw,
-        P0_bar=parameters['reference_pressure'].value,
-        R_pl=parameters['R_pl'].value
-    )
-
-    # Transform the outputs into the units of our data.
-    planet_transit_radius = prt_object.transm_rad
-    wlen_model = nc.c / prt_object.freq * 1e4  # wlen in micron
-
-    return wlen_model, planet_transit_radius
 
 
 def retrieval_run(retrieval_name, n_live_points, model, pressures, true_parameters,
@@ -1354,6 +1489,26 @@ def simple_log_l(wavelength_data, spectral_data_earth_corrected, wavelength_mode
                 log_l__[i, j, k] = log_l_b()
 
     return ccf_, log_l__, sf, sg, log_l__2
+
+
+def transit_radius_model(prt_object, parameters):
+    temperatures, abundances, mmw = init_retrieval_model(prt_object, parameters)
+
+    # Calculate the spectrum
+    prt_object.calc_transm(
+        temp=temperatures,
+        abunds=abundances,
+        gravity=10 ** parameters['log_g'].value,
+        mmw=mmw,
+        P0_bar=parameters['reference_pressure'].value,
+        R_pl=parameters['R_pl'].value
+    )
+
+    # Transform the outputs into the units of our data.
+    planet_transit_radius = prt_object.transm_rad
+    wlen_model = nc.c / prt_object.freq * 1e4  # wlen in micron
+
+    return wlen_model, planet_transit_radius
 
 
 def true_model(prt_object, parameters):

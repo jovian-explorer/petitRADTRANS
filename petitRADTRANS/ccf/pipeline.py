@@ -151,7 +151,7 @@ def __remove_throughput_masked(spectral_data, reduction_matrix, noise=None,
 
 
 def remove_throughput(spectral_data, reduction_matrix, data_noise=None,
-                      throughput_correction_lower_bound=0.70, throughput_correction_upper_bound=None):
+                      throughput_correction_lower_bound=0.70, throughput_correction_upper_bound=None, median=False):
     """Correct for the variable throughput.
 
     Args:
@@ -173,23 +173,71 @@ def remove_throughput(spectral_data, reduction_matrix, data_noise=None,
         spectral_data_corrected = np.zeros(spectral_data.shape)
         pipeline_noise = np.zeros(spectral_data.shape)
 
-    for i, data in enumerate(spectral_data):
-        if isinstance(spectral_data, np.ma.core.MaskedArray):
-            spectral_data_corrected[i, :, :], reduction_matrix[i, :, :], pipeline_noise[i, :, :] = \
-                __remove_throughput_masked(
-                    data, reduction_matrix[i, :, :], data_noise[i, :, :],
-                    throughput_correction_lower_bound, throughput_correction_upper_bound
-                )
-        elif isinstance(spectral_data, np.ndarray):
-            spectral_data_corrected[i, :, :], reduction_matrix[i, :, :], pipeline_noise[i, :, :] = \
-                __remove_throughput(
-                    data, reduction_matrix[i, :, :],
-                    throughput_correction_lower_bound, throughput_correction_upper_bound
-                )
-        else:
-            raise ValueError(f"spectral_data must be a numpy.ndarray or a numpy.ma.core.MaskedArray, "
-                             f"but is of type '{type(spectral_data)}'")
+    if data_noise is None:
+        data_noise = np.array([None])
 
+    if median:
+        print('Median!!')
+        for i, data in enumerate(spectral_data):
+            if isinstance(spectral_data, np.ma.core.MaskedArray):
+                correction_coefficient = np.ma.median(data, axis=1)
+            elif isinstance(spectral_data, np.ndarray):
+                correction_coefficient = np.median(data, axis=1)
+            else:
+                raise ValueError(f"spectral_data must be a numpy.ndarray or a numpy.ma.core.MaskedArray, "
+                                 f"but is of type '{type(spectral_data)}'")
+
+            spectral_data_corrected[i, :, :] = np.transpose(
+                np.transpose(data) / correction_coefficient
+            )
+            reduction_matrix[i, :, :] = np.transpose(
+                np.transpose(reduction_matrix[i, :, :]) / correction_coefficient
+            )
+
+            if data_noise is not None:
+                for j, correction_coefficient_ in enumerate(correction_coefficient):
+                    brightest_data_wavelength_noise = median_uncertainties(
+                        data_noise[i, j, :][~data[j, :].mask]
+                    )
+
+                    partial_derivatives = np.array([
+                        spectral_data_corrected[i, j, :] / data[j, :],  # dS'/dS
+                        - spectral_data_corrected[i, j, :] / correction_coefficient_  # dS'/dC
+                    ])
+
+                    uncertainties = np.abs(np.array([
+                        data_noise[i, j, :],  # sigma_S
+                        brightest_data_wavelength_noise * np.ones(data_noise[i, j, :].shape)  # sigma_C
+                    ]))
+
+                    for k in range(uncertainties.shape[1]):
+                        pipeline_noise[i, j, k] = calculate_uncertainty(partial_derivatives[:, k], uncertainties[:, k])
+                        pipeline_noise.mask[i, j, k] = data.mask[j, k]
+            # pipeline_noise = copy.copy(data_noise)  # TODO add true pipeline noise
+    else:
+        print('Not median!!')
+        for i, data in enumerate(spectral_data):
+            if isinstance(spectral_data, np.ma.core.MaskedArray):
+                spectral_data_corrected[i, :, :], reduction_matrix[i, :, :], pipeline_noise[i, :, :] = \
+                    __remove_throughput_masked(
+                        data, reduction_matrix[i, :, :], data_noise[i],
+                        throughput_correction_lower_bound, throughput_correction_upper_bound
+                    )
+            elif isinstance(spectral_data, np.ndarray):
+                spectral_data_corrected[i, :, :], reduction_matrix[i, :, :], pipeline_noise[i, :, :] = \
+                    __remove_throughput(
+                        data, reduction_matrix[i, :, :], data_noise[i],
+                        throughput_correction_lower_bound, throughput_correction_upper_bound
+                    )
+            else:
+                raise ValueError(f"spectral_data must be a numpy.ndarray or a numpy.ma.core.MaskedArray, "
+                                 f"but is of type '{type(spectral_data)}'")
+
+            # spectral_data_corrected[i, :, :] = np.transpose(
+            #     np.transpose(spectral_data_corrected[i, :, :])
+            #     / np.mean(spectral_data_corrected[i, :, :], axis=1)
+            # )
+            # print(np.mean(spectral_data_corrected[i, :, :], axis=1))
     return spectral_data_corrected, reduction_matrix, pipeline_noise
 
 
@@ -205,28 +253,32 @@ def remove_telluric_lines(spectral_data, reduction_matrix, airmass=None, times=N
     Returns:
         Spectral data corrected from the telluric transmittance
     """
-    for j, data in enumerate(spectral_data):
+    for i, data in enumerate(spectral_data):
         # Remove the mean of the telluric lines
+        # TODO better mask management, like in remove_throughput
         if airmass is not None:
-            exp_airmass = np.exp(-airmass[j])
+            exp_airmass = np.exp(-airmass[i])
 
-            for i in range(np.size(data, axis=1)):
+            for k in range(np.size(data, axis=1)):
                 # Fit the telluric lines change over time with a 2nd order polynomial
                 # The telluric lines opacity depends on airmass (tau = alpha / cos(theta)), so the telluric lines
                 # transmittance (T = exp(-tau)) depend on exp(airmass)
                 # Using a 1st order polynomial is not enough, as the atm. composition will change slowly over time
-                fit_parameters = np.polyfit(x=exp_airmass, y=data[:, i], deg=2)
+                fit_parameters = np.polyfit(x=exp_airmass, y=data[:, k], deg=2)
                 fit_function = np.poly1d(fit_parameters)
                 fit = fit_function(exp_airmass)  # might be necessary to mask 0 here
-                data[:, i] = data[:, i] / fit
-                reduction_matrix[j, :, i] /= fit
+                data[:, k] = data[:, k] / fit
+                reduction_matrix[i, :, k] /= fit
         else:
-            for i in range(np.size(data, axis=1)):
-                fit_parameters = np.polyfit(x=times, y=data[:, i], deg=2)
+            for k in range(np.size(data, axis=1)):
+                if np.all(data.mask[:, k]):
+                    continue
+
+                fit_parameters = np.polyfit(x=times[~data.mask[:, k]], y=data[:, k][~data.mask[:, k]], deg=2)
                 fit_function = np.poly1d(fit_parameters)
                 fit = fit_function(times)
-                data[:, i] = data[:, i] / fit
-                reduction_matrix[j, :, i] /= fit
+                data[:, k][~data.mask[:, k]] = data[:, k][~data.mask[:, k]] / fit
+                reduction_matrix[i, :, k][~data.mask[:, k]] /= fit
 
     return spectral_data, reduction_matrix
 
@@ -305,7 +357,7 @@ def remove_noisy_wavelength_channels(spectral_data, reduction_matrix, mean_subtr
 
 def simple_pipeline(spectral_data, airmass=None, times=None, data_noise=None,
                     throughput_correction_lower_bound=0.70, throughput_correction_upper_bound=None,
-                    mean_subtract=False):
+                    mean_subtract=False, median=False):
     """Removes the telluric lines and variable throughput of some data.
 
     Args:
@@ -323,15 +375,33 @@ def simple_pipeline(spectral_data, airmass=None, times=None, data_noise=None,
     reduction_matrix = np.ones(spectral_data.shape)
 
     spectral_data_corrected, reduction_matrix, pipeline_noise = remove_throughput(
-        spectral_data, reduction_matrix, data_noise,
-        throughput_correction_lower_bound, throughput_correction_upper_bound
+        spectral_data=spectral_data,
+        reduction_matrix=reduction_matrix,
+        data_noise=data_noise,
+        throughput_correction_lower_bound=throughput_correction_lower_bound,
+        throughput_correction_upper_bound=throughput_correction_upper_bound,
+        median=median
     )
 
-    #return spectral_data_corrected, reduction_matrix, pipeline_noise
+    # for i in range(spectral_data_corrected.shape[0]):  # thomi5 tests
+    #     print('mean-subtraction!')
+    #     print('m', np.ma.mean(spectral_data_corrected[i], axis=1))
+    #     print('md', np.ma.median(spectral_data_corrected[i], axis=1))
+    #     spectral_data_corrected[i] = np.transpose(
+    #         np.transpose(spectral_data_corrected[i]) - np.ma.median(spectral_data_corrected[i], axis=1)
+    #     )
+    #     #reduction_matrix[i] -= np.mean(spectral_data_corrected[i], axis=1)
+
+    return spectral_data_corrected, reduction_matrix, pipeline_noise
 
     spectral_data_corrected, reduction_matrix = remove_telluric_lines(
-        spectral_data_corrected, airmass, times
+        spectral_data=spectral_data_corrected,
+        reduction_matrix=reduction_matrix,  # TODO separate the 2 reduction matrices?
+        airmass=airmass,
+        times=times
     )
+
+    return spectral_data_corrected, reduction_matrix, pipeline_noise
 
     spectral_data_corrected, reduction_matrix = remove_noisy_wavelength_channels(
         spectral_data_corrected, reduction_matrix, mean_subtract

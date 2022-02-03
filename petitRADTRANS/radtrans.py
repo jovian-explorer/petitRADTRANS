@@ -1256,8 +1256,11 @@ class Radtrans(_read_opacities.ReadOpacities):
         if self.mu_star <= 0.:
             self.mu_star = 1e-8
 
-        # TODO add condition to avoid re-calculation of star spectrum if not needed
-        self.get_star_spectrum(Tstar, semimajoraxis, Rstar, stellar_intensity)
+        if stellar_intensity is None:
+            self.get_star_spectrum(Tstar, semimajoraxis, Rstar)
+        else:
+            self.stellar_intensity = stellar_intensity
+
         self.interpolate_species_opa(temp)
         self.mix_opa_tot(abunds, mmw, gravity, sigma_lnorm, fsed, Kzz, radius,
                          add_cloud_scat_as_abs=add_cloud_scat_as_abs,
@@ -1278,7 +1281,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     self.kappa_rosseland.reshape(1, 1, 1, len(self.press))
                 ).reshape(len(self.press))
 
-    def get_star_spectrum(self, Tstar, distance, Rstar=None, stellar_intensity=None):
+    def get_star_spectrum(self, Tstar, distance, Rstar=None):
         """Method to get the PHOENIX spectrum of the star and rebin it
         to the wavelength points. If Tstar is not explicitly written, the
         spectrum will be 0. If the distance is not explicitly written,
@@ -1293,43 +1296,39 @@ class Radtrans(_read_opacities.ReadOpacities):
                 Rstar (float):
                     if specified, uses this radius in Solar radii
                     to scale the flux, otherwise it uses PHOENIX radius.
-                stellar_intensity (array):
-                    if specified, it will be used directly as the stellar intensity
         """
-        if stellar_intensity is None:
-            if Tstar is not None:
+        # TODO this could be static
+        if Tstar is not None:
+            if Rstar is not None:
+                spec = phoenix.get_PHOENIX_spec(Tstar)
+                rad = Rstar
+            else:
                 spec, rad = phoenix.get_PHOENIX_spec_rad(Tstar)
 
-                if Rstar is not None:
-                    print('Using Rstar value input by user.')
-                    rad = Rstar
+            add_stellar_flux = np.zeros(100)
+            add_wavelengths = np.logspace(np.log10(1.0000002e-02), 2, 100)
 
-                add_stellar_flux = np.zeros(100)
-                add_wavelengths = np.logspace(np.log10(1.0000002e-02), 2, 100)
+            # import pdb
+            # pdb.set_trace()
 
-                # import pdb
-                # pdb.set_trace()
+            interpwavelengths = np.append(spec[:, 0], add_wavelengths)
+            interpfluxes = np.append(spec[:, 1], add_stellar_flux)
 
-                interpwavelengths = np.append(spec[:, 0], add_wavelengths)
-                interpfluxes = np.append(spec[:, 1], add_stellar_flux)
+            self.stellar_intensity = fr.rebin_spectrum(interpwavelengths,
+                                                       interpfluxes,
+                                                       nc.c / self.freq)
 
-                self.stellar_intensity = fr.rebin_spectrum(interpwavelengths,
-                                                           interpfluxes,
-                                                           nc.c / self.freq)
-
-                try:
-                    # SCALED INTENSITY (Flux/pi)
-                    self.stellar_intensity = self.stellar_intensity / np.pi * \
-                                             (rad / distance) ** 2
-                except TypeError as e:
-                    message = '********************************' + \
-                              ' Error! Please set the semi-major axis or turn off the calculation ' + \
-                              'of the stellar spectrum by removing Tstar. ********************************'
-                    raise Exception(message) from e
-            else:
-                self.stellar_intensity = np.zeros_like(self.freq)
+            try:
+                # SCALED INTENSITY (Flux/pi)
+                self.stellar_intensity = self.stellar_intensity / np.pi * \
+                                         (rad / distance) ** 2
+            except TypeError as e:
+                message = '********************************' + \
+                          ' Error! Please set the semi-major axis or turn off the calculation ' + \
+                          'of the stellar spectrum by removing Tstar. ********************************'
+                raise Exception(message) from e
         else:
-            self.stellar_intensity = stellar_intensity
+            self.stellar_intensity = np.zeros_like(self.freq)
 
     def calc_transm(self, temp, abunds, gravity, mmw, P0_bar, R_pl,
                     sigma_lnorm=None,
