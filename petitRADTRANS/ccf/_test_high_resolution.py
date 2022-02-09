@@ -134,8 +134,46 @@ def get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=N
     # TODO generation of multiple-detector models
 
     if parameters['apply_pipeline'].value:
-        impact_parameter = 1 / np.mean(spectrum_model, axis=1)
-        spectrum_model = np.array([add_variable_throughput(spectrum_model, impact_parameter)])
+        spectrum_model = np.array([spectrum_model]) \
+                         * parameters['deformation_matrix_approximation'].value \
+                         * parameters['reduction_matrix'].value
+        print('dm',
+            np.max(np.abs(
+                parameters['deformation_matrix_approximation'].value \
+                * parameters['reduction_matrix'].value
+            ))
+        )
+
+        if parameters['use_true_spectra'].value is None:
+            pass
+        elif parameters['use_true_spectra'].value:
+            pass
+        else:
+            for i, det in enumerate(spectrum_model):
+                # First correction: the time-dependent mean over wavelength
+                correction = np.transpose(np.transpose(np.ones(det.shape)) / np.mean(det, axis=1))
+                print('spec_t',
+                      np.max(np.abs(
+                          np.transpose(correction) / np.mean(parameters['true_spectra'].value, axis=2)[i]
+                      ))
+                )
+                ml = np.transpose(
+                    np.transpose(parameters['true_spectra'].value[i])
+                    / np.mean(parameters['true_spectra'].value, axis=2)[i]
+                )
+
+                # Divide the spectrum by the time-dependent mean over wavelength
+                spectrum_mean_wavelength = np.transpose(np.transpose(det) / np.mean(det, axis=1))
+
+                # Second correction: the wavelength-dependent mean over time of spectrum_mean_wavelength
+                correction = correction / np.mean(spectrum_mean_wavelength, axis=0)
+                print('spec_l',
+                      np.max(np.abs(
+                          correction / (ml / np.mean(ml, axis=0))
+                      ))
+                )
+                # spectrum_model[i] = add_variable_throughput(det, correction[i])
+                spectrum_model[i] = det * correction
     else:
         spectrum_model = np.array([spectrum_model])
 
@@ -162,43 +200,50 @@ def get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=F
         planet_rest_frame_shift=parameters['planet_rest_frame_shift'].value
     )
 
-    # TODO add telluric transmittance (probably)
     # TODO generation of multiple-detector models
 
     if parameters['apply_pipeline'].value:
-        # impact_parameter = np.mean(2 - spectrum_model, axis=1)
-        impact_parameter = 1 / np.mean(spectrum_model, axis=1)
-        # print('i1', impact_parameter.shape, np.mean(impact_parameter))
-        # s, m = simple_pipeline(np.array([spectrum_model]))
-        # impact_parameter *= (0.995 + 10 ** parameters['variable_throughput_coefficient'].value)
-        #impact_parameter = m[0, :, 0] #* (0.995 + 10 ** parameters['variable_throughput_coefficient'].value)
-        #spectrum_model = np.array([spectrum_model]) * parameters['reduction_matrix'].value  # tho
-        #spectrum_model, _ = simple_pipeline(np.array([spectrum_model]) / parameters['reduction_matrix'].value)  # thomx
+        spectrum_model = np.array([spectrum_model]) \
+                         * parameters['deformation_matrix_approximation'].value \
+                         * parameters['reduction_matrix'].value
+        print('dm',
+            np.max(np.abs(
+                parameters['deformation_matrix_approximation'].value \
+                * parameters['reduction_matrix'].value
+            ))
+        )
 
-        # if parameters['telluric_transmittance'].value is not None:
-        #     spectrum_model = add_telluric_lines(spectrum_model, parameters['telluric_transmittance'].value)
-        #
-        # if parameters['variable_throughput'] is not None:
-        #     spectrum_model = add_variable_throughput(spectrum_model, parameters['variable_throughput'].value)
-        #
-        # spectrum_model = np.array([spectrum_model]) * parameters['reduction_matrix'].value  # thom
+        if parameters['use_true_spectra'].value is None:
+            pass
+        elif parameters['use_true_spectra'].value:
+            pass
+        else:
+            for i, det in enumerate(spectrum_model):
+                # First correction: the time-dependent mean over wavelength
+                correction = np.transpose(np.transpose(np.ones(det.shape)) / np.mean(det, axis=1))
+                print('spec_t',
+                      np.max(np.abs(
+                          np.transpose(correction) / np.mean(parameters['true_spectra'].value, axis=2)[i]
+                      ))
+                )
+                ml = np.transpose(
+                    np.transpose(parameters['true_spectra'].value[i])
+                    / np.mean(parameters['true_spectra'].value, axis=2)[i]
+                )
 
-        # spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput_approximation'].value)]) * parameters['reduction_matrix'].value  # thomap
-        # spectrum_model = np.array([add_variable_throughput(spectrum_model, impact_parameter * parameters['variable_throughput_approximation'].value)]) * parameters['reduction_matrix'].value  # thomap3
-        # spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput_approximation'].value * impact_parameter)]) * parameters['reduction_matrix'].value  # thomi63
-        #spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value * 1.0001)]) * parameters['reduction_matrix'].value  # thomp
-        #spectrum_model = np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value * 0.9999)]) * parameters['reduction_matrix'].value  # thomm
-        # spectrum_model = np.array([add_variable_throughput(spectrum_model, impact_parameter / parameters['reduction_matrix'].value[0, :, 0])]) * parameters['reduction_matrix'].value  # thomi
-        spectrum_model = np.array([add_variable_throughput(spectrum_model, impact_parameter)])  # thomi3
-        # spectrum_model = np.array([add_variable_throughput(spectrum_model, impact_parameter / parameters['reduction_matrix'].value[0, :, 0])])  # thomi4
-        # spectrum_model, _, _ = simple_pipeline(spectrum_model)  # thomi4
-        # spectrum_model = add_variable_throughput(spectrum_model, impact_parameter)  # thomi4
-        # spectrum_model = np.transpose(np.transpose(spectrum_model) - np.mean(spectrum_model, axis=1))  # thomi5
-        #spectrum_model, _ = simple_pipeline(np.array([add_variable_throughput(spectrum_model, parameters['variable_throughput'].value)]))  # thoma
-        # print(np.mean(impact_parameter[0, :, 0] / parameters['reduction_matrix'].value[0, :, 0] - parameters['variable_throughput'].value))
-        # print(f"{np.mean(impact_parameter / parameters['reduction_matrix'].value[0, :, 0] - parameters['variable_throughput'].value):+.3e}", parameters['variable_throughput_coefficient'].value, np.mean(impact_parameter))
-        #print(np.mean(parameters['variable_throughput'].value / (1 / parameters['reduction_matrix'].value[0, :, 0])))
-        # spectrum_model = np.array([spectrum_model])
+                # Divide the spectrum by the time-dependent mean over wavelength
+                spectrum_mean_wavelength = np.transpose(np.transpose(det) / np.mean(det, axis=1))
+                print(spectrum_mean_wavelength.shape, correction.shape)
+
+                # Second correction: the wavelength-dependent mean over time of spectrum_mean_wavelength
+                correction = correction / np.mean(spectrum_mean_wavelength, axis=0)
+                print('spec_l',
+                      np.max(np.abs(
+                          correction / (ml / np.mean(ml, axis=0))
+                      ))
+                )
+                # spectrum_model[i] = add_variable_throughput(det, correction[i])
+                spectrum_model[i] = det * correction
     else:
         spectrum_model = np.array([spectrum_model])
 
@@ -269,7 +314,8 @@ def init_model(planet, w_bords, line_species_str, p0=1e-2):
 def init_parameters(planet, line_species_str, mode,
                     retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
                     apply_variable_throughput=True, apply_telluric_transmittance=True,
-                    apply_pipeline=True, load_from=None, median=False):
+                    apply_pipeline=True, load_from=None, median=False,
+                    use_true_deformation_matrix=False, deformation_matrix_noise=0.0, use_true_spectra=None):
     star_name = planet.host_name.replace(' ', '_')
 
     retrieval_name += f'_{mode}'
@@ -530,8 +576,12 @@ def init_parameters(planet, line_species_str, mode,
             median=median
         )
 
+        print('mean error, mean pipeline noise', np.mean(error), np.mean(pipeline_noise))
         if not np.all(pipeline_noise == 0):
             error = pipeline_noise
+        else:
+            print('Using data noise')
+        print('mean error', np.mean(error))
 
         if add_noise:
             reduced_mock_observations_without_noise = copy.deepcopy(mock_observations_without_noise)
@@ -571,19 +621,73 @@ def init_parameters(planet, line_species_str, mode,
 
     true_parameters['reduction_matrix'] = Param(reduction_matrix)
 
+    true_parameters['apply_pipeline'] = Param(False)
+
+    _, true_spectra = retrieval_model(model, true_parameters)
+
+    true_parameters['true_spectra'] = Param(true_spectra)
+    true_parameters['apply_pipeline'] = Param(apply_pipeline)
+    true_parameters['use_true_deformation_matrix'] = Param(use_true_deformation_matrix)
+    true_parameters['use_true_spectra'] = Param(use_true_spectra)
+
     if telluric_transmittance is not None:
-        true_parameters['telluric_transmittance_approximation'] = Param(telluric_transmittance)
+        telluric_matrix = telluric_transmittance * np.ones(reduction_matrix[0].shape)
+    else:
+        telluric_matrix = np.ones(reduction_matrix[0].shape)
 
     if variable_throughput is not None:
-        n = np.random.default_rng().normal(loc=0.0, scale=1.5e-4, size=true_parameters['variable_throughput'].value.size)
-        v_approx = true_parameters['variable_throughput'].value + n
-        v_approx2 = 1 / (reduction_matrix[0, :, 0] * np.mean(mock_observations_without_noise[0], axis=1))
-        v_approx3 = 1 / (reduction_matrix[0, :, 0])
-        true_parameters['variable_throughput_approximation'] = Param(v_approx3)
+        vt_matrix = add_variable_throughput(
+            np.ones(reduction_matrix[0].shape), variable_throughput
+        )
+    else:
+        vt_matrix = np.ones(reduction_matrix[0].shape)
 
-        print('v_approx dif', np.mean((v_approx - v_approx2) / v_approx))
-        print('v_approx dif2',
-              np.mean((v_approx2 - v_approx3 / np.mean(mock_observations_without_noise[0], axis=1)) / v_approx2))
+    deformation_matrix = np.ma.masked_array([telluric_matrix * vt_matrix])
+    deformation_matrix.mask = copy.copy(reduction_matrix.mask)
+
+    true_parameters['deformation_matrix'] = Param(deformation_matrix)
+
+    print('Retrieval model parameters:')
+    if true_parameters['apply_pipeline'].value:
+        print('\tPipeline in retrieval model: yes')
+    else:
+        print('\tPipeline in retrieval model: NO')
+
+    if true_parameters['use_true_deformation_matrix'].value:
+        print('\tDeformation matrix in retrieval model: USING TRUE')
+        true_parameters['deformation_matrix_approximation'] = Param(deformation_matrix)
+    else:
+        print('\tDeformation matrix in retrieval model: approximated')
+        true_parameters['deformation_matrix_approximation'] = Param(1 / reduction_matrix)
+
+    if deformation_matrix_noise > 0:
+        print(f'\tNoise in approx. deformation matrix: YES (+/-{deformation_matrix_noise})')
+        n = np.random.default_rng().normal(
+            loc=0.0, scale=deformation_matrix_noise, size=telluric_transmittance.shape
+        )
+
+        tmp = np.zeros(true_parameters['deformation_matrix_approximation'].value.shape)
+
+        # for i in range(tmp.shape[0]):
+        #     tmp[i] = np.transpose(np.transpose(tmp[i]) + n)
+        tmp += n
+
+        true_parameters['deformation_matrix_approximation'].value = \
+            true_parameters['deformation_matrix_approximation'].value + tmp
+    else:
+        print('\tNoise in approx. deformation matrix: no')
+
+    if true_parameters['use_true_spectra'].value is None:
+        print('\tSpectral correction in retrieval model: NONE')
+    elif true_parameters['use_true_spectra'].value:
+        print('\tSpectral correction in retrieval model: USING TRUE')
+        for i, det in enumerate(true_parameters['deformation_matrix_approximation'].value):
+            rm = np.transpose(np.transpose(det) / np.mean(true_spectra, axis=2)[i])
+            ml = np.transpose(np.transpose(true_spectra[i]) / np.mean(true_spectra, axis=2)[i])
+            rm = rm / np.mean(ml, axis=0)
+            true_parameters['deformation_matrix_approximation'].value[i] = rm
+    else:
+        print('\tSpectral correction in retrieval model: using current model')
 
     # Check if the retrieval model with the true parameters is the same as the reduced mock observations without noise
     w, r = retrieval_model(model, true_parameters)
@@ -600,7 +704,7 @@ def init_parameters(planet, line_species_str, mode,
             rmown_mean_normalized[i, :, :] = np.transpose(
                 np.transpose(
                     reduced_mock_observations_without_noise[i, :, :])
-                    / np.mean(reduced_mock_observations_without_noise[i, :, :], axis=1)
+                / np.mean(reduced_mock_observations_without_noise[i, :, :], axis=1)
             )
 
         if not np.allclose(r, rmown_mean_normalized, atol=0.0, rtol=1e-14):
@@ -648,6 +752,62 @@ def init_parameters(planet, line_species_str, mode,
     assert np.allclose(r2[0][0], r, atol=0.0, rtol=1e-14)
 
     print(f'True log L = {true_log_l[0][0]}')
+
+    rm_diff = \
+        (deformation_matrix[0] - true_parameters['deformation_matrix_approximation'].value[0]) / deformation_matrix[0]
+    log_l_reduction_matrix = log_likelihood_3d(
+        true_parameters['deformation_matrix_approximation'].value, deformation_matrix, error
+    )
+
+    print(f'Log L reduction matrix = {log_l_reduction_matrix}')
+
+    plot_observations(
+        mock_observations[0],
+        wavelength_instrument[0], wavelength_instrument[-1], true_parameters['orbital_phases'].value[0],
+        true_parameters['orbital_phases'].value[-1],
+        v_min=np.percentile(mock_observations[0], 16), v_max=np.percentile(mock_observations[0], 84),
+        title='Mock observations',
+        file_name=os.path.join(retrieval_directory, 'mock_observation.png')
+    )
+    plot_observations(
+        reduced_mock_observations[0],
+        wavelength_instrument[0], wavelength_instrument[-1], true_parameters['orbital_phases'].value[0],
+        true_parameters['orbital_phases'].value[-1],
+        v_min=np.percentile(reduced_mock_observations[0], 16), v_max=np.percentile(reduced_mock_observations[0], 84),
+        title='Reduced mock observations',
+        file_name=os.path.join(retrieval_directory, 'reduced_mock_observation.png')
+    )
+    plot_observations(
+        reduced_mock_observations_without_noise[0],
+        wavelength_instrument[0], wavelength_instrument[-1], true_parameters['orbital_phases'].value[0],
+        true_parameters['orbital_phases'].value[-1],
+        v_min=None, v_max=None,
+        title='Reduced mock observations without noise',
+        file_name=os.path.join(retrieval_directory, 'reduced_mock_observation_without_noise.png')
+    )
+    plot_observations(
+        true_spectra[0],
+        wavelength_instrument[0], wavelength_instrument[-1], true_parameters['orbital_phases'].value[0],
+        true_parameters['orbital_phases'].value[-1], v_min=None, v_max=None, title='True spectra',
+        file_name=os.path.join(retrieval_directory, 'true_spectra.png')
+    )
+    plot_observations(
+        r[0],
+        wavelength_instrument[0], wavelength_instrument[-1], true_parameters['orbital_phases'].value[0],
+        true_parameters['orbital_phases'].value[-1], v_min=None, v_max=None, title='True model',
+        file_name=os.path.join(retrieval_directory, 'true_model.png')
+    )
+    plot_observations(
+        rm_diff,
+        wavelength_instrument[0], wavelength_instrument[-1], true_parameters['orbital_phases'].value[0],
+        true_parameters['orbital_phases'].value[-1],
+        v_min=-np.max(np.abs(rm_diff)), v_max=np.max(np.abs(rm_diff)),
+        title=f'log L = {log_l_reduction_matrix}',
+        cbar=True,
+        cmap='RdBu',
+        clabel='True vs appr. def. matrix rel. diff.',
+        file_name=os.path.join(retrieval_directory, 'reduction_matrix.png')
+    )
 
     save_all(
         directory=retrieval_directory,
@@ -880,6 +1040,22 @@ def load_all(directory):
         true_parameters, instrument_snr
 
 
+def log_likelihood_3d(model, data, error):
+    logl = 0
+
+    for i, det in enumerate(data):
+        for j, spectrum in enumerate(det):
+            logl += Data.log_likelihood_gibson(
+                model=model[i, j, ~data.mask[i, j, :]],
+                data=spectrum[~data.mask[i, j, :]],
+                uncertainties=error[i, j, ~data.mask[i, j, :]],
+                alpha=1.0,
+                beta=1.0
+            )
+
+    return logl
+
+
 def main():
     from mpi4py import MPI
 
@@ -891,14 +1067,18 @@ def main():
 
     line_species_str = ['CO_all_iso', 'H2O_main_iso']
 
-    retrieval_name = 't0l2_thomi3_kp_vr_CO_H2O_79-80'
-    mode = 'transit'
+    retrieval_name = 't0l_vttt_v_md_kp_vr_CO_H2O_79-80'
+    mode = 'eclipse'
     n_live_points = 200
     add_noise = True
     apply_variable_throughput = True
-    apply_telluric_transmittance = False
+    apply_telluric_transmittance = True
     apply_pipeline = True
-    median = False
+    median = True
+
+    use_true_deformation_matrix = False
+    use_true_spectra = False
+    deformation_matrix_noise = 0
 
     retrieval_directories = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval'))
 
@@ -932,7 +1112,10 @@ def main():
                 retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
                 apply_variable_throughput=apply_variable_throughput,
                 apply_telluric_transmittance=apply_telluric_transmittance,
-                apply_pipeline=apply_pipeline, load_from=load_from, median=median
+                apply_pipeline=apply_pipeline, load_from=load_from, median=median,
+                use_true_deformation_matrix=use_true_deformation_matrix,
+                deformation_matrix_noise=deformation_matrix_noise,
+                use_true_spectra=use_true_spectra
             )
 
         retrieval_parameters = {
@@ -955,7 +1138,7 @@ def main():
         retrieval_parameters = None
         retrieval_directory = ''
 
-    #return 0
+    # return 0
 
     retrieval_parameters = comm.bcast(retrieval_parameters, root=0)
     retrieval_directory = comm.bcast(retrieval_directory, root=0)
@@ -1010,7 +1193,8 @@ def main():
 
 
 def plot_observations(observations, wmin, wmax, phase_min, phase_max, v_min=None, v_max=None, title=None,
-                      cbar=False, clabel=None, cmap='viridis'):
+                      cbar=False, clabel=None, cmap='viridis', file_name=None):
+    plt.figure()
     plt.imshow(
         observations, origin='lower', extent=[wmin, wmax, phase_min, phase_max], aspect='auto', vmin=v_min, vmax=v_max,
         cmap=cmap
@@ -1022,6 +1206,9 @@ def plot_observations(observations, wmin, wmax, phase_min, phase_max, v_min=None
     if cbar:
         cbar = plt.colorbar()
         cbar.set_label(clabel)
+
+    if file_name is not None:
+        plt.savefig(file_name)
 
 
 def pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations, error,
