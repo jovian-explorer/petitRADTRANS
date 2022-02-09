@@ -4,9 +4,9 @@ All notable changes to the CCF module will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com)
 and this project adheres to [Semantic Versioning](http://semver.org).
 
-## [2.4.0-a12] - 2021-01-25
+## [2.4.0-a13] - 2021-02-09
 ### Added
-- [WIP] High-resolution retrieval.
+- High-resolution retrieval.
 - Possibility to initialize a `retrieval.Data` class without needing a file.
 - Possibility to initialize a `retrieval.Data` class with a `Radtrans` object, without the need to re-create one.
 - Possibility to initialize a `retrieval.Retrieval` class with a stellar spectrum, without the need to recalculate it.
@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 - Module `phoenix` for PHOENIX stellar models.
 - Module `physics` to store useful physical functions.
 - Module `utils` to store generic useful functions.
-- [WIP] Module `ccf.pipeline` to reduce ground-based high-resolution data.
+- Module `ccf.pipeline` to reduce ground-based high-resolution data.
 - Function `get_guillot_2010_temperature_profile`, a more general Guillot 2010 temperature profile.
 - Function to calculate the ESM of a planet.
 - Function to calculate the orbital phase of a planet.
