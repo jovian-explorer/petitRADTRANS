@@ -545,6 +545,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                         radius = None, \
                         add_cloud_scat_as_abs = None,
                         dist = "lognormal", a_hans = None,
+                        b_hans = None,
                         give_absorption_opacity = None,
                         give_scattering_opacity = None):
         # Combine total line opacities,
