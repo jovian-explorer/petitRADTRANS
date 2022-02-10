@@ -275,7 +275,7 @@ def guillot_free_emission(pRT_object, \
             Pbases[cname] = 10**parameters['Pbase_'+cname].value
 
         abundances[cname] = np.zeros_like(temperatures)
-        #msum += 10**parameters['log_X_cb_'+cname].value
+        #msum += 10**parameters['log_X_cb_'+cname].values
         try:
             abundances[cname][pressures < Pbases[cname]] = \
                             10**parameters['log_X_cb_'+cname].value *\
@@ -943,18 +943,10 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
     MMW = abundances_interp['MMW']
 
     Pbases = {}
-    if 'log_X_cb_Fe(c)' in parameters.keys():
-        Pbases['Fe(c)'] = fc.simple_cdf_Fe(pressures, temperatures,
-                                    parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
-    if 'log_X_cb_MgSiO3(c)' in parameters.keys():
-        Pbases['MgSiO3(c)'] = fc.simple_cdf_MgSiO3(pressures, temperatures,
-                                   parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
-    if 'log_X_cb_KCL(c)' in parameters.keys():
-        Pbases['KCL(c)'] = fc.simple_cdf_KCL(pressures, temperatures,
-                                    parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
-    if 'log_X_cb_Na2S(c)' in parameters.keys():
-        Pbases['Na2S(c)'] = fc.simple_cdf_Na2S(pressures, temperatures,
-                                    parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
+    for cloud in cloud_species:
+        cname = cloud.split('_')[0]
+        Pbases[cname] = fc.simple_cdf(cname,pressures, temperatures,
+                                     parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
     fseds = {}
     abundances = {}
     # Clouds
