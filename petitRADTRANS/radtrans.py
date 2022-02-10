@@ -660,7 +660,9 @@ class Radtrans(_read_opacities.ReadOpacities):
                     sigma_lnorm=None, fsed=None, Kzz=None,
                     radius=None,
                     add_cloud_scat_as_abs=None,
-                    dist="lognormal", a_hans=None, b_hans=None):
+                    dist="lognormal", a_hans=None, b_hans=None,
+                    give_absorption_opacity=None,
+                    give_scattering_opacity=None):
         # Combine total line opacities,
         # according to mass fractions (abundances),
         # also add continuum opacities, i.e. clouds, CIA...
@@ -748,6 +750,18 @@ class Radtrans(_read_opacities.ReadOpacities):
 
             if self.do_scat_emis:
                 self.continuum_opa_scat_emis += add_term
+
+        # Opacity input from outside?
+        if give_absorption_opacity is not None:
+            self.continuum_opa += give_absorption_opacity(nc.c / self.freq * 1e4, self.press * 1e-6)
+
+        if give_scattering_opacity is not None:
+            add_term = give_scattering_opacity(nc.c / self.freq * 1e4, self.press * 1e-6)
+            self.continuum_opa_scat += \
+                add_term
+            if self.do_scat_emis:
+                self.continuum_opa_scat_emis += \
+                    add_term
 
         # Interpolate line opacities, combine with continuum oacities
         self.line_struc_kappas = fi.mix_opas_ck(self.line_abundances,
@@ -1150,7 +1164,10 @@ class Radtrans(_read_opacities.ReadOpacities):
                   geometry='dayside_ave', theta_star=0,
                   hack_cloud_photospheric_tau=None,
                   dist="lognormal", a_hans=None, b_hans=None,
-                  stellar_intensity=None):
+                  stellar_intensity=None,
+                  give_absorption_opacity=None,
+                  give_scattering_opacity=None
+                  ):
         """ Method to calculate the atmosphere's emitted flux
         (emission spectrum).
 
@@ -1241,8 +1258,26 @@ class Radtrans(_read_opacities.ReadOpacities):
                     included cloud species and for each atmospheric layer,
                     formatted as the kzz argument. This is the width of the hansen
                     distribution normalized by the particle area (1/a_hans^2)
+                give_absorption_opacity (Optional[function]):
+                    A python function that takes wavelength arrays in microns and pressure arrays in bars
+                    as input, and returns an absorption opacity matrix in units of cm^2/g, in the shape of
+                    number of wavelength points x number of pressure points.
+                    This opacity will then be added to the atmospheric absorption opacity.
+                    This must not be used to add atomic / molecular line opacities in low-resolution mode (c-k),
+                    because line opacities require a proper correlated-k treatment.
+                    It may be used to add simple cloud absorption laws, for example, which
+                    have opacities that vary only slowly with wavelength, such that the current
+                    model resolution is sufficient to resolve any variations.
                 stellar_intensity (Optional[array]):
                     The stellar intensity to use. If None, it will be calculated using a PHOENIX model.
+                give_scattering_opacity (Optional[function]):
+                    A python function that takes wavelength arrays in microns and pressure arrays in bars
+                    as input, and returns an isotropic scattering opacity matrix in units of cm^2/g, in the shape of
+                    number of wavelength points x number of pressure points.
+                    This opacity will then be added to the atmospheric absorption opacity.
+                    It may be used to add simple cloud absorption laws, for example, which
+                    have opacities that vary only slowly with wavelength, such that the current
+                    model resolution is sufficient to resolve any variations.
         """
 
         self.__hack_cloud_photospheric_tau = hack_cloud_photospheric_tau
@@ -1265,7 +1300,9 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.interpolate_species_opa(temp)
         self.mix_opa_tot(abunds, mmw, gravity, sigma_lnorm, fsed, Kzz, radius,
                          add_cloud_scat_as_abs=add_cloud_scat_as_abs,
-                         dist=dist, a_hans=a_hans, b_hans=b_hans)
+                         dist=dist, a_hans=a_hans, b_hans=b_hans,
+                         give_absorption_opacity=give_absorption_opacity,
+                         give_scattering_opacity=give_scattering_opacity)
         self.calc_opt_depth(gravity)
         self.calc_RT(contribution)
 
@@ -1339,7 +1376,9 @@ class Radtrans(_read_opacities.ReadOpacities):
                     gamma_scat=None,
                     contribution=False, haze_factor=None,
                     gray_opacity=None, variable_gravity=True,
-                    dist="lognormal", b_hans=None, a_hans=None):
+                    dist="lognormal", b_hans=None, a_hans=None,
+                    give_absorption_opacity=None,
+                    give_scattering_opacity=None):
         """ Method to calculate the atmosphere's transmission radius
         (for the transmission spectrum).
 
@@ -1416,6 +1455,24 @@ class Radtrans(_read_opacities.ReadOpacities):
                     included cloud species and for each atmospheric layer,
                     formatted as the kzz argument. This is the width of the hansen
                     distribution normalized by the particle area (1/a_hans^2)
+                give_absorption_opacity (Optional[function]):
+                    A python function that takes wavelength arrays in microns and pressure arrays in bars
+                    as input, and returns an absorption opacity matrix in units of cm^2/g, in the shape of
+                    number of wavelength points x number of pressure points.
+                    This opacity will then be added to the atmospheric absorption opacity.
+                    This must not be used to add atomic / molecular line opacities in low-resolution mode (c-k),
+                    because line opacities require a proper correlated-k treatment.
+                    It may be used to add simple cloud absorption laws, for example, which
+                    have opacities that vary only slowly with wavelength, such that the current
+                    model resolution is sufficient to resolve any variations.
+                give_scattering_opacity (Optional[function]):
+                    A python function that takes wavelength arrays in microns and pressure arrays in bars
+                    as input, and returns an isotropic scattering opacity matrix in units of cm^2/g, in the shape of
+                    number of wavelength points x number of pressure points.
+                    This opacity will then be added to the atmospheric absorption opacity.
+                    It may be used to add simple cloud absorption laws, for example, which
+                    have opacities that vary only slowly with wavelength, such that the current
+                    model resolution is sufficient to resolve any variations.
         """
         self.__hack_cloud_photospheric_tau = None
         self.Pcloud = Pcloud
@@ -1425,7 +1482,9 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.kappa_zero = kappa_zero
         self.gamma_scat = gamma_scat
         self.mix_opa_tot(abunds, mmw, gravity, sigma_lnorm, fsed, Kzz, radius,
-                         dist=dist, a_hans=a_hans, b_hans=b_hans)
+                         dist=dist, a_hans=a_hans, b_hans=b_hans,
+                         give_absorption_opacity=give_absorption_opacity,
+                         give_scattering_opacity=give_scattering_opacity)
         self.calc_tr_rad(P0_bar, R_pl, gravity, mmw, contribution, variable_gravity)
 
     def calc_flux_transm(self, temp, abunds, gravity, mmw, P0_bar, R_pl,
@@ -1437,7 +1496,9 @@ class Radtrans(_read_opacities.ReadOpacities):
                          contribution=False, gray_opacity=None,
                          add_cloud_scat_as_abs=None,
                          variable_gravity=True,
-                         dist="lognormal", b_hans=None, a_hans=None):
+                         dist="lognormal", b_hans=None, a_hans=None,
+                         give_absorption_opacity=None,
+                         give_scattering_opacity=None):
         """ Method to calculate the atmosphere's emission flux *and*
         transmission radius (for the transmission spectrum).
 
@@ -1515,6 +1576,24 @@ class Radtrans(_read_opacities.ReadOpacities):
                     included cloud species and for each atmospheric layer,
                     formatted as the kzz argument. This is the width of the hansen
                     distribution normalized by the particle area (1/a_hans^2)
+                give_absorption_opacity (Optional[function]):
+                    A python function that takes wavelength arrays in microns and pressure arrays in bars
+                    as input, and returns an absorption opacity matrix in units of cm^2/g, in the shape of
+                    number of wavelength points x number of pressure points.
+                    This opacity will then be added to the atmospheric absorption opacity.
+                    This must not be used to add atomic / molecular line opacities in low-resolution mode (c-k),
+                    because line opacities require a proper correlated-k treatment.
+                    It may be used to add simple cloud absorption laws, for example, which
+                    have opacities that vary only slowly with wavelength, such that the current
+                    model resolution is sufficient to resolve any variations.
+                give_scattering_opacity (Optional[function]):
+                    A python function that takes wavelength arrays in microns and pressure arrays in bars
+                    as input, and returns an isotropic scattering opacity matrix in units of cm^2/g, in the shape of
+                    number of wavelength points x number of pressure points.
+                    This opacity will then be added to the atmospheric absorption opacity.
+                    It may be used to add simple cloud absorption laws, for example, which
+                    have opacities that vary only slowly with wavelength, such that the current
+                    model resolution is sufficient to resolve any variations.
         """
         self.Pcloud = Pcloud
         self.gray_opacity = gray_opacity
@@ -1523,7 +1602,9 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.interpolate_species_opa(temp)
         self.mix_opa_tot(abunds, mmw, gravity, sigma_lnorm, fsed, Kzz, radius,
                          add_cloud_scat_as_abs=add_cloud_scat_as_abs,
-                         dist=dist, a_hans=a_hans, b_hans=b_hans)
+                         dist=dist, a_hans=a_hans, b_hans=b_hans,
+                         give_absorption_opacity=give_absorption_opacity,
+                         give_scattering_opacity=give_scattering_opacity)
         self.calc_opt_depth(gravity)
         self.calc_RT(contribution)
         self.calc_tr_rad(P0_bar, R_pl, gravity, mmw, contribution, variable_gravity)
