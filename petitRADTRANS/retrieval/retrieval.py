@@ -71,7 +71,9 @@ class Retrieval:
                  corner_plot_names = None,
                  short_names = None,
                  pRT_plot_style = True):
+
         self.rd = run_definition
+        print(f"Starting retrieval {self.rd.retrieval_name}")
         if len(self.rd.line_species) < 1:
             logging.warning("There are no line species present in the run definition!")
 

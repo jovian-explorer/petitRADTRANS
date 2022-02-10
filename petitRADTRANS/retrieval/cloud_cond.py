@@ -76,6 +76,20 @@ def return_cloud_mass_fraction(name,FeH,CO):
     else:
         logging.warn(f"The cloud {name} is not currently implemented.")
         return np.zeros_like(FeH)
+
+def simple_cdf(name,press, temp, FeH, CO, MMW = 2.33):
+        if "Fe(c)" in name:
+            return simple_cdf_Fe(press, temp, FeH, CO, MMW)
+        if "MgSiO3(c)" in name:
+            return simple_cdf_MgSiO3(press, temp, FeH, CO, MMW)
+        if "Na2S(c)" in name:
+            return simple_cdf_Na2S(press, temp, FeH, CO, MMW)
+        if "KCL(c)" in name:
+            return simple_cdf_KCL(press, temp, FeH, CO, MMW)
+        else:
+            logging.warn(f"The cloud {name} is not currently implemented.")
+            return np.zeros_like(FeH)
+
 def return_XFe(FeH, CO):
 
     nfracs_use = cp.copy(nfracs)
