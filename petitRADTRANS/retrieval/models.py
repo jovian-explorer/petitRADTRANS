@@ -1,6 +1,3 @@
-import sys
-import os
-import time
 import copy as cp
 import os
 import sys
@@ -11,6 +8,7 @@ from scipy.interpolate import interp1d, CubicSpline
 from petitRADTRANS import nat_cst as nc
 from petitRADTRANS.retrieval import cloud_cond as fc
 from petitRADTRANS.physics import guillot_global
+from typing import Tuple
 from .util import surf_to_meas, calc_MMW
 
 """
@@ -122,7 +120,7 @@ def emission_model_diseq(pRT_object,
                                                   pRT_object.cloud_species,
                                                   parameters,
                                                   AMR=AMR)
-    kzz_use = (10.0** parameters['log_kzz'].value) * np.ones_like(p_use)
+    kzz_use = (10.0 ** parameters['log_kzz'].value) * np.ones_like(p_use)
 
     # Only include the high resolution pressure array near the cloud base.
     pressures = p_use
@@ -138,8 +136,6 @@ def emission_model_diseq(pRT_object,
         return None, None
     pRT_object.press = pressures * 1e6
 
-    gravity = -np.inf
-    R_pl = -np.inf
     if 'log_g' in parameters.keys() and 'mass' in parameters.keys():
         gravity = 10 ** parameters['log_g'].value
         r_pl = np.sqrt(nc.G * parameters['mass'].value / gravity)
@@ -150,8 +146,7 @@ def emission_model_diseq(pRT_object,
         r_pl = parameters['R_pl'].value
         gravity = nc.G * parameters['mass'].value / r_pl ** 2
     else:
-        print("Pick two of log_g, R_pl and mass priors!")
-        sys.exit(5)
+        raise ValueError(f"Pick two of log_g, R_pl and mass priors!")
 
     sigma_lnorm = None
     b_hans = None
@@ -237,74 +232,15 @@ def guillot_free_emission(pRT_object,
     pglobal_check(pRT_object.press * 1e-6,
                   parameters['pressure_simple'].value,
                   parameters['pressure_scaling'].value)
+
     if AMR:
         p_use = PGLOBAL
     else:
         p_use = pRT_object.press * 1e-6
-    temperatures = guillot_global(p_use,
-                                  10 ** parameters['log_kappa_IR'].value,
-                                  parameters['gamma'].value,
-                                  10 ** parameters['log_g'].value,
-                                  parameters['T_int'].value,
-                                  parameters['T_equ'].value)
-    pbases = {}
-    # TODO - identify species rather than hard coding
-    if "Pbase_Fe(c)" not in parameters.keys():
-        pbases['Fe(c)'] = fc.simple_cdf_Fe_free(
-            p_use, temperatures, 10 ** parameters['log_X_cb_Fe(c)'].value
-        )
-    else:
-        pbases['Fe(c)'] = 10 ** parameters["Pbase_Fe(c)"].value
-    if 'Pbase_MgSiO3(c)' not in parameters.keys():
-        pbases['MgSiO3(c)'] = fc.simple_cdf_MgSiO3_free(
-            p_use, temperatures, 10 ** parameters['log_X_cb_MgSiO3(c)'].value
-        )
-    else:
-        pbases['MgSiO3(c)'] = 10 ** parameters['Pbase_MgSiO3(c)'].value
-
-    if AMR:
-        p_clouds = np.array(list(pbases.values()))
-        pressures, small_index = fixed_length_amr(p_clouds,
-                                                  p_use,
-                                                  parameters['pressure_scaling'].value,
-                                                  parameters['pressure_width'].value)
-        pRT_object.press = pressures * 1e6
-        temperatures = temperatures[small_index]
-    else:
-        pressures = pRT_object.press / 1e6
-
-    # If in evaluation mode, and PTs are supposed to be plotted
-    if PT_plot_mode:
-        return pressures, temperatures
-    abundances = {}
-    msum = 0.0
-    for species in pRT_object.line_species:
-        abundances[species] = 10 ** parameters[species.split("_R_")[0]].value * np.ones_like(pressures)
-        msum += 10 ** parameters[species.split("_R_")[0]].value
-    abundances['H2'] = 0.766 * (1.0 - msum) * np.ones_like(pressures)
-    abundances['He'] = 0.234 * (1.0 - msum) * np.ones_like(pressures)
-
-    mmw = calc_MMW(abundances)
-
-    for cloud in pRT_object.cloud_species:
-        cname = cloud.split('_')[0]
-        pbase = pbases[cname]
-        abundances[cname] = np.zeros_like(temperatures)
-        msum += 10 ** parameters['log_X_cb_' + cname].value
-        try:
-            abundances[cname][pressures < pbase] = \
-                10 ** parameters['log_X_cb_' + cname].value * \
-                ((pressures[pressures <= pbase] / pbase) ** parameters['fsed'].value)
-        except:
-            return None, None
-
-    # This is bad for some reason...
-    # if msum > 1.0:
-    #    return None, None
 
     if 'log_g' in parameters.keys() and 'mass' in parameters.keys():
         gravity = 10 ** parameters['log_g'].value
-        r_pl = np.sqrt(nc.G * parameters['mass'].value / gravity)
+        r_pl = np.sqrt(nc.G*parameters['mass'].value / gravity)
     elif 'log_g' in parameters.keys():
         gravity = 10 ** parameters['log_g'].value
         r_pl = parameters['R_pl'].value
@@ -312,8 +248,80 @@ def guillot_free_emission(pRT_object,
         r_pl = parameters['R_pl'].value
         gravity = nc.G * parameters['mass'].value / r_pl ** 2
     else:
-        print("Pick two of log_g, R_pl and mass priors!")
-        sys.exit(5)
+        raise ValueError(f"Pick two of log_g, R_pl and mass priors!")
+
+    temperatures = guillot_global(p_use,
+                                  10 ** parameters['log_kappa_IR'].value,
+                                  parameters['gamma'].value,
+                                  gravity,
+                                  parameters['T_int'].value,
+                                  parameters['T_equ'].value)
+
+    abundances = {}
+    msum = 0.0
+
+    for species in pRT_object.line_species:
+        abundances[species] = 10**parameters[species.split("_R_")[0]].value * np.ones_like(pRT_object.press)
+        msum += 10**parameters[species.split("_R_")[0]].value
+
+    abundances['H2'] = 0.766 * (1.0-msum) * np.ones_like(pRT_object.press)
+    abundances['He'] = 0.234 * (1.0-msum) * np.ones_like(pRT_object.press)
+
+    mmw = calc_MMW(abundances)
+
+    pbases = {}
+
+    for cloud in pRT_object.cloud_species:
+        cname = cloud.split('_')[0]
+
+        if not "Pbase_" + cname in parameters.keys():
+            pbases[cname] = fc.simple_cdf_free(
+                cname, p_use, temperatures, 10**parameters['log_X_cb_'+cname].value, np.mean(mmw)
+            )
+        else:
+            pbases[cname] = 10**parameters['Pbase_'+cname].value
+
+        abundances[cname] = np.zeros_like(temperatures)
+
+        try:
+            abundances[cname][p_use < pbases[cname]] = \
+                            10**parameters['log_X_cb_'+cname].value *\
+                            ((p_use[p_use <= pbases[cname]] / pbases[cname])**parameters['fsed'].value)
+        except ValueError:  # TODO check if ValueError was expected
+            return None, None
+
+    if AMR:
+        p_clouds = np.array(list(pbases.values()))
+        pressures, small_index = fixed_length_amr(p_clouds,
+                                                  p_use,
+                                                  parameters['pressure_scaling'].value,
+                                                  parameters['pressure_width'].value)
+
+        if pressures.shape[0] != pRT_object.press.shape[0]:
+            print("Shapes ", pressures.shape[0], pRT_object.press.shape[0])
+            print("Pbase ", pbases)
+            return None, None
+
+        pRT_object.press = pressures * 1e6
+        temperatures = temperatures[small_index]
+    else:
+        pressures = pRT_object.press * 1e-6
+
+    # If in evaluation mode, and PTs are supposed to be plotted
+    if PT_plot_mode:
+        return pressures, temperatures
+    abundances = {}
+    msum = 0.0
+    for species in pRT_object.line_species:
+        abundances[species] = 10**parameters[species.split("_R_")[0]].value * np.ones_like(pressures)
+        msum += 10**parameters[species.split("_R_")[0]].value
+    abundances['H2'] = 0.766 * (1.0-msum) * np.ones_like(pressures)
+    abundances['He'] = 0.234 * (1.0-msum) * np.ones_like(pressures)
+
+    # This is bad for some reason...
+    # if msum > 1.0:
+    #    return None, None
+
     pRT_object.calc_flux(temperatures,
                          abundances,
                          gravity,
@@ -681,6 +689,8 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv=True):
         conv_index = nabla_rad > nabla_ad
 
         # TODO: Check remains convective and convergence
+        tfinal = 0
+
         for i in range(10):
             if i == 0:
                 t_take = cp.copy(tedd)
@@ -723,6 +733,7 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv=True):
 
     # Where is the uppermost pressure of the Eddington radiative structure?
     p_bot_spline = press_tau(0.1)
+    tret = 0
 
     for i_intp in range(2):
 
@@ -776,7 +787,6 @@ def PT_ret_model(T3, delta, alpha, tint, press, FeH, CO, conv=True):
             # (from the radiative-convectice solution)
             t_support[int(len(support_points_low)):] = \
                 tfintp(support_points[(int(len(support_points_low))):])
-
         else:
             tfintp1 = interp1d(press_cgs, tret, kind='cubic')
             t_support[:(int(len(support_points_low)) - 1)] = \
@@ -815,7 +825,7 @@ def _make_half_pressure_better(P_clouds, press):
     indexes_small = press_small[:, 0] > 0.
     indexes = press_plus_index[:, 0] > 0.
 
-    for cname, P_cloud in P_clouds.items():
+    for P_cloud in P_clouds:
         indexes_small = indexes_small & \
                         ((np.log10(press_small[:, 0] / P_cloud) > 0.05) |
                          (np.log10(press_small[:, 0] / P_cloud) < -0.3))
@@ -834,16 +844,20 @@ def _make_half_pressure_better(P_clouds, press):
     return press_out[:, 0], press_out[:, 1].astype('int')
 
 
-def fixed_length_amr(P_clouds, press, scaling=10, width=3):
-    """
-    This function takes in the cloud base pressures for each cloud,
+def fixed_length_amr(p_clouds, pressures, scaling=10, width=3):
+    r"""This function takes in the cloud base pressures for each cloud,
     and returns an array of pressures with a high resolution mesh
-    in the region where the cloud is located.
+    in the region where the clouds are located.
+
+    Author:  Francois Rozet.
+
+    The output length is always
+        len(pressures[::scaling]) + len(p_clouds) * width * (scaling - 1)
 
     Args:
-        P_clouds : numpy.ndarray
+        p_clouds : numpy.ndarray
             The cloud base pressures in bar
-        press : np.ndarray
+        pressures : np.ndarray
             The high resolution pressure array.
         scaling : int
             The factor by which the low resolution pressure array is scaled
@@ -851,114 +865,44 @@ def fixed_length_amr(P_clouds, press, scaling=10, width=3):
             The number of low resolution bins to be replaced for each cloud layer.
     """
 
-    # P_clouds is array of pressures
-    # press should be ~len scaling*100
-    # guarantees total length will be press.shape[0] + P_clouds.shape[0]*width*(scaling - 1)
-    # scaling is how many hi-res points per normal point. Must be int
-    # width is the number of low res points to replace. Must be int.
-    press_plus_index = np.zeros((press.shape[0], 2))
-    press_plus_index[:, 0] = np.logspace(np.log10(np.min(press)), np.log10(np.max(press)), press.shape[0])
-    press_plus_index[:, 1] = range(len(press_plus_index[:, 0]))
-    # Set up arrays for indexing
-    press_small = press_plus_index[::scaling, :]
-    # Make some lists to store the replacement indices
-    c_list = []
-    for i, P_cloud in enumerate(P_clouds):
-        # Find out where the clouds are in the high res grid
-        idx = (np.abs(press_plus_index[:, 0] - P_cloud)).argmin()
-        # constant length list of indices around that point
-        inds = np.linspace(int(idx - (width * scaling / 2.0)), int(idx + (width * scaling / 2.0)) - 1,
-                           int(scaling * width), dtype=int)
-        c_list.append(inds)
-    # We need to return a list that's always the same length
-    # So we need to check for duplicates
-    total_inds = [-9999]
-    for j in range(len(c_list)):
-        uselist = c_list[j]
-        if np.min(uselist) < 0:
-            uselist -= np.min(uselist)
-        if np.max(uselist) > len(press_plus_index)-1:
-            uselist -= (np.max(uselist)-len(press_plus_index)-1)
-        # At first, just copy in the list
-        #if j == 0:
-        #    if np.any(c_list[j] < 0):
-        #        total_inds.extend(np.linspace(0, len(c_list[j]), len(c_list[j]), dtype=int))
-        #        continue
-        #    if np.any(c_list[j] > press.shape[0]):
-        #        total_inds.extend(np.linspace(press.shape[0] - len(c_list[j]), press.shape[0], dtype=int))
-        #        continue
-        #    total_inds.extend(c_list[j])
-        #    continue
-        # Check if the next set of indices is lower than the current minimum
-        # if so, we want to add scaling*width indices below the current minimum
-        if min(uselist) <= min(np.array(total_inds)):
-            start = uselist[-1]
-            sl = len(total_inds)
-            ind = 0
-            done = 0
-            while len(total_inds) < sl + int(scaling * width):
-                if start - ind < 0:
-                    start = start + len(uselist)
-                    ind = done
-                if np.in1d(start - ind, np.array(total_inds)).any():
-                    ind += 1
-                    continue
-                else:
-                    total_inds.append(int(start - ind))
-                    ind += 1
-                    done += 1
-        # Check if the smallest new index is larger than the current max
-        # if so, we can just add the indexes
-        # I can probably replace all this with total_inds.extend(c_list[j])
-        elif max(uselist) >= max(np.array(total_inds)):
-            start = uselist[0]
-            sl = len(total_inds)
-            ind = 0
-            done = 0
-            while len(total_inds) < sl + int(scaling * width):
-                if (start + ind) >= (len(press_plus_index) - 1):
-                    start = start - len(uselist)
-                    ind = done
-                    continue
-                if np.in1d(start + ind, np.array(total_inds)).any():
-                    ind += 1
-                    continue
-                else:
-                    total_inds.append(int(start + ind))
-                    ind += 1
-                    done += 1
-        else:
-            # This loop takes care of cases where we're between existing entries
-            # it adds indices until duplicates are found, then keeps incrementing
-            # until there is a free index to add.
-            start = uselist[0]
-            sl = len(total_inds)
-            ind = 0
-            done = 0
-            while len(total_inds) < sl + int(scaling * width):
-                if (start + ind) >= (len(press_plus_index) - 1):
-                    start = start - len(uselist)
-                    ind = done
-                    continue
-                if np.in1d(start + ind, np.array(total_inds)).any():
-                    ind += 1
-                    continue
-                else:
-                    total_inds.append(int(start + ind))
-                    ind += 1
-                    done += 1
-    # total_inds = np.array(sorted(total_inds,reverse=False))
-    # Stack the low res and high res grids, sort it, and take the unique values
-    total_inds.pop(0)
-    press_out = np.vstack((press_small, press_plus_index[total_inds]))
-    press_out = np.sort(press_out, axis=0)
-    p_out, ind = np.unique(press_out[:, 0], return_index=True)
-    shape = int((press.shape[0]/scaling) + P_clouds.shape[0]*width*(scaling - 1))
+    length = len(pressures)
+    cloud_indices = np.searchsorted(pressures, np.asarray(p_clouds))
 
-    if p_out.shape[0] != shape:
-        print(f"AMR returned incorrect shape: {p_out.shape[0]} instead of {shape}!")
+    # High resolution intervals
+    def bounds(center: int, width_: int) -> Tuple[int, int]:
+        upper = min(center + width_ // 2, length)
+        lower = max(upper - width_, 0)
+        return lower, lower + width_
 
-    return p_out, press_out[ind, 1].astype('int')
+    intervals = [bounds(idx, scaling * width) for idx in cloud_indices]
+
+    # Merge intervals
+    while True:
+        intervals, stack = sorted(intervals), []
+
+        for interval in intervals:
+            if stack and stack[-1][1] >= interval[0]:
+                last = stack.pop()
+                interval = bounds(
+                    (last[0] + max(last[1], interval[1]) + 1) // 2,
+                    last[1] - last[0] + interval[1] - interval[0],
+                )
+
+            stack.append(interval)
+
+        if len(intervals) == len(stack):
+            break
+        intervals = stack
+
+    # Intervals to indices
+    indices = [np.arange(0, length, scaling)]
+
+    for interval in intervals:
+        indices.append(np.arange(*interval))
+
+    indices = np.unique(np.concatenate(indices))
+
+    return pressures[indices], indices
 
 
 def get_abundances(pressures, temperatures, line_species, cloud_species, parameters, AMR=False):
@@ -1001,17 +945,19 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
     fehs = parameters['Fe/H'].value * np.ones_like(pressures)
 
     # Prior check all input params
-    x_fe = fc.return_XFe(parameters['Fe/H'].value, parameters['C/O'].value)
-    x_mgsio3 = fc.return_XMgSiO3(parameters['Fe/H'].value, parameters['C/O'].value)
+    clouds = {}
+    for cloud in cloud_species:
+        # equilibrium cloud abundance
+        xcloud = fc.return_cloud_mass_fraction(cloud, parameters['Fe/H'].value, parameters['C/O'].value)
 
-    clouds = {
-        'Fe(c)': 10 ** parameters['log_X_cb_Fe(c)'].value * x_fe,
-        'MgSiO3(c)': 10 ** parameters['log_X_cb_MgSiO3(c)'].value * x_mgsio3
-    }
+        # Scaled by a constant factor
+        clouds[cloud.split("_")[0]] = 10**parameters['log_X_cb_'+cloud.split("_")[0]].value*xcloud
 
     pquench_c = None
+
     if 'log_pquench' in parameters.keys():
         pquench_c = 10 ** parameters['log_pquench'].value
+
     abundances_interp = pm.interpol_abundances(co_ratios,
                                                fehs,
                                                temperatures,
@@ -1019,18 +965,12 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
                                                Pquench_carbon=pquench_c)
     mmw = abundances_interp['MMW']
 
-    pbases = {
-        'Fe(c)': fc.simple_cdf_Fe(
-            pressures, temperatures, parameters['Fe/H'].value, parameters['C/O'].value, np.mean(mmw)
-        ),
-        'MgSiO3(c)': fc.simple_cdf_MgSiO3(
-            pressures, temperatures, parameters['Fe/H'].value, parameters['C/O'].value, np.mean(mmw)
-        )
-    }
-    # Pbases['KCL(c)'] = fc.simple_cdf_KCL(pressures, temperatures,
-    #                            parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
-    # Pbases['Na2S(c)'] = fc.simple_cdf_Na2S(pressures, temperatures,
-    #                            parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
+    pbases = {}
+
+    for cloud in cloud_species:
+        cname = cloud.split('_')[0]
+        pbases[cname] = fc.simple_cdf(cname, pressures, temperatures,
+                                      parameters['Fe/H'].value, parameters['C/O'].value, np.mean(mmw))
     fseds = {}
     abundances = {}
     # Clouds
@@ -1060,9 +1000,9 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
              pbases[cname]) ** parameters['fsed'].value
         fseds[cname] = parameters['fsed'].value
 
+        if AMR:
+            abundances[cname] = abundances[cname][small_index]
     if AMR:
-        abundances['Fe(c)'] = abundances['Fe(c)'][small_index]
-        abundances['MgSiO3(c)'] = abundances['MgSiO3(c)'][small_index]
         for species in line_species:
             abundances[species] = abundances_interp[species.split('_')[0]][small_index]
         abundances['H2'] = abundances_interp['H2'][small_index]
@@ -1073,6 +1013,9 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
             abundances[species] = abundances_interp[species.split('_')[0]]
         abundances['H2'] = abundances_interp['H2']
         abundances['He'] = abundances_interp['He']
+
+    # Magic factor for FeH abundances
+    # Ask Paul to explain this
     if 'FeH' in abundances.keys():
         abundances['FeH'] = abundances['FeH'] / 2.
     return abundances, mmw, small_index

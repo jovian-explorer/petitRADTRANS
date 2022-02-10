@@ -18,14 +18,16 @@ def plot_specs(fig, ax, path, name, nsample, color1, color2, zorder, rebin_val=N
         wlen = uniform_filter1d(wlen, rebin_val)[::rebin_val]
     npoints = int(len(wlen))
     spectra = np.zeros((nsample, npoints))
+
     for i_s in range(nsample):
         if rebin_val is not None:
             spectra[i_s, :] = uniform_filter1d(np.genfromtxt(specs[i_s])[:, 1],
                                                rebin_val)[::rebin_val]
         else:
             wlen = np.genfromtxt(specs[i_s])[:, 0]
-            for i_s in range(nsample):  # TODO check this weird loop
-                spectra[i_s, :] = np.genfromtxt(specs[i_s])[:, 1]
+
+            for i_s2 in range(nsample):  # TODO check this weird loop
+                spectra[i_s, :] = np.genfromtxt(specs[i_s2])[:, 1]
 
     sort_spec = np.sort(spectra, axis=0)
     # 3 sigma
@@ -54,8 +56,8 @@ def plot_data(fig, ax, data, resolution=None, scaling=1.0):
             if int(ratio) > 1:
                 flux, edges, _ = binned_statistic(data.wlen, data.calculate_star_radiosity, 'mean',
                                                   data.wlen.shape[0] / ratio)
-                error, _, _ = binned_statistic(data.wlen, data.flux_error,
-                                               'mean', data.wlen.shape[0] / ratio) / np.sqrt(ratio)
+                error, _, _ = np.array(binned_statistic(data.wlen, data.flux_error,
+                                       'mean', data.wlen.shape[0] / ratio)) / np.sqrt(ratio)
                 wlen = np.array([(edges[i] + edges[i + 1]) / 2.0 for i in range(edges.shape[0] - 1)])
             else:
                 wlen = data.wlen
@@ -98,6 +100,7 @@ def contour_corner(sampledict,
                    short_name=None,
                    legend=False,
                    prt_plot_style=True,
+                   plot_best_fit = False,
                    **kwargs):
     """
     Use the corner package to plot the posterior distributions produced by pymultinest.
@@ -177,9 +180,10 @@ def contour_corner(sampledict,
     range_list = []
     handles = []
     count = 0
+    fig = None
 
     for key, samples in sampledict.items():
-        if count > len(color_list):
+        if prt_plot_style and count > len(color_list):
             print("Not enough colors to continue plotting. Please add to the list.")
             print("Outputting first " + str(count) + " retrievals.")
             break
@@ -225,8 +229,14 @@ def contour_corner(sampledict,
         if parameter_plot_indices is not None and true_values is not None:
             truths_list = []
 
-            for i in parameter_plot_indices[key]:
-                truths_list.append(true_values[key][i])
+            if plot_best_fit:
+                best_fit_ind = np.argmax(samples[:, -1])
+
+                for i in parameter_plot_indices[key]:
+                    truths_list.append(samples[best_fit_ind][i])
+            else:
+                for i in parameter_plot_indices[key]:
+                    truths_list.append(true_values[key][i])
         else:
             truths_list = None
 
@@ -292,6 +302,7 @@ def contour_corner(sampledict,
             label = key
         else:
             label = short_name[key]
+
         handles.append(Line2D([0], [0], marker='o', color=color_list[count], label=label, markersize=15))
 
     if legend:
@@ -361,16 +372,17 @@ def nice_corner(samples,
 
     try:
         truths_list = []
+
         for i in parameter_plot_indices:
             truths_list.append(true_values[i])
     except:
-        pass
+        truths_list = None
 
     dimensions = len(parameter_plot_indices)
 
     # Set up the matplotlib figure
     f, axes = plt.subplots(dimensions, dimensions, figsize=(13, 13),
-                           sharex=False, sharey=False)
+                           sharex='none', sharey='none')
     i_col = 0
     i_lin = 0
 

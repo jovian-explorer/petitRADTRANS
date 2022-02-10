@@ -1273,7 +1273,7 @@ module fort_spec
                         mass_to_vol = 0.75d0 * cloud_mass_fracs(i_struc, i_spec) * rho(i_struc) / pi / rho_p(i_spec)
 
                         N = mass_to_vol / (&
-                            a_h(i_struc, i_spec) ** 3d0 * (b_h(i_struc,i_spec) -1d0) &
+                            a_h(i_struc, i_spec) ** 3d0 * (b_h(i_struc,i_spec) - 1d0) &
                             * (2d0 * b_h(i_struc,i_spec) - 1d0) &
                         )
                         dndr_scale = &
@@ -1848,10 +1848,10 @@ module fort_spec
             call search_intp_ind(x, input_len, x_out, output_len, interp_ind)
 
             do i = 1, output_len
-                dy = y(interp_ind(i))-y(interp_ind(i)+1)
-                dx = x(interp_ind(i))-x(interp_ind(i)+1)
+                dy = y(interp_ind(i) + 1) - y(interp_ind(i))
+                dx = x(interp_ind(i) + 1) - x(interp_ind(i))
                 delta_x = x_out(i) - x(interp_ind(i))
-                y_out(i) = y(interp_ind(i)) + ((dy/dx)*delta_x)
+                y_out(i) = y(interp_ind(i)) + ((dy / dx) * delta_x)
             enddo
         end subroutine linear_interpolate
 
@@ -2149,7 +2149,8 @@ module fort_spec
 
                             do i_g = 1, g_len
                                 do j_g = 1, g_len
-                                    k_out((i_g-1)*g_len+j_g) = line_struc_kappas_out(i_g, i_freq, i_struc) + spec2(j_g)
+                                    k_out((i_g-1) * g_len + j_g) = line_struc_kappas_out(i_g, i_freq, i_struc) &
+                                        + spec2(j_g)
                                 end do
                             end do
 
@@ -2162,8 +2163,6 @@ module fort_spec
 
                             g_out = 0d0
                             cum_sum = 0d0
-
-                            !g_out = sampled_opa_weights(:, 2) * 0.5d0
 
                             do i_samp = 1, n_sample
                                 g_out(i_samp) = sampled_opa_weights(i_samp, 2) * 0.5d0 + cum_sum
@@ -2844,7 +2843,7 @@ module fort_spec
 
             implicit none
 
-            integer, parameter :: iter_scat = 100
+            integer, parameter :: iter_scat = 1000
             double precision, parameter :: tiniest = tiny(0d0), pi_4 = 4d0 * pi
 
             integer, intent(in)             :: freq_len_p_1, struc_len, N_mu, N_g
@@ -3127,7 +3126,7 @@ module fort_spec
                 ! Test if the flux has converged
                 conv_val = maxval(abs((flux - flux_old) / flux))
                 
-                if ((conv_val < 1d-2) .and. (i_iter_scat > 9)) then
+                if ((conv_val < 1d-3) .and. (i_iter_scat > 9)) then
                     exit
                 end if
             end do  ! iterations

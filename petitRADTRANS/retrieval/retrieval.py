@@ -72,6 +72,8 @@ class Retrieval:
                  short_names=None,
                  pRT_plot_style=True):
         self.rd = run_definition
+        print(f"Starting retrieval {self.rd.retrieval_name}")
+
         if len(self.rd.line_species) < 1:
             logging.warning("There are no line species present in the run definition!")
 
@@ -128,7 +130,11 @@ class Retrieval:
         # Setup pRT Objects for each data structure.
         print("Setting up PRT Objects")
         self.setup_data()
-        self.generate_retrieval_summary()
+
+        try:
+            self.generate_retrieval_summary()
+        except ValueError as e:  # TODO check if ValueError was expected here
+            print(f"Could not generate summary file! Error was: {str(e)}")
 
     def run(self,
             sampling_efficiency=0.8,
@@ -137,6 +143,7 @@ class Retrieval:
             log_z_convergence=0.5,
             step_sampler=False,
             warmstart_max_tau=0.5,
+            n_iter_before_update=50,
             resume=True,
             max_iter=0):
         """
@@ -228,7 +235,7 @@ class Retrieval:
                 n_live_points=n_live_points,
                 evidence_tolerance=log_z_convergence,  # default value is 0.5
                 sampling_efficiency=sampling_efficiency,  # default value is 0.8
-                n_iter_before_update=50,  # default value is 100
+                n_iter_before_update=n_iter_before_update,  # default value is 100
                 outputfiles_basename=prefix,
                 verbose=True,
                 resume=resume,
@@ -1597,7 +1604,7 @@ class Retrieval:
         plt.savefig(self.output_dir + 'evaluate_' + self.retrieval_name + '/PT_envelopes.pdf')
         return fig, ax
 
-    def plot_corner(self, sample_dict, parameter_dict, parameters_read, **kwargs):
+    def plot_corner(self, sample_dict, parameter_dict, parameters_read, plot_best_fit=True, **kwargs):
         """
         Make the corner plots
 
@@ -1624,6 +1631,10 @@ class Retrieval:
         p_plot_inds = {}
         p_ranges = {}
         p_use_dict = {}
+        bf_index = None
+
+        if plot_best_fit:
+            bf_index = {}
 
         for name, params in parameter_dict.items():
             samples_use = cp.copy(sample_dict[name])
@@ -1663,6 +1674,8 @@ class Retrieval:
             parameter_ranges=p_ranges,
             true_values=None,
             prt_plot_style=self.prt_plot_style,
+            plot_best_fit=plot_best_fit,
             **kwargs
         )
+
         return fig

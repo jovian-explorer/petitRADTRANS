@@ -1,4 +1,5 @@
 import copy as cp
+import warnings
 
 import numpy as np
 from scipy.interpolate import interp1d
@@ -68,15 +69,61 @@ masses = {
 }
 
 
-def return_XFe(FeH, CO):
+def return_cloud_mass_fraction(name, metallicity, co_ratio):
+    if "Fe(c)" in name:
+        return return_x_fe(metallicity, co_ratio)
+    if "MgSiO3(c)" in name:
+        return return_x_mgsio3(metallicity, co_ratio)
+    if "Na2S(c)" in name:
+        return return_x_na2s(metallicity, co_ratio)
+    if "KCL(c)" in name:
+        return return_x_kcl(metallicity, co_ratio)
+    else:
+        warnings.warn(f"The cloud {name} is not currently implemented.")
+        return np.zeros_like(metallicity)
+
+
+def simple_cdf(name, press, temp, metallicity, co_ratio, mmw=2.33):
+    if "Fe(c)" in name:
+        return simple_cdf_fe(press, temp, metallicity, co_ratio, mmw)
+    if "MgSiO3(c)" in name:
+        return simple_cdf_mgsio3(press, temp, metallicity, co_ratio, mmw)
+    if "Na2S(c)" in name:
+        return simple_cdf_na2s(press, temp, metallicity, co_ratio, mmw)
+    if "KCL(c)" in name:
+        return simple_cdf_kcl(press, temp, metallicity, co_ratio, mmw)
+    else:
+        warnings.warn(f"The cloud {name} is not currently implemented.")
+
+        return np.zeros_like(metallicity)
+
+
+def simple_cdf_free(name, press, temp, metallicity, mfrac, mmw=2.33):
+    if "Fe(c)" in name:
+        return simple_cdf_fe_free(press, temp, mfrac, mmw)
+    if "MgSiO3(c)" in name:
+        return simple_cdf_mgsio3_free(press, temp, mfrac, mmw)
+    if "Na2S(c)" in name:
+        raise NotImplemented("Na2S not implemented yet")
+        # return simple_cdf_Na2S_free(press, temp, mfrac, mmw)
+    if "KCL(c)" in name:
+        raise NotImplemented("KCl not implemented yet")
+        # return simple_cdf_KCL_free(press, temp, mfrac, mmw)
+    else:
+        warnings.warn(f"The cloud {name} is not currently implemented.")
+
+        return np.zeros_like(metallicity)
+
+
+def return_x_fe(metallicity, co_ratio):
     nfracs_use = cp.copy(nfracs)
 
     for spec in nfracs.keys():
 
         if (spec != 'H') and (spec != 'He'):
-            nfracs_use[spec] = nfracs[spec] * 1e1 ** FeH
+            nfracs_use[spec] = nfracs[spec] * 1e1 ** metallicity
 
-    nfracs_use['O'] = nfracs_use['C'] / CO
+    nfracs_use['O'] = nfracs_use['C'] / co_ratio
 
     x_fe = masses['Fe'] * nfracs_use['Fe']
     add = 0.
@@ -88,15 +135,15 @@ def return_XFe(FeH, CO):
     return x_fe
 
 
-def return_XMgSiO3(FeH, CO):
+def return_x_mgsio3(metallicity, co_ratio):
     nfracs_use = cp.copy(nfracs)
 
     for spec in nfracs.keys():
 
         if (spec != 'H') and (spec != 'He'):
-            nfracs_use[spec] = nfracs[spec] * 1e1 ** FeH
+            nfracs_use[spec] = nfracs[spec] * 1e1 ** metallicity
 
-    nfracs_use['O'] = nfracs_use['C'] / CO
+    nfracs_use['O'] = nfracs_use['C'] / co_ratio
 
     nfracs_mgsio3 = np.min([nfracs_use['Mg'],
                             nfracs_use['Si'],
@@ -115,15 +162,15 @@ def return_XMgSiO3(FeH, CO):
     return xmgsio3
 
 
-def return_XNa2S(FeH, CO):
+def return_x_na2s(metallicity, co_ratio):
     nfracs_use = cp.copy(nfracs)
 
     for spec in nfracs.keys():
 
         if (spec != 'H') and (spec != 'He'):
-            nfracs_use[spec] = nfracs[spec] * 1e1 ** FeH
+            nfracs_use[spec] = nfracs[spec] * 1e1 ** metallicity
 
-    nfracs_use['O'] = nfracs_use['C'] / CO
+    nfracs_use['O'] = nfracs_use['C'] / co_ratio
 
     nfracs_na2s = np.min([nfracs_use['Na'] / 2.,
                           nfracs_use['S']])
@@ -140,15 +187,15 @@ def return_XNa2S(FeH, CO):
     return xna2s
 
 
-def return_XKCL(FeH, CO):
+def return_x_kcl(metallicity, co_ratio):
     nfracs_use = cp.copy(nfracs)
 
     for spec in nfracs.keys():
 
         if (spec != 'H') and (spec != 'He'):
-            nfracs_use[spec] = nfracs[spec] * 1e1 ** FeH
+            nfracs_use[spec] = nfracs[spec] * 1e1 ** metallicity
 
-    nfracs_use['O'] = nfracs_use['C'] / CO
+    nfracs_use['O'] = nfracs_use['C'] / co_ratio
 
     nfracs_kcl = np.min([nfracs_use['K'],
                          nfracs_use['Cl']])
@@ -169,35 +216,37 @@ def return_XKCL(FeH, CO):
 # Fe saturation pressure, from Ackerman & Marley (2001), including erratum (P_vap is in bar, not cgs!)
 #############################################################
 
-def return_T_cond_Fe(FeH, CO, MMW=2.33):
+def return_t_cond_fe(metallicity, co_ratio, mmw=2.33):
     t = np.linspace(100., 10000., 1000)
+
     # Taken from Ackerman & Marley (2001)
     # including their erratum
 
     def p_vap(x):
         return np.exp(15.71 - 47664. / x)
 
-    x_fe = return_XFe(FeH, CO)
+    x_fe = return_x_fe(metallicity, co_ratio)
 
-    return p_vap(t) / (x_fe * MMW / masses['Fe']), t
+    return p_vap(t) / (x_fe * mmw / masses['Fe']), t
 
 
-def return_T_cond_Fe_l(FeH, CO, MMW=2.33):
+def return_t_cond_fe_l(metallicity, co_ratio, mmw=2.33):
     t = np.linspace(100., 10000., 1000)
+
     # Taken from Ackerman & Marley (2001)
     # including their erratum
 
     def p_vap(x):
         return np.exp(9.86 - 37120. / x)
 
-    x_fe = return_XFe(FeH, CO)
+    x_fe = return_x_fe(metallicity, co_ratio)
 
-    return p_vap(t) / (x_fe * MMW / masses['Fe']), t
+    return p_vap(t) / (x_fe * mmw / masses['Fe']), t
 
 
-def return_T_cond_Fe_comb(FeH, CO, MMW=2.33):
-    p1, t1 = return_T_cond_Fe(FeH, CO, MMW)
-    p2, t2 = return_T_cond_Fe_l(FeH, CO, MMW)
+def return_t_cond_fe_comb(metallicity, co_ratio, mmw=2.33):
+    p1, t1 = return_t_cond_fe(metallicity, co_ratio, mmw)
+    p2, t2 = return_t_cond_fe_l(metallicity, co_ratio, mmw)
 
     ret_p = np.zeros_like(p1)
     index = p1 < p2
@@ -206,31 +255,33 @@ def return_T_cond_Fe_comb(FeH, CO, MMW=2.33):
     return ret_p, t2
 
 
-def return_T_cond_Fe_free(XFe, MMW=2.33):
+def return_t_cond_fe_free(x_fe, mmw=2.33):
     t = np.linspace(100., 10000., 1000)
+
     # Taken from Ackerman & Marley (2001)
     # including their erratum
 
     def p_vap(x):
         return np.exp(15.71 - 47664. / x)
 
-    return p_vap(t) / (XFe * MMW / masses['Fe']), t
+    return p_vap(t) / (x_fe * mmw / masses['Fe']), t
 
 
-def return_T_cond_Fe_l_free(XFe, MMW=2.33):
+def return_t_cond_fe_l_free(x_fe, mmw=2.33):
     t = np.linspace(100., 10000., 1000)
+
     # Taken from Ackerman & Marley (2001)
     # including their erratum
 
     def p_vap(x):
         return np.exp(9.86 - 37120. / x)
 
-    return p_vap(t) / (XFe * MMW / masses['Fe']), t
+    return p_vap(t) / (x_fe * mmw / masses['Fe']), t
 
 
-def return_T_cond_Fe_comb_free(XFe, MMW=2.33):
-    p1, t1 = return_T_cond_Fe_free(XFe, MMW)
-    p2, t2 = return_T_cond_Fe_l_free(XFe, MMW)
+def return_t_cond_fe_comb_free(x_fe, mmw=2.33):
+    p1, t1 = return_t_cond_fe_free(x_fe, mmw)
+    p2, t2 = return_t_cond_fe_l_free(x_fe, mmw)
     ret_p = np.zeros_like(p1)
     index = p1 < p2
     ret_p[index] = p1[index]
@@ -238,24 +289,26 @@ def return_T_cond_Fe_comb_free(XFe, MMW=2.33):
     return ret_p, t2
 
 
-def return_T_cond_MgSiO3(FeH, CO, MMW=2.33):
+def return_t_cond_mgsio3(metallicity, co_ratio, mmw=2.33):
     t = np.linspace(100., 10000., 1000)
+
     # Taken from Ackerman & Marley (2001)
     # including their erratum
 
     def p_vap(x):
         return np.exp(25.37 - 58663. / x)
 
-    xmgsio3 = return_XMgSiO3(FeH, CO)
+    xmgsio3 = return_x_mgsio3(metallicity, co_ratio)
 
     m_mgsio3 = masses['Mg'] \
         + masses['Si'] \
         + 3. * masses['O']
-    return p_vap(t) / (xmgsio3 * MMW / m_mgsio3), t
+    return p_vap(t) / (xmgsio3 * mmw / m_mgsio3), t
 
 
-def return_T_cond_MgSiO3_free(Xmgsio3, MMW=2.33):
+def return_t_cond_mgsio3_free(x_mgsio3, mmw=2.33):
     t = np.linspace(100., 10000., 1000)
+
     # Taken from Ackerman & Marley (2001)
     # including their erratum
 
@@ -265,12 +318,13 @@ def return_T_cond_MgSiO3_free(Xmgsio3, MMW=2.33):
     m_mgsio3 = masses['Mg'] \
         + masses['Si'] \
         + 3. * masses['O']
-    return p_vap(t) / (Xmgsio3 * MMW / m_mgsio3), t
+    return p_vap(t) / (x_mgsio3 * mmw / m_mgsio3), t
 
 
-def return_T_cond_Na2S(FeH, CO, MMW=2.33):
+def return_t_cond_na2s(metallicity, co_ratio, mmw=2.33):
     # Taken from Charnay+2018
     t = np.linspace(100., 10000., 1000)
+
     # This is the partial pressure of Na, so
     # Divide by factor 2 to get the partial
     # pressure of the hypothetical Na2S gas
@@ -279,18 +333,20 @@ def return_T_cond_Na2S(FeH, CO, MMW=2.33):
     # abundance ratios.
 
     def p_vap(x):
-        return 1e1 ** (8.55 - 13889. / x - 0.5 * FeH) / 2.
+        return 1e1 ** (8.55 - 13889. / x - 0.5 * metallicity) / 2.
 
-    xna2s = return_XNa2S(FeH, CO)
+    xna2s = return_x_na2s(metallicity, co_ratio)
 
     m_na2s = 2. * masses['Na'] \
         + masses['S']
-    return p_vap(t) / (xna2s * MMW / m_na2s), t
+
+    return p_vap(t) / (xna2s * mmw / m_na2s), t
 
 
-def return_T_cond_Na2S_free(Xna2s, FeH, MMW=2.33):
+def return_t_cond_na2s_free(x_na2s, metallicity, mmw=2.33):
     # Taken from Charnay+2018
     t = np.linspace(100., 10000., 1000)
+
     # This is the partial pressure of Na, so
     # Divide by factor 2 to get the partial
     # pressure of the hypothetical Na2S gas
@@ -299,29 +355,30 @@ def return_T_cond_Na2S_free(Xna2s, FeH, MMW=2.33):
     # abundance ratios.
 
     def p_vap(x):
-        return 1e1 ** (8.55 - 13889. / x - 0.5 * FeH) / 2.
+        return 1e1 ** (8.55 - 13889. / x - 0.5 * metallicity) / 2.
 
     m_na2s = 2. * masses['Na'] \
         + masses['S']
 
-    return p_vap(t) / (Xna2s * MMW / m_na2s), t
+    return p_vap(t) / (x_na2s * mmw / m_na2s), t
 
 
-def return_T_cond_KCL(FeH, CO, MMW=2.33):
+def return_t_cond_kcl(metallicity, co_ratio, mmw=2.33):
     # Taken from Charnay+2018
     t = np.linspace(100., 10000., 1000)
 
     def p_vap(x):
         return 1e1 ** (7.611 - 11382. / x)  # TODO check if this p_vap is alright
 
-    xkcl = return_XKCL(FeH, CO)
+    xkcl = return_x_kcl(metallicity, co_ratio)
 
     m_kcl = masses['K'] \
         + masses['Cl']
-    return p_vap(t) / (xkcl * MMW / m_kcl), t
+
+    return p_vap(t) / (xkcl * mmw / m_kcl), t
 
 
-def return_T_cond_KCL_free(Xkcl, MMW=2.33):
+def return_t_cond_kcl_free(x_kcl, mmw=2.33):
     # Taken from Charnay+2018
     t = np.linspace(100., 10000., 1000)
 
@@ -330,11 +387,12 @@ def return_T_cond_KCL_free(Xkcl, MMW=2.33):
 
     m_kcl = masses['K'] \
         + masses['Cl']
-    return p_vap(t) / (Xkcl * MMW / m_kcl), t
+
+    return p_vap(t) / (x_kcl * mmw / m_kcl), t
 
 
-def simple_cdf_Fe(press, temp, FeH, CO, MMW=2.33):
-    pc, tc = return_T_cond_Fe_comb(FeH, CO, MMW)
+def simple_cdf_fe(press, temp, metallicity, co_ratio, mmw=2.33):
+    pc, tc = return_t_cond_fe_comb(metallicity, co_ratio, mmw)
     index = (pc > 1e-8) & (pc < 1e5)
     pc, tc = pc[index], tc[index]
     tcond_p = interp1d(pc, tc)
@@ -348,7 +406,7 @@ def simple_cdf_Fe(press, temp, FeH, CO, MMW=2.33):
         p_clouds = (press[1:] + press[:-1])[ind_cdf] / 2.
         p_cloud = p_clouds[-1]
     else:
-        p_cloud = 1e-8
+        p_cloud = np.min(press)
 
     if plotting:
         plt.plot(temp, press)
@@ -362,8 +420,8 @@ def simple_cdf_Fe(press, temp, FeH, CO, MMW=2.33):
     return p_cloud
 
 
-def simple_cdf_Fe_free(press, temp, XFe, MMW=2.33):
-    pc, tc = return_T_cond_Fe_comb_free(XFe, MMW)
+def simple_cdf_fe_free(press, temp, x_fe, mmw=2.33):
+    pc, tc = return_t_cond_fe_comb_free(x_fe, mmw)
     index = (pc > 1e-8) & (pc < 1e5)
     pc, tc = pc[index], tc[index]
     tcond_p = interp1d(pc, tc)
@@ -377,7 +435,7 @@ def simple_cdf_Fe_free(press, temp, XFe, MMW=2.33):
         p_clouds = (press[1:] + press[:-1])[ind_cdf] / 2.
         p_cloud = p_clouds[-1]
     else:
-        p_cloud = 1e-8
+        p_cloud = np.min(press)
 
     if plotting:
         plt.plot(temp, press)
@@ -391,8 +449,8 @@ def simple_cdf_Fe_free(press, temp, XFe, MMW=2.33):
     return p_cloud
 
 
-def simple_cdf_MgSiO3(press, temp, FeH, CO, MMW=2.33):
-    pc, tc = return_T_cond_MgSiO3(FeH, CO, MMW)
+def simple_cdf_mgsio3(press, temp, metallicity, co_ratio, mmw=2.33):
+    pc, tc = return_t_cond_mgsio3(metallicity, co_ratio, mmw)
     index = (pc > 1e-8) & (pc < 1e5)
     pc, tc = pc[index], tc[index]
     tcond_p = interp1d(pc, tc)
@@ -406,7 +464,7 @@ def simple_cdf_MgSiO3(press, temp, FeH, CO, MMW=2.33):
         p_clouds = (press[1:] + press[:-1])[ind_cdf] / 2.
         p_cloud = p_clouds[-1]
     else:
-        p_cloud = 1e-8
+        p_cloud = np.min(press)
 
     if plotting:
         plt.plot(temp, press)
@@ -420,8 +478,8 @@ def simple_cdf_MgSiO3(press, temp, FeH, CO, MMW=2.33):
     return p_cloud
 
 
-def simple_cdf_MgSiO3_free(press, temp, Xmgsio3, MMW=2.33):
-    pc, tc = return_T_cond_MgSiO3_free(Xmgsio3, MMW)
+def simple_cdf_mgsio3_free(press, temp, x_mgsio3, mmw=2.33):
+    pc, tc = return_t_cond_mgsio3_free(x_mgsio3, mmw)
     index = (pc > 1e-8) & (pc < 1e5)
     pc, tc = pc[index], tc[index]
     tcond_p = interp1d(pc, tc)
@@ -435,7 +493,7 @@ def simple_cdf_MgSiO3_free(press, temp, Xmgsio3, MMW=2.33):
         p_clouds = (press[1:] + press[:-1])[ind_cdf] / 2.
         p_cloud = p_clouds[-1]
     else:
-        p_cloud = 1e-8
+        p_cloud = np.min(press)
 
     if plotting:
         plt.plot(temp, press)
@@ -449,8 +507,8 @@ def simple_cdf_MgSiO3_free(press, temp, Xmgsio3, MMW=2.33):
     return p_cloud
 
 
-def simple_cdf_Na2S(press, temp, FeH, CO, MMW=2.33):
-    pc, tc = return_T_cond_Na2S(FeH, CO, MMW)
+def simple_cdf_na2s(press, temp, metallicity, co_ratio, mmw=2.33):
+    pc, tc = return_t_cond_na2s(metallicity, co_ratio, mmw)
     index = (pc > 1e-8) & (pc < 1e5)
     pc, tc = pc[index], tc[index]
     tcond_p = interp1d(pc, tc)
@@ -464,7 +522,7 @@ def simple_cdf_Na2S(press, temp, FeH, CO, MMW=2.33):
         p_clouds = (press[1:] + press[:-1])[ind_cdf] / 2.
         p_cloud = p_clouds[-1]
     else:
-        p_cloud = 1e-8
+        p_cloud = np.min(press)
 
     if plotting:
         plt.plot(temp, press)
@@ -478,8 +536,8 @@ def simple_cdf_Na2S(press, temp, FeH, CO, MMW=2.33):
     return p_cloud
 
 
-def simple_cdf_KCL(press, temp, FeH, CO, MMW=2.33):
-    pc, tc = return_T_cond_KCL(FeH, CO, MMW)
+def simple_cdf_kcl(press, temp, metallicity, co_ratio, mmw=2.33):
+    pc, tc = return_t_cond_kcl(metallicity, co_ratio, mmw)
     index = (pc > 1e-8) & (pc < 1e5)
     pc, tc = pc[index], tc[index]
     tcond_p = interp1d(pc, tc)
@@ -493,7 +551,7 @@ def simple_cdf_KCL(press, temp, FeH, CO, MMW=2.33):
         p_clouds = (press[1:] + press[:-1])[ind_cdf] / 2.
         p_cloud = p_clouds[-1]
     else:
-        p_cloud = 1e-8
+        p_cloud = np.min(press)
 
     if plotting:
         plt.plot(temp, press)
@@ -517,17 +575,17 @@ def plot_all():
 
     for FeH in fehs:
         for CO in co_ratios:
-            p, t = return_T_cond_Fe(FeH, CO)
+            p, t = return_t_cond_fe(FeH, CO)
             plt.plot(t, p, label='Fe(c), [Fe/H] = ' + str(FeH) + ', C/O = ' + str(CO), color='black')
-            p, t = return_T_cond_Fe_l(FeH, CO)
+            p, t = return_t_cond_fe_l(FeH, CO)
             plt.plot(t, p, '--', label='Fe(l), [Fe/H] = ' + str(FeH) + ', C/O = ' + str(CO))
-            p, t = return_T_cond_Fe_comb(FeH, CO)
+            p, t = return_t_cond_fe_comb(FeH, CO)
             plt.plot(t, p, ':', label='Fe(c+l), [Fe/H] = ' + str(FeH) + ', C/O = ' + str(CO))
-            p, t = return_T_cond_MgSiO3(FeH, CO)
+            p, t = return_t_cond_mgsio3(FeH, CO)
             plt.plot(t, p, label='MgSiO3, [Fe/H] = ' + str(FeH) + ', C/O = ' + str(CO))
-            p, t = return_T_cond_Na2S(FeH, CO)
+            p, t = return_t_cond_na2s(FeH, CO)
             plt.plot(t, p, label='Na2S, [Fe/H] = ' + str(FeH) + ', C/O = ' + str(CO))
-            p, t = return_T_cond_KCL(FeH, CO)
+            p, t = return_t_cond_kcl(FeH, CO)
             plt.plot(t, p, label='KCL, [Fe/H] = ' + str(FeH) + ', C/O = ' + str(CO))
 
     plt.yscale('log')
@@ -550,18 +608,18 @@ def plot_all():
 
     temperature = guillot_global(pressures, kappa_ir, gamma, gravity, t_int, t_equ)
 
-    simple_cdf_Fe(pressures, temperature, 0., 0.55)
-    simple_cdf_MgSiO3(pressures, temperature, 0., 0.55)
+    simple_cdf_fe(pressures, temperature, 0., 0.55)
+    simple_cdf_mgsio3(pressures, temperature, 0., 0.55)
 
     t_int = 200.
     t_equ = 800.
     temperature = guillot_global(pressures, kappa_ir, gamma, gravity, t_int, t_equ)
-    simple_cdf_Na2S(pressures, temperature, 0., 0.55)
+    simple_cdf_na2s(pressures, temperature, 0., 0.55)
 
     t_int = 150.
     t_equ = 650.
     temperature = guillot_global(pressures, kappa_ir, gamma, gravity, t_int, t_equ)
-    simple_cdf_KCL(pressures, temperature, 0., 0.55)
+    simple_cdf_kcl(pressures, temperature, 0., 0.55)
 
 
 if __name__ == '__main__':

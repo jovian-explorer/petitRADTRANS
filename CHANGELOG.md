@@ -4,7 +4,7 @@ All notable changes to the CCF module will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com)
 and this project adheres to [Semantic Versioning](http://semver.org).
 
-## [2.4.0-a15] - 2021-04-01
+## [2.5.0-a15] - 2021-04-01
 ### Added
 - High-resolution retrievals.
 - Possibility to initialize a `retrieval.Data` class without needing a file.
@@ -55,6 +55,17 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 - True values not plotted in function `contour_corner`.
 - Function `get_MM` not working with e- and H-.
 - Wrong docstrings in function `Radtrans.get_star_spectrum`.
+
+## [2.3.5] - 2021-02-10
+
+
+## [2.3.4] - 2021-11-22
+### Changed
+- Switched to corr-k combination method without Monte Carlo noise (relevant for scattering mode).
+
+## [2.3.3] - 2021-11-16
+### Changed
+- Stricter scattering convergence criterion
 
 ---
 No changelog before version 2.4.0.
