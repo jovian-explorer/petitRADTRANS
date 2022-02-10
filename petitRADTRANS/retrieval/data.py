@@ -84,6 +84,7 @@ class Data:
                  model_generating_function = None,
                  wlen_range_micron = None,
                  scale = False,
+                 scale_err = False,
                  wlen_bins = None,
                  photometry = False,
                  photometric_transformation_function = None,
@@ -136,6 +137,8 @@ class Data:
         self.inv_cov = None
         self.flux_error = None
         self.scale = scale
+        self.scale_err = scale_err
+
         self.scale_factor = 1.0
 
         # Bins and photometry
@@ -264,6 +267,11 @@ class Data:
         self.distance = distance
         return self.distance
 
+    def update_bins(self,wlens):
+        self.wlen_bins = np.zeros_like(wlens)
+        self.wlen_bins[:-1] = np.diff(wlens)
+        self.wlen_bins[-1] = self.wlen_bins[-2]
+
     def scale_to_distance(self, new_dist):
         """
         Updates the distance variable in the data class.
@@ -328,7 +336,9 @@ class Data:
 
 
         diff = (flux_rebinned - self.flux*self.scale_factor)
-        f_err = self.flux_error*self.scale_factor
+        f_err = self.flux_error
+        if self.scale_err:
+            f_err = self.flux_error*self.scale_factor
         logL=0.0
         if self.covariance is not None:
             logL += -1*np.dot(diff, np.dot(self.inv_cov, diff))/2.

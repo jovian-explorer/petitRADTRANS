@@ -1,12 +1,12 @@
 import numpy as np
 import copy as cp
 from scipy.interpolate import interp1d
-
+import logging
 plotting = False
 if plotting:
     import pylab as plt
     from petitRADTRANS import nat_cst as nc
-    
+
 #############################################################
 # Cloud Cond
 #############################################################
@@ -64,6 +64,43 @@ masses['V'] = 51.
 masses['Fe'] = 55.8
 masses['Ni'] = 58.7
 
+def return_cloud_mass_fraction(name,FeH,CO):
+    if "Fe(c)" in name:
+        return return_XFe(FeH,CO)
+    if "MgSiO3(c)" in name:
+        return return_XMgSiO3(FeH,CO)
+    if "Na2S(c)" in name:
+        return return_XNa2S(FeH,CO)
+    if "KCL(c)" in name:
+        return return_XKCL(FeH,CO)
+    else:
+        logging.warn(f"The cloud {name} is not currently implemented.")
+        return np.zeros_like(FeH)
+
+def simple_cdf(name,press, temp, FeH, CO, MMW = 2.33):
+        if "Fe(c)" in name:
+            return simple_cdf_Fe(press, temp, FeH, CO, MMW)
+        if "MgSiO3(c)" in name:
+            return simple_cdf_MgSiO3(press, temp, FeH, CO, MMW)
+        if "Na2S(c)" in name:
+            return simple_cdf_Na2S(press, temp, FeH, CO, MMW)
+        if "KCL(c)" in name:
+            return simple_cdf_KCL(press, temp, FeH, CO, MMW)
+        else:
+            logging.warn(f"The cloud {name} is not currently implemented.")
+            return np.zeros_like(FeH)
+def simple_cdf_free(name,press, temp, mfrac, MMW = 2.33):
+        if "Fe(c)" in name:
+            return simple_cdf_Fe_free(press, temp, mfrac, MMW)
+        if "MgSiO3(c)" in name:
+            return simple_cdf_MgSiO3_free(press, temp, mfrac, MMW)
+        if "Na2S(c)" in name:
+            return simple_cdf_Na2S_free(press, temp, mfrac, MMW)
+        if "KCL(c)" in name:
+            return simple_cdf_KCL_free(press, temp, mfrac, MMW)
+        else:
+            logging.warn(f"The cloud {name} is not currently implemented.")
+            return np.zeros_like(FeH)
 def return_XFe(FeH, CO):
 
     nfracs_use = cp.copy(nfracs)
@@ -101,7 +138,7 @@ def return_XMgSiO3(FeH, CO):
     masses_mgsio3 = masses['Mg'] \
       + masses['Si'] \
       + 3. * masses['O']
-      
+
     Xmgsio3 = masses_mgsio3*nfracs_mgsio3
     add = 0.
     for spec in nfracs_use.keys():
@@ -126,7 +163,7 @@ def return_XNa2S(FeH, CO):
                             nfracs_use['S']])
     masses_na2s = 2.*masses['Na'] \
       + masses['S']
-      
+
     Xna2s = masses_na2s*nfracs_na2s
     add = 0.
     for spec in nfracs_use.keys():
@@ -151,7 +188,7 @@ def return_XKCL(FeH, CO):
                             nfracs_use['Cl']])
     masses_kcl = masses['K'] \
       + masses['Cl']
-      
+
     Xkcl = masses_kcl*nfracs_kcl
     add = 0.
     for spec in nfracs_use.keys():
@@ -302,7 +339,7 @@ def return_T_cond_KCL_free(Xkcl, MMW = 2.33):
 
 
 if plotting:
-    
+
     #FeHs = np.linspace(-0.5, 2., 5)
     #COs = np.linspace(0.3, 1.2, 5)
     FeHs = [0.]
@@ -322,7 +359,7 @@ if plotting:
             plt.plot(T,P, label = 'Na2S, [Fe/H] = '+str(FeH)+', C/O = '+str(CO))
             P, T = return_T_cond_KCL(FeH, CO)
             plt.plot(T,P, label = 'KCL, [Fe/H] = '+str(FeH)+', C/O = '+str(CO))
-            
+
 
     plt.yscale('log')
     '''
@@ -350,7 +387,7 @@ def simple_cdf_Fe(press, temp, FeH, CO, MMW = 2.33):
         P_clouds = (press[1:]+press[:-1])[ind_cdf]/2.
         P_cloud = P_clouds[-1]
     else:
-        P_cloud = 1e-8
+        P_cloud = np.min(press)
 
     if plotting:
         plt.plot(temp, press)
@@ -378,7 +415,7 @@ def simple_cdf_Fe_free(press, temp, XFe, MMW = 2.33):
         P_clouds = (press[1:]+press[:-1])[ind_cdf]/2.
         P_cloud = P_clouds[-1]
     else:
-        P_cloud = 1e-8
+        P_cloud = np.min(press)
 
     if plotting:
         plt.plot(temp, press)
@@ -406,7 +443,7 @@ def simple_cdf_MgSiO3(press, temp, FeH, CO, MMW = 2.33):
         P_clouds = (press[1:]+press[:-1])[ind_cdf]/2.
         P_cloud = P_clouds[-1]
     else:
-        P_cloud = 1e-8
+        P_cloud = np.min(press)
 
     if plotting:
         plt.plot(temp, press)
@@ -434,7 +471,7 @@ def simple_cdf_MgSiO3_free(press, temp, Xmgsio3, MMW = 2.33):
         P_clouds = (press[1:]+press[:-1])[ind_cdf]/2.
         P_cloud = P_clouds[-1]
     else:
-        P_cloud = 1e-8
+        P_cloud = np.min(press)
 
     if plotting:
         plt.plot(temp, press)
@@ -462,7 +499,7 @@ def simple_cdf_Na2S(press, temp, FeH, CO, MMW = 2.33):
         P_clouds = (press[1:]+press[:-1])[ind_cdf]/2.
         P_cloud = P_clouds[-1]
     else:
-        P_cloud = 1e-8
+        P_cloud = np.min(press)
 
     if plotting:
         plt.plot(temp, press)
@@ -491,7 +528,7 @@ def simple_cdf_KCL(press, temp, FeH, CO, MMW = 2.33):
         P_clouds = (press[1:]+press[:-1])[ind_cdf]/2.
         P_cloud = P_clouds[-1]
     else:
-        P_cloud = 1e-8
+        P_cloud = np.min(press)
 
     if plotting:
         plt.plot(temp, press)
@@ -527,4 +564,4 @@ if plotting:
     T_equ = 650.
     temperature = nc.guillot_global(pressures, kappa_IR, gamma, gravity, T_int, T_equ)
     simple_cdf_KCL(pressures, temperature, 0., 0.55)
-    
+
