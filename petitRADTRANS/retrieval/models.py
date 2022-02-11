@@ -270,7 +270,7 @@ def guillot_free_emission(pRT_object, \
     for cloud in pRT_object.cloud_species:
         cname = cloud.split('_')[0]
         if not "Pbase_" +cname in parameters.keys():
-            Pbases[cname] = fc.simple_cd_free(cname, p_use, temperatures, 10**parameters['log_X_cb_'+cname].value, np.mean(MMW))
+            Pbases[cname] = fc.simple_cdf_free(cname, p_use, temperatures, 10**parameters['log_X_cb_'+cname].value, np.mean(MMW))
         else:
             Pbases[cname] = 10**parameters['Pbase_'+cname].value
 
