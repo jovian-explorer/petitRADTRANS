@@ -483,9 +483,39 @@ def simple_cdf_MgSiO3_free(press, temp, Xmgsio3, MMW = 2.33):
         plt.show()
 
     return P_cloud
+
 def simple_cdf_Na2S(press, temp, FeH, CO, MMW = 2.33):
 
     Pc, Tc = return_T_cond_Na2S(FeH, CO, MMW)
+    index = (Pc > 1e-8) & (Pc < 1e5)
+    Pc, Tc = Pc[index], Tc[index]
+    tcond_p = interp1d(Pc, Tc)
+    #print(Pc, press)
+    Tcond_on_input_grid = tcond_p(press)
+
+    Tdiff = Tcond_on_input_grid - temp
+    diff_vec = Tdiff[1:]*Tdiff[:-1]
+    ind_cdf = (diff_vec < 0.)
+    if len(diff_vec[ind_cdf]) > 0:
+        P_clouds = (press[1:]+press[:-1])[ind_cdf]/2.
+        P_cloud = P_clouds[-1]
+    else:
+        P_cloud = np.min(press)
+
+    if plotting:
+        plt.plot(temp, press)
+        plt.plot(Tcond_on_input_grid, press)
+        plt.axhline(P_cloud, color = 'red', linestyle = '--')
+        plt.yscale('log')
+        plt.xlim([0., 3000.])
+        plt.ylim([1e2,1e-6])
+        plt.show()
+
+    return P_cloud
+
+def simple_cdf_Na2S(press, temp, XNa2S, MMW = 2.33):
+
+    Pc, Tc = return_T_cond_Na2S_free(XNa2S, MMW)
     index = (Pc > 1e-8) & (Pc < 1e5)
     Pc, Tc = Pc[index], Tc[index]
     tcond_p = interp1d(Pc, Tc)
@@ -541,6 +571,34 @@ def simple_cdf_KCL(press, temp, FeH, CO, MMW = 2.33):
 
     return P_cloud
 
+def simple_cdf_KCL_free(press, temp, XKCL, MMW = 2.33):
+
+    Pc, Tc = return_T_cond_KCL_free(XKCL, MMW)
+    index = (Pc > 1e-8) & (Pc < 1e5)
+    Pc, Tc = Pc[index], Tc[index]
+    tcond_p = interp1d(Pc, Tc)
+    #print(Pc, press)
+    Tcond_on_input_grid = tcond_p(press)
+
+    Tdiff = Tcond_on_input_grid - temp
+    diff_vec = Tdiff[1:]*Tdiff[:-1]
+    ind_cdf = (diff_vec < 0.)
+    if len(diff_vec[ind_cdf]) > 0:
+        P_clouds = (press[1:]+press[:-1])[ind_cdf]/2.
+        P_cloud = P_clouds[-1]
+    else:
+        P_cloud = np.min(press)
+
+    if plotting:
+        plt.plot(temp, press)
+        plt.plot(Tcond_on_input_grid, press)
+        plt.axhline(P_cloud, color = 'red', linestyle = '--')
+        plt.yscale('log')
+        plt.xlim([0., 3000.])
+        plt.ylim([1e2,1e-6])
+        plt.show()
+
+    return P_cloud
 if plotting:
     kappa_IR = 0.01
     gamma = 0.4
