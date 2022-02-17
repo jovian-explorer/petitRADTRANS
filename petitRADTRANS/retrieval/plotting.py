@@ -140,8 +140,6 @@ def contour_corner(sampledict,
             the title_kwargs,label_kwargs,hist_kwargs, hist2d_kawargs or the contour kwargs. Each
             kwarg must be a dictionary with the arguments as keys and values as the values.
     """
-    import matplotlib as mpl
-
     if parameter_ranges is None:
         parameter_ranges = {}
 
@@ -149,6 +147,8 @@ def contour_corner(sampledict,
         parameter_plot_indices = {}
 
     if prt_plot_style:
+        import matplotlib as mpl
+
         mpl.rcParams.update(mpl.rcParamsDefault)
         font = {'family': 'serif'}
         xtick = {'top': True,
@@ -169,7 +169,6 @@ def contour_corner(sampledict,
         color_list = ['#009FB8', '#FF695C', '#70FF92', '#FFBB33', '#6171FF', "#FF1F69", "#52AC25", '#E574FF', "#FF261D",
                       "#B429FF"]
     else:
-        mpl.rcParams.update(mpl.rcParamsDefault)
         color_list = [f'C{i}' for i in range(8)]  # standard matplotlib color cycle
 
         # from .plot_style import prt_colours
