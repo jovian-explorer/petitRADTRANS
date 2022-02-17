@@ -226,15 +226,20 @@ def guillot_free_emission(pRT_object, \
 
     #for key, val in parameters.items():
     #    print(key,val.value)
+
+    # let's start out by setting up our global pressure arrays
+    # This is used for the hi res bins for AMR
     pglobal_check(pRT_object.press/1e6,
                   parameters['pressure_simple'].value,
                   parameters['pressure_scaling'].value)
-
     if AMR:
         p_use = PGLOBAL
     else:
         p_use = pRT_object.press/1e6
 
+    # We need 2 of 3 for gravity, radius and mass
+    # So check which parameters are included in the Retrieval
+    # and calculate the third if necessary
     gravity = -np.inf
     R_pl = -np.inf
     if 'log_g' in parameters.keys() and 'mass' in parameters.keys():
@@ -250,38 +255,44 @@ def guillot_free_emission(pRT_object, \
         print("Pick two of log_g, R_pl and mass priors!")
         sys.exit(5)
 
+    # We're using a guillot profile
     temperatures = nc.guillot_global(p_use, \
                                 10**parameters['log_kappa_IR'].value,
                                 parameters['gamma'].value, \
                                 gravity, \
                                 parameters['T_int'].value, \
                                 parameters['T_equ'].value)
+
+    # Set up gas phase abundances, check to make sure that
+    # the total mass fraction is < 1.0
+    # We assume vertically constant abundances
     abundances = {}
     msum = 0.0
     for species in pRT_object.line_species:
-        abundances[species] = 10**parameters[species.split("_R_")[0]].value * np.ones_like(pRT_object.press)
-        msum += 10**parameters[species.split("_R_")[0]].value
+        abund = 10**parameters[species.split("_R_")[0]].value
+        abundances[species] = abund * np.ones_like(pRT_object.press)
+        msum += abund
+    # Whatever's left is H2 and He
     abundances['H2'] = 0.766 * (1.0-msum) * np.ones_like(pRT_object.press)
     abundances['He'] = 0.234 * (1.0-msum) * np.ones_like(pRT_object.press)
-
+    if msum > 1.0:
+        #print(f"Abundance sum > 1.0, msum={msum}")
+        return None,None
     MMW = calc_MMW(abundances)
 
+    # Now we need to find the cloud base pressure
+    # This sets where in the atmosphere the cloud is
+    # as well as giving us the location for the AMR regions
     Pbases = {}
     for cloud in pRT_object.cloud_species:
         cname = cloud.split('_')[0]
         if not "Pbase_" +cname in parameters.keys():
-            Pbases[cname] = fc.simple_cdf_free(cname, p_use, temperatures, 10**parameters['log_X_cb_'+cname].value, np.mean(MMW))
+            # Assume vertically constant abundances
+            Pbases[cname] = fc.simple_cdf_free(cname, p_use, temperatures, 10**parameters['log_X_cb_'+cname].value, MMW[0])
         else:
             Pbases[cname] = 10**parameters['Pbase_'+cname].value
 
-        abundances[cname] = np.zeros_like(temperatures)
-        #msum += 10**parameters['log_X_cb_'+cname].values
-        try:
-            abundances[cname][pressures < Pbases[cname]] = \
-                            10**parameters['log_X_cb_'+cname].value *\
-                            ((pressures[pressures <= pbase]/pbase)**parameters['fsed'].value)
-        except:
-            return None,None
+    # Set up the adaptive pressure grid
     if AMR:
         p_clouds = np.array(list(Pbases.values()))
         pressures,small_index = fixed_length_amr(p_clouds,
@@ -298,15 +309,26 @@ def guillot_free_emission(pRT_object, \
     else:
         pressures = pRT_object.press/1e6
 
+    # Now that we have the pressure array, we can set up the
+    # cloud abundance profile
+    for cloud in pRT_object.cloud_species:
+        cname = cloud.split('_')[0]
+        abundances[cname] = np.zeros_like(pRT_object.press)
+        try:
+            abundances[cname][pressures < Pbases[cname]] = 10**parameters['log_X_cb_'+cname].value *\
+                        ((pressures[pressures <= Pbases[cname]]/Pbases[cname])**parameters['fsed'].value)
+        except:
+            print(cname)
+            print(f"{Pbases[cname]}")
+            print(f"{10**parameters['log_X_cb_'+cname].value}")
+            print(f"{(pressures[pressures <= Pbases[cname]]/Pbases[cname])**parameters['fsed'].value}\n")
+            return None,None
+
     # If in evaluation mode, and PTs are supposed to be plotted
     if PT_plot_mode:
         return pressures, temperatures
 
-
-    # This is bad for some reason...
-    #if msum > 1.0:
-    #    return None, None
-
+    # Calculate the spectrum
     pRT_object.calc_flux(temperatures, \
                      abundances, \
                      gravity, \
@@ -316,6 +338,8 @@ def guillot_free_emission(pRT_object, \
                      Kzz = 10**parameters['log_kzz'].value * np.ones_like(pressures),
                      sigma_lnorm = parameters['sigma_lnorm'].value)
 
+    # Change units to W/m^2/micron
+    # and wavelength units in micron
     wlen_model = nc.c/pRT_object.freq/1e-4
     wlen = nc.c/pRT_object.freq
     f_lambda = pRT_object.flux*nc.c/wlen**2.
@@ -325,9 +349,12 @@ def guillot_free_emission(pRT_object, \
     #f_lambda = f_lambda * 1e-4
     # convert from ergs to Joule
     f_lambda = f_lambda * 1e-7
+
+    # Scale to planet distance
     spectrum_model = surf_to_meas(f_lambda,
                                   R_pl,
                                   parameters['D_pl'].value)
+    #print(spectrum_model)
     return wlen_model, spectrum_model
 
 def guillot_eqchem_transmission(pRT_object, \

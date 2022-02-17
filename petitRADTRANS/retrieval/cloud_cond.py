@@ -302,6 +302,7 @@ def return_T_cond_Na2S(FeH, CO, MMW = 2.33):
     m_na2s =  2.*masses['Na'] \
       + masses['S']
     return P_vap(T)/(Xna2s*MMW/m_na2s), T
+
 def return_T_cond_Na2S_free(Xna2s, MMW = 2.33):
 
     # Taken from Charnay+2018
@@ -312,16 +313,22 @@ def return_T_cond_Na2S_free(Xna2s, MMW = 2.33):
     # particles, this is OK: there are
     # more S than Na atoms at solar
     # abundance ratios.
-    P_vap = lambda x: 1e1**(8.55 - 13889./x - 0.5*FeH)/2.
+
+    # We're also using [Na/H] as a proxy for [Fe/H]
+    # Definitely not strictly correct, but should be
+    # good enough for ~ solar compositions. [+- 1 for Fe/H]
+    # Assumes constant vertical abundance
     m_na2s =  2.*masses['Na'] \
       + masses['S']
+    P_vap = lambda x: 10**(8.55 - 13889./x - 0.5*(np.log10(2*Xna2s*MMW/m_na2s)+5.7))/2
+
     return P_vap(T)/(Xna2s*MMW/m_na2s), T
 
 def return_T_cond_KCL(FeH, CO, MMW = 2.33):
 
     # Taken from Charnay+2018
     T = np.linspace(100.,10000.,1000)
-    P_vap = lambda x: 1e1**(7.611 - 11382./T)
+    P_vap = lambda x: 1e1**(7.611 - 11382./x)
 
     Xkcl = return_XKCL(FeH, CO)
 
@@ -332,7 +339,7 @@ def return_T_cond_KCL_free(Xkcl, MMW = 2.33):
 
     # Taken from Charnay+2018
     T = np.linspace(100.,10000.,1000)
-    P_vap = lambda x: 1e1**(7.611 - 11382./T)
+    P_vap = lambda x: 1e1**(7.611 - 11382./x)
     m_kcl =  masses['K'] \
       + masses['Cl']
     return P_vap(T)/(Xkcl*MMW/m_kcl), T
@@ -513,10 +520,11 @@ def simple_cdf_Na2S(press, temp, FeH, CO, MMW = 2.33):
 
     return P_cloud
 
-def simple_cdf_Na2S(press, temp, XNa2S, MMW = 2.33):
+def simple_cdf_Na2S_free(press, temp, XNa2S, MMW = 2.33):
 
     Pc, Tc = return_T_cond_Na2S_free(XNa2S, MMW)
     index = (Pc > 1e-8) & (Pc < 1e5)
+
     Pc, Tc = Pc[index], Tc[index]
     tcond_p = interp1d(Pc, Tc)
     #print(Pc, press)
