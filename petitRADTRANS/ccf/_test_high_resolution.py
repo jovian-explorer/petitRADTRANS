@@ -148,17 +148,17 @@ def get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=N
             # )  # p_true
 
             spectrum_model, rm, _ = simple_pipeline(
-                spectrum_model0, median=True
+                spectrum_model0, mean=True
             )  # p
 
             # spectrum_model, _, _ = simple_pipeline(
-            #     spectrum_model * parameters['data'].value, mean=True
+            #     spectrum_model * parameters['data'].value, mean=True, airmass=parameters['airmass'].value
             # )  # mbrogi
+            # spectrum_model = spectrum_model / parameters['reduced_data'].value  # mbrogid
 
             # spectrum_model, _, _ = simple_pipeline(
             #     spectrum_model0 / parameters['reduction_matrix'].value * rm, mean=True
             # )  # p_approx
-            # spectrum_model = spectrum_model / parameters['reduced_data'].value  # p_approx
     else:
         spectrum_model = np.array([spectrum_model])
 
@@ -204,17 +204,17 @@ def get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=F
             # )  # p_true
 
             spectrum_model, rm, _ = simple_pipeline(
-                spectrum_model0, median=True
+                spectrum_model0, mean=True, airmass=parameters['airmass'].value
             )  # p
 
             # spectrum_model, _, _ = simple_pipeline(
-            #     spectrum_model * parameters['data'].value, mean=True
+            #     spectrum_model * parameters['data'].value, mean=True, airmass=parameters['airmass'].value
             # )  # mbrogi
+            # spectrum_model = spectrum_model / parameters['reduced_data'].value  # mbrogid
 
             # spectrum_model, _, _ = simple_pipeline(
             #     spectrum_model0 / parameters['reduction_matrix'].value * rm, mean=True
             # )  # p_approx
-            # spectrum_model = spectrum_model / parameters['reduced_data'].value  # p_approx
     else:
         spectrum_model = np.array([spectrum_model])
 
@@ -284,7 +284,7 @@ def init_model(planet, w_bords, line_species_str, p0=1e-2):
 
 def init_parameters(planet, line_species_str, mode,
                     retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
-                    apply_variable_throughput=True, apply_telluric_transmittance=True,
+                    apply_variable_throughput=True, apply_telluric_transmittance=True, apply_airmass=True,
                     apply_pipeline=True, load_from=None, median=False,
                     use_true_deformation_matrix=False, deformation_matrix_noise=0.0, use_true_spectra=None):
     star_name = planet.host_name.replace(' ', '_')
@@ -327,8 +327,6 @@ def init_parameters(planet, line_species_str, mode,
     else:
         raise ValueError(f"Mode must be 'eclipse' or 'transit', not '{mode}'")
 
-    airmass = None
-
     if apply_telluric_transmittance:
         print('Add TT')
         telluric_data = np.loadtxt(
@@ -339,6 +337,22 @@ def init_parameters(planet, line_species_str, mode,
     else:
         print('No TT')
         telluric_transmittance = None
+
+    if apply_airmass:
+        print('Add Airmass')
+        airmass = np.load(os.path.join(module_dir, 'metis', 'brogi_crires_test', 'air.npy'))
+        xp = np.linspace(0, 1, np.size(airmass))
+        x = np.linspace(0, 1, np.size(orbital_phases))
+        airmass = np.interp(x, xp, airmass)
+        telluric_transmittance = np.exp(
+            np.transpose(np.transpose(
+                np.ones((np.size(orbital_phases), np.size(wavelengths_instrument)))
+                * np.log(telluric_transmittance)
+            ) * airmass)
+        )
+    else:
+        print('No Airmass')
+        airmass = None
 
     if apply_variable_throughput:
         print('Add VT')
@@ -414,6 +428,7 @@ def init_parameters(planet, line_species_str, mode,
             'planet_orbital_inclination': Param(planet.orbital_inclination),
             'orbital_phases': Param(orbital_phases),
             'times': Param(times),
+            'airmass': Param(airmass),
             'instrument_resolving_power': Param(instrument_resolving_power),
             'wavelengths_instrument': Param(wavelengths_instrument),
             'apply_pipeline': Param(apply_pipeline),
@@ -484,6 +499,7 @@ def init_parameters(planet, line_species_str, mode,
         true_parameters['variable_throughput'] = Param(variable_throughput)
         true_parameters['variable_throughput_coefficient'] = Param(np.log10(5e-3))
         true_parameters['telluric_transmittance'] = Param(telluric_transmittance)
+        true_parameters['airmass'] = Param(airmass)
 
         mock_observations = np.ma.asarray(copy.deepcopy(mock_observations_without_noise))
         mock_observations.mask = copy.deepcopy(mock_observations_.mask)
@@ -547,7 +563,7 @@ def init_parameters(planet, line_species_str, mode,
             airmass=airmass,
             times=times,
             mean_subtract=False,
-            median=median
+            mean=median
         )
         # pipeline_noise = 0
 
@@ -658,8 +674,8 @@ def init_parameters(planet, line_species_str, mode,
         print('\tSpectral correction in retrieval model: NONE')
     elif true_parameters['use_true_spectra'].value:
         print('\tSpectral correction in retrieval model: USING TRUE')
-        _, rm, _ = simple_pipeline(true_spectra, times=times)
-        true_parameters['deformation_matrix_approximation'].value[i] = rm
+        _, rm, _ = simple_pipeline(true_spectra, times=times, airmass=airmass)
+        true_parameters['deformation_matrix_approximation'].value = rm
     else:
         print('\tSpectral correction in retrieval model: using current model')
 
@@ -1044,13 +1060,14 @@ def main():
 
     line_species_str = ['CO_all_iso', 'H2O_main_iso']
 
-    retrieval_name = 't0l1_p_kp_vr_CO_H2O_79-80'
+    retrieval_name = 't0l1_vttta_mbrogid_kp_vr_CO_H2O_79-80'
     mode = 'transit'
-    n_live_points = 10
+    n_live_points = 1000
     add_noise = True
     apply_variable_throughput = True
     apply_telluric_transmittance = True
     apply_pipeline = True
+    apply_airmass = True
     median = True
 
     use_true_deformation_matrix = False
@@ -1089,6 +1106,7 @@ def main():
                 retrieval_name, n_live_points, add_noise, band, wavelengths_borders, integration_times_ref,
                 apply_variable_throughput=apply_variable_throughput,
                 apply_telluric_transmittance=apply_telluric_transmittance,
+                apply_airmass=apply_airmass,
                 apply_pipeline=apply_pipeline, load_from=load_from, median=median,
                 use_true_deformation_matrix=use_true_deformation_matrix,
                 deformation_matrix_noise=deformation_matrix_noise,

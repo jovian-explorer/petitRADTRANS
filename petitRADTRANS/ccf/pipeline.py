@@ -308,6 +308,60 @@ def remove_telluric_lines_mean(spectral_data, reduction_matrix, noise=None, mask
     return reduced_spectral_data, reduction_matrix, pipeline_noise
 
 
+def remove_telluric_lines_fit(spectral_data, reduction_matrix, airmass, noise=None, mask_threshold=1e-16, deg=2):
+    """Remove telluric lines with a polynomial function.
+    The telluric transmittance can be written as:
+        T = exp(-airmass * optical_depth),
+    hence the log of the transmittance can be written as a first order polynomial:
+        log(T) ~ b * airmass + a.
+    Using a 1st order polynomial might be not enough, as the atmospheric composition can change slowly over time. Using
+    a second order polynomial, as in:
+        log(T) ~ c * airmass ** 2 + b * airmass + a,
+    might be safer.
+
+    Args:
+        spectral_data:
+        reduction_matrix:
+        airmass:
+        noise:
+        mask_threshold:
+        deg:
+
+    Returns:
+
+    """
+    # print('rm tla')
+    # TODO check if large difference in core of telluric line is expected (improve by mean-removal over time before/after? Better with error propagation?)
+    # TODO compare with Brogi
+    # TODO test with deg=1
+    reduced_spectral_data = copy.deepcopy(spectral_data)
+
+    for i, det in enumerate(spectral_data):
+        log_det_t = np.log(np.transpose(det))
+        telluric_lines_fits = np.zeros(det.shape)
+
+        for k, log_wavelength_column in enumerate(log_det_t):
+            fit_parameters = np.polyfit(x=airmass, y=log_wavelength_column, deg=deg)
+            fit_function = np.poly1d(fit_parameters)
+            telluric_lines_fits[:, k] = fit_function(airmass)
+
+        telluric_lines_fits = np.exp(telluric_lines_fits)
+        telluric_lines_fits = np.ma.masked_where(
+            telluric_lines_fits < mask_threshold, telluric_lines_fits
+        )
+
+        reduced_spectral_data[i, :, :] = det / telluric_lines_fits
+        reduction_matrix[i, :, :] /= telluric_lines_fits
+
+    if noise is not None:
+        # TODO add proper noise
+        pipeline_noise = copy.copy(noise)
+    else:
+        pipeline_noise = copy.copy(noise)
+
+    return reduced_spectral_data, reduction_matrix, pipeline_noise
+
+
 def remove_telluric_lines(spectral_data, reduction_matrix, airmass=None, times=None):
     """Correct for Earth's atmospheric absorptions.
 
@@ -424,7 +478,7 @@ def remove_noisy_wavelength_channels(spectral_data, reduction_matrix, mean_subtr
 
 def simple_pipeline(spectral_data, airmass=None, times=None, data_noise=None,
                     throughput_correction_lower_bound=0.70, throughput_correction_upper_bound=None,
-                    mean_subtract=False, median=False):
+                    mean_subtract=False, mean=False):
     """Removes the telluric lines and variable throughput of some data.
 
     Args:
@@ -458,19 +512,26 @@ def simple_pipeline(spectral_data, airmass=None, times=None, data_noise=None,
         data_noise=data_noise,
         throughput_correction_lower_bound=throughput_correction_lower_bound,
         throughput_correction_upper_bound=throughput_correction_upper_bound,
-        mean=median
+        mean=mean
     )
     # return spectral_data_corrected, reduction_matrix, pipeline_noise
 
     # print('rm tl')
-    spectral_data_corrected, reduction_matrix, _ = remove_telluric_lines_mean(
-        spectral_data=spectral_data_corrected,
-        reduction_matrix=reduction_matrix,  # TODO separate the 2 reduction matrices?
-        noise=None,
-        mask_threshold=0.1
-        # airmass=airmass,
-        # times=times
-    )
+    if airmass is None:
+        spectral_data_corrected, reduction_matrix, _ = remove_telluric_lines_mean(
+            spectral_data=spectral_data_corrected,
+            reduction_matrix=reduction_matrix,  # TODO separate the 2 reduction matrices?
+            noise=data_noise,
+            mask_threshold=1e-16
+        )
+    else:
+        spectral_data_corrected, reduction_matrix, _ = remove_telluric_lines_fit(
+            spectral_data=spectral_data_corrected,
+            reduction_matrix=reduction_matrix,
+            airmass=airmass,
+            noise=data_noise,
+            mask_threshold=1e-16
+        )
 
     return spectral_data_corrected, reduction_matrix, pipeline_noise
 
