@@ -175,6 +175,59 @@ def number_to_mass(n_fracs):
         m_frac[key] = value*getMM(spec)/MMW
     return m_frac
 
+def teff_calc(waves,model,dist=1.0,r_pl=1.0):
+    """
+    This function takes in the wavelengths and flux of a model
+    in units of W/m2/micron and calculates the effective temperature
+    by integrating the model and using the stefan boltzmann law.
+    Args:
+        waves : numpy.ndarray
+            Wavelength grid in units of micron
+        model : numpy.ndarray
+            Flux density grid in units of W/m2/micron
+        dist : Optional(float)
+            Distance to the object. Must have same units as r_pl
+        r_pl : Optional(float)
+            Object radius. Must have same units as dist
+    """
+    import astropy.units as u
+    import astropy.constants as c
+    def integ(waves,model):
+        return np.sum(model[:-1]*((dist/r_pl)**2.)*(u.W/u.m**2/u.micron)* np.diff(waves)*u.micron)
+
+    energy = integ(waves,model)
+    #print(energy)
+    summed = ((energy /c.sigma_sb))
+    #print(summed)
+    return (summed.value)**0.25
+
+def bin_species_exok(species,resolution):
+    """
+    This function uses exo-k to bin the c-k table of a
+    single species to a desired (lower) spectral resolution.
+
+    Args:
+        species : string
+            The name of the species
+        resolution : int
+            The desired spectral resolving power.
+    """
+    from petitRADTRANS import Radtrans
+    prt_path = os.environ.get("pRT_input_data_path")
+    atmosphere = Radtrans(line_species = species,
+                            wlen_bords_micron = [0.1, 251.])
+    ck_path = prt_path + '/opacities/lines/corr_k/'
+    print("Saving to " + ck_path)
+    print("Resolution: ", resolution)
+    masses = {}
+    for spec in species:
+        masses[spec.split('_')[0]] = getMM(spec)
+    atmosphere.write_out_rebin(int(resolution),
+                                path = ck_path,
+                                species = species,
+                                masses = masses)
+    return
+
 ########################
 # File Formatting
 ########################

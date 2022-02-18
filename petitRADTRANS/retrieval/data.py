@@ -84,6 +84,7 @@ class Data:
                  model_generating_function = None,
                  wlen_range_micron = None,
                  scale = False,
+                 scale_err = False,
                  wlen_bins = None,
                  photometry = False,
                  photometric_transformation_function = None,
@@ -136,6 +137,8 @@ class Data:
         self.inv_cov = None
         self.flux_error = None
         self.scale = scale
+        self.scale_err = scale_err
+
         self.scale_factor = 1.0
 
         # Bins and photometry
@@ -264,6 +267,11 @@ class Data:
         self.distance = distance
         return self.distance
 
+    def update_bins(self,wlens):
+        self.wlen_bins = np.zeros_like(wlens)
+        self.wlen_bins[:-1] = np.diff(wlens)
+        self.wlen_bins[-1] = self.wlen_bins[-2]
+
     def scale_to_distance(self, new_dist):
         """
         Updates the distance variable in the data class.
@@ -305,30 +313,32 @@ class Data:
         """
 
         if plotting:
-            import pylab as plt
+            import matplotlib.pyplot as plt
         # Convolve to data resolution
         if self.data_resolution is not None:
-            spectrum_model = self.convolve(wlen_model, \
-                        spectrum_model, \
-                        self.data_resolution)
+            spectrum_model = self.convolve(wlen_model,
+                                           spectrum_model,
+                                           self.data_resolution)
 
         if not self.photometry:
             # Rebin to model observation
-            flux_rebinned = rebin_give_width(wlen_model, \
-                                            spectrum_model, \
-                                            self.wlen, \
-                                            self.wlen_bins)
+            flux_rebinned = rebin_give_width(wlen_model,
+                                             spectrum_model,
+                                             self.wlen,
+                                             self.wlen_bins)
         else:
             flux_rebinned = \
-                self.photometric_transformation_function(wlen_model, \
-                                                spectrum_model)
+                self.photometric_transformation_function(wlen_model,
+                                                         spectrum_model)
             # species spectrum_to_flux functions return (flux,error)
             if isinstance(flux_rebinned,(tuple,list)):
                 flux_rebinned = flux_rebinned[0]
 
 
         diff = (flux_rebinned - self.flux*self.scale_factor)
-        f_err = self.flux_error*self.scale_factor
+        f_err = self.flux_error
+        if self.scale_err:
+            f_err = self.flux_error*self.scale_factor
         logL=0.0
         if self.covariance is not None:
             logL += -1*np.dot(diff, np.dot(self.inv_cov, diff))/2.
@@ -337,10 +347,10 @@ class Data:
         if plotting:
             if not self.photometry:
                 plt.plot(self.wlen, flux_rebinned)
-                plt.errorbar(self.wlen, \
-                                self.flux*self.scale_factor, \
-                                yerr = f_err, \
-                                fmt = '+')
+                plt.errorbar(self.wlen,
+                             self.flux*self.scale_factor,
+                             yerr = f_err,
+                             fmt = '+')
                 plt.show()
         return logL
 

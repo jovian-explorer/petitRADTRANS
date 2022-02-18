@@ -1248,97 +1248,111 @@ end subroutine calc_cloud_opas
 
 !!$ Subroutine to calculate cloud opacities
 subroutine calc_hansen_opas(rho,rho_p,cloud_mass_fracs,a_h,b_h,cloud_rad_bins, &
-   cloud_radii,cloud_lambdas,cloud_specs_abs_opa,cloud_specs_scat_opa,cloud_aniso, &
+   cloud_radii,cloud_specs_abs_opa,cloud_specs_scat_opa,cloud_aniso, &
    cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT, &
    struc_len,N_cloud_spec,N_cloud_rad_bins, N_cloud_lambda_bins)
+   ! """
+   ! Subroutine to calculate cloud opacities.
+   ! """
+   use constants_block
+   implicit none
 
-  use constants_block
-  implicit none
+   integer, intent(in) :: struc_len, N_cloud_spec, N_cloud_rad_bins, N_cloud_lambda_bins
+   double precision, intent(in) :: rho(struc_len), rho_p(N_cloud_spec)
+   double precision, intent(in) :: cloud_mass_fracs(struc_len,N_cloud_spec), &
+         a_h(struc_len,N_cloud_spec), b_h(struc_len,N_cloud_spec)
+   double precision, intent(in) :: cloud_rad_bins(N_cloud_rad_bins+1), cloud_radii(N_cloud_rad_bins)
+   double precision, intent(in) :: cloud_specs_abs_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
+         cloud_specs_scat_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
+         cloud_aniso(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec)
+   double precision, intent(out) :: cloud_abs_opa_TOT(N_cloud_lambda_bins,struc_len), &
+         cloud_scat_opa_TOT(N_cloud_lambda_bins,struc_len), &
+         cloud_red_fac_aniso_TOT(N_cloud_lambda_bins,struc_len)
 
-  ! I/O
-  INTEGER, intent(in) :: struc_len, N_cloud_spec, N_cloud_rad_bins, N_cloud_lambda_bins
-  DOUBLE PRECISION, intent(in) :: rho(struc_len), rho_p(N_cloud_spec)
-  DOUBLE PRECISION, intent(in) :: cloud_mass_fracs(struc_len,N_cloud_spec), &
-       a_h(struc_len,N_cloud_spec), b_h(struc_len,N_cloud_spec)
-  DOUBLE PRECISION, intent(in) :: cloud_rad_bins(N_cloud_rad_bins+1), cloud_radii(N_cloud_rad_bins), &
-       cloud_lambdas(N_cloud_lambda_bins)
-  DOUBLE PRECISION, intent(in) :: cloud_specs_abs_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
-       cloud_specs_scat_opa(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec), &
-       cloud_aniso(N_cloud_rad_bins,N_cloud_lambda_bins,N_cloud_spec)
+   integer :: i_struc, i_spec, i_lamb, i_cloud
+   double precision :: N, dndr(N_cloud_rad_bins), integrand_abs(N_cloud_rad_bins), mass_to_vol, &
+         integrand_scat(N_cloud_rad_bins), add_abs, add_scat, integrand_aniso(N_cloud_rad_bins), add_aniso, &
+         dndr_scale
 
-  DOUBLE PRECISION, intent(out) :: cloud_abs_opa_TOT(N_cloud_lambda_bins,struc_len), &
-       cloud_scat_opa_TOT(N_cloud_lambda_bins,struc_len), &
-       cloud_red_fac_aniso_TOT(N_cloud_lambda_bins,struc_len)
+   cloud_abs_opa_TOT = 0d0
+   cloud_scat_opa_TOT = 0d0
+   cloud_red_fac_aniso_TOT = 0d0
 
+   do i_struc = 1, struc_len
+         do i_spec = 1, N_cloud_spec
+            do i_lamb = 1, N_cloud_lambda_bins
+               mass_to_vol = 0.75d0 * cloud_mass_fracs(i_struc, i_spec) * rho(i_struc) / pi / rho_p(i_spec)
 
-  ! internal
-  INTEGER :: i_struc, i_spec, i_lamb, i_cloud
-  DOUBLE PRECISION :: N, dndr(N_cloud_rad_bins), integrand_abs(N_cloud_rad_bins), mass_to_vol, &
-       integrand_scat(N_cloud_rad_bins), add_abs, add_scat, integrand_aniso(N_cloud_rad_bins), add_aniso, &
-       hansen_size_nr, dndr_scale
+               N = mass_to_vol / (&
+                     a_h(i_struc, i_spec) ** 3d0 * (b_h(i_struc,i_spec) -1d0) &
+                     * (2d0 * b_h(i_struc,i_spec) - 1d0) &
+               )
+               dndr_scale = &
+                     log(N) + log(a_h(i_struc, i_spec) * b_h(i_struc, i_spec)) &
+                        * ((2d0 * (b_h(i_struc, i_spec)) - 1d0) / b_h(i_struc, i_spec)) &
+                        - log(gamma((1d0 - 2d0 * b_h(i_struc, i_spec)) / b_h(i_struc, i_spec)))
 
-  !~~~~~~~~~~~~~~~~
+               do i_cloud = 1, N_cloud_rad_bins
+                     dndr(i_cloud) = dndr_scale + hansen_size_nr(&
+                        cloud_radii(i_cloud), &
+                        a_h(i_struc,i_spec), &
+                        b_h(i_struc,i_spec) &
+                     )
+               end do
 
-  cloud_abs_opa_TOT = 0d0
-  cloud_scat_opa_TOT = 0d0
-  cloud_red_fac_aniso_TOT = 0d0
+               dndr = exp(dndr)
 
-  do i_struc = 1, struc_len
-     do i_spec = 1, N_cloud_spec
+               integrand_abs = 0.75d0 * pi * cloud_radii ** 3d0 * rho_p(i_spec) * dndr &
+                     * cloud_specs_abs_opa(:,i_lamb,i_spec)
+               integrand_scat = 0.75d0 * pi * cloud_radii ** 3d0 * rho_p(i_spec) * dndr &
+                     * cloud_specs_scat_opa(:,i_lamb,i_spec)
+               integrand_aniso = integrand_scat * (1d0 - cloud_aniso(:, i_lamb, i_spec))
 
-           do i_lamb = 1, N_cloud_lambda_bins
+               add_abs = sum(&
+                     integrand_abs &
+                     * (cloud_rad_bins(2:N_cloud_rad_bins + 1) - cloud_rad_bins(1:N_cloud_rad_bins)) &
+               )
+               cloud_abs_opa_TOT(i_lamb,i_struc) = cloud_abs_opa_TOT(i_lamb, i_struc) + add_abs
 
-              mass_to_vol= 3d0*cloud_mass_fracs(i_struc,i_spec)*rho(i_struc)/4d0/pi/rho_p(i_spec)
+               add_scat = sum(&
+                     integrand_scat &
+                     * (cloud_rad_bins(2:N_cloud_rad_bins + 1) - cloud_rad_bins(1:N_cloud_rad_bins)) &
+               )
+               cloud_scat_opa_TOT(i_lamb, i_struc) = cloud_scat_opa_TOT(i_lamb, i_struc) + add_scat
 
-              N = mass_to_vol/((a_h(i_struc,i_spec)**3d0) *(b_h(i_struc,i_spec) -1d0)*&
-                               ((2d0*b_h(i_struc,i_spec)) -1d0))
-              dndr_scale = N * (a_h(i_struc,i_spec)*b_h(i_struc,i_spec))**((2d0*(b_h(i_struc,i_spec))&
-                                 - 1d0)/(b_h(i_struc,i_spec))) /gamma((1d0-(2d0*(b_h(i_struc,i_spec))))/&
-                                 (b_h(i_struc,i_spec)))
-              do i_cloud = 1, N_cloud_rad_bins
-                 dndr(i_cloud) =  dndr_scale * hansen_size_nr(cloud_radii(i_cloud),a_h(i_struc,i_spec),&
-                                                              b_h(i_struc,i_spec))
-              end do
-              integrand_abs = 4d0*pi/3d0*cloud_radii**3d0*rho_p(i_spec)*dndr* &
-                   cloud_specs_abs_opa(:,i_lamb,i_spec)
-              integrand_scat = 4d0*pi/3d0*cloud_radii**3d0*rho_p(i_spec)*dndr* &
-                   cloud_specs_scat_opa(:,i_lamb,i_spec)
-              integrand_aniso = integrand_scat*(1d0-cloud_aniso(:,i_lamb,i_spec))
+               add_aniso = sum(&
+                     integrand_aniso &
+                     * (cloud_rad_bins(2:N_cloud_rad_bins+1) - cloud_rad_bins(1:N_cloud_rad_bins)) &
+               )
+               cloud_red_fac_aniso_TOT(i_lamb, i_struc) = &
+                     cloud_red_fac_aniso_TOT(i_lamb, i_struc) + add_aniso
+            end do
+         end do
 
-              add_abs = sum(integrand_abs*(cloud_rad_bins(2:N_cloud_rad_bins+1)- &
-                   cloud_rad_bins(1:N_cloud_rad_bins)))
-              cloud_abs_opa_TOT(i_lamb,i_struc) = cloud_abs_opa_TOT(i_lamb,i_struc) + &
-                   add_abs
+         do i_lamb = 1, N_cloud_lambda_bins
+            if (cloud_scat_opa_TOT(i_lamb,i_struc) > 1d-200) then
+               cloud_red_fac_aniso_TOT(i_lamb, i_struc) = &
+                     cloud_red_fac_aniso_TOT(i_lamb, i_struc) / cloud_scat_opa_TOT(i_lamb, i_struc)
+            else
+               cloud_red_fac_aniso_TOT(i_lamb, i_struc) = 0d0
+            end if
+         end do
 
-              add_scat = sum(integrand_scat*(cloud_rad_bins(2:N_cloud_rad_bins+1)- &
-                   cloud_rad_bins(1:N_cloud_rad_bins)))
-              cloud_scat_opa_TOT(i_lamb,i_struc) = cloud_scat_opa_TOT(i_lamb,i_struc) + &
-                   add_scat
+         cloud_abs_opa_TOT(:, i_struc) = cloud_abs_opa_TOT(:, i_struc) / rho(i_struc)
+         cloud_scat_opa_TOT(:, i_struc) = cloud_scat_opa_TOT(:, i_struc) / rho(i_struc)
+   end do
 
-              add_aniso = sum(integrand_aniso*(cloud_rad_bins(2:N_cloud_rad_bins+1)- &
-                   cloud_rad_bins(1:N_cloud_rad_bins)))
-              cloud_red_fac_aniso_TOT(i_lamb,i_struc) = cloud_red_fac_aniso_TOT(i_lamb,i_struc) + &
-                   add_aniso
+   contains
+         function hansen_size_nr(r,a,b)
+            implicit none
 
-           end do
+            double precision :: r, a, b
+            double precision :: hansen_size_nr
 
-     end do
-
-     do i_lamb = 1, N_cloud_lambda_bins
-        if (cloud_scat_opa_TOT(i_lamb,i_struc) > 1d-200) then
-           cloud_red_fac_aniso_TOT(i_lamb,i_struc) = cloud_red_fac_aniso_TOT(i_lamb,i_struc)/ &
-                     cloud_scat_opa_TOT(i_lamb,i_struc)
-        else
-           cloud_red_fac_aniso_TOT(i_lamb,i_struc) = 0d0
-        end if
-     end do
-
-     cloud_abs_opa_TOT(:,i_struc) = cloud_abs_opa_TOT(:,i_struc)/rho(i_struc)
-     cloud_scat_opa_TOT(:,i_struc) = cloud_scat_opa_TOT(:,i_struc)/rho(i_struc)
-
-  end do
-
+            hansen_size_nr = log(r) * (1d0 - 3d0 * b) / b - 1d0 * r / (a * b)
+         end function hansen_size_nr
 end subroutine calc_hansen_opas
+
 !!$ #########################################################################
 !!$ #########################################################################
 !!$ #########################################################################
@@ -1994,6 +2008,132 @@ subroutine combine_opas_sample_ck(line_struc_kappas, g_gauss, weights, &
 
 end subroutine combine_opas_sample_ck
 
+
+
+! Implementation of linear interpolation function
+! Takes arrays of points in x and y, together with an
+! array of output points. Interpolates to find
+! the output y-values.
+subroutine linear_interpolate(x,y,x_out,input_len,output_len,y_out)
+
+   implicit none
+
+   ! inputs
+   DOUBLE PRECISION, INTENT(IN) :: x(input_len), y(input_len), x_out(output_len)
+   INTEGER, INTENT(IN) :: input_len, output_len
+
+   ! outputs
+   DOUBLE PRECISION, INTENT(INOUT) :: y_out(output_len)
+
+   ! internal
+   INTEGER :: i, interp_ind(output_len)
+   DOUBLE PRECISION :: dx, dy, delta_x
+   call search_intp_ind(x, input_len, x_out, output_len, interp_ind)
+   do i = 1, output_len
+      dy = y(interp_ind(i)+1)-y(interp_ind(i))
+      dx = x(interp_ind(i)+1)-x(interp_ind(i))
+      delta_x = x_out(i) - x(interp_ind(i))
+      y_out(i) = y(interp_ind(i)) + ((dy/dx)*delta_x)
+   enddo
+end subroutine linear_interpolate
+
+
+
+
+! Subroutine to completely mix the c-k opacities
+subroutine combine_opas_ck(line_struc_kappas, g_gauss, weights, &
+   g_len, freq_len, N_species, struc_len, line_struc_kappas_out)
+
+   implicit none
+
+   INTEGER, INTENT(IN)          :: g_len, freq_len, N_species, struc_len
+   DOUBLE PRECISION, INTENT(IN) :: line_struc_kappas(g_len, freq_len, &
+      N_species, struc_len), g_gauss(g_len), weights(g_len)
+   DOUBLE PRECISION, INTENT(OUT) :: line_struc_kappas_out(g_len, freq_len, &
+      struc_len)
+
+   ! Internal
+   INTEGER          :: i_freq, i_spec, i_struc, i_samp, i_g, j_g, nsample
+   DOUBLE PRECISION :: cum_sum, g_out(g_len*g_len+1), k_out(g_len*g_len+1), &
+      g_presort(g_len*g_len+1), sampled_opa_weights(g_len*g_len, 2), &
+      spec2(g_len), threshold(freq_len, struc_len)
+
+   nsample = g_len*g_len
+
+
+   ! In every layer and frequency bin:
+   ! find the species with the largest kappa(g=0) value,
+   ! save that value.
+   do i_struc = 1, struc_len
+      do i_freq = 1, freq_len
+         threshold(i_freq, i_struc) = MAXVAL(line_struc_kappas(1, i_freq, :, i_struc))
+      end do
+   end do
+
+   ! This is for the everything-with-everything combination, if only two species
+   ! get combined. Only need to do this here once.
+   do i_g = 1, g_len
+      do j_g = 1, g_len
+         g_presort((i_g-1)*g_len+j_g) = weights(i_g) * weights(j_g)
+      end do
+   end do
+   ! Here we'll loop over every entry, mix and add the kappa values,
+   ! calculate the g-weights and then interpolate back to the standard
+   ! g-grid.
+   line_struc_kappas_out = line_struc_kappas(:,:,1,:)
+   if (N_species > 1) then
+      do i_struc = 1, struc_len
+         do i_freq = 1, freq_len
+            do i_spec = 2, N_species
+               if (line_struc_kappas(g_len, i_freq, i_spec, i_struc) < &
+                  threshold(i_freq, i_struc)*1d-2) then
+                     cycle
+               endif
+               spec2 = line_struc_kappas(:, i_freq, i_spec, i_struc)
+
+               k_out = 0d0
+               do i_g = 1, g_len
+                  do j_g = 1, g_len
+                        k_out((i_g-1)*g_len+j_g) = line_struc_kappas_out(i_g, i_freq, i_struc) + spec2(j_g)
+                  end do
+               end do
+
+               sampled_opa_weights(:,1) = k_out(1:nsample)
+               sampled_opa_weights(:,2) = g_presort(1:nsample)
+
+               call wrap_quicksort_swap(nsample, sampled_opa_weights)
+
+               sampled_opa_weights(:, 2) = &
+                        sampled_opa_weights(:, 2) / &
+                        SUM(sampled_opa_weights(:, 2))
+
+               g_out = 0d0
+               cum_sum = 0d0
+               do i_samp = 1, nsample
+                  g_out(i_samp) = &
+                        sampled_opa_weights(i_samp, 2)/2d0 + &
+                           cum_sum
+                  cum_sum = cum_sum + &
+                        sampled_opa_weights(i_samp, 2)
+               end do
+
+               g_out(nsample+1) = 1d0
+
+               k_out(1:nsample) = sampled_opa_weights(:, 1)
+               k_out(1) = line_struc_kappas_out(1, i_freq, i_struc) + spec2(1)
+               k_out(nsample+1) = line_struc_kappas_out(g_len, i_freq, i_struc) + spec2(g_len)
+
+               ! Linearly interpolate back to the 16-point grid, storing in the output array
+               call linear_interpolate(g_out, k_out, g_gauss, nsample+1, g_len, &
+                                       line_struc_kappas_out(:, i_freq, i_struc))
+            end do
+         end do
+      end do
+
+   endif
+end subroutine combine_opas_ck
+
+
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2138,7 +2278,7 @@ subroutine feautrier_rad_trans(border_freqs, &
   ! END PAUL NEW
 
   GCM_read = .FALSE.
-  iter_scat = 100
+  iter_scat = 1000
   source = 0d0
   flux_old = 0d0
   flux = 0d0
@@ -2407,7 +2547,7 @@ subroutine feautrier_rad_trans(border_freqs, &
     end if
 
     conv_val = MAXVAL(ABS((flux-flux_old)/flux))
-    if ((conv_val < 1d-2) .AND. (i_iter_scat > 9)) then
+    if ((conv_val < 1d-3) .AND. (i_iter_scat > 9)) then
         exit
     end if
 

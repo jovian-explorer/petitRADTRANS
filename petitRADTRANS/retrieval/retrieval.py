@@ -20,6 +20,7 @@ from .parameter import Parameter
 from .data import Data
 from .plotting import plot_specs,plot_data,contour_corner
 from .rebin_give_width import rebin_give_width as rgw
+from .util import bin_species_exok
 
 class Retrieval:
     """
@@ -50,6 +51,10 @@ class Retrieval:
             List of additional retrieval names that should be included in the corner plot.
         short_names : List(Str)
             For each corner_plot_name, a shorter name to be included when plotting.
+        pRT_plot_style : Bool
+            Use the petitRADTRANS plotting style as described in plot_style.py. Recommended to
+            turn this parameter to false if you want to use interactive plotting, or if the
+            test_plotting parameter is True.
     """
 
     def __init__(self,
@@ -66,9 +71,11 @@ class Retrieval:
                  corner_plot_names = None,
                  short_names = None,
                  pRT_plot_style = True):
+
         self.rd = run_definition
+        print(f"Starting retrieval {self.rd.retrieval_name}")
         if len(self.rd.line_species) < 1:
-            logging.error("There are no line species present in the run definition!")
+            logging.warning("There are no line species present in the run definition!")
 
         # Maybe inherit from retrieval config class?
         self.retrieval_name = self.rd.retrieval_name
@@ -92,7 +99,7 @@ class Retrieval:
         self.best_fit_params = {}
         self.posterior_sample_specs = {}
         self.plotting = test_plotting
-        self.PT_plot_mode = test_plotting
+        self.PT_plot_mode = False
         self.evaluate_sample_spectra = sample_spec
 
         # Pymultinest stuff
@@ -107,6 +114,7 @@ class Retrieval:
         # Set up pretty plotting
         if pRT_plot_style:
             import petitRADTRANS.retrieval.plot_style
+        self.prt_plot_style =pRT_plot_style
         # Path to input opacities
         self.path = os.environ.get("pRT_input_data_path")
         if self.path is None:
@@ -128,23 +136,31 @@ class Retrieval:
         # Setup pRT Objects for each data structure.
         print("Setting up PRT Objects")
         self.setup_data()
-        self.generate_retrieval_summary()
+        try:
+            self.generate_retrieval_summary()
+        except:
+            print("Could not generate summary file!")
+
 
     def run(self,
             sampling_efficiency = 0.8,
             const_efficiency_mode = True,
             n_live_points = 4000,
             log_z_convergence = 0.5,
-            step_sampler = True,
+            step_sampler = False,
             warmstart_max_tau=0.5,
-            resume = True):
+            n_iter_before_update=50,
+            resume = True,
+            max_iter = 0):
         """
         Run mode for the class. Uses pynultinest to sample parameter space
         and produce standard PMN outputs.
 
         Args:
             sampling_efficiency : Float
-                pymultinest sampling efficiency
+                pymultinest sampling efficiency. If const efficiency mode is true, should be set to around
+                0.05. Otherwise, it should be around 0.8 for parameter estimation and 0.3 for evidence
+                comparison.
             const_efficiency_mode : Bool
                 pymultinest constant efficiency mode
             n_live_points : Int
@@ -154,6 +170,8 @@ class Retrieval:
                 If ultranest is being used, the convergence criterion on log z.
             step_sampler : bool
                 Use a step sampler to improve the efficiency in ultranest.
+            warmstart_max_tau : float
+                Warm start allows accelerated computation based on a different but similar UltraNest run.
             resume : bool
                 Continue existing retrieval. If FALSE THIS WILL OVERWRITE YOUR EXISTING RETRIEVAL.
         """
@@ -174,9 +192,11 @@ class Retrieval:
                                 log_z_convergence,
                                 step_sampler,
                                 warmstart_max_tau,
-                                resume)
+                                resume,
+                                max_iter)
             return
-
+        if const_efficiency_mode and sampling_efficiency > 0.1:
+            logging.warning("Sampling efficiency should be ~ 0.05 if you're using constant efficiency mode!")
         prefix = self.output_dir + 'out_PMN/'+self.retrieval_name+'_'
 
         if len(self.output_dir + 'out_PMN/') > 100:
@@ -202,8 +222,10 @@ class Retrieval:
                             verbose = True,
                             sampling_efficiency = sampling_efficiency,
                             const_efficiency_mode = const_efficiency_mode,
+                            evidence_tolerance = log_z_convergence,
                             n_live_points = n_live_points,
-                            n_iter_before_update = 10)
+                            n_iter_before_update = n_iter_before_update,
+                            max_iter = max_iter)
         self.analyzer = pymultinest.Analyzer(n_params = n_params,
                                              outputfiles_basename = prefix)
         s = self.analyzer.get_stats()
@@ -232,7 +254,8 @@ class Retrieval:
                        log_z_convergence = 0.5,
                        step_sampler = True,
                        warmstart_max_tau=0.5,
-                       resume = True):
+                       resume = True,
+                       max_iter = 0):
         """
         Run mode for the class. Uses ultranest to sample parameter space
         and produce standard outputs.
@@ -266,13 +289,15 @@ class Retrieval:
                     free_parameter_names.append(self.parameters[pp].name)
                     n_params += 1
 
-
+            if max_iter is 0:
+                max_iter = None
             sampler = un.ReactiveNestedSampler(free_parameter_names,
                                                self.log_likelihood,
                                                self.prior_ultranest,
                                                log_dir=self.output_dir + "out_" + self.retrieval_name,
                                                warmstart_max_tau=warmstart_max_tau,
-                                               resume=resume)
+                                               resume=resume,
+                                               max_iters = max_iter)
             if step_sampler:
                 try:
                     import ultranest.stepsampler
@@ -387,6 +412,8 @@ class Retrieval:
                     out = value.value
                     if self.parameters[key].corner_transform is not None:
                         out = self.parameters[key].corner_transform(out)
+                    if out is None:
+                        continue
                     fmt = '%.3f' % out
                     summary.write("    " +key + " = " + fmt + '\n')
 
@@ -404,7 +431,7 @@ class Retrieval:
             width : int
                 The number of cells in the low pressure grid to replace with the high resolution grid.
         """
-
+        exo_k_check = False
         for name,dd in self.data.items():
             # Only create if there's no other data
             # object using the same pRT object
@@ -420,21 +447,11 @@ class Retrieval:
                             species.append(line)
                     # If not, setup low-res c-k tables
                     if len(species)>0:
-                        from .util import getMM
+                        exo_k_check = True
+                        print("Exo-k should only be run on a single thread.")
+                        print("The retrieval should be run once on a single core to build the c-k\ntables, and then again with multiple cores for the remainder of the retrieval.")
                         # Automatically build the entire table
-                        atmosphere = Radtrans(line_species = species,
-                                                wlen_bords_micron = [0.1, 251.])
-                        prt_path = self.path
-                        ck_path = prt_path + 'opacities/lines/corr_k/'
-                        print("Saving to " + ck_path)
-                        print("Resolution: ", dd.model_resolution)
-                        masses = {}
-                        for spec in species:
-                            masses[spec.split('_')[0]] = getMM(spec)
-                        atmosphere.write_out_rebin(int(dd.model_resolution),
-                                                    path = ck_path,
-                                                    species = species,
-                                                    masses = masses)
+                        bin_species_exok(species,dd.model_resolution)
                     species = []
                     for spec in self.rd.line_species:
                         species.append(spec + "_R_" + str(dd.model_resolution))
@@ -463,6 +480,12 @@ class Retrieval:
                     p = self.rd.p_global
                 rt_object.setup_opa_structure(p)
                 dd.pRT_object = rt_object
+        if exo_k_check:
+            # Sorry that we have to do this, not sure how to use mpi4py to run the
+            # exo-k in a single thread.
+            print("c-k tables have been binned with exo-k. Exiting single-core process.")
+            print("Please restart the retrieval.")
+            sys.exit(12)
 
     def prior(self, cube, ndim=0, nparams=0):
         """
@@ -537,15 +560,9 @@ class Retrieval:
                     # Sanity checks on outputs
                     #print(spectrum_model)
                     if spectrum_model is None:
-                        if self.ultranest:
-                            return -1e99
-                        else:
-                            return -np.inf
+                        return -1e99
                     if np.isnan(spectrum_model).any():
-                        if self.ultranest:
-                            return -1e99
-                        else:
-                            return -np.inf
+                        return -1e99
                     log_likelihood += dd.get_chisq(wlen_model,
                                             spectrum_model,
                                             self.plotting)
@@ -583,7 +600,11 @@ class Retrieval:
                         log_likelihood += dede.get_chisq(wlen_model, \
                                         spectrum_model, \
                                         self.plotting)
-        #print(log_likelihood)
+        #print(log_likelihood+log_prior)
+        if log_likelihood + log_prior < -9e99:
+            return -1e99
+        if np.abs(log_likelihood + log_prior) < 1e-99:
+            return -1e-99
         if self.ultranest and np.isinf(log_likelihood+log_prior):
             return -1e99
         return log_likelihood + log_prior
@@ -661,17 +682,7 @@ class Retrieval:
             parameters_read : list
                 A list of the free parameters as read from the output files.
         """
-
-        i_p = 0
-        for pp in self.parameters:
-            if self.parameters[pp].is_free_parameter:
-                for i_s in range(len(parameters_read)):
-                    if parameters_read[i_s] == self.parameters[pp].name:
-                        self.best_fit_params[self.parameters[pp].name] = \
-                            Parameter(pp,False,value=best_fit_params[i_p])
-                        i_p += 1
-            else:
-                self.best_fit_params[pp] = Parameter(pp,False,value=self.parameters[pp].value)
+        self.best_fit_params = self.build_param_dict(best_fit_params,parameters_read)
         return self.best_fit_params
 
     def get_best_fit_model(self,best_fit_params,parameters_read,model_generating_func = None,ret_name = None):
@@ -725,6 +736,9 @@ class Retrieval:
                             do_scat_emis = self.rd.scattering)
         if self.rd.AMR:
             p = self.rd._setup_pres()
+            self.best_fit_params["pressure_scaling"] = self.parameters["pressure_scaling"]
+            self.best_fit_params["pressure_width"] = self.parameters["pressure_width"]
+            self.best_fit_params["pressure_simple"] = self.parameters["pressure_simple"]
         else:
             p = self.rd.p_global
         bf_prt.setup_opa_structure(p)
@@ -839,10 +853,128 @@ class Retrieval:
         if ret_name == self.retrieval_name:
             self.analyzer = analyzer
         return analyzer
+    def build_param_dict(self,sample,free_param_names):
+        """
+        This function builds a dictionary of parameters that can be passed to the
+        model building functions. It requires a numpy array with the same length
+        as the number of free parameters, and a list of all of the parameter names
+        in the order they appear in the array. The returned dictionary will contain
+        all of these parameters, together with the fixed retrieval parameters.
+
+        Args:
+            sample : numpy.ndarray
+                An array or list of free parameter values
+            free_param_names : list(string)
+                A list of names for each of the free parameters.
+        Returns:
+            params : dict
+                A dictionary of Parameters, with values set to the values
+                in sample.
+        """
+        params = {}
+        i_p = 0
+        for pp in self.parameters:
+            if self.parameters[pp].is_free_parameter:
+                for i_s in range(len(free_param_names)):
+                    if free_param_names[i_s] == self.parameters[pp].name:
+                        params[self.parameters[pp].name] = \
+                            Parameter(pp,False,value=sample[i_p])
+                        i_p += 1
+            else:
+                params[pp] = Parameter(pp,False,value=self.parameters[pp].value)
+        return params
+
+    def sample_teff(self,sample_dict,param_dict,ret_names = None,nsample = None,resolution=40):
+        """
+        This function samples the outputs of a retrieval and computes Teff
+        for each sample. For each sample, a model is computed at low resolution,
+        and integrated to find the total radiant emittance, which is converted into
+        a temperature using the stefan boltzmann law: $j^{\star} = \sigma T^{4}$.
+        Teff itself is computed using util.calc_teff.
+
+        Args:
+            sample_dict : dict
+                A dictionary, where each key is the name of a retrieval, and the values
+                are the equal weighted samples.
+            param_dict : dict
+                A dictionary where each key is the name of a retrieval, and the values
+                are the names of the free parameters associated with that retrieval.
+            ret_names : Optional(list(string))
+                A list of retrieval names, each should be included in the sample_dict.
+                If left as none, it defaults to only using the current retrieval name.
+            nsample : Optional(int)
+                The number of times to compute Teff. If left empty, uses the "take_PTs_from"
+                plot_kwarg. Recommended to use ~300 samples, probably more than is set in
+                the kwarg!
+            resolution : int
+                The spectra resolution to compute the models at. Typically, this should be very
+                low in order to enable rapid calculation.
+        Returns:
+            tdict : dict
+                A dictionary with retrieval names for keys, and the values are the calculated
+                values of Teff for each sample.
+        """
+        from .util import teff_calc
+        if ret_names is None:
+            ret_names = [self.retrieval_name]
+        if nsample is None:
+            nsample = self.rd.plot_kwargs["nsample"]
+
+        # Setup the pRT object
+        species = []
+        for line in self.rd.line_species:
+            if not os.path.isdir(self.path + "opacities/lines/corr_k/" +\
+                                 line + "_R_" + \
+                                 str(resolution)):
+                species.append(line)
+        # If not, setup low-res c-k tables
+        if len(species)>0:
+            exo_k_check = True
+            print("Exo-k should only be run on a single thread.")
+            print("The retrieval should be run once on a single core to build the c-k\ntables, and then again with multiple cores for the remainder of the retrieval.")
+            # Automatically build the entire table
+            bin_species_exok(species,resolution)
+        species = []
+        for spec in self.rd.line_species:
+            species.append(spec + "_R_" + str(resolution))
+
+        pRT_Object = Radtrans(line_species = cp.copy(self.rd.line_species), \
+                            rayleigh_species= cp.copy(self.rd.rayleigh_species), \
+                            continuum_opacities = cp.copy(self.rd.continuum_opacities), \
+                            cloud_species = cp.copy(self.rd.cloud_species), \
+                            mode='c-k', \
+                            wlen_bords_micron = [0.5,28],
+                            do_scat_emis = self.rd.scattering)
+        if self.rd.AMR:
+            p = self.rd._setup_pres()
+        else:
+            p = self.rd.p_global
+        pRT_Object.setup_opa_structure(p)
+        tdict = {}
+        for name in ret_names:
+            teffs = []
+            samples = sample_dict[name]
+            parameters_read = param_dict[name]
+            rands = np.random.randint(0,samples.shape[0],nsample)
+            duse = self.data[self.rd.plot_kwargs["take_PTs_from"]]
+            for rint in rands:
+                samp = samples[rint,:-1]
+                params = self.build_param_dict(samp,parameters_read)
+                wlen,model = duse.model_generating_function(pRT_Object,
+                                                            params,
+                                                            False,
+                                                            self.rd.AMR)
+                tfit = teff_calc(wlen,model,params["D_pl"],params["R_pl"])
+                teffs.append(tfit)
+            tdict[name] = np.array(teffs)
+            np.save(self.output_dir + "evaluate_" + name + "/sampled_teff",np.array(teffs))
+        return tdict
+
+
 #############################################################
 # Plotting functions
 #############################################################
-    def plot_all(self, output_dir = None):
+    def plot_all(self, output_dir = None, ret_names = []):
         """
         Produces plots for the best fit spectrum, a sample of 100 output spectra,
         the best fit PT profile and a corner plot for parameters specified in the
@@ -854,7 +986,7 @@ class Retrieval:
             self.run_mode = 'evaluate'
         if output_dir is None:
             output_dir = self.output_dir
-        sample_dict, parameter_dict = self.get_samples(output_dir)
+        sample_dict, parameter_dict = self.get_samples(output_dir,ret_names=ret_names)
 
         ###########################################
         # Plot best-fit spectrum
@@ -862,6 +994,8 @@ class Retrieval:
         samples_use = cp.copy(sample_dict[self.retrieval_name])
         parameters_read = cp.copy(parameter_dict[self.retrieval_name])
         i_p = 0
+
+        # This might actually be redundant...
         for pp in self.parameters:
             if self.parameters[pp].is_free_parameter:
                 for i_s in range(len(parameters_read)):
@@ -874,6 +1008,9 @@ class Retrieval:
         # Get best-fit index
         logL = samples_use[:,-1]
         best_fit_index = np.argmax(logL)
+
+        # Print outputs
+        # TODO add verbosity
         for pp in self.parameters:
             if self.parameters[pp].is_free_parameter:
                 for i_s in range(len(parameters_read)):
@@ -883,7 +1020,8 @@ class Retrieval:
 
         # Plotting
         self.plot_spectra(samples_use,parameters_read)
-        self.plot_sampled(samples_use, parameters_read)
+        if self.evaluate_sample_spectra:
+            self.plot_sampled(samples_use, parameters_read)
         self.plot_PT(sample_dict,parameters_read)
         self.plot_corner(sample_dict,parameter_dict,parameters_read)
         print("Done!")
@@ -1279,7 +1417,7 @@ class Retrieval:
         plt.savefig(self.output_dir + 'evaluate_'+self.retrieval_name +'/PT_envelopes.pdf')
         return fig, ax
 
-    def plot_corner(self,sample_dict,parameter_dict,parameters_read):
+    def plot_corner(self,sample_dict,parameter_dict,parameters_read, plot_best_fit = True, **kwargs):
         """
         Make the corner plots
 
@@ -1291,6 +1429,10 @@ class Retrieval:
             parameters_read : List
                 Used to plot correct parameters, as some in self.parameters are not free, and
                 aren't included in the PMN outputs
+            kwargs : dict
+                Each kwarg can be one of the kwargs used in corner.corner. These can be used to adjust
+                the title_kwargs,label_kwargs,hist_kwargs, hist2d_kawargs or the contour kwargs. Each
+                kwarg must be a dictionary with the arguments as keys and values as the values.
         """
 
         if not self.run_mode == 'evaluate':
@@ -1301,6 +1443,10 @@ class Retrieval:
         p_plot_inds = {}
         p_ranges = {}
         p_use_dict = {}
+        bf_index = None
+        if plot_best_fit:
+            bf_index = {}
+
         for name,params in parameter_dict.items():
             samples_use = cp.copy(sample_dict[name])
             parameters_use = cp.copy(params)
@@ -1327,9 +1473,13 @@ class Retrieval:
 
 
         # from Plotting
-        contour_corner(sample_use_dict, \
-                        p_use_dict, \
-                        output_file, \
-                        parameter_plot_indices = p_plot_inds,
-                        parameter_ranges = p_ranges, \
-                        true_values = None)
+        fig = contour_corner(sample_use_dict,
+                             p_use_dict,
+                             output_file,
+                             parameter_plot_indices = p_plot_inds,
+                             parameter_ranges = p_ranges, \
+                             true_values = None,
+                             prt_plot_style=self.prt_plot_style,
+                             plot_best_fit = plot_best_fit,
+                             **kwargs)
+        return fig

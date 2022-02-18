@@ -30,9 +30,6 @@ class RetrievalConfig:
             Use an adaptive high resolution pressure grid around the location of cloud condensation.
             This will increase the size of the pressure grid by a constant factor that can be adjusted
             in the setup_pres function.
-        plotting : bool
-            Produce plots for each sample to check that the retrieval is running properly. Only
-            set to true on a local machine.
         scattering : bool
             If using emission spectra, turn scattering on or off.
         pressures : numpy.array
@@ -44,8 +41,8 @@ class RetrievalConfig:
                  retrieval_name = "retrieval_name",
                  run_mode = "retrieval",
                  AMR = False,
-                 plotting = False,
                  scattering = False,
+                 distribution = "lognormal",
                  pressures = None,
                  write_out_spec_sample = False):
 
@@ -63,8 +60,8 @@ class RetrievalConfig:
         else:
             self.p_global = np.logspace(-6,3,100)
 
-        self.plotting = plotting
         self.scattering = scattering
+        self.distribution = distribution
         self.parameters = {} #: Dictionary of the parameters passed to the model generating function
         self.data = {} #: Dictionary of the datasets used in the retrieval.
         self.instruments = []
@@ -218,7 +215,8 @@ class RetrievalConfig:
         files = set(files)
         for f in files: print(f)
         return files
-    def set_line_species(self,linelist,free=False,abund_lim=(-6.0,6.0)):
+
+    def set_line_species(self,linelist,eq=False,abund_lim=(-6.0,6.0)):
         """
         Set RadTrans.line_species
 
@@ -229,9 +227,11 @@ class RetrievalConfig:
         Args:
             linelist : List(str)
                 The list of species to include in the retrieval
-            free : bool
-                If true, the retrieval should use free chemistry, and Parameters for the abundance of each
-                species in the linelist will be added to the retrieval
+            eq : bool
+                If false, the retrieval should use free chemistry, and Parameters for the abundance of each
+                species in the linelist will be added to the retrieval. Otherwise equilibrium chemistry will
+                be used. If you need fine control species, use the add_line_species and set up each species
+                individually.
             abund_lim : Tuple(float,float)
                 If free is True, this sets the boundaries of the uniform prior that will be applied for
                 each species in linelist. The range of the prior goes from abund_lim[0]
@@ -240,7 +240,7 @@ class RetrievalConfig:
         """
 
         self.line_species = linelist
-        if free:
+        if not eq:
             for spec in self.line_species:
                 self.parameters[spec] = Parameter(spec,True,\
                                     transform_prior_cube_coordinate = \
@@ -267,7 +267,7 @@ class RetrievalConfig:
 
         self.continuum_opacities = linelist
 
-    def add_line_species(self,species,free=False,abund_lim=(-8.0,7.0)):
+    def add_line_species(self,species,eq=False,abund_lim=(-7.0,7.0), fixed_abund = None):
         """
         This function adds a single species to the pRT object that will define the line opacities of the model.
         The name must match the pRT opacity name, which vary between the c-k line opacities and the line-by-line opacities.
@@ -275,21 +275,28 @@ class RetrievalConfig:
         Args:
             species : str
                 The species to include in the retrieval
-            free : bool
-                If true, the retrieval should use free chemistry, and Parameters for the abundance of the
-                species will be added to the retrieval
+            eq : bool
+                If False, the retrieval should use free chemistry, and Parameters for the abundance of the
+                species will be added to the retrieval. Otherwise (dis)equilibrium chemistry will be used.
             abund_lim : Tuple(float,float)
                 If free is True, this sets the boundaries of the uniform prior that will be applied the species given.
                 The range of the prior goes from abund_lim[0] to abund_lim[0] + abund_lim[1].
                 The abundance limits must be given in log10 units of the mass fraction.
+            fixed_abund : float
+                The log-mass fraction abundance of the species. Currently only supports vertically constant
+                abundances. If this is set, then the species will not be a free parameter in the retrieval.
         """
 
         # parameter passed through loglike is log10 abundance
         self.line_species.append(species)
-        if free:
-            self.parameters[species] = Parameter(species,True,\
-                                    transform_prior_cube_coordinate = \
-                                    lambda x : abund_lim[0] + abund_lim[1]*x)
+        if not eq:
+            if fixed_abund is not None:
+                self.parameters[species] = Parameter(species,False,\
+                                                    value = fixed_abund)
+            else:
+                self.parameters[species] = Parameter(species,True,\
+                                        transform_prior_cube_coordinate = \
+                                        lambda x : abund_lim[0] + abund_lim[1]*x)
 
     def remove_species_lines(self,species,free=False):
         """
@@ -309,7 +316,7 @@ class RetrievalConfig:
         if free:
             self.parameters.pop(species,None)
 
-    def add_cloud_species(self,species,eq = True, abund_lim = (-3.5,4.5), PBase_lim = (-5.0,7.0)):
+    def add_cloud_species(self,species, eq = True, abund_lim = (-3.5,4.5), PBase_lim = (-5.0,7.0), fixed_abund = None,fixed_base=None):
         """
         This function adds a single cloud species to the list of species. Optionally,
         it will add parameters to allow for a retrieval using an ackermann-marley model.
@@ -330,20 +337,37 @@ class RetrievalConfig:
             PBase_lim : tuple(float,float)
                 Only used if not using an equilibrium model. Sets the limits on teh log of the cloud base pressure.
                 Obsolete.
+            fixed_abund : Optional(float)
+                A vertically constant log mass fraction abundance for the cloud species. If set, this will not be
+                a free parameter in the retrieval. Only compatible with non-equilibrium clouds.
+            fixed_base : Optional(float)
+                The log cloud base pressure. If set, fixes this parameter to a constant value, and it will not be
+                a free parameter in the retrieval. Only compatible with non-equilibrium clouds. Not yet compatible
+                with most built in pRT models.
         """
 
         if species.endswith("(c)"):
             logging.warning("Ensure you set the cloud particle shape, typically with the _cd tag!")
             logging.warning(species + " was not added to the list of cloud species")
             return
+
         self.cloud_species.append(species)
         cname = species.split('_')[0]
-        self.parameters['log_X_cb_'+cname] = Parameter('log_X_cb_'+cname,True,\
-                                       transform_prior_cube_coordinate = \
-                                       lambda x : abund_lim[0] + abund_lim[1]*x)
-        #self.parameters['Pbase_'+cname] = Parameter('Pbase_'+cname,True,\
-        #                     transform_prior_cube_coordinate = \
-        #                     lambda x : PBase_lim[0] + PBase_lim[1]*x)
+        if fixed_abund is None:
+            self.parameters['log_X_cb_'+cname] = Parameter('log_X_cb_'+cname,True,\
+                                        transform_prior_cube_coordinate = \
+                                        lambda x : abund_lim[0] + abund_lim[1]*x)
+        else:
+            self.parameters['log_X_cb_'+cname] = Parameter('log_X_cb_'+cname,False,\
+                            value = fixed_abund)
+        if not eq:
+            if fixed_base is None:
+                self.parameters['Pbase_'+cname] =Parameter('Pbase_'+cname,True,\
+                                                               transform_prior_cube_coordinate = \
+                                                               lambda x : PBase_lim[0] + PBase_lim[1]*x)
+            else:
+                self.parameters['Pbase_'+cname] =Parameter('Pbase_'+cname,False,\
+                                                               value = fixed_base)
 
     def add_data(self, name, path,
                  model_generating_function,
@@ -351,6 +375,7 @@ class RetrievalConfig:
                  model_resolution = None,
                  distance = None,
                  scale = False,
+                 scale_err = False,
                  wlen_range_micron = None,
                  external_pRT_reference = None,
                  opacity_mode = 'c-k'):
@@ -398,6 +423,7 @@ class RetrievalConfig:
                                 model_resolution = model_resolution,
                                 distance = distance,
                                 scale = scale,
+                                scale_err = scale_err,
                                 wlen_range_micron = wlen_range_micron,
                                 external_pRT_reference=external_pRT_reference,
                                 opacity_mode = opacity_mode)
