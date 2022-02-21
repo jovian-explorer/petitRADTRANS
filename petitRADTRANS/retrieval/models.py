@@ -232,6 +232,7 @@ def guillot_free_emission(pRT_object, \
     pglobal_check(pRT_object.press/1e6,
                   parameters['pressure_simple'].value,
                   parameters['pressure_scaling'].value)
+
     if AMR:
         p_use = PGLOBAL
     else:
