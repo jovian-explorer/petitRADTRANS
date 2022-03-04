@@ -234,7 +234,7 @@ def contour_corner(sampledict,
         label_kwargs = None
         title_kwargs = None
         hist_kwargs = None
-        hist2d_kwargs = None
+        hist2d_kwargs = {}
         contour_kwargs = None
         if "label_kwargs" in kwargs.keys():
             label_kwargs = kwargs["label_kwargs"]
@@ -258,13 +258,13 @@ def contour_corner(sampledict,
                                 range=range_list,
                                 color=color_list[count],
                                 quantiles=[0.16, 0.5, 0.84],
-                                hist2d_kwargs=hist2d_kwargs,
+                                **hist2d_kwargs,
                                 plot_contours=True,
                                 truths=truths_list,
                                 truth_color='r',
                                 contour_kwargs=contour_kwargs,
                                 hist_kwargs=hist_kwargs,
-                                levels=[1 - np.exp(-0.5), 1 - np.exp(-2), 1 - np.exp(-4.5)]
+                                levels=[1 - np.exp(-0.5), 1 - np.exp(-1.5), 1 - np.exp(-2.5)]
                                 )
             count += 1
         else:
@@ -278,13 +278,13 @@ def contour_corner(sampledict,
                           color=color_list[count],
                           labels=labels_list,
                           label_kwargs=label_kwargs,
-                          hist2d_kwargs=hist2d_kwargs,
+                          **hist2d_kwargs,
                           plot_contours=True,
                           contour_kwargs=contour_kwargs,
                           truths=truths_list,
                           truth_color='r',
                           hist_kwargs=hist_kwargs,
-                          levels=[1 - np.exp(-0.5), 1 - np.exp(-2), 1 - np.exp(-4.5)]
+                          levels=[1 - np.exp(-0.5), 1 - np.exp(-1.5), 1 - np.exp(-2.5)]
                           )
             count += 1
 

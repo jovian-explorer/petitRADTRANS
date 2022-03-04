@@ -331,7 +331,6 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
         variable_throughput = np.ones_like(orbital_phases) * variable_throughput
 
     if np.ndim(telluric_transmittance) == 1:
-        # TODO add changes in airmass
         telluric_transmittance = np.asarray([telluric_transmittance] * np.size(orbital_phases))
 
     if np.size(telluric_transmittance, axis=1) != np.size(wavelength_instrument):

@@ -67,6 +67,14 @@ def calculate_uncertainty(derivatives, uncertainties, covariance_matrix=None):
         ]))
 
 
+def calculate_chi2(data, model, uncertainties):
+    return np.sum(((data - model) / uncertainties) ** 2)
+
+
+def calculate_reduced_chi2(data, model, uncertainties, degrees_of_freedom=0):
+    return calculate_chi2(data, model, uncertainties) / (np.size(data) - degrees_of_freedom - 1)
+
+
 def mean_uncertainty(uncertainties):
     """Calculate the uncertainty of the mean of an array.
 
