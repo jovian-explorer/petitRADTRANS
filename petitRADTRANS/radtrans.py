@@ -1791,8 +1791,76 @@ class Radtrans(_read_opacities.ReadOpacities):
                 tab.write_hdf5(path + '/' + spec + '_R_' + str(int(resolution)) + '/' + spec + '_R_' + str(
                     int(resolution)) + '.h5')
                 os.system('rm temp.h5')
+def py_calc_cloud_opas(
+    rho: Array, # (M,)
+    rho_p: Array,  # (N,)
+    cloud_mass_fracs: Array,  # (M, N)
+    r_g: Array,  # (M, N)
+    sigma_n: float,
+    cloud_rad_bins: Array,  # (P + 1,)
+    cloud_radii: Array,  # (P,)
+    cloud_lambdas: Array,  # (Q,)
+    cloud_specs_abs_opa: Array,  # (P, Q, N)
+    cloud_specs_scat_opa: Array,  # (P, Q, N)
+    cloud_aniso: Array,  # (P, Q, N)
+) -> Tuple[Array, Array]:
+    r""""
+    This function reimplements calc_cloud_opas from fort_spec.f90. For some reason
+    it runs faster in python than in fortran, so we'll use this from now on.
+    This function integrates the cloud opacity throught the different layers of
+    the atmosphere to get the total optical depth, scattering and anisotropic fraction.
 
-def py_calc_cloud_opas(rho,
+    author: Francois Rozet
+"""
+
+    N = (  # (M, N)
+        3.0
+        * cloud_mass_fracs
+        * rho[:, None]
+        / (4.0 * np.pi * rho_p * (r_g ** 3))
+        * np.exp(-4.5 * np.log(sigma_n) ** 2)
+    )
+
+    dndr = (  # (P, M, N)
+        N
+        / (cloud_radii[:, None, None] * np.sqrt(2.0 * np.pi) * np.log(sigma_n))
+        * np.exp(
+            -np.log(cloud_radii[:, None, None] / r_g) ** 2
+            / (2.0 * np.log(sigma_n) ** 2)
+        )
+    )
+
+    integrand_scale = (  # (P, M, N)
+        (4.0 * np.pi / 3.0)
+        * cloud_radii[:, None, None] ** 3
+        * rho_p
+        * dndr
+    )
+
+    integrand_abs = integrand_scale[:, None] * cloud_specs_abs_opa[:, :, None]
+    integrand_scat = integrand_scale[:, None] * cloud_specs_scat_opa[:, :, None]
+    integrand_aniso = integrand_scat * (1.0 - cloud_aniso[:, :, None])
+
+    widths = np.diff(cloud_rad_bins)[:, None, None, None]  # (P, 1, 1, 1)
+
+    cloud_abs_opa = np.sum(integrand_abs * widths, axis=(0, 3))  # (Q, M)
+    cloud_scat_opa = np.sum(integrand_scat * widths, axis=(0, 3))  # (Q, M)
+    cloud_red_fac_aniso = np.sum(integrand_aniso * widths, axis=(0, 3))  # (Q, M)
+
+    cloud_red_fac_aniso = np.true_divide(
+        cloud_red_fac_aniso,
+        cloud_scat_opa,
+        out=np.zeros_like(cloud_scat_opa),
+        where=cloud_scat_opa > 1e-200,
+    )
+
+    cloud_abs_opa = cloud_abs_opa / rho
+    cloud_scat_opa = cloud_scat_opa / rho
+
+    return cloud_abs_opa, cloud_scat_opa, cloud_red_fac_aniso
+
+
+def py_calc_cloud_opas_old(rho,
                     rho_p,
                     cloud_mass_fracs,
                     r_g,
