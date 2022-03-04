@@ -13,6 +13,7 @@ import os,glob
 import sys,pdb
 from scipy import interpolate
 import h5py
+from Typing import Tuple, Array
 
 class Radtrans(_read_opacities.ReadOpacities):
     """ Class defining objects for carrying out spectral calculations for a
