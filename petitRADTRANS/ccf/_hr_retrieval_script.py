@@ -93,7 +93,7 @@ def main(sim_id=0):
             'prt_object': model,
             'pressures': pressures,
             'parameters': true_parameters,
-            'line_species': line_species,
+            'retrieved_species': line_species,
             'rayleigh_species': rayleigh_species,
             'continuum_species': continuum_species,
             'retrieval_model': retrieval_model,

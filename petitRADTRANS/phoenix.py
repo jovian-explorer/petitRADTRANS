@@ -81,7 +81,7 @@ def get_PHOENIX_spec(temperature):
         temperature (float):
             stellar effective temperature in K.
     """
-    spec_dat, radius = __get_phoenix_spec_wrap(temperature)
+    spec_dat, _ = __get_phoenix_spec_wrap(temperature)
 
     return spec_dat
 

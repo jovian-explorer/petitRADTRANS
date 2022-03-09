@@ -64,6 +64,67 @@ def _init_model(planet, w_bords, line_species_str, p0=1e-2):
     for species in line_species:
         m_sum += mass_fractions[species]
 
+    mass_fractions['H2'] = (1 - m_sum) / (1 + 0.24 / 0.74)
+    mass_fractions['He'] = mass_fractions['H2'] * 0.24 / 0.74
+
+    for key in mass_fractions:
+        mass_fractions[key] *= np.ones_like(pressures)
+
+    mean_molar_mass = calc_MMW(mass_fractions)
+
+    print('Setting up models...')
+    atmosphere = Radtrans(
+        line_species=line_species_str,
+        rayleigh_species=['H2', 'He'],
+        continuum_opacities=['H2-H2', 'H2-He'],
+        wlen_bords_micron=w_bords,
+        mode='lbl',
+        do_scat_emis=True,
+        lbl_opacity_sampling=1
+    )
+    atmosphere.setup_opa_structure(pressures)
+
+    return pressures, temperature, gravity, radius, star_radius, star_effective_temperature, p0, p_cloud, \
+        mean_molar_mass, mass_fractions, \
+        line_species, rayleigh_species, continuum_species, \
+        atmosphere
+
+
+def _init_model_old(planet, w_bords, line_species_str, p0=1e-2):
+    print('Initialization...')
+    #line_species_str = ['H2O_main_iso']  # ['H2O_main_iso', 'CO_all_iso']  # 'H2O_Exomol'
+
+    pressures = np.logspace(-6, 2, 100)
+    temperature = guillot_global(
+        pressure=pressures,
+        kappa_ir=0.01,
+        gamma=0.4,
+        grav=planet.surface_gravity,
+        t_int=200,
+        t_equ=planet.equilibrium_temperature
+    )
+    gravity = planet.surface_gravity
+    radius = planet.radius
+    star_radius = planet.star_radius
+    star_effective_temperature = planet.star_effective_temperature
+    p_cloud = 1e2
+    line_species = line_species_str
+    rayleigh_species = ['H2', 'He']
+    continuum_species = ['H2-H2', 'H2-He']
+
+    mass_fractions = {
+        'H2': 0.74,
+        'He': 0.24,
+       # line_species_str: 1e-3
+    }
+    for species in line_species_str:
+        mass_fractions[species] = 1e-3
+
+    m_sum = 0.0  # Check that the total mass fraction of all species is <1
+
+    for species in line_species:
+        m_sum += mass_fractions[species]
+
     mass_fractions['H2'] = 0.74 * (1.0 - m_sum)
     mass_fractions['He'] = 0.24 * (1.0 - m_sum)
 
@@ -79,8 +140,8 @@ def _init_model(planet, w_bords, line_species_str, p0=1e-2):
         continuum_opacities=['H2-H2', 'H2-He'],
         wlen_bords_micron=w_bords,
         mode='lbl',
-        lbl_opacity_sampling=1,
-        do_scat_emis=True
+        do_scat_emis=True,
+        lbl_opacity_sampling=1
     )
     atmosphere.setup_opa_structure(pressures)
 
@@ -97,9 +158,39 @@ def _init_retrieval_model(prt_object, parameters):
         pressure=pressures,
         kappa_ir=0.01,
         gamma=0.4,
-        grav=10 ** parameters['log_g'].value,
+        grav=10 ** parameters['log10_surface_gravity'].value,
         t_int=200,
-        t_equ=parameters['Temperature'].value
+        t_equ=parameters['temperature'].value
+    )
+
+    # Make the abundance profiles
+    abundances = {}
+    m_sum = 0.0  # Check that the total mass fraction of all species is <1
+
+    for species in prt_object.line_species:
+        spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities (see below)
+        abundances[species] = 10 ** parameters[spec].value * np.ones_like(pressures)
+        m_sum += 10 ** parameters[spec].value
+
+    abundances['H2'] = (1 - m_sum) / (1 + 0.24 / 0.74)
+    abundances['He'] = abundances['H2'] * 0.24 / 0.74
+
+    # Find the mean molecular weight in each layer
+    mmw = calc_MMW(abundances)
+
+    return temperatures, abundances, mmw
+
+
+def _init_retrieval_model_old(prt_object, parameters):
+    # Make the P-T profile
+    pressures = prt_object.press * 1e-6  # bar to cgs
+    temperatures = guillot_global(
+        pressure=pressures,
+        kappa_ir=0.01,
+        gamma=0.4,
+        grav=10 ** parameters['log10_surface_gravity'].value,
+        t_int=200,
+        t_equ=parameters['temperature'].value
     )
 
     # Make the abundance profiles
@@ -155,8 +246,8 @@ def _get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=
         wavelength_model=wlen_model,
         spectrum_model=planet_radiosity,
         star_spectral_radiosity=parameters['star_spectral_radiosity'].value,
-        planet_radius=parameters['R_pl'].value,
-        star_radius=parameters['Rstar'].value,
+        planet_radius=parameters['planet_radius'].value,
+        star_radius=parameters['star_radius'].value,
         wavelength_instrument=parameters['wavelengths_instrument'].value,
         instrument_resolving_power=parameters['instrument_resolving_power'].value,
         planet_velocities=planet_velocities,
@@ -194,7 +285,7 @@ def _get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=
     spectrum_model = get_mock_transit_spectra(
         wavelength_model=wlen_model,
         transit_radius_model=transit_radius,
-        star_radius=parameters['Rstar'].value,
+        star_radius=parameters['star_radius'].value,
         wavelength_instrument=parameters['wavelengths_instrument'].value,
         instrument_resolving_power=parameters['instrument_resolving_power'].value,
         planet_velocities=planet_velocities,
@@ -296,12 +387,12 @@ def _radiosity_model(prt_object, parameters):
     prt_object.calc_flux(
         temperatures,
         abundances,
-        10 ** parameters['log_g'].value,
+        10 ** parameters['log10_surface_gravity'].value,
         mmw,
         Tstar=parameters['star_effective_temperature'].value,
-        Rstar=parameters['Rstar'].value / nc.r_sun,
+        Rstar=parameters['star_radius'].value / nc.r_sun,
         semimajoraxis=parameters['semi_major_axis'].value / nc.AU,
-        Pcloud=10 ** parameters['log_Pcloud'].value,
+        Pcloud=10 ** parameters['log10_cloud_pressure'].value,
         #stellar_intensity=parameters['star_spectral_radiosity'].value
     )
 
@@ -319,10 +410,10 @@ def _transit_radius_model(prt_object, parameters):
     prt_object.calc_transm(
         temp=temperatures,
         abunds=abundances,
-        gravity=10 ** parameters['log_g'].value,
+        gravity=10 ** parameters['log10_surface_gravity'].value,
         mmw=mmw,
         P0_bar=parameters['reference_pressure'].value,
-        R_pl=parameters['R_pl'].value
+        R_pl=parameters['planet_radius'].value
     )
 
     # Transform the outputs into the units of our data.
@@ -467,13 +558,13 @@ def init_mock_observations(planet, line_species_str, mode,
         # TODO all of these could be in an object
         # Initialize true parameters
         true_parameters = {
-            'R_pl': Param(radius),
-            'Temperature': Param(planet.equilibrium_temperature),
-            'log_Pcloud': Param(np.log10(p_cloud)),
-            'log_g': Param(np.log10(gravity)),
+            'planet_radius': Param(radius),
+            'temperature': Param(planet.equilibrium_temperature),
+            'log10_cloud_pressure': Param(np.log10(p_cloud)),
+            'log10_surface_gravity': Param(np.log10(gravity)),
             'reference_pressure': Param(p0),
             'star_effective_temperature': Param(star_effective_temperature),
-            'Rstar': Param(star_radius),
+            'star_radius': Param(star_radius),
             'semi_major_axis': Param(planet.orbit_semi_major_axis),
             'planet_max_radial_orbital_velocity': Param(kp),
             'system_observer_radial_velocities': Param(v_sys),
@@ -518,8 +609,8 @@ def init_mock_observations(planet, line_species_str, mode,
             wavelength_instrument=true_parameters['wavelengths_instrument'].value,
             instrument_snr=instrument_snr,
             instrument_resolving_power=true_parameters['instrument_resolving_power'].value,
-            planet_radius=true_parameters['R_pl'].value,
-            star_radius=true_parameters['Rstar'].value,
+            planet_radius=true_parameters['planet_radius'].value,
+            star_radius=true_parameters['star_radius'].value,
             star_spectral_radiosity=true_parameters['star_spectral_radiosity'].value,
             orbital_phases=true_parameters['orbital_phases'].value,
             system_observer_radial_velocities=true_parameters['system_observer_radial_velocities'].value,
@@ -610,8 +701,8 @@ def init_mock_observations(planet, line_species_str, mode,
             wavelength_instrument=true_parameters['wavelengths_instrument'].value,
             instrument_snr=instrument_snr,
             instrument_resolving_power=true_parameters['instrument_resolving_power'].value,
-            planet_radius=true_parameters['R_pl'].value,
-            star_radius=true_parameters['Rstar'].value,
+            planet_radius=true_parameters['planet_radius'].value,
+            star_radius=true_parameters['star_radius'].value,
             star_spectral_radiosity=true_parameters['star_spectral_radiosity'].value,
             orbital_phases=true_parameters['orbital_phases'].value,
             system_observer_radial_velocities=true_parameters['system_observer_radial_velocities'].value,
@@ -687,7 +778,13 @@ def init_mock_observations(planet, line_species_str, mode,
     true_parameters['reduced_data'] = Param(reduced_mock_observations)
     true_parameters['true_spectra'] = Param(true_spectra)
     true_parameters['true_model'] = Param(r)
-    true_parameters['reduced_data_uncertainties'] = Param(copy.copy(uncertainties))
+    true_parameters['intrinsic_temperature'] = Param(200)
+    true_parameters['included_line_species'] = Param('all')
+    true_parameters['co_ratio'] = Param(0.55)
+    true_parameters['log10_metallicity'] = Param(0)
+    true_parameters['carbon_pressure_quench'] = Param(None)
+    true_parameters['heh2_ratio'] = Param(0.24/0.74)
+    true_parameters['use_equilibrium_chemistry'] = Param(False)
 
     # True models checks
     assert np.all(w == wavelengths_instrument)

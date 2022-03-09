@@ -3,6 +3,7 @@ This module contains a set of useful functions that don't really fit anywhere
 else. This includes flux conversions, prior functions, mean molecular weight
 calculations, transforms from mass to number fractions, and fits file output.
 """
+import sys
 import os
 
 # To not have numpy start parallelizing on its own
@@ -104,11 +105,20 @@ def getMM(species):
     Returns:
         The molar mass of the compound in atomic mass units.
     """
+    e_molar_mass = 5.4857990888e-4  # (g.mol-1) e- molar mass (source: NIST CODATA)
+
+    if species == 'e-':
+        return e_molar_mass
+    elif species == 'H-':
+        return Formula('H').mass + e_molar_mass
+
     name = species.split("_")[0]
     name = name.split(',')[0]
     f = Formula(name)
+
     if "all_iso" in species:
         return f.mass
+
     return f.isotope.massnumber
 
 
@@ -122,12 +132,14 @@ def calc_MMW(abundances):
             dictionary of abundance arrays, each array must have the shape of the pressure array used in pRT,
             and contain the abundance at each layer in the atmosphere.
     """
-    mmw = 0.
+    mmw = sys.float_info.min  # prevent division by 0
+
     for key in abundances.keys():
         # exo_k resolution
         spec = key.split("_R_")[0]
         mmw += abundances[key] / getMM(spec)
-    return 1. / mmw
+
+    return 1.0 / mmw
 
 
 def get_MMW_from_mfrac(m_frac):

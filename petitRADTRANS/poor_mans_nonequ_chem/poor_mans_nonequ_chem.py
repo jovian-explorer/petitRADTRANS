@@ -123,6 +123,7 @@ def interpol_abundances(COs_goal_in, FEHs_goal_in, temps_goal_in, pressures_goal
     pressures_large_int = np.searchsorted(pressures, pressures_goal)+1
 
     # Get the interpolated values from Fortran routine
+    # TODO nabla ad and MMW are not abundances, they should be returned as extra parameters
     abundances_arr = cfu.interpolate(
         co_ratios_goal, fehs_goal, temps_goal,
         pressures_goal, co_ratios_large_int,
