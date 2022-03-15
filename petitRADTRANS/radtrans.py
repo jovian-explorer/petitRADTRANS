@@ -1133,22 +1133,22 @@ class Radtrans(_read_opacities.ReadOpacities):
         # Calculate the transmission spectrum
         if ((self.mode == 'lbl') or self.test_ck_shuffle_comp) \
                 and (int(len(self.line_species)) > 1):
-            self.transm_rad = fs.calc_transm_spec(self.line_struc_kappas[:, :, :1, :], self.temp,
+            self.transm_rad, self.radius_hse = fs.calc_transm_spec(self.line_struc_kappas[:, :, :1, :], self.temp,
                                                   self.press, gravity, mmw, P0_bar, R_pl,
                                                   self.w_gauss, self.scat,
                                                   self.continuum_opa_scat, variable_gravity)
             if contribution:
-                self.contr_tr = fs.calc_transm_spec_contr(self.line_struc_kappas[:, :, :1, :], self.temp,
+                self.contr_tr, self.radius_hse = fs.calc_transm_spec_contr(self.line_struc_kappas[:, :, :1, :], self.temp,
                                                           self.press, gravity, mmw, P0_bar, R_pl,
                                                           self.w_gauss, self.transm_rad ** 2., self.scat,
                                                           self.continuum_opa_scat, variable_gravity)
         else:
-            self.transm_rad = fs.calc_transm_spec(self.line_struc_kappas, self.temp,
+            self.transm_rad, self.radius_hse = fs.calc_transm_spec(self.line_struc_kappas, self.temp,
                                                   self.press, gravity, mmw, P0_bar, R_pl,
                                                   self.w_gauss, self.scat,
                                                   self.continuum_opa_scat, variable_gravity)
             if contribution:
-                self.contr_tr = fs.calc_transm_spec_contr(self.line_struc_kappas, self.temp,
+                self.contr_tr, self.radius_hse = fs.calc_transm_spec_contr(self.line_struc_kappas, self.temp,
                                                           self.press, gravity, mmw, P0_bar, R_pl,
                                                           self.w_gauss, self.transm_rad ** 2.,
                                                           self.scat,

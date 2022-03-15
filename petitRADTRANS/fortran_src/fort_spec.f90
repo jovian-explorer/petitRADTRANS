@@ -420,7 +420,7 @@ module fort_spec
         !!$ Subroutine to calculate the transmission spectrum
 
         subroutine calc_transm_spec(total_kappa_in,temp,press,gravity,mmw,P0_bar,R_pl, &
-             w_gauss,scat,continuum_opa_scat,var_grav,transm,freq_len,struc_len,g_len,N_species)
+             w_gauss,scat,continuum_opa_scat,var_grav,transm,radius,freq_len,struc_len,g_len,N_species)
 
           use constants_block
           implicit none
@@ -436,10 +436,10 @@ module fort_spec
           logical, intent(in)                         :: scat !, contribution
           logical, intent(in)                         :: var_grav
 
-          double precision, intent(out)               :: transm(freq_len) !, contr_tr(struc_len,freq_len)
+          double precision, intent(out)               :: transm(freq_len), radius(struc_len) !, contr_tr(struc_len,freq_len)
 
           ! Internal
-          double precision                            :: P0_cgs, rho(struc_len), radius(struc_len), &
+          double precision                            :: P0_cgs, rho(struc_len), &
                 total_kappa(g_len,freq_len,N_species,struc_len)
           integer                                     :: i_str, i_freq, i_g, i_spec, j_str
           logical                                     :: rad_neg
@@ -999,7 +999,7 @@ module fort_spec
         
 
         subroutine calc_transm_spec_contr(total_kappa,temp,press,gravity,mmw,P0_bar,R_pl, &
-             w_gauss,transm_in,scat,continuum_opa_scat,var_grav,contr_tr,freq_len,struc_len,g_len,N_species)
+             w_gauss,transm_in,scat,continuum_opa_scat,var_grav,contr_tr,radius,freq_len,struc_len,g_len,N_species)
             ! """
             ! Subroutine to calculate the contribution function of the transmission spectrum
             ! """
@@ -1016,10 +1016,10 @@ module fort_spec
             double precision, intent(in)                :: gravity
             double precision, intent(in)                :: w_gauss(g_len), continuum_opa_scat(freq_len,struc_len)
             double precision, intent(in)                :: transm_in(freq_len)
-            double precision, intent(out)               :: contr_tr(struc_len,freq_len)
+            double precision, intent(out)               :: contr_tr(struc_len,freq_len), radius(struc_len)
             
             integer                                     :: i_str, i_freq,  i_spec, j_str, i_leave_str
-            double precision                            :: P0_cgs, rho(struc_len), radius(struc_len)
+            double precision                            :: P0_cgs, rho(struc_len)
             double precision                            :: alpha_t2(g_len,freq_len,N_species,struc_len-1)
             double precision                            :: t_graze(g_len,freq_len,N_species,struc_len), s_1, s_2, &
                t_graze_wlen_int(struc_len,freq_len), alpha_t2_scat(freq_len,struc_len-1), &
