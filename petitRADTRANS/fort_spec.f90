@@ -417,7 +417,7 @@ end subroutine planck_f
 !!$ Subroutine to calculate the transmission spectrum
 
 subroutine calc_transm_spec(total_kappa_in,temp,press,gravity,mmw,P0_bar,R_pl, &
-     w_gauss,scat,continuum_opa_scat,var_grav,transm,freq_len,struc_len,g_len,N_species)
+     w_gauss,scat,continuum_opa_scat,var_grav,transm,radius,freq_len,struc_len,g_len,N_species)
 
   use constants_block
   implicit none
@@ -433,10 +433,10 @@ subroutine calc_transm_spec(total_kappa_in,temp,press,gravity,mmw,P0_bar,R_pl, &
   LOGICAL, intent(in)                         :: scat !, contribution
   LOGICAL, intent(in)                         :: var_grav
 
-  DOUBLE PRECISION, intent(out)               :: transm(freq_len) !, contr_tr(struc_len,freq_len)
+  DOUBLE PRECISION, intent(out)               :: transm(freq_len), radius(struc_len) !, contr_tr(struc_len,freq_len)
 
   ! Internal
-  DOUBLE PRECISION                            :: P0_cgs, rho(struc_len), radius(struc_len), &
+  DOUBLE PRECISION                            :: P0_cgs, rho(struc_len), &
         total_kappa(g_len,freq_len,N_species,struc_len)
   INTEGER                                     :: i_str, i_freq, i_g, i_spec, j_str
   LOGICAL                                     :: rad_neg
