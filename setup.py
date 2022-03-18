@@ -48,7 +48,7 @@ extensions = [fort_spec, fort_input, fort_rebin, rebin_give_width, poor_mans]
 
 def setup_function(extensions):
     setup(name='petitRADTRANS',
-          version="2.3.6",
+          version="2.3.7",
           description='Exoplanet spectral synthesis tool for retrievals',
           long_description=open(os.path.join(
               os.path.dirname(__file__), 'README.rst')).read(),

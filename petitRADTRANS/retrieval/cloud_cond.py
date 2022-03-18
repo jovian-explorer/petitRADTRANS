@@ -312,16 +312,22 @@ def return_T_cond_Na2S_free(Xna2s, MMW = 2.33):
     # particles, this is OK: there are
     # more S than Na atoms at solar
     # abundance ratios.
-    P_vap = lambda x: 1e1**(8.55 - 13889./x - 0.5*FeH)/2.
+
+    # We're also using [Na/H] as a proxy for [Fe/H]
+    # Definitely not strictly correct, but should be
+    # good enough for ~ solar compositions. [+- 1 for Fe/H]
+    # Assumes constant vertical abundance
     m_na2s =  2.*masses['Na'] \
       + masses['S']
+    P_vap = lambda x: 10**(8.55 - 13889./x - 0.5*(np.log10(2*Xna2s*MMW/m_na2s)+5.7))/2
+
     return P_vap(T)/(Xna2s*MMW/m_na2s), T
 
 def return_T_cond_KCL(FeH, CO, MMW = 2.33):
 
     # Taken from Charnay+2018
     T = np.linspace(100.,10000.,1000)
-    P_vap = lambda x: 1e1**(7.611 - 11382./T)
+    P_vap = lambda x: 1e1**(7.611 - 11382./x)
 
     Xkcl = return_XKCL(FeH, CO)
 
@@ -332,7 +338,7 @@ def return_T_cond_KCL_free(Xkcl, MMW = 2.33):
 
     # Taken from Charnay+2018
     T = np.linspace(100.,10000.,1000)
-    P_vap = lambda x: 1e1**(7.611 - 11382./T)
+    P_vap = lambda x: 1e1**(7.611 - 11382./x)
     m_kcl =  masses['K'] \
       + masses['Cl']
     return P_vap(T)/(Xkcl*MMW/m_kcl), T
@@ -483,10 +489,41 @@ def simple_cdf_MgSiO3_free(press, temp, Xmgsio3, MMW = 2.33):
         plt.show()
 
     return P_cloud
+
 def simple_cdf_Na2S(press, temp, FeH, CO, MMW = 2.33):
 
     Pc, Tc = return_T_cond_Na2S(FeH, CO, MMW)
     index = (Pc > 1e-8) & (Pc < 1e5)
+    Pc, Tc = Pc[index], Tc[index]
+    tcond_p = interp1d(Pc, Tc)
+    #print(Pc, press)
+    Tcond_on_input_grid = tcond_p(press)
+
+    Tdiff = Tcond_on_input_grid - temp
+    diff_vec = Tdiff[1:]*Tdiff[:-1]
+    ind_cdf = (diff_vec < 0.)
+    if len(diff_vec[ind_cdf]) > 0:
+        P_clouds = (press[1:]+press[:-1])[ind_cdf]/2.
+        P_cloud = P_clouds[-1]
+    else:
+        P_cloud = np.min(press)
+
+    if plotting:
+        plt.plot(temp, press)
+        plt.plot(Tcond_on_input_grid, press)
+        plt.axhline(P_cloud, color = 'red', linestyle = '--')
+        plt.yscale('log')
+        plt.xlim([0., 3000.])
+        plt.ylim([1e2,1e-6])
+        plt.show()
+
+    return P_cloud
+
+def simple_cdf_Na2S_free(press, temp, XNa2S, MMW = 2.33):
+
+    Pc, Tc = return_T_cond_Na2S_free(XNa2S, MMW)
+    index = (Pc > 1e-8) & (Pc < 1e5)
+
     Pc, Tc = Pc[index], Tc[index]
     tcond_p = interp1d(Pc, Tc)
     #print(Pc, press)
@@ -541,6 +578,34 @@ def simple_cdf_KCL(press, temp, FeH, CO, MMW = 2.33):
 
     return P_cloud
 
+def simple_cdf_KCL_free(press, temp, XKCL, MMW = 2.33):
+
+    Pc, Tc = return_T_cond_KCL_free(XKCL, MMW)
+    index = (Pc > 1e-8) & (Pc < 1e5)
+    Pc, Tc = Pc[index], Tc[index]
+    tcond_p = interp1d(Pc, Tc)
+    #print(Pc, press)
+    Tcond_on_input_grid = tcond_p(press)
+
+    Tdiff = Tcond_on_input_grid - temp
+    diff_vec = Tdiff[1:]*Tdiff[:-1]
+    ind_cdf = (diff_vec < 0.)
+    if len(diff_vec[ind_cdf]) > 0:
+        P_clouds = (press[1:]+press[:-1])[ind_cdf]/2.
+        P_cloud = P_clouds[-1]
+    else:
+        P_cloud = np.min(press)
+
+    if plotting:
+        plt.plot(temp, press)
+        plt.plot(Tcond_on_input_grid, press)
+        plt.axhline(P_cloud, color = 'red', linestyle = '--')
+        plt.yscale('log')
+        plt.xlim([0., 3000.])
+        plt.ylim([1e2,1e-6])
+        plt.show()
+
+    return P_cloud
 if plotting:
     kappa_IR = 0.01
     gamma = 0.4
