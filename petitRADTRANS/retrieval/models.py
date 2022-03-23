@@ -356,6 +356,193 @@ def guillot_free_emission(pRT_object, \
     #print(spectrum_model)
     return wlen_model, spectrum_model
 
+def guillot_free_secondary_eclipse(pRT_object, \
+                                   parameters, \
+                                   PT_plot_mode = False,
+                                   AMR = False):
+    """
+    Free Chemistry Emission (secondary eclipse) Model
+
+    This model computes an secondary eclipse spectrum based on free retrieval chemistry,
+    free Ackermann-Marley clouds and a Guillot temperature-pressure profile. (Molliere 2018).
+
+    Args:
+        pRT_object : object
+            An instance of the pRT class, with optical properties as defined in the RunDefinition.
+        parameters : dict
+            Dictionary of required parameters:
+                *  log_g : Log of surface gravity
+                *  R_pl : planet radius [cm]
+                *  R_star : stellar radius [cm]
+                *  T_star : stellar temperature [K]
+                *  T_int : Interior temperature of the planet [K]
+                *  T_equ : Equilibrium temperature of the planet
+                *  gamma : Guillot gamma parameter
+                *  log_kappa_IR : The log of the ratio between the infrared and optical opacities
+                *  sigma_lnorm : [optional] Width of cloud particle size distribution (log normal)
+                *  log_kzz : [optional] Vertical mixing parameter
+                *  fsed : [optional] sedimentation parameter
+                *  species : Log abundances for each species in rd.line_list
+                   (species stands in for the actual name)
+                *  log_X_cb : [optional] Log cloud abundances.
+                *  Pbase : [optional] log of cloud base pressure for each species.
+        PT_plot_mode : bool
+            Return only the pressure-temperature profile for plotting. Evaluate mode only.
+        AMR :
+            Adaptive mesh refinement. Use the high resolution pressure grid around the cloud base.
+
+    Returns:
+        wlen_model : np.array
+            Wavlength array of computed model, not binned to data [um]
+        spectrum_model : np.array
+            Computed emission spectrum [F_p/F_star]
+    """
+
+    #for key, val in parameters.items():
+    #    print(key,val.value)
+
+    # let's start out by setting up our global pressure arrays
+    # This is used for the hi res bins for AMR
+    pglobal_check(pRT_object.press/1e6,
+                  parameters['pressure_simple'].value,
+                  parameters['pressure_scaling'].value)
+
+    if AMR:
+        p_use = PGLOBAL
+    else:
+        p_use = pRT_object.press/1e6
+
+    # We need 2 of 3 for gravity, radius and mass
+    # So check which parameters are included in the Retrieval
+    # and calculate the third if necessary
+    gravity = -np.inf
+    R_pl = -np.inf
+    if 'log_g' in parameters.keys() and 'mass' in parameters.keys():
+        gravity = 10**parameters['log_g'].value
+        R_pl = np.sqrt(nc.G*parameters['mass'].value/gravity)
+    elif 'log_g' in parameters.keys():
+        gravity= 10**parameters['log_g'].value
+        R_pl = parameters['R_pl'].value
+    elif 'mass' in parameters.keys():
+        R_pl = parameters['R_pl'].value
+        gravity = nc.G * parameters['mass'].value/R_pl**2
+    else:
+        print("Pick two of log_g, R_pl and mass priors!")
+        sys.exit(5)
+
+    # We're using a guillot profile
+    temperatures = nc.guillot_global(p_use, \
+                                10**parameters['log_kappa_IR'].value,
+                                parameters['gamma'].value, \
+                                gravity, \
+                                parameters['T_int'].value, \
+                                parameters['T_equ'].value)
+
+    # Set up gas phase abundances, check to make sure that
+    # the total mass fraction is < 1.0
+    # We assume vertically constant abundances
+    abundances = {}
+    msum = 0.0
+    for species in pRT_object.line_species:
+        abund = 10**parameters[species.split("_R_")[0]].value
+        abundances[species] = abund * np.ones_like(pRT_object.press)
+        msum += abund
+    # Whatever's left is H2 and He
+    abundances['H2'] = 0.766 * (1.0-msum) * np.ones_like(pRT_object.press)
+    abundances['He'] = 0.234 * (1.0-msum) * np.ones_like(pRT_object.press)
+    if msum > 1.0:
+        #print(f"Abundance sum > 1.0, msum={msum}")
+        return None,None
+    MMW = calc_MMW(abundances)
+
+    # Now we need to find the cloud base pressure
+    # This sets where in the atmosphere the cloud is
+    # as well as giving us the location for the AMR regions
+    Pbases = {}
+    for cloud in pRT_object.cloud_species:
+        cname = cloud.split('_')[0]
+        if not "Pbase_" +cname in parameters.keys():
+            # Assume vertically constant abundances
+            Pbases[cname] = fc.simple_cdf_free(cname, p_use, temperatures, 10**parameters['log_X_cb_'+cname].value, MMW[0])
+        else:
+            Pbases[cname] = 10**parameters['Pbase_'+cname].value
+
+    # Set up the adaptive pressure grid
+    if AMR:
+        p_clouds = np.array(list(Pbases.values()))
+        pressures,small_index = fixed_length_amr(p_clouds,
+                                                 p_use,
+                                                 parameters['pressure_scaling'].value,
+                                                 parameters['pressure_width'].value)
+        if pressures.shape[0] != pRT_object.press.shape[0]:
+            print("Shapes ",pressures.shape[0],pRT_object.press.shape[0])
+            print("Pbase ",Pbases)
+            return None,None
+
+        pRT_object.press = pressures * 1e6
+        temperatures = temperatures[small_index]
+    else:
+        pressures = pRT_object.press/1e6
+
+    # Now that we have the pressure array, we can set up the
+    # cloud abundance profile
+    for cloud in pRT_object.cloud_species:
+        cname = cloud.split('_')[0]
+        abundances[cname] = np.zeros_like(pRT_object.press)
+        try:
+            abundances[cname][pressures < Pbases[cname]] = 10**parameters['log_X_cb_'+cname].value *\
+                        ((pressures[pressures <= Pbases[cname]]/Pbases[cname])**parameters['fsed'].value)
+        except:
+            print(cname)
+            print(f"{Pbases[cname]}")
+            print(f"{10**parameters['log_X_cb_'+cname].value}")
+            print(f"{(pressures[pressures <= Pbases[cname]]/Pbases[cname])**parameters['fsed'].value}\n")
+            return None,None
+
+    # If in evaluation mode, and PTs are supposed to be plotted
+    if PT_plot_mode:
+        return pressures, temperatures
+
+    # Don't need to include these parameters if there are no clouds.
+    kzz = None
+    fsed = None
+    sigma_lnorm = None
+    try:
+        fsed = parameters['fsed'].value,
+        kzz = 10**parameters['log_kzz'].value * np.ones_like(pressures),
+        sigma_lnorm = parameters['sigma_lnorm'].value,
+    except:
+        kzz = None
+        fsed = None
+        sigma_lnorm = None
+
+    # Calculate the spectrum
+    pRT_object.calc_flux(temperatures, \
+                     abundances, \
+                     gravity, \
+                     MMW, \
+                     contribution = False,
+                     fsed = fsed,
+                     Kzz = kzz,
+                     sigma_lnorm = sigma_lnorm,
+                     Rstar = parameters['R_star'].value,
+                     Tstar = parameters['T_star'].value,
+                     semimajoraxis = parameters['semimajor'].value)
+    wlen_model = nc.c/pRT_object.freq/1e-4
+
+    # We need to account for the different areas of the star and planet
+    # to properly get the contrast
+    spectrum_model = (pRT_object.flux*parameters['R_pl'].value**2)
+
+    # Correcting stellar spectrum from pRT-PHOENIX normalization
+    stellar_flux = (pRT_object.stellar_intensity * np.pi *\
+            (parameters['semimajor'].value/parameters['R_star'].value)**2.0)
+    stellar_flux *= parameters['R_star'].value**2.0
+
+    # Calculate the contrast
+    spectrum_model /=stellar_flux
+    return wlen_model, spectrum_model
+
 def guillot_eqchem_transmission(pRT_object, \
                                     parameters, \
                                     PT_plot_mode = False,
