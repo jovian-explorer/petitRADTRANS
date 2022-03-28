@@ -609,7 +609,7 @@ def remove_throughput_mean(spectral_data, reduction_matrix=None, data_uncertaint
 
 def simple_pipeline(spectral_data, data_uncertainties=None,
                     airmass=None, tellurics_mask_threshold=0.1, polynomial_fit_degree=1,
-                    apply_throughput_removal=True, apply_telluric_lines_removal=True):
+                    apply_throughput_removal=True, apply_telluric_lines_removal=True, full=False, **kwargs):
     """Removes the telluric lines and variable throughput of some data.
     If airmass is None, the Earth atmospheric transmittance is assumed to be time-independent, so telluric transmittance
     will be fitted using the weighted arithmetic mean. Otherwise, telluric transmittance are fitted with a polynomial.
@@ -673,4 +673,7 @@ def simple_pipeline(spectral_data, data_uncertainties=None,
                 polynomial_fit_degree=polynomial_fit_degree
             )
 
-    return reduced_data, reduction_matrix, reduced_data_uncertainties
+    if full:
+        return reduced_data, reduction_matrix, reduced_data_uncertainties
+    else:
+        return reduced_data

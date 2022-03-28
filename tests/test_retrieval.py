@@ -263,7 +263,8 @@ def test_simple_retrieval(test_number=0, max_test_number=max_number_of_tests):
             test_simple_retrieval(test_number=test_number, max_test_number=max_test_number)
         else:
             raise AssertionError(
-                f"Retrievals are expected to give results within a +/- 1 sigma uncertainty range. "
+                f"Retrievals are expected to give results within a +/- 1 sigma uncertainty range with a probability of "
+                f"~68% for each parameters."
                 f"To take that into account, {test_number} tests were performed, "
                 f"but all failed to fall within this range "
                 f"compared to the results of the previous version.\n"

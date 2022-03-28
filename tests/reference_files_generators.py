@@ -180,9 +180,7 @@ def npz2dat(file, new_resolution_power=60.0, relative_error=0.05, mode='transmis
     wavelength = npz_data['wavelength']
 
     if mode == 'emission':
-        from petitRADTRANS.ccf.model_containers import SpectralModel
-
-        flux = SpectralModel.radiosity_erg_hz2radiosity_erg_cm(
+        flux = petitRADTRANS.ccf.spectra_utils.radiosity_erg_hz2radiosity_erg_cm(
             npz_data['spectral_radiosity'],
             petitRADTRANS.nat_cst.c * 1e4 / wavelength  # um to Hz
         )

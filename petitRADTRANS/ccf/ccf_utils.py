@@ -29,7 +29,7 @@ def calculate_star_snr(wavelengths, star_effective_temperature, star_radius, sta
     ))
     wavelength_stellar = wavelength_stellar[wh]
 
-    stellar_spectral_radiance = SpectralModel.radiosity_erg_hz2radiosity_erg_cm(
+    stellar_spectral_radiance = radiosity_erg_hz2radiosity_erg_cm(
         stellar_spectral_radiance[wh, 1],
         nc.c / wavelength_stellar  # in Hz
     )
@@ -47,7 +47,7 @@ def calculate_star_snr(wavelengths, star_effective_temperature, star_radius, sta
 def calculate_star_radiosity(wavelength_boundaries, star_effective_temperature, star_radius, star_distance):
     stellar_spectral_radiance = phoenix.get_PHOENIX_spec(star_effective_temperature)
     wavelength_stellar = stellar_spectral_radiance[:, 0]  # in cm
-    stellar_spectral_radiance = SpectralModel.radiosity_erg_hz2radiosity_erg_cm(
+    stellar_spectral_radiance = radiosity_erg_hz2radiosity_erg_cm(
         stellar_spectral_radiance[:, 1],
         nc.c / wavelength_stellar
     )
@@ -645,7 +645,7 @@ def load_wavelength_settings(file):
 
 
 def radiosity_erg_hz2radiosity_erg_cm(radiosity_erg_hz, frequency):
-    """
+    """  # TODO use spectra_utils function instead
     Convert a radiosity from erg.s-1.cm-2.sr-1/Hz to erg.s-1.cm-2.sr-1/cm at a given frequency.
     Steps:
         [cm] = c[cm.s-1] / [Hz]

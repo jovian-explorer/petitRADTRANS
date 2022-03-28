@@ -9,5 +9,4 @@ Then simply use the `tox` command:
     tox
     ```
 """
-# TODO test rebinning
-# TODO test retrieval
+# TODO test re-binning

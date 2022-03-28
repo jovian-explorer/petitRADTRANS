@@ -1,6 +1,7 @@
 import copy
 import os
 import pickle
+import sys
 
 import h5py
 import numpy as np
@@ -8,10 +9,13 @@ import pyvo
 from astropy.table.table import Table
 
 from petitRADTRANS import nat_cst as nc
+from petitRADTRANS.ccf.spectra_utils import convolve_shift_rebin, calculate_spectral_radiosity_spectrum, \
+    calculate_transit_spectrum, scale_secondary_eclipse_spectrum, scale_transit_spectrum, \
+    radiosity_erg_hz2radiosity_erg_cm
 from petitRADTRANS.ccf.utils import calculate_uncertainty, module_dir
 from petitRADTRANS.fort_rebin import fort_rebin as fr
 from petitRADTRANS.phoenix import get_PHOENIX_spec
-from petitRADTRANS.physics import guillot_global
+from petitRADTRANS.physics import doppler_shift, guillot_global
 from petitRADTRANS.radtrans import Radtrans
 from petitRADTRANS.retrieval.util import calc_MMW
 
@@ -22,10 +26,335 @@ planet_models_directory = os.path.abspath(os.path.dirname(__file__) + os.path.se
 
 
 # planet_models_directory = petitradtrans_config['Paths']['pRT_outputs_path']
+
+class BaseSpectralModel:
+    # TODO ideally this should inherit from Radtrans, but it cannot be done right now because when Radtrans is init, it takes ages to load opacity data
+    def __init__(self, wavelengths_boundaries, pressures, temperatures=None,
+                 mass_mixing_ratios=None, mean_molar_masses=None,
+                 line_species=None, rayleigh_species=None, continuum_opacities=None, cloud_species=None,
+                 opacity_mode='lbl', do_scat_emis=True, lbl_opacity_sampling=1,
+                 wavelengths=None, transit_radii=None, spectral_radiosities=None, times=None,
+                 **model_parameters):
+        # Atmosphere/Radtrans parameters
+        self.wavelengths_boundaries = wavelengths_boundaries
+        self.pressures = pressures
+        self.lbl_opacity_sampling = lbl_opacity_sampling
+        self.do_scat_emis = do_scat_emis
+        self.opacity_mode = opacity_mode
+
+        if line_species is None:
+            self.line_species = []
+        else:
+            self.line_species = line_species
+
+        if rayleigh_species is None:
+            self.rayleigh_species = []
+        else:
+            self.rayleigh_species = rayleigh_species
+
+        if continuum_opacities is None:
+            self.continuum_opacities = []
+        else:
+            self.continuum_opacities = continuum_opacities
+
+        if cloud_species is None:
+            self.cloud_species = []
+        else:
+            self.cloud_species = cloud_species
+
+        # Spectrum generation base parameters
+        self.temperatures = temperatures
+        self.mass_mixing_ratios = mass_mixing_ratios
+        self.mean_molar_masses = mean_molar_masses
+
+        # Spectrum parameters
+        self.wavelengths = wavelengths
+        self.transit_radii = transit_radii
+        self.spectral_radiosities = spectral_radiosities
+
+        # Time-dependent parameters
+        self.times = times
+
+        # Other model parameters
+        self.model_parameters = model_parameters
+
+    @staticmethod
+    def get_mass_mixing_ratios(pressures, **kwargs):
+        """Template for mass mixing ratio profile function.
+        Here, generate iso-abundant mass mixing ratios profiles.
+
+        Args:
+            pressures: (bar) pressures of the temperature profile
+            **kwargs: other parameters needed to generate the temperature profile
+
+        Returns:
+            A 1D-array containing the temperatures as a function of pressures
+        """
+        return {
+            species: mass_mixing_ratio * np.ones(np.size(pressures))
+            for species, mass_mixing_ratio in kwargs['imposed_mass_mixing_ratios'].items()
+        }
+
+    @staticmethod
+    def get_mean_molar_masses(mass_mixing_ratios, **kwargs):
+        return calc_MMW(mass_mixing_ratios)
+
+    @staticmethod
+    def get_model_parameters(**kwargs):
+        """Function to update model parameters.
+
+        Args:
+            **kwargs: parameters to update
+
+        Returns:
+            Updated parameters
+        """
+        # This function can be expanded to include anything
+        return kwargs
+
+    def get_parameters_dict(self):
+        parameters_dict = {}
+
+        for key, value in self.__dict__.items():
+            if key == 'model_parameters':  # model_parameters is a dictionary, extract its values
+                for parameter, parameter_value in value.items():
+                    parameters_dict[parameter] = copy.copy(parameter_value)
+            else:
+                parameters_dict[key] = copy.copy(value)
+
+        return parameters_dict
+
+    def get_radtrans(self):
+        """Return the Radtrans object corresponding to this SpectrumModel."""
+        return self.init_radtrans(
+            wavelengths_boundaries=self.wavelengths_boundaries,
+            pressures=self.pressures,
+            line_species=self.line_species,
+            rayleigh_species=self.rayleigh_species,
+            continuum_opacities=self.continuum_opacities,
+            lbl_opacity_sampling=self.lbl_opacity_sampling,
+            do_scat_emis=self.do_scat_emis,
+            opacity_mode=self.opacity_mode
+        )
+
+    def get_spectral_calculation_parameters(self, pressures=None, **kwargs):
+        if pressures is None:
+            pressures = self.pressures
+
+        temperatures = self.get_temperature_profile(
+            pressures=pressures,
+            **kwargs
+        )
+
+        mass_mixing_ratios = self.get_mass_mixing_ratios(
+            pressures=pressures,
+            **kwargs
+        )
+
+        mean_molar_masses = self.get_mean_molar_masses(
+            mass_mixing_ratios=mass_mixing_ratios,
+            **kwargs
+        )
+
+        model_parameters = self.get_model_parameters(
+            temperatures=temperatures,
+            mass_mixing_ratios=mass_mixing_ratios,
+            mean_molar_masses=mean_molar_masses,
+            **kwargs
+        )
+
+        return temperatures, mass_mixing_ratios, mean_molar_masses, model_parameters
+
+    @staticmethod
+    def get_spectral_radiosity_spectrum(radtrans: Radtrans, temperatures, mass_mixing_ratios,
+                                        planet_surface_gravity, mean_molar_mass, star_effective_temperature,
+                                        star_radius, semi_major_axis, cloud_pressure, **kwargs):
+        """Wrapper of Radtrans.calc_flux that output wavelengths in um and spectral radiosity in erg.s-1.cm-2.sr-1/cm.
+        # TODO move to Radtrans or outside of object
+        Args:
+            radtrans:
+            temperatures:
+            mass_mixing_ratios:
+            planet_surface_gravity:
+            mean_molar_mass:
+            star_effective_temperature:
+            star_radius:
+            semi_major_axis:
+            cloud_pressure:
+
+        Returns:
+
+        """
+        # Calculate the spectrum
+        # TODO units in native calc_flux units for more performances?
+        radtrans.calc_flux(
+            temp=temperatures,
+            abunds=mass_mixing_ratios,
+            gravity=planet_surface_gravity,
+            mmw=mean_molar_mass,
+            Tstar=star_effective_temperature,
+            Rstar=star_radius / nc.r_sun,
+            semimajoraxis=semi_major_axis / nc.AU,
+            Pcloud=cloud_pressure,
+            # stellar_intensity=parameters['star_spectral_radiosity'].value
+            # **kwargs  # TODO add kwargs once arguments names are made unambiguous
+        )
+
+        # Transform the outputs into the units of our data.
+        spectral_radiosity = radiosity_erg_hz2radiosity_erg_cm(radtrans.flux, radtrans.freq)
+        wavelengths = nc.c / radtrans.freq * 1e4  # cm to um
+
+        return wavelengths, spectral_radiosity
+
+    def get_spectral_radiosity_spectrum_model(self, radtrans: Radtrans, parameters):
+        self.wavelengths, self.spectral_radiosities = self.get_spectral_radiosity_spectrum(
+            radtrans=radtrans,
+            temperatures=self.temperatures,
+            mass_mixing_ratios=self.mass_mixing_ratios,
+            **parameters
+        )
+
+        return self.wavelengths, self.spectral_radiosities
+
+    def get_spectrum_model(self, radtrans: Radtrans, parameters, mode='emission'):
+        self.update_spectral_calculation_parameters(
+            radtrans=radtrans,
+            **parameters
+        )
+
+        if mode == 'emission':
+            wavelengths, spectrum = self.get_spectral_radiosity_spectrum_model(
+                radtrans=radtrans,
+                parameters=parameters
+            )
+        elif mode == 'transmission':
+            wavelengths, spectrum = self.get_transit_spectrum_model(
+                radtrans=radtrans,
+                parameters=parameters
+            )
+        else:
+            raise ValueError(f"mode must be 'emission' or 'transmission', not '{mode}'")
+
+        return wavelengths, spectrum
+
+    @staticmethod
+    def get_temperature_profile(pressures, **kwargs):
+        """Template for temperature profile function.
+        Here, generate an isothermal temperature profile.
+
+        Args:
+            pressures: (bar) pressures of the temperature profile
+            **kwargs: other parameters needed to generate the temperature profile
+
+        Returns:
+            A 1D-array containing the temperatures as a function of pressures
+        """
+        return np.ones(np.size(pressures)) * kwargs['temperature']
+
+    @staticmethod
+    def get_transit_spectrum(radtrans: Radtrans, temperatures, mass_mixing_ratios, mean_molar_masses,
+                             planet_surface_gravity, reference_pressure, planet_radius, **kwargs):
+        """Wrapper of Radtrans.calc_transm that output wavelengths in um and transit radius in cm.
+        # TODO move to Radtrans or outside of object
+
+        Args:
+            radtrans:
+            temperatures:
+            mass_mixing_ratios:
+            planet_surface_gravity:
+            mean_molar_masses:
+            reference_pressure:
+            planet_radius:
+
+        Returns:
+
+        """
+        # Calculate the spectrum
+        radtrans.calc_transm(
+            temp=temperatures,
+            abunds=mass_mixing_ratios,
+            gravity=planet_surface_gravity,
+            mmw=mean_molar_masses,
+            P0_bar=reference_pressure,
+            R_pl=planet_radius,
+            # **kwargs  # TODO add kwargs once arguments names are made unambiguous
+        )
+
+        # Convert into more useful units
+        planet_transit_radius = copy.copy(radtrans.transm_rad)
+        wavelengths = nc.c / radtrans.freq * 1e4  # Hz to um
+
+        return wavelengths, planet_transit_radius
+
+    def get_transit_spectrum_model(self, radtrans: Radtrans, parameters):
+        self.wavelengths, self.transit_radii = self.get_transit_spectrum(
+            radtrans=radtrans,
+            temperatures=self.temperatures,
+            mass_mixing_ratios=self.mass_mixing_ratios,
+            mean_molar_masses=self.mean_molar_masses,
+            **parameters
+        )
+
+        return self.wavelengths, self.transit_radii
+
+    @staticmethod
+    def init_radtrans(wavelengths_boundaries, pressures,
+                      line_species=None, rayleigh_species=None, continuum_opacities=None, cloud_species=None,
+                      opacity_mode='lbl', do_scat_emis=True, lbl_opacity_sampling=1):
+        print('Generating atmosphere...')
+
+        radtrans = Radtrans(
+            line_species=line_species,
+            rayleigh_species=rayleigh_species,
+            continuum_opacities=continuum_opacities,
+            cloud_species=cloud_species,
+            wlen_bords_micron=wavelengths_boundaries,
+            mode=opacity_mode,
+            do_scat_emis=do_scat_emis,
+            lbl_opacity_sampling=lbl_opacity_sampling
+        )
+
+        radtrans.setup_opa_structure(pressures)
+
+        return radtrans
+
+    def save(self, file):
+        pass
+        # TODO save and load functions
+        # with h5py.File(file, 'w') as f:
+        #
+        #     dataset = f.create_dataset(
+        #         name='wavelengths',
+        #         data=wavelengths
+        #     )
+        #     dataset.attrs['units'] = f'{wavelengths_units}'
+
+    def update_spectral_calculation_parameters(self, radtrans: Radtrans, **kwargs):
+        self.temperatures, self.mass_mixing_ratios, self.mean_molar_masses, self.model_parameters = \
+            self.get_spectral_calculation_parameters(
+                pressures=radtrans.press * 1e-6,  # cgs to bar
+                **kwargs
+            )
+
+
 class Param:
     """Object used only to satisfy the requirements of the retrieval module."""
     def __init__(self, value):
         self.value = value
+
+
+class ParametersDict(dict):
+    def __init__(self, t_int, metallicity, co_ratio, p_cloud):
+        super().__init__()
+
+        self['intrinsic_temperature'] = t_int
+        self['metallicity'] = metallicity
+        self['co_ratio'] = co_ratio
+        self['p_cloud'] = p_cloud
+
+    def to_str(self):
+        return f"T_int = {self['intrinsic_temperature']}, [Fe/H] = {self['metallicity']}, C/O = {self['co_ratio']}, " \
+               f"P_cloud = {self['p_cloud']}"
 
 
 class Planet:
@@ -959,6 +1288,20 @@ class Planet:
     @staticmethod
     def generate_filename(name):
         return f"{planet_models_directory}{os.path.sep}planet_{name.replace(' ', '_')}.h5"
+
+    @staticmethod
+    def get_orbital_phases(phase_start, orbital_period, times):
+        """Calculate orbital phases assuming low eccentricity.
+
+        Args:
+            phase_start: planet phase at the start of observations
+            orbital_period: (s) orbital period of the planet
+            times: (s) time array
+
+        Returns:
+            The orbital phases for the given time
+        """
+        return np.mod(phase_start + times / orbital_period, 1.0)
 
     @staticmethod
     def download_from_nasa_exoplanet_archive(name):
@@ -1951,6 +2294,13 @@ class SpectralModel:
                 else:
                     mass_fractions_dict[key] = abundances[key]
 
+        for key in mass_fractions:
+            if key not in mass_fractions_dict:
+                if key not in include_species:
+                    mass_fractions_dict[key] = np.zeros_like(temperature)
+                else:
+                    mass_fractions_dict[key] = mass_fractions[key]
+
         return mass_fractions_dict
 
     def init_temperature_guillot(self, planet: Planet, atmosphere: Radtrans):
@@ -2054,7 +2404,13 @@ class SpectralModel:
                 continuum_opacities = cls.default_continuum_opacities
 
             if include_species == ['all']:
-                include_species = [species_name.split('_', 1)[0] for species_name in line_species_list]
+                include_species = []
+
+                for species_name in line_species_list:
+                    if species_name == 'CO_36':
+                        include_species.append(species_name)
+                    else:
+                        include_species.append(species_name.split('_', 1)[0])
 
             # Generate the model
             return cls._generate(
@@ -2255,18 +2611,1169 @@ class SpectralModel:
         return atmosphere
 
 
-class ParametersDict(dict):
-    def __init__(self, t_int, metallicity, co_ratio, p_cloud):
-        super().__init__()
+class SpectralModel2(BaseSpectralModel):
+    default_line_species = [
+        'CH4_main_iso',
+        'CO_all_iso',
+        'CO2_main_iso',
+        'H2O_main_iso',
+        'HCN_main_iso',
+        'K',
+        'Na_allard',
+        'NH3_main_iso',
+        'TiO_all_iso_exo',
+        'VO'
+    ]
+    default_rayleigh_species = [
+        'H2',
+        'He'
+    ]
+    default_continuum_opacities = [
+        'H2-H2',
+        'H2-He'
+    ]
 
-        self['intrinsic_temperature'] = t_int
-        self['metallicity'] = metallicity
-        self['co_ratio'] = co_ratio
-        self['p_cloud'] = p_cloud
+    def __init__(self, wavelengths_boundaries, pressures, temperatures=None,
+                 mass_mixing_ratios=None, mean_molar_masses=None,
+                 line_species=None, rayleigh_species=None, continuum_opacities=None, cloud_species=None,
+                 opacity_mode='lbl', do_scat_emis=True, lbl_opacity_sampling=1,
+                 wavelengths=None, transit_radii=None, spectral_radiosities=None, times=None,
+                 star_spectral_radiosities=None, shifted_star_spectral_radiosities=None, star_effective_temperature=None,
+                 wavelengths_rest=None, resolving_power_rest=None,
+                 shifted_transit_radii=None, shifted_spectral_radiosities=None,
+                 orbital_phases=None,
+                 **model_parameters):
+        super().__init__(
+            wavelengths_boundaries=wavelengths_boundaries,
+            pressures=pressures,
+            temperatures=temperatures,
+            mass_mixing_ratios=mass_mixing_ratios,
+            mean_molar_masses=mean_molar_masses,
+            line_species=line_species,
+            rayleigh_species=rayleigh_species,
+            continuum_opacities=continuum_opacities,
+            cloud_species=cloud_species,
+            opacity_mode=opacity_mode,
+            do_scat_emis=do_scat_emis,
+            lbl_opacity_sampling=lbl_opacity_sampling,
+            wavelengths=wavelengths,
+            transit_radii=transit_radii,
+            spectral_radiosities=spectral_radiosities,
+            times=times,
+            **model_parameters
+        )
 
-    def to_str(self):
-        return f"T_int = {self['intrinsic_temperature']}, [Fe/H] = {self['metallicity']}, C/O = {self['co_ratio']}, " \
-               f"P_cloud = {self['p_cloud']}"
+        self.star_spectral_radiosities = star_spectral_radiosities
+        self.shifted_star_spectral_radiosities = shifted_star_spectral_radiosities
+        self.star_effective_temperature = star_effective_temperature
+        self.wavelengths_rest = wavelengths_rest
+        self.resolving_power_rest = resolving_power_rest
+        self.shifted_transit_radii = shifted_transit_radii
+        self.shifted_spectral_radiosities = shifted_spectral_radiosities
+        self.orbital_phases = orbital_phases
+
+    @staticmethod
+    def _get_equilibrium_mass_mixing_ratios(pressures, temperatures, co_ratio, log10_metallicity,
+                                            line_species, included_line_species,
+                                            carbon_pressure_quench=None, imposed_mass_mixing_ratios=None):
+        from petitRADTRANS.poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm  # import is here because it is long to load
+
+        if np.size(co_ratio) == 1:
+            co_ratios = np.ones_like(pressures) * co_ratio
+        else:
+            co_ratios = co_ratio
+
+        if np.size(log10_metallicity) == 1:
+            log10_metallicities = np.ones_like(pressures) * log10_metallicity
+        else:
+            log10_metallicities = log10_metallicity
+
+        equilibrium_mass_mixing_ratios = pm.interpol_abundances(
+            COs_goal_in=co_ratios,
+            FEHs_goal_in=log10_metallicities,
+            temps_goal_in=temperatures,
+            pressures_goal_in=pressures,
+            Pquench_carbon=carbon_pressure_quench
+        )
+
+        # Check imposed mass mixing ratios keys
+        for key in imposed_mass_mixing_ratios:
+            if key not in line_species and key not in equilibrium_mass_mixing_ratios:
+                raise KeyError(f"key '{key}' not in retrieved species list or "
+                               f"standard petitRADTRANS mass fractions dict")
+
+        # Get the right keys for the mass fractions dictionary
+        mass_mixing_ratios = {}
+
+        if included_line_species == 'all':
+            included_line_species = copy.copy(line_species)
+
+        for key in equilibrium_mass_mixing_ratios:
+            found = False
+
+            # Set line species mass mixing ratios into to their imposed one
+            for line_species_name in line_species:
+                # Correct for line species name to match pRT chemistry name
+                line_species_name = line_species_name.split('_', 1)[0]
+
+                if line_species_name == 'C2H2':  # C2H2 special case
+                    line_species_name += ',acetylene'
+
+                if key == line_species_name:
+                    if key not in included_line_species:
+                        # Species not included, set mass mixing ratio to 0
+                        mass_mixing_ratios[line_species_name] = np.zeros(np.shape(temperatures))
+                    elif line_species_name in imposed_mass_mixing_ratios:
+                        # Use imposed mass mixing ratio
+                        mass_mixing_ratios[line_species_name] = 10 ** imposed_mass_mixing_ratios[line_species_name]
+                    else:
+                        # Use calculated mass mixing ratio
+                        mass_mixing_ratios[line_species_name] = equilibrium_mass_mixing_ratios[line_species_name]
+
+                    found = True
+
+                    break
+
+            # Set species mass mixing ratio to their imposed one
+            if not found:
+                if key in imposed_mass_mixing_ratios:
+                    # Use imposed mass mixing ratio
+                    mass_mixing_ratios[key] = imposed_mass_mixing_ratios[key]
+                else:
+                    # Use calculated mass mixing ratio
+                    mass_mixing_ratios[key] = equilibrium_mass_mixing_ratios[key]
+
+        return mass_mixing_ratios
+
+    def calculate_orbital_phases(self, phase_start, orbital_period):
+        self.orbital_phases = Planet.get_orbital_phases(
+            phase_start=phase_start,
+            orbital_period=orbital_period,
+            times=self.times
+        )
+
+    def calculate_star_spectral_radiosity(self):
+        self.star_spectral_radiosities = self._get_phoenix_star_spectral_radiosity(
+            star_effective_temperature=self.star_effective_temperature,
+            wavelengths=self.wavelengths
+        )
+
+    @staticmethod
+    def get_mass_mixing_ratios(pressures, line_species=None,
+                               included_line_species='all', temperatures=None, co_ratio=0.55, log10_metallicity=0,
+                               carbon_pressure_quench=None,
+                               imposed_mass_mixing_ratios=None, heh2_ratio=0.324324, use_equilibrium_chemistry=False):
+        """Initialize a model mass mixing ratios.
+        Ensure that in any case, the sum of mass mixing ratios is equal to 1. Imposed mass mixing ratios are kept to
+        their imposed value as long as the sum of the imposed values is lower or equal to 1. H2 and He are used as
+        filling gases.
+        The different possible cases are dealt with as follows:
+            - Sum of imposed mass mixing ratios > 1: the mass mixing ratios are scaled down, conserving the ratio
+            between them. Non-imposed mass mixing ratios are set to 0.
+            - Sum of imposed mass mixing ratio of all imposed species < 1: if equilibrium chemistry is used or if H2 and
+            He are imposed species, the atmosphere will be filled with H2 and He respecting the imposed H2/He ratio.
+            Otherwise, the heh2_ratio parameter is used.
+            - Sum of imposed and non-imposed mass mixing ratios > 1: the non-imposed mass mixing ratios are scaled down,
+            conserving the ratios between them. Imposed mass mixing ratios are unchanged.
+            - Sum of imposed and non-imposed mass mixing ratios < 1: if equilibrium chemistry is used or if H2 and
+            He are imposed species, the atmosphere will be filled with H2 and He respecting the imposed H2/He ratio.
+            Otherwise, the heh2_ratio parameter is used.
+
+        When using equilibrium chemistry with imposed mass mixing ratios, imposed mass mixing ratios are set to their
+        imposed value regardless of chemical equilibrium consistency.
+
+        Args:
+            pressures: (bar) pressures of the mass mixing ratios
+            line_species: list of line species, required to manage naming differences between opacities and chemistry
+            included_line_species: which line species of the list to include, mass mixing ratio set to 0 otherwise
+            temperatures: (K) temperatures of the mass mixing ratios, used with equilibrium chemistry
+            co_ratio: carbon over oxygen ratios of the model, used with equilibrium chemistry
+            log10_metallicity: ratio between heavy elements and H2 + He compared to solar, used with equilibrium chemistry
+            carbon_pressure_quench: (bar) pressure where the carbon species are quenched, used with equilibrium chemistry
+            imposed_mass_mixing_ratios: imposed mass mixing ratios
+            heh2_ratio: H2 over He mass mixing ratio
+            use_equilibrium_chemistry: if True, use pRT equilibrium chemistry module
+
+        Returns:
+            A dictionary containing the mass mixing ratios.
+        """
+        # Initialization
+        mass_mixing_ratios = {}
+        m_sum_imposed_species = np.zeros(np.shape(pressures))
+        m_sum_species = np.zeros(np.shape(pressures))
+
+        if line_species is None:
+            line_species = []
+
+        # Initialize imposed mass mixing ratios
+        if imposed_mass_mixing_ratios is not None:
+            for species, mass_mixing_ratio in imposed_mass_mixing_ratios.items():
+                if np.size(mass_mixing_ratio) == 1:
+                    imposed_mass_mixing_ratios[species] = np.ones(np.shape(pressures)) * mass_mixing_ratio
+                elif np.size(mass_mixing_ratio) != np.size(pressures):
+                    raise ValueError(f"mass mixing ratio for species '{species}' must be a scalar or an array of the"
+                                     f"size of the pressure array ({np.size(pressures)}), "
+                                     f"but is of size ({np.size(mass_mixing_ratio)})")
+        else:
+            # Nothing is imposed
+            imposed_mass_mixing_ratios = {}
+
+        # Chemical equilibrium
+        if use_equilibrium_chemistry:
+            mass_mixing_ratios_equilibrium = SpectralModel2._get_equilibrium_mass_mixing_ratios(
+                pressures=pressures,
+                temperatures=temperatures,
+                co_ratio=co_ratio,
+                log10_metallicity=log10_metallicity,
+                line_species=line_species,
+                included_line_species=included_line_species,
+                carbon_pressure_quench=carbon_pressure_quench,
+                imposed_mass_mixing_ratios=imposed_mass_mixing_ratios
+            )
+
+            if imposed_mass_mixing_ratios == {}:
+                imposed_mass_mixing_ratios = copy.copy(mass_mixing_ratios_equilibrium)
+        else:
+            mass_mixing_ratios_equilibrium = None
+
+        # Ensure that the sum of mass mixing ratios of imposed species is <= 1
+        for species in imposed_mass_mixing_ratios:
+            # Ignore the non-abundances coming from the chemistry module
+            if species == 'nabla_ad' or species == 'MMW':
+                continue
+
+            spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities
+            mass_mixing_ratios[species] = imposed_mass_mixing_ratios[spec]
+            m_sum_imposed_species += imposed_mass_mixing_ratios[spec]
+
+        for i in range(np.size(m_sum_imposed_species)):
+            if m_sum_imposed_species[i] > 1:
+                # TODO changing retrieved mmr might come problematic in some retrievals (retrieved value not corresponding to actual value in model)
+                print(f"Warning: sum of mass mixing ratios of imposed species ({m_sum_imposed_species}) is > 1, "
+                      f"correcting...")
+
+                for species in imposed_mass_mixing_ratios:
+                    mass_mixing_ratios[species][i] /= m_sum_imposed_species[i]
+
+        m_sum_imposed_species = np.sum(list(mass_mixing_ratios.values()), axis=0)
+
+        # Get the sum of mass mixing ratios of non-imposed species
+        if mass_mixing_ratios_equilibrium is None:
+            # TODO this is assuming an H2-He atmosphere with line species, this could be more general
+            species_list = copy.copy(line_species)
+        else:
+            species_list = list(mass_mixing_ratios_equilibrium.keys())
+
+        for species in species_list:
+            # Ignore the non-abundances coming from the chemistry module
+            if species == 'nabla_ad' or species == 'MMW':
+                continue
+
+            # Search for imposed species
+            found = False
+
+            for key in imposed_mass_mixing_ratios:
+                spec = key.split('_R_')[0]  # deal with the naming scheme for binned down opacities
+
+                if species == spec:
+                    found = True
+
+                    break
+
+            # Only take into account non-imposed species and ignore imposed species
+            if not found:
+                mass_mixing_ratios[species] = mass_mixing_ratios_equilibrium[species]
+                m_sum_species += mass_mixing_ratios_equilibrium[species]
+
+        # Ensure that the sum of mass mixing ratios of all species is = 1
+        m_sum_total = m_sum_species + m_sum_imposed_species
+
+        if np.any(np.logical_or(m_sum_total > 1, m_sum_total < 1)):
+            # Search for H2 and He in both imposed and non-imposed species
+            h2_in_imposed_mass_mixing_ratios = False
+            he_in_imposed_mass_mixing_ratios = False
+            h2_in_mass_mixing_ratios = False
+            he_in_mass_mixing_ratios = False
+
+            if 'H2' in imposed_mass_mixing_ratios:
+                h2_in_imposed_mass_mixing_ratios = True
+
+            if 'He' in imposed_mass_mixing_ratios:
+                he_in_imposed_mass_mixing_ratios = True
+
+            if 'H2' in mass_mixing_ratios:
+                h2_in_mass_mixing_ratios = True
+
+            if 'He' in mass_mixing_ratios:
+                he_in_mass_mixing_ratios = True
+
+            if not h2_in_mass_mixing_ratios or not he_in_mass_mixing_ratios:
+                if not h2_in_mass_mixing_ratios:
+                    mass_mixing_ratios['H2'] = np.zeros(np.shape(pressures))
+
+                if not he_in_mass_mixing_ratios:
+                    mass_mixing_ratios['He'] = np.zeros(np.shape(pressures))
+
+            for i in range(np.size(m_sum_total)):
+                if m_sum_total[i] > 1:
+                    print(f"Warning: sum of species mass fraction ({m_sum_species[i]} + {m_sum_imposed_species[i]}) "
+                          f"is > 1, correcting...")
+
+                    for species in mass_mixing_ratios:
+                        if species not in imposed_mass_mixing_ratios:
+                            mass_mixing_ratios[species][i] = \
+                                mass_mixing_ratios[species][i] * (1 - m_sum_imposed_species[i]) / m_sum_species[i]
+
+                elif m_sum_total[i] < 1:
+                    # Fill atmosphere with H2 and He
+                    # TODO there might be a better filling species, N2?
+                    if h2_in_imposed_mass_mixing_ratios and he_in_imposed_mass_mixing_ratios:
+                        # Use imposed He/H2 ratio
+                        heh2_ratio = 10 ** imposed_mass_mixing_ratios['He'][i] \
+                                     / 10 ** imposed_mass_mixing_ratios['H2'][i]
+
+                    if h2_in_mass_mixing_ratios and he_in_mass_mixing_ratios:
+                        # Use calculated He/H2 ratio
+                        heh2_ratio = mass_mixing_ratios['He'][i] / mass_mixing_ratios['H2'][i]
+
+                        mass_mixing_ratios['H2'][i] += (1 - m_sum_total[i]) / (1 + heh2_ratio)
+                        mass_mixing_ratios['He'][i] = mass_mixing_ratios['H2'][i] * heh2_ratio
+                    else:
+                        # Remove H2 and He mass mixing ratios from total for correct mass mixing ratio calculation
+                        if h2_in_mass_mixing_ratios:
+                            m_sum_total[i] -= mass_mixing_ratios['H2'][i]
+                        elif he_in_mass_mixing_ratios:
+                            m_sum_total[i] -= mass_mixing_ratios['He'][i]
+
+                        # Use He/H2 ratio in argument
+                        mass_mixing_ratios['H2'][i] = (1 - m_sum_total[i]) / (1 + heh2_ratio)
+                        mass_mixing_ratios['He'][i] = mass_mixing_ratios['H2'][i] * heh2_ratio
+
+        return mass_mixing_ratios
+
+    def get_relative_velocities(self, planet_max_radial_orbital_velocity, planet_orbital_inclination,
+                                system_observer_radial_velocities, planet_rest_frame_shift):
+        if -sys.float_info.min < planet_max_radial_orbital_velocity < sys.float_info.min:
+            relative_velocities = 0.0
+        else:
+            relative_velocities = Planet.calculate_planet_radial_velocity(
+                planet_max_radial_orbital_velocity=planet_max_radial_orbital_velocity,
+                planet_orbital_inclination=planet_orbital_inclination,
+                orbital_phases=self.orbital_phases
+            )
+
+        relative_velocities += system_observer_radial_velocities + planet_rest_frame_shift  # planet + system velocity
+
+        return relative_velocities
+
+    def get_shifted_spectrum_model(self, radtrans: Radtrans, parameters, mode='transit'):
+        _, _, = self.get_spectrum_model(
+            radtrans=radtrans,
+            parameters=parameters,
+            mode=mode
+        )
+
+        relative_velocities = self.get_relative_velocities(
+            planet_max_radial_orbital_velocity=parameters['planet_max_radial_orbital_velocity'],
+            planet_orbital_inclination=parameters['planet_orbital_inclination'],
+            system_observer_radial_velocities=parameters['system_observer_radial_velocities'],
+            planet_rest_frame_shift=parameters['planet_rest_frame_shift'],
+        )
+
+        spectra = convolve_shift_rebin(
+            input_wavelengths=self.wavelengths,
+            input_spectrum=self.transit_radii,
+            output_wavelengths=self.wavelengths_rest,
+            new_resolving_power=self.resolving_power_rest,
+            relative_velocities=relative_velocities
+        )
+
+        if mode == 'emission':
+            self.shifted_spectral_radiosities = spectra
+
+            return self.wavelengths_rest, self.shifted_spectral_radiosities
+        elif mode == 'transmission':
+            self.shifted_transit_radii = spectra
+
+            return self.wavelengths_rest, self.shifted_transit_radii
+
+    def get_scaled_shifted_spectrum_model(self, radtrans: Radtrans, parameters, mode='transit'):
+        wavelengths, spectrum = self.get_shifted_spectrum_model(
+            radtrans=radtrans,
+            parameters=parameters,
+            mode=mode
+        )
+
+        if mode == 'emission':
+            star_relative_velocities = self.get_relative_velocities(
+                planet_max_radial_orbital_velocity=0.0,
+                planet_orbital_inclination=0.0,
+                system_observer_radial_velocities=parameters['system_observer_radial_velocities'],
+                planet_rest_frame_shift=parameters['planet_rest_frame_shift'],
+            )
+
+            self.shifted_star_spectral_radiosities = convolve_shift_rebin(
+                input_wavelengths=self.wavelengths,
+                input_spectrum=self.transit_radii,
+                output_wavelengths=self.wavelengths_rest,
+                new_resolving_power=self.resolving_power_rest,
+                relative_velocities=star_relative_velocities
+            )
+
+            return wavelengths, self.scale_spectrum(
+                spectrum=spectrum,
+                star_radius=parameters['star_radius'],
+                planet_radius=parameters['planet_radius'],
+                star_spectral_radiosity=self.shifted_star_spectral_radiosities,
+                mode=mode
+            )
+        elif mode == 'transmission':
+            return wavelengths, self.scale_spectrum(
+                spectrum=spectrum,
+                star_radius=parameters['star_radius'],
+                mode=mode
+            )
+
+    def get_spectral_calculation_parameters(self, pressures=None, temperature=None, line_species=None,
+                                            included_line_species='all',
+                                            imposed_mass_mixing_ratios=None,
+                                            intrinsic_temperature=None, planet_surface_gravity=None, metallicity=None,
+                                            guillot_temperature_profile_gamma=0.4,
+                                            guillot_temperature_profile_kappa_ir_z0=0.01,
+                                            co_ratio=0.55, carbon_pressure_quench=None, heh2_ratio=0.324324,
+                                            use_equilibrium_chemistry=False, **parameters
+                                            ):
+        """Initialize the temperature profile, mass mixing ratios and mean molar mass of a model.
+
+        Args:
+            pressures:
+            temperature:
+            line_species:
+            included_line_species:
+            imposed_mass_mixing_ratios:
+            intrinsic_temperature:
+            planet_surface_gravity:
+            metallicity:
+            guillot_temperature_profile_gamma:
+            guillot_temperature_profile_kappa_ir_z0:
+            co_ratio:
+            carbon_pressure_quench:
+            heh2_ratio:
+            use_equilibrium_chemistry:
+
+        Returns:
+
+        """
+        if pressures is None:
+            pressures = self.pressures
+
+        temperatures = self.get_temperature_profile(
+            pressures=pressures,
+            temperature=temperature,
+            intrinsic_temperature=intrinsic_temperature,
+            surface_gravity=planet_surface_gravity,
+            metallicity=metallicity,
+            guillot_temperature_profile_gamma=guillot_temperature_profile_gamma,
+            guillot_temperature_profile_kappa_ir_z0=guillot_temperature_profile_kappa_ir_z0
+        )
+
+        mass_mixing_ratios = self.get_mass_mixing_ratios(
+            pressures=pressures,
+            line_species=line_species,
+            included_line_species=included_line_species,
+            temperatures=temperatures,
+            co_ratio=co_ratio,
+            log10_metallicity=np.log10(metallicity),
+            carbon_pressure_quench=carbon_pressure_quench,
+            imposed_mass_mixing_ratios=imposed_mass_mixing_ratios,
+            heh2_ratio=heh2_ratio,
+            use_equilibrium_chemistry=use_equilibrium_chemistry
+        )
+
+        # Find the mean molar mass in each layer
+        mean_molar_mass = self.get_mean_molar_masses(mass_mixing_ratios)
+
+        model_parameters = self.get_model_parameters(
+            temperature=temperature,
+            included_line_species=included_line_species,
+            imposed_mass_mixing_ratios=imposed_mass_mixing_ratios,
+            intrinsic_temperature=intrinsic_temperature,
+            surface_gravity=planet_surface_gravity,
+            metallicity=metallicity,
+            guillot_temperature_profile_gamma=guillot_temperature_profile_gamma,
+            guillot_temperature_profile_kappa_ir_z0=guillot_temperature_profile_kappa_ir_z0,
+            co_ratio=co_ratio,
+            carbon_pressure_quench=carbon_pressure_quench,
+            heh2_ratio=heh2_ratio,
+            use_equilibrium_chemistry=use_equilibrium_chemistry,
+            **parameters
+        )
+
+        return temperatures, mass_mixing_ratios, mean_molar_mass, model_parameters
+
+    @staticmethod
+    def get_temperature_profile(pressures, temperature=None,
+                                intrinsic_temperature=None, surface_gravity=None, metallicity=None,
+                                guillot_temperature_profile_gamma=0.4, guillot_temperature_profile_kappa_ir_z0=0.01):
+        if temperature is None:
+            raise TypeError(f"missing required argument 'temperature'")
+
+        if intrinsic_temperature is not None:  # TODO change condition to include more cases
+            temperatures = SpectralModel.get_guillot_metallic_temperature_profile(
+                pressures=pressures,
+                gamma=guillot_temperature_profile_gamma,
+                surface_gravity=surface_gravity,
+                intrinsic_temperature=intrinsic_temperature,
+                equilibrium_temperature=temperature,
+                kappa_ir_z0=guillot_temperature_profile_kappa_ir_z0,
+                metallicity=metallicity
+            )
+        elif isinstance(temperature, (float, int)):
+            temperatures = np.ones(np.shape(pressures)) * temperature
+        elif np.size(temperature) == np.size(pressures):
+            temperatures = np.asarray(temperature)
+        else:
+            raise ValueError(f"could not initialize temperature profile; "
+                             f"possible inputs are float, int, "
+                             f"or a 1-D array of the same size of parameter 'pressures' ({np.size(pressures)})")
+
+        return temperatures
+
+    @staticmethod
+    def get_guillot_metallic_temperature_profile(pressures, gamma, surface_gravity,
+                                                 intrinsic_temperature, equilibrium_temperature, kappa_ir_z0,
+                                                 metallicity=None):
+        """Get a Guillot temperature profile depending on metallicity.
+
+        Args:
+            pressures: (bar) pressures of the profile
+            gamma: ratio between visual and infrated opacity
+            surface_gravity: (cm.s-2) surface gravity
+            intrinsic_temperature: (K) intrinsic temperature
+            equilibrium_temperature: (K) equilibrium temperature
+            kappa_ir_z0: (cm2.s-1) infrared opacity
+            metallicity: ratio of heavy elements abundance over H abundance with respect to the solar ratio
+
+        Returns:
+            temperatures: (K) the temperature at each pressures of the atmosphere
+        """
+        # TODO move to physics
+        if metallicity is not None:
+            kappa_ir = kappa_ir_z0 * metallicity
+        else:
+            kappa_ir = kappa_ir_z0
+
+        temperatures = guillot_global(
+            pressure=pressures,
+            kappa_ir=kappa_ir,
+            gamma=gamma,
+            grav=surface_gravity,
+            t_int=intrinsic_temperature,
+            t_equ=equilibrium_temperature
+        )
+
+        return temperatures
+
+    @staticmethod
+    def scale_spectrum(spectrum, star_radius, planet_radius=None, star_spectral_radiosity=None, mode='transmission'):
+        if mode == 'emission':
+            return 1 + spectrum / star_spectral_radiosity * (planet_radius / star_radius) ** 2
+        elif mode == 'transmission':
+            return 1 - (spectrum / star_radius) ** 2
+        else:
+            raise ValueError(f"mode must be 'emission' or 'transmission', not '{mode}'")
+
+    @staticmethod
+    def _get_phoenix_star_spectral_radiosity(star_effective_temperature, wavelengths):
+        star_data = get_PHOENIX_spec(star_effective_temperature)
+        star_data[:, 1] = radiosity_erg_hz2radiosity_erg_cm(
+            star_data[:, 1], nc.c / star_data[:, 0]
+        )
+
+        star_data[:, 0] *= 1e4  # cm to um
+
+        star_radiosity = fr.rebin_spectrum(
+            star_data[:, 0],
+            star_data[:, 1],
+            wavelengths
+        )
+
+        return star_radiosity
+
+    def update_spectral_calculation_parameters(self, radtrans: Radtrans, **parameters):
+        pressures = radtrans.press * 1e-6  # cgs to bar
+        imposed_mass_mixing_ratios = {}
+
+        for species in radtrans.line_species:
+            # TODO mass mixing ratio dict initialization more general
+            spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities
+
+            if spec in parameters:
+                imposed_mass_mixing_ratios[species] = 10 ** parameters[spec] * np.ones_like(pressures)
+
+        self.temperatures, self.mass_mixing_ratios, self.mean_molar_masses, self.model_parameters = \
+            self.get_spectral_calculation_parameters(
+                pressures=pressures,
+                temperature=parameters['temperature'],
+                line_species=radtrans.line_species,
+                included_line_species=parameters['included_line_species'],
+                imposed_mass_mixing_ratios=imposed_mass_mixing_ratios,
+                intrinsic_temperature=parameters['intrinsic_temperature'],
+                planet_surface_gravity=10 ** parameters['log10_surface_gravity'],
+                metallicity=10 ** parameters['log10_metallicity'],
+                guillot_temperature_profile_gamma=parameters['guillot_temperature_profile_gamma'],
+                guillot_temperature_profile_kappa_ir_z0=parameters['guillot_temperature_profile_kappa_ir_z0'],
+                co_ratio=10 ** parameters['log10_co_ratio'],
+                carbon_pressure_quench=parameters['log10_carbon_pressure_quench'],
+                heh2_ratio=parameters['heh2_ratio'],
+                use_equilibrium_chemistry=parameters['use_equilibrium_chemistry']
+            )
+
+        # Adapt chemical names to line species names, as required by Retrieval
+        for species in radtrans.line_species:
+            spec = species.split('_', 1)[0]
+
+            if spec in self.mass_mixing_ratios:
+                if species not in self.mass_mixing_ratios:
+                    self.mass_mixing_ratios[species] = self.mass_mixing_ratios[spec]
+
+                del self.mass_mixing_ratios[spec]
+
+
+class RetrievalSpectralModel(SpectralModel):
+    def __init__(self, planet_name, wavelength_boundaries, lbl_opacity_sampling, do_scat_emis, t_int, metallicity,
+                 co_ratio, p_cloud,
+                 line_species=None, rayleigh_species=None, continuum_opacities=None,
+                 kappa_ir_z0=0.01, gamma=0.4, p_quench_c=None, haze_factor=1.0,
+                 atmosphere_file=None, wavelengths=None, transit_radius=None, eclipse_depth=None,
+                 spectral_radiosity=None, star_spectral_radiosity=None, opacity_mode='lbl',
+                 heh2_ratio=0.324, use_equilibrium_chemistry=False,
+                 temperature=None, pressures=None, mass_fractions=None, mean_molar_mass=None,
+                 orbital_phases=None, system_observer_radial_velocities=None, planet_rest_frame_shift=0.0,
+                 wavelengths_instrument=None, instrument_resolving_power=None,
+                 planet_model_file=None, model_suffix='', filename=None):
+        super().__init__(
+            planet_name, wavelength_boundaries, lbl_opacity_sampling, do_scat_emis, t_int, metallicity,
+            co_ratio, p_cloud,
+            line_species=line_species,
+            rayleigh_species=rayleigh_species,
+            continuum_opacities=continuum_opacities,
+            kappa_ir_z0=kappa_ir_z0,
+            gamma=gamma,
+            p_quench_c=p_quench_c,
+            haze_factor=haze_factor,
+            atmosphere_file=atmosphere_file,
+            wavelengths=wavelengths,
+            transit_radius=transit_radius,
+            eclipse_depth=eclipse_depth,
+            spectral_radiosity=spectral_radiosity,
+            star_spectral_radiosity=star_spectral_radiosity,
+            opacity_mode=opacity_mode,
+            heh2_ratio=heh2_ratio,
+            use_equilibrium_chemistry=use_equilibrium_chemistry,
+            temperature=temperature,
+            pressures=pressures,
+            mass_fractions=mass_fractions,
+            mean_molar_mass=mean_molar_mass,
+            planet_model_file=planet_model_file,
+            model_suffix=model_suffix,
+            filename=filename
+            )
+
+        self.orbital_phases = orbital_phases
+        self.system_observer_radial_velocities = system_observer_radial_velocities
+        self.planet_rest_frame_shift = planet_rest_frame_shift
+        self.wavelengths_instrument = wavelengths_instrument
+        self.instrument_resolving_power = instrument_resolving_power
+
+    def _calculate_transit_radius_from_parameters(self, atmosphere: Radtrans, **parameters):
+        self.calculate_transit_radius(
+            atmosphere=atmosphere,
+            planet_surface_gravity=10 ** parameters['log10_surface_gravity'].value,
+            planet_reference_pressure=parameters['reference_pressure'].value,
+            planet_radius=parameters['planet_radius'].value
+        )
+
+    @staticmethod
+    def _get_parameters_dict(surface_gravity, planet_radius=None, reference_pressure=1e-2,
+                             temperature=None, mass_mixing_ratios=None, cloud_pressure=None,
+                             guillot_temperature_profile_gamma=0.4, guillot_temperature_profile_kappa_ir_z0=0.01,
+                             included_line_species=None, intrinsic_temperature=None, heh2_ratio=0.324,
+                             use_equilibrium_chemistry=False,
+                             co_ratio=0.55, metallicity=1.0, carbon_pressure_quench=None,
+                             star_effective_temperature=None, star_radius=None, star_spectral_radiosity=None,
+                             planet_max_radial_orbital_velocity=None, planet_orbital_inclination=None,
+                             semi_major_axis=None, planet_radial_velocities=None,
+                             planet_rest_frame_shift=0.0, orbital_phases=None, system_observer_radial_velocities=None,
+                             wavelengths_instrument=None, instrument_resolving_power=None,
+                             data=None, data_uncertainties=None,
+                             reduced_data=None, reduced_data_uncertainties=None, reduction_matrix=None,
+                             airmass=None, telluric_transmittance=None, variable_throughput=None
+                             ):
+        # Conversions to log-space
+        if carbon_pressure_quench is not None:
+            carbon_pressure_quench = np.log10(carbon_pressure_quench)
+
+        if cloud_pressure is not None:
+            cloud_pressure = np.log10(cloud_pressure)
+
+        if co_ratio is not None:
+            co_ratio = np.log10(co_ratio)
+
+        if metallicity is not None:
+            metallicity = np.log10(metallicity)
+
+        if surface_gravity is not None:
+            surface_gravity = np.log10(surface_gravity)
+
+        # TODO expand to include all possible parameters of transm and calc_flux
+        # TODO merge parameters and SpectralModel attributes?
+        parameters = {
+            'airmass': Param(airmass),
+            'log10_co_ratio': Param(co_ratio),
+            'data': Param(data),
+            'data_uncertainties': Param(data_uncertainties),
+            'guillot_temperature_profile_gamma': Param(guillot_temperature_profile_gamma),
+            'guillot_temperature_profile_kappa_ir_z0': Param(guillot_temperature_profile_kappa_ir_z0),
+            'heh2_ratio': Param(heh2_ratio),
+            'included_line_species': Param(included_line_species),
+            'instrument_resolving_power': Param(instrument_resolving_power),
+            'intrinsic_temperature': Param(intrinsic_temperature),
+            'log10_carbon_pressure_quench': Param(carbon_pressure_quench),
+            'log10_cloud_pressure': Param(cloud_pressure),
+            'log10_metallicity': Param(metallicity),
+            'log10_surface_gravity': Param(surface_gravity),
+            'orbital_phases': Param(orbital_phases),
+            'planet_max_radial_orbital_velocity': Param(planet_max_radial_orbital_velocity),
+            'planet_radius': Param(planet_radius),
+            'planet_radial_velocities': Param(planet_radial_velocities),
+            'planet_rest_frame_shift': Param(planet_rest_frame_shift),
+            'planet_orbital_inclination': Param(planet_orbital_inclination),
+            'reduced_data': Param(reduced_data),
+            'reduction_matrix': Param(reduction_matrix),
+            'reduced_data_uncertainties': Param(reduced_data_uncertainties),
+            'reference_pressure': Param(reference_pressure),
+            'semi_major_axis': Param(semi_major_axis),
+            'star_effective_temperature': Param(star_effective_temperature),
+            'star_radius': Param(star_radius),
+            'star_spectral_radiosity': Param(star_spectral_radiosity),
+            'system_observer_radial_velocities': Param(system_observer_radial_velocities),
+            'telluric_transmittance': Param(telluric_transmittance),
+            'temperature': Param(temperature),
+            'use_equilibrium_chemistry': Param(use_equilibrium_chemistry),
+            'variable_throughput': Param(variable_throughput),
+            'wavelengths_instrument': Param(wavelengths_instrument),
+        }
+
+        if mass_mixing_ratios is None:
+            mass_mixing_ratios = {}
+
+        for species, mass_mixing_ratio in mass_mixing_ratios.items():
+            parameters[species] = Param(np.log10(mass_mixing_ratio))
+
+        return parameters
+
+    def _get_shifted_transit_radius_from_parameters(self, atmosphere: Radtrans, **parameters):
+        return self.get_shifted_transit_radius(
+            atmosphere=atmosphere,
+            planet_surface_gravity=10 ** parameters['log10_surface_gravity'].value,
+            planet_reference_pressure=parameters['reference_pressure'].value,
+            planet_radius=parameters['planet_radius'].value,
+            planet_max_radial_orbital_velocity=parameters['planet_max_radial_orbital_velocity'].value,
+            planet_orbital_inclination=parameters['planet_orbital_inclination'].value,
+            orbital_phases=parameters['orbital_phases'].value,
+            system_observer_radial_velocities=parameters['system_observer_radial_velocities'].value,
+            planet_rest_frame_shift=parameters['planet_rest_frame_shift'].value,
+            wavelengths_instrument=parameters['wavelengths_instrument'].value,
+            instrument_resolving_power=parameters['instrument_resolving_power'].value,
+            star_radius=parameters['star_radius'].value
+        )
+
+    @classmethod
+    def from_parameters_dict(cls, planet_name, wavelength_boundaries=None, **parameters):
+        # planet_orbital_velocity = Planet.calculate_orbital_velocity(
+        #     star_mass=parameters['star_mass'].value,
+        #     semi_major_axis=parameters['semi_major_axis'].value
+        # )
+
+        if wavelength_boundaries is None:
+            wavelength_boundaries = [
+                parameters['wavelengths_instrument'].value[0],
+                parameters['wavelengths_instrument'].value[-1]
+            ]
+        else:
+            # Constrain to boundaries
+            within_boundaries = np.where(np.logical_and(
+                parameters['wavelengths_instrument'].value > wavelength_boundaries[0],
+                parameters['wavelengths_instrument'].value < wavelength_boundaries[-1]
+            ))[0]
+            parameters['wavelengths_instrument'] = Param(parameters['wavelengths_instrument'].value[within_boundaries])
+
+        # Add enough spaces for Doppler shifting, taking into account a max rest frame shift of +/- K_p
+        # wavelength_boundaries = [
+        #     doppler_shift(wavelength_boundaries[0], -2 * planet_orbital_velocity),
+        #     doppler_shift(wavelength_boundaries[-1], 2 * planet_orbital_velocity)
+        # ]
+
+        mass_mixing_ratios = {}
+
+        for parameter, value in parameters.items():
+            # TODO add default chemical species, otherwise this won't work as expected
+            if parameter in cls.default_line_species or parameter in cls.default_rayleigh_species:
+                mass_mixing_ratios[parameter] = value.value
+
+        return cls(
+            planet_name=planet_name,
+            wavelength_boundaries=wavelength_boundaries,
+            lbl_opacity_sampling=1,
+            do_scat_emis=True,
+            t_int=parameters['intrinsic_temperature'].value,
+            metallicity=10 ** parameters['log10_metallicity'].value,
+            co_ratio=10 ** parameters['log10_co_ratio'].value,
+            p_cloud=10 ** parameters['log10_cloud_pressure'].value,
+            kappa_ir_z0=parameters['guillot_temperature_profile_kappa_ir_z0'].value,
+            gamma=parameters['guillot_temperature_profile_gamma'].value,
+            p_quench_c=10 ** parameters['log10_carbon_pressure_quench'].value,
+            haze_factor=1.0,
+            atmosphere_file=None,
+            wavelengths=None,
+            transit_radius=None,
+            eclipse_depth=None,
+            spectral_radiosity=None,
+            star_spectral_radiosity=None,
+            opacity_mode='lbl',
+            heh2_ratio=parameters['heh2_ratio'].value,
+            use_equilibrium_chemistry=parameters['use_equilibrium_chemistry'].value,
+            temperature=parameters['temperature'].value,
+            pressures=None,
+            mass_fractions=mass_mixing_ratios,
+            mean_molar_mass=None,
+            orbital_phases=parameters['orbital_phases'].value,
+            system_observer_radial_velocities=parameters['system_observer_radial_velocities'].value,
+            planet_rest_frame_shift=parameters['planet_rest_frame_shift'].value,
+            wavelengths_instrument=parameters['wavelengths_instrument'].value,
+            instrument_resolving_power=parameters['instrument_resolving_power'].value,
+            planet_model_file=None,
+            model_suffix='',
+            filename=None
+        )
+
+    @staticmethod
+    def get_orbital_phases(planet_orbital_period, integration_time, start=None, integrations_number=50,
+                           mode='transit'):
+        if mode == 'transit':
+            orbital_phases = get_orbital_phases(
+                0.0, planet_orbital_period, integration_time, integrations_number
+            )
+            orbital_phases -= np.max(orbital_phases) / 2
+        else:
+            orbital_phases = \
+                get_orbital_phases(start, planet_orbital_period, integration_time, integrations_number)
+
+        return orbital_phases
+
+    def get_parameters_dict(self, planet: Planet, included_line_species='all'):
+        # star_spectral_radiosity = self.get_phoenix_star_spectral_radiosity(planet)
+        planet_max_radial_orbital_velocity = planet.calculate_orbital_velocity(
+            planet.star_mass, planet.orbit_semi_major_axis
+        )
+        # TODO complete this
+        # TODO add class function from parameter dict
+
+        return self._get_parameters_dict(
+            surface_gravity=planet.surface_gravity,
+            planet_radius=planet.radius,
+            reference_pressure=planet.reference_pressure,
+            temperature=self.temperature,
+            mass_mixing_ratios=self.mass_mixing_ratios,
+            cloud_pressure=self.cloud_pressure,
+            guillot_temperature_profile_gamma=self.guillot_temperature_profile_gamma,
+            guillot_temperature_profile_kappa_ir_z0=self.guillot_temperature_profile_kappa_ir_z0,
+            included_line_species=included_line_species,
+            intrinsic_temperature=self.intrinsic_temperature,
+            heh2_ratio=self.heh2_ratio,
+            use_equilibrium_chemistry=self.use_equilibrium_chemistry,
+            co_ratio=self.co_ratio,
+            metallicity=self.metallicity,
+            carbon_pressure_quench=self.carbon_pressure_quench,
+            star_effective_temperature=planet.star_effective_temperature,
+            star_radius=planet.star_radius,
+            # star_spectral_radiosity=star_spectral_radiosity,
+            planet_max_radial_orbital_velocity=planet_max_radial_orbital_velocity,
+            planet_orbital_inclination=planet.orbital_inclination,
+            semi_major_axis=planet.orbit_semi_major_axis,
+            planet_rest_frame_shift=self.planet_rest_frame_shift,
+            orbital_phases=self.orbital_phases,
+            system_observer_radial_velocities=self.system_observer_radial_velocities,
+            wavelengths_instrument=self.wavelengths_instrument,
+            instrument_resolving_power=self.instrument_resolving_power,
+            data=None,
+            data_uncertainties=None,
+            reduced_data=None,
+            reduced_data_uncertainties=None,
+            reduction_matrix=None,
+            airmass=None,
+            telluric_transmittance=None,
+            variable_throughput=None
+        )
+
+    @staticmethod
+    def get_reduced_spectrum(spectrum, pipeline, **kwargs):
+        if 'data' in kwargs:
+            if isinstance(kwargs['data'], np.ma.core.MaskedArray):
+                spectrum = np.ma.masked_array(spectrum)
+                spectrum.mask = copy.copy(kwargs['data'].mask)
+
+        return pipeline(spectrum, **kwargs)
+
+    def get_reduced_shifted_transit_radius_model(self, atmosphere: Radtrans, parameters, pt_plot_mode=None, AMR=False):
+        self.update_spectral_calculation_parameters(atmosphere, **parameters)
+        wavelengths, spectra = self._get_shifted_transit_radius_from_parameters(atmosphere, **parameters)
+
+        value_parameters = {key: value.value for key, value in parameters.items()}
+
+        return wavelengths, self.get_reduced_spectrum(np.array([spectra]), self.pipeline, **value_parameters)
+
+    def get_shifted_transit_radius_model(self, atmosphere: Radtrans, parameters):
+        self.update_spectral_calculation_parameters(atmosphere, **parameters)
+
+        return self._get_shifted_transit_radius_from_parameters(atmosphere, **parameters)
+
+    def get_transit_radius_model(self, atmosphere: Radtrans, parameters):
+        self.update_spectral_calculation_parameters(atmosphere, **parameters)
+        self._calculate_transit_radius_from_parameters(atmosphere, **parameters)
+
+        return self.wavelengths, self.transit_radius
+
+    @staticmethod
+    def get_wavelengths_boundaries(wavelengths_boundaries, min_radial_velocity=0.0, max_radial_velocity=0.0):
+        """Get wavelength boundaries for a source moving between two radial velocities with respect to the observer.
+        A negative velocity means that the source is going toward the observer. A positive velocity means the source is
+        going away from the observer.
+
+        Args:
+            wavelengths_boundaries: list containing the desired wavelengths boundaries for the source at rest.
+            min_radial_velocity: (cm.s-1) minimum velocity of the source
+            max_radial_velocity: (cm.s-1) maximum velocity of the source
+
+        Returns:
+            New wavelengths boundaries, taking into account the velocity of the source
+        """
+        return [
+            doppler_shift(wavelengths_boundaries[0], min_radial_velocity),
+            doppler_shift(wavelengths_boundaries[-1], max_radial_velocity)
+        ]
+
+    @staticmethod
+    def pipeline(spectrum):
+        """Simplistic pipeline model. Do nothing.
+        To be updated when initializing an instance of retrieval model.
+
+        Args:
+            spectrum: a spectrum
+
+        Returns:
+            spectrum: the spectrum reduced by the pipeline
+        """
+        return spectrum
+
+    def update_spectral_calculation_parameters(self, radtrans: Radtrans, **parameters):
+        pressures = radtrans.press * 1e-6  # cgs to bar
+        imposed_mass_mixing_ratios = {}
+
+        for species in radtrans.line_species:
+            # TODO mass mixing ratio dict initialization more general
+            spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities
+
+            if spec in parameters:
+                imposed_mass_mixing_ratios[species] = 10 ** parameters[spec].value * np.ones_like(pressures)
+
+        self.temperature, self.mass_mixing_ratios, self.mean_molar_mass = \
+            self._get_spectral_calculation_parameters(
+                pressures=pressures,
+                temperature=parameters['temperature'].value,
+                line_species=radtrans.line_species,
+                included_line_species=parameters['included_line_species'].value,
+                imposed_mass_mixing_ratios=imposed_mass_mixing_ratios,
+                intrinsic_temperature=parameters['intrinsic_temperature'].value,
+                surface_gravity=10 ** parameters['log10_surface_gravity'].value,
+                metallicity=10 ** parameters['log10_metallicity'].value,
+                guillot_temperature_profile_gamma=parameters['guillot_temperature_profile_gamma'].value,
+                guillot_temperature_profile_kappa_ir_z0=parameters['guillot_temperature_profile_kappa_ir_z0'].value,
+                co_ratio=10 ** parameters['log10_co_ratio'].value,
+                carbon_pressure_quench=parameters['log10_carbon_pressure_quench'].value,
+                heh2_ratio=parameters['heh2_ratio'].value,
+                use_equilibrium_chemistry=parameters['use_equilibrium_chemistry'].value
+            )
+
+        # Adapt chemical names to line species names, as required by Retrieval
+        for species in radtrans.line_species:
+            spec = species.split('_', 1)[0]
+
+            if spec in self.mass_mixing_ratios:
+                if species not in self.mass_mixing_ratios:
+                    self.mass_mixing_ratios[species] = self.mass_mixing_ratios[spec]
+
+                del self.mass_mixing_ratios[spec]
+
+
+class RetrievalSpectralModel2(SpectralModel2):
+    def __init__(self,  wavelengths_boundaries, pressures, temperatures=None,
+                 mass_mixing_ratios=None, mean_molar_masses=None,
+                 line_species=None, rayleigh_species=None, continuum_opacities=None, cloud_species=None,
+                 opacity_mode='lbl', do_scat_emis=True, lbl_opacity_sampling=1,
+                 wavelengths=None, transit_radii=None, spectral_radiosities=None, times=None,
+                 star_spectral_radiosities=None, shifted_star_spectral_radiosities=None,
+                 wavelengths_rest=None, resolving_power_rest=None,
+                 shifted_transit_radii=None, shifted_spectral_radiosities=None,
+                 orbital_phases=None, log10_parameters=None,
+                 **model_parameters):
+        super().__init__(
+            wavelengths_boundaries=wavelengths_boundaries,
+            pressures=pressures,
+            temperatures=temperatures,
+            mass_mixing_ratios=mass_mixing_ratios,
+            mean_molar_masses=mean_molar_masses,
+            line_species=line_species,
+            rayleigh_species=rayleigh_species,
+            continuum_opacities=continuum_opacities,
+            cloud_species=cloud_species,
+            opacity_mode=opacity_mode,
+            do_scat_emis=do_scat_emis,
+            lbl_opacity_sampling=lbl_opacity_sampling,
+            wavelengths=wavelengths,
+            transit_radii=transit_radii,
+            spectral_radiosities=spectral_radiosities,
+            times=times,
+            star_spectral_radiosities=star_spectral_radiosities,
+            shifted_star_spectral_radiosities=shifted_star_spectral_radiosities,
+            wavelengths_rest=wavelengths_rest,
+            resolving_power_rest=resolving_power_rest,
+            shifted_transit_radii=shifted_transit_radii,
+            shifted_spectral_radiosities=shifted_spectral_radiosities,
+            orbital_phases=orbital_phases,
+            **model_parameters
+        )
+
+        self.log10_parameters = log10_parameters
+
+    @staticmethod
+    def __parameter_to_log10(parameter, parameter_value):
+        return f'log10_{parameter}', np.log10(parameter_value)
+
+    @staticmethod
+    def __log10_to_parameter(parameter, parameter_value):
+        return parameter.split('log10', 1)[-1], 10 ** parameter_value
+
+    def get_parameters_dict(self):
+        parameters_dict = {}
+
+        for key, value in self.__dict__.items():
+            if key == 'model_parameters':  # model_parameters is a dictionary, extract its values
+                for parameter, parameter_value in value.items():
+                    if parameter == 'imposed_mass_mixing_ratios':
+                        for species, mass_mixing_ratio in parameter_value.items():
+                            parameters_dict[species] = copy.copy(
+                                np.log10(np.max((mass_mixing_ratio, sys.float_info.min)))
+                            )
+                    else:
+                        if parameter in self.log10_parameters:
+                            if parameter_value is not None:
+                                parameter, parameter_value = self.__parameter_to_log10(parameter, parameter_value)
+                            else:
+                                parameter, _ = self.__parameter_to_log10(parameter, 1)
+
+                        parameters_dict[parameter] = copy.copy(parameter_value)
+
+        return self.dict_to_param(parameters_dict)
+
+    @staticmethod
+    def param_to_dict(parameters):
+        return {key: value.value for key, value in parameters.items()}
+
+    @staticmethod
+    def dict_to_param(dictionary):
+        return {key: Param(value) for key, value in dictionary.items()}
+
+    @staticmethod
+    def get_reduced_spectrum(spectrum, pipeline, **kwargs):
+        if 'data' in kwargs:
+            if isinstance(kwargs['data'], np.ma.core.MaskedArray):
+                spectrum = np.ma.masked_array(spectrum)
+                spectrum.mask = copy.copy(kwargs['data'].mask)
+
+        return pipeline(spectrum, **kwargs)
+
+    def spectrum_model(self, radtrans: Radtrans, parameters, mode='transmission'):
+        return self.get_scaled_shifted_spectrum_model(
+            radtrans=radtrans,
+            parameters=parameters,
+            mode=mode
+        )
+
+    def retrieval_model(self, radtrans: Radtrans, parameters, pt_plot_mode=None, AMR=False, mode='transit'):
+        parameter_dict = self.param_to_dict(parameters)
+        wavelengths, spectra = self.spectrum_model(
+            radtrans=radtrans,
+            parameters=parameter_dict,
+            mode=mode
+        )
+
+        return wavelengths, self.get_reduced_spectrum(np.array([spectra]), self.pipeline, **parameter_dict)
+
+    @staticmethod
+    def get_wavelengths_boundaries(wavelengths_boundaries, min_radial_velocity=0.0, max_radial_velocity=0.0):
+        """Get wavelength boundaries for a source moving between two radial velocities with respect to the observer.
+        A negative velocity means that the source is going toward the observer. A positive velocity means the source is
+        going away from the observer.
+
+        Args:
+            wavelengths_boundaries: list containing the desired wavelengths boundaries for the source at rest.
+            min_radial_velocity: (cm.s-1) minimum velocity of the source
+            max_radial_velocity: (cm.s-1) maximum velocity of the source
+
+        Returns:
+            New wavelengths boundaries, taking into account the velocity of the source
+        """
+        return [
+            doppler_shift(wavelengths_boundaries[0], min_radial_velocity),
+            doppler_shift(wavelengths_boundaries[-1], max_radial_velocity)
+        ]
+
+    @staticmethod
+    def pipeline(spectrum):
+        """Simplistic pipeline model. Do nothing.
+        To be updated when initializing an instance of retrieval model.
+
+        Args:
+            spectrum: a spectrum
+
+        Returns:
+            spectrum: the spectrum reduced by the pipeline
+        """
+        return spectrum
+
+
+def get_orbital_phases(phase_start, orbital_period, dit, ndit, return_times=False):
+    """Calculate orbital phases assuming low eccentricity.
+
+    Args:
+        phase_start: planet phase at the start of observations
+        orbital_period: (s) orbital period of the planet
+        dit: (s) integration duration
+        ndit: number of integrations
+        return_times: if true, also returns the time used to calculate the orbital phases
+
+    Returns:
+        ndit phases from start_phase at t=0 to the phase at t=dit * ndit
+    """
+    times = np.linspace(0, dit * ndit, ndit)
+    phases = np.mod(phase_start + times / orbital_period, 1.0)
+
+    if return_times:
+        return phases, times  # the 2 * pi factors cancel out
+    else:
+        return phases
 
 
 def _get_generic_planet_name(radius, surface_gravity, equilibrium_temperature):

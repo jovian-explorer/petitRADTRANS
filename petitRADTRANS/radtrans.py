@@ -151,7 +151,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             cloud_species = []
 
         if continuum_opacities is None:
-            continuum_opacities = []
+            continuum_opacities = []  # TODO add continuum_opacities as attribute
 
         if wlen_bords_micron is None:
             wlen_bords_micron = np.array([0.05, 300.])  # um
@@ -184,7 +184,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.mu_star = mu_star
 
         # Distance from the star (AU)
-        self.semimajoraxis = semimajoraxis
+        self.semimajoraxis = semimajoraxis  # TODO remove as it is never used
 
         # Line-by-line or corr-k
         self.mode = mode
@@ -620,6 +620,7 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         if len(self.line_species) > 0:
             for i_spec in range(len(self.line_species)):
+                #print(np.shape(self.line_struc_kappas), 'i', np.shape(self.line_grid_kappas_custom_PT[self.line_species[i_spec]]))
                 self.line_struc_kappas[:, :, i_spec, :] = fi.interpol_opa_ck(
                     self.press,
                     temp,
@@ -1416,7 +1417,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     formatted as the kzz argument. This is the width of the hansen
                     distribution normalized by the particle area (1/a_hans^2)
         """
-        self.__hack_cloud_photospheric_tau = None  # TODO move that into init to make transmission with scattering work
+        self.__hack_cloud_photospheric_tau = None
         self.Pcloud = Pcloud
         self.gray_opacity = gray_opacity
         self.interpolate_species_opa(temp)
