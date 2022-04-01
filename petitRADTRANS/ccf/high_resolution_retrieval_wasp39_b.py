@@ -285,7 +285,7 @@ def _get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=
     planet_velocities = Planet.calculate_planet_radial_velocity(
         parameters['planet_max_radial_orbital_velocity'].value,
         parameters['planet_orbital_inclination'].value,
-        parameters['orbital_phases'].value
+        np.rad2deg(2 * np.pi * parameters['orbital_phases'].value)
     )
 
     spectrum_model = get_mock_secondary_eclipse_spectra(
@@ -330,7 +330,7 @@ def _get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=
     planet_velocities = Planet.calculate_planet_radial_velocity(
         parameters['planet_max_radial_orbital_velocity'].value,
         parameters['planet_orbital_inclination'].value,
-        parameters['orbital_phases'].value
+        np.rad2deg(2 * np.pi * parameters['orbital_phases'].value)
     )
 
     spectrum_model = np.zeros((

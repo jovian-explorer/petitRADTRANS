@@ -356,7 +356,7 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
             orbital_phases = np.asarray([orbital_phases])
 
         planet_velocities = Planet.calculate_planet_radial_velocity(
-            planet_max_radial_orbital_velocity, planet_orbital_inclination, orbital_phases
+            planet_max_radial_orbital_velocity, planet_orbital_inclination, np.rad2deg(2 * np.pi * orbital_phases)
         )
 
     # Check types, sizes and dimensions

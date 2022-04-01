@@ -2,22 +2,23 @@ import copy
 import os
 import pickle
 import sys
+import warnings
 
 import h5py
 import numpy as np
 import pyvo
 from astropy.table.table import Table
+from scipy.ndimage import gaussian_filter1d
 
 from petitRADTRANS import nat_cst as nc
-from petitRADTRANS.ccf.spectra_utils import convolve_shift_rebin, calculate_spectral_radiosity_spectrum, \
-    calculate_transit_spectrum, scale_secondary_eclipse_spectrum, scale_transit_spectrum, \
-    radiosity_erg_hz2radiosity_erg_cm
+from petitRADTRANS.ccf.spectra_utils import convolve_shift_rebin
 from petitRADTRANS.ccf.utils import calculate_uncertainty, module_dir
 from petitRADTRANS.fort_rebin import fort_rebin as fr
 from petitRADTRANS.phoenix import get_PHOENIX_spec
-from petitRADTRANS.physics import doppler_shift, guillot_global
+from petitRADTRANS.physics import doppler_shift, guillot_global, guillot_metallic_temperature_profile
 from petitRADTRANS.radtrans import Radtrans
-from petitRADTRANS.retrieval.util import calc_MMW
+from petitRADTRANS.retrieval import RetrievalConfig
+from petitRADTRANS.retrieval.util import calc_MMW, uniform_prior
 
 # from petitRADTRANS.config import petitradtrans_config
 
@@ -33,7 +34,8 @@ class BaseSpectralModel:
                  mass_mixing_ratios=None, mean_molar_masses=None,
                  line_species=None, rayleigh_species=None, continuum_opacities=None, cloud_species=None,
                  opacity_mode='lbl', do_scat_emis=True, lbl_opacity_sampling=1,
-                 wavelengths=None, transit_radii=None, spectral_radiosities=None, times=None,
+                 wavelengths=None, transit_radii=None, spectral_radiosities=None,
+                 times=None,
                  **model_parameters):
         # Atmosphere/Radtrans parameters
         self.wavelengths_boundaries = wavelengths_boundaries
@@ -79,7 +81,7 @@ class BaseSpectralModel:
         self.model_parameters = model_parameters
 
     @staticmethod
-    def get_mass_mixing_ratios(pressures, **kwargs):
+    def calculate_mass_mixing_ratios(pressures, **kwargs):
         """Template for mass mixing ratio profile function.
         Here, generate iso-abundant mass mixing ratios profiles.
 
@@ -96,11 +98,11 @@ class BaseSpectralModel:
         }
 
     @staticmethod
-    def get_mean_molar_masses(mass_mixing_ratios, **kwargs):
+    def calculate_mean_molar_masses(mass_mixing_ratios, **kwargs):
         return calc_MMW(mass_mixing_ratios)
 
     @staticmethod
-    def get_model_parameters(**kwargs):
+    def calculate_model_parameters(**kwargs):
         """Function to update model parameters.
 
         Args:
@@ -110,65 +112,78 @@ class BaseSpectralModel:
             Updated parameters
         """
         # This function can be expanded to include anything
+        if 'star_spectral_radiosities' in kwargs:
+            if kwargs['star_spectral_radiosities'] is None:
+                kwargs['star_spectral_radiosities'] = BaseSpectralModel.calculate_star_spectral_radiosity(
+                    **kwargs
+                )
+
+        if 'relative_velocities' in kwargs:
+            if kwargs['relative_velocities'] is None:
+                kwargs['relative_velocities'] = BaseSpectralModel.calculate_relative_velocities(
+                    **kwargs
+                )
+
         return kwargs
 
-    def get_parameters_dict(self):
-        parameters_dict = {}
+    @staticmethod
+    def calculate_relative_velocities(planet_max_radial_orbital_velocity, orbital_longitudes=None,
+                                      planet_orbital_inclination=None, system_observer_radial_velocities=None,
+                                      planet_rest_frame_shift=0.0, **kwargs):
+        if -sys.float_info.min < planet_max_radial_orbital_velocity < sys.float_info.min:
+            relative_velocities = 0.0
+        else:
+            relative_velocities = Planet.calculate_planet_radial_velocity(
+                planet_max_radial_orbital_velocity=planet_max_radial_orbital_velocity,
+                planet_orbital_inclination=planet_orbital_inclination,
+                orbital_longitude=orbital_longitudes
+            )
 
-        for key, value in self.__dict__.items():
-            if key == 'model_parameters':  # model_parameters is a dictionary, extract its values
-                for parameter, parameter_value in value.items():
-                    parameters_dict[parameter] = copy.copy(parameter_value)
-            else:
-                parameters_dict[key] = copy.copy(value)
+        relative_velocities += system_observer_radial_velocities + planet_rest_frame_shift  # planet + system velocity
 
-        return parameters_dict
+        return relative_velocities
 
-    def get_radtrans(self):
-        """Return the Radtrans object corresponding to this SpectrumModel."""
-        return self.init_radtrans(
-            wavelengths_boundaries=self.wavelengths_boundaries,
-            pressures=self.pressures,
-            line_species=self.line_species,
-            rayleigh_species=self.rayleigh_species,
-            continuum_opacities=self.continuum_opacities,
-            lbl_opacity_sampling=self.lbl_opacity_sampling,
-            do_scat_emis=self.do_scat_emis,
-            opacity_mode=self.opacity_mode
-        )
+    @staticmethod
+    def calculate_spectral_parameters(temperature_profile_function, mass_mixing_ratios_function,
+                                      mean_molar_masses_function, spectral_parameters_function, **kwargs):
+        """Calculate the temperature profile, the mass mixing ratios, the mean molar masses and other parameters
+        required for spectral calculation.
 
-    def get_spectral_calculation_parameters(self, pressures=None, **kwargs):
-        if pressures is None:
-            pressures = self.pressures
+        This function define how these parameters are calculated and how they are combined.
 
-        temperatures = self.get_temperature_profile(
-            pressures=pressures,
+        Args:
+            temperature_profile_function:
+            mass_mixing_ratios_function:
+            mean_molar_masses_function:
+            spectral_parameters_function:
+            **kwargs:
+
+        Returns:
+
+        """
+        temperatures = temperature_profile_function(
             **kwargs
         )
 
-        mass_mixing_ratios = self.get_mass_mixing_ratios(
-            pressures=pressures,
+        mass_mixing_ratios = mass_mixing_ratios_function(
             **kwargs
         )
 
-        mean_molar_masses = self.get_mean_molar_masses(
+        mean_molar_masses = mean_molar_masses_function(
             mass_mixing_ratios=mass_mixing_ratios,
             **kwargs
         )
 
-        model_parameters = self.get_model_parameters(
-            temperatures=temperatures,
-            mass_mixing_ratios=mass_mixing_ratios,
-            mean_molar_masses=mean_molar_masses,
+        model_parameters = spectral_parameters_function(
             **kwargs
         )
 
         return temperatures, mass_mixing_ratios, mean_molar_masses, model_parameters
 
     @staticmethod
-    def get_spectral_radiosity_spectrum(radtrans: Radtrans, temperatures, mass_mixing_ratios,
-                                        planet_surface_gravity, mean_molar_mass, star_effective_temperature,
-                                        star_radius, semi_major_axis, cloud_pressure, **kwargs):
+    def calculate_spectral_radiosity_spectrum(radtrans: Radtrans, temperatures, mass_mixing_ratios,
+                                              planet_surface_gravity, mean_molar_mass, star_effective_temperature,
+                                              star_spectral_radiosities, cloud_pressure=None, **kwargs):
         """Wrapper of Radtrans.calc_flux that output wavelengths in um and spectral radiosity in erg.s-1.cm-2.sr-1/cm.
         # TODO move to Radtrans or outside of object
         Args:
@@ -178,8 +193,7 @@ class BaseSpectralModel:
             planet_surface_gravity:
             mean_molar_mass:
             star_effective_temperature:
-            star_radius:
-            semi_major_axis:
+            star_spectral_radiosities:
             cloud_pressure:
 
         Returns:
@@ -193,52 +207,38 @@ class BaseSpectralModel:
             gravity=planet_surface_gravity,
             mmw=mean_molar_mass,
             Tstar=star_effective_temperature,
-            Rstar=star_radius / nc.r_sun,
-            semimajoraxis=semi_major_axis / nc.AU,
             Pcloud=cloud_pressure,
-            # stellar_intensity=parameters['star_spectral_radiosity'].value
+            stellar_intensity=BaseSpectralModel.radiosity_erg_cm2radiosity_erg_hz(
+                star_spectral_radiosities, nc.c / radtrans.freq
+            )
             # **kwargs  # TODO add kwargs once arguments names are made unambiguous
         )
 
-        # Transform the outputs into the units of our data.
-        spectral_radiosity = radiosity_erg_hz2radiosity_erg_cm(radtrans.flux, radtrans.freq)
+        # Transform the outputs into the units of our data
+        spectral_radiosity = BaseSpectralModel.radiosity_erg_hz2radiosity_erg_cm(radtrans.flux, radtrans.freq)
         wavelengths = nc.c / radtrans.freq * 1e4  # cm to um
 
         return wavelengths, spectral_radiosity
 
-    def get_spectral_radiosity_spectrum_model(self, radtrans: Radtrans, parameters):
-        self.wavelengths, self.spectral_radiosities = self.get_spectral_radiosity_spectrum(
-            radtrans=radtrans,
-            temperatures=self.temperatures,
-            mass_mixing_ratios=self.mass_mixing_ratios,
-            **parameters
+    @staticmethod
+    def calculate_star_spectral_radiosity(wavelengths, star_effective_temperature, star_radius, semi_major_axis,
+                                          **kwargs):
+        star_data = get_PHOENIX_spec(star_effective_temperature)
+
+        star_radiosities = star_data[:, 1]
+        star_wavelengths = star_data[:, 0] * 1e4  # cm to um
+
+        star_radiosities = fr.rebin_spectrum(star_wavelengths, star_radiosities, wavelengths)
+        star_radiosities *= (star_radius / semi_major_axis) ** 2 / np.pi
+
+        star_radiosities = BaseSpectralModel.radiosity_erg_hz2radiosity_erg_cm(
+            star_radiosities, nc.c / wavelengths * 1e4
         )
 
-        return self.wavelengths, self.spectral_radiosities
-
-    def get_spectrum_model(self, radtrans: Radtrans, parameters, mode='emission'):
-        self.update_spectral_calculation_parameters(
-            radtrans=radtrans,
-            **parameters
-        )
-
-        if mode == 'emission':
-            wavelengths, spectrum = self.get_spectral_radiosity_spectrum_model(
-                radtrans=radtrans,
-                parameters=parameters
-            )
-        elif mode == 'transmission':
-            wavelengths, spectrum = self.get_transit_spectrum_model(
-                radtrans=radtrans,
-                parameters=parameters
-            )
-        else:
-            raise ValueError(f"mode must be 'emission' or 'transmission', not '{mode}'")
-
-        return wavelengths, spectrum
+        return star_radiosities
 
     @staticmethod
-    def get_temperature_profile(pressures, **kwargs):
+    def calculate_temperature_profile(pressures, **kwargs):
         """Template for temperature profile function.
         Here, generate an isothermal temperature profile.
 
@@ -252,8 +252,8 @@ class BaseSpectralModel:
         return np.ones(np.size(pressures)) * kwargs['temperature']
 
     @staticmethod
-    def get_transit_spectrum(radtrans: Radtrans, temperatures, mass_mixing_ratios, mean_molar_masses,
-                             planet_surface_gravity, reference_pressure, planet_radius, **kwargs):
+    def calculate_transit_spectrum(radtrans: Radtrans, temperatures, mass_mixing_ratios, mean_molar_masses,
+                                   planet_surface_gravity, reference_pressure, planet_radius, **kwargs):
         """Wrapper of Radtrans.calc_transm that output wavelengths in um and transit radius in cm.
         # TODO move to Radtrans or outside of object
 
@@ -286,8 +286,197 @@ class BaseSpectralModel:
 
         return wavelengths, planet_transit_radius
 
+    @staticmethod
+    def convolve(input_wavelengths, input_spectrum, new_resolving_power, **kwargs):
+        """Convolve a spectrum to a new resolving power.
+        The spectrum is convolved using a Gaussian filter with a standard deviation ~ R_in / R_new input wavelengths bins.
+        The spectrum must have a constant resolving power as a function of wavelength.
+        The input resolving power is given by:
+            lambda / Delta_lambda
+        where lambda is the center of a wavelength bin and Delta_lambda the difference between the edges of the bin.
+
+        Args:
+            input_wavelengths: (cm) wavelengths of the input spectrum
+            input_spectrum: input spectrum
+            new_resolving_power: resolving power of output spectrum  # TODO change to actual resolution of output wvl
+
+        Returns:
+            convolved_spectrum: the convolved spectrum at the new resolving power
+        """
+        # Compute resolving power of the model
+        # In petitRADTRANS, the wavelength grid is log-spaced, so the resolution is constant as a function of wavelength
+        model_resolving_power = np.mean(
+            (input_wavelengths[1:] + input_wavelengths[:-1]) / (2 * np.diff(input_wavelengths))
+        )
+
+        # Calculate the sigma to be used in the gauss filter in units of input wavelength bins
+        # Delta lambda of resolution element is the FWHM of the instrument's LSF (here: a gaussian)
+        sigma_lsf_gauss_filter = model_resolving_power / new_resolving_power / (2 * np.sqrt(2 * np.log(2)))
+
+        convolved_spectrum = gaussian_filter1d(
+            input=input_spectrum,
+            sigma=sigma_lsf_gauss_filter,
+            mode='reflect'
+        )
+
+        return convolved_spectrum
+
+    def get_parameters_dict(self):
+        parameters_dict = {}
+
+        for key, value in self.__dict__.items():
+            if key == 'model_parameters':  # model_parameters is a dictionary, extract its values
+                for parameter, parameter_value in value.items():
+                    parameters_dict[parameter] = copy.copy(parameter_value)
+            else:
+                parameters_dict[key] = copy.copy(value)
+
+        return parameters_dict
+
+    def get_radtrans(self):
+        """Return the Radtrans object corresponding to this SpectrumModel."""
+        return self.init_radtrans(
+            wavelengths_boundaries=self.wavelengths_boundaries,
+            pressures=self.pressures,
+            line_species=self.line_species,
+            rayleigh_species=self.rayleigh_species,
+            continuum_opacities=self.continuum_opacities,
+            lbl_opacity_sampling=self.lbl_opacity_sampling,
+            do_scat_emis=self.do_scat_emis,
+            opacity_mode=self.opacity_mode
+        )
+
+    @staticmethod
+    def get_reduced_spectrum(spectrum, pipeline, **kwargs):
+        if 'data' in kwargs:
+            if isinstance(kwargs['data'], np.ma.core.MaskedArray):
+                spectrum = np.ma.masked_array(spectrum)
+                spectrum.mask = copy.copy(kwargs['data'].mask)
+
+        return pipeline(spectrum, **kwargs)
+
+    def get_spectral_calculation_parameters(self, pressures=None, wavelengths=None, **kwargs):
+        if pressures is None:
+            pressures = self.pressures
+
+        if wavelengths is None:
+            wavelengths = self.wavelengths
+
+        return self.calculate_spectral_parameters(
+            temperature_profile_function=self.calculate_temperature_profile,
+            mass_mixing_ratios_function=self.calculate_mass_mixing_ratios,
+            mean_molar_masses_function=self.calculate_mean_molar_masses,
+            spectral_parameters_function=self.calculate_model_parameters,
+            pressures=pressures,
+            wavelengths=wavelengths,
+            **kwargs
+        )
+
+    def get_spectral_radiosity_spectrum_model(self, radtrans: Radtrans, parameters):
+        self.wavelengths, self.spectral_radiosities = self.calculate_spectral_radiosity_spectrum(
+            radtrans=radtrans,
+            temperatures=self.temperatures,
+            mass_mixing_ratios=self.mass_mixing_ratios,
+            mean_molar_mass=self.mean_molar_masses,
+            **parameters
+        )
+
+        return self.wavelengths, self.spectral_radiosities
+
+    def get_spectrum_model(self, radtrans: Radtrans, parameters, mode='emission', update_parameters=False,
+                           deformation_matrix=None, noise_matrix=None,
+                           scale=False, shift=False, convolve=False, rebin=False, reduce=False):
+        if update_parameters:
+            self.update_spectral_calculation_parameters(
+                radtrans=radtrans,
+                **parameters
+            )
+            parameters = copy.copy(self.model_parameters)
+
+        if mode == 'emission':
+            self.wavelengths, self.spectral_radiosities = self.get_spectral_radiosity_spectrum_model(
+                radtrans=radtrans,
+                parameters=parameters
+            )
+            spectrum = copy.copy(self.spectral_radiosities)
+        elif mode == 'transmission':
+            self.wavelengths, self.transit_radii = self.get_transit_spectrum_model(
+                radtrans=radtrans,
+                parameters=parameters
+            )
+            spectrum = copy.copy(self.transit_radii)
+        else:
+            raise ValueError(f"mode must be 'emission' or 'transmission', not '{mode}'")
+
+        wavelengths = copy.copy(self.wavelengths)
+
+        if scale:
+            spectrum = self.scale_spectrum(
+                spectrum=spectrum,
+                mode=mode,
+                **parameters
+            )
+
+        if shift:
+            wavelengths = self.shift_wavelengths(
+                wavelengths_rest=wavelengths,
+                **parameters
+            )
+
+        if convolve:
+            if np.ndim(wavelengths) <= 1:
+                spectrum = self.convolve(
+                    input_wavelengths=wavelengths,
+                    input_spectrum=spectrum,
+                    **parameters
+                )
+            else:
+                spectrum = self.convolve(
+                    input_wavelengths=wavelengths[0],  # assuming Doppler shifting doesn't change the resolving power
+                    input_spectrum=spectrum,
+                    **parameters
+                )
+
+        if rebin:
+            if np.ndim(wavelengths) <= 1:
+                wavelengths_tmp, spectrum = self.rebin_spectrum(
+                    input_wavelengths=wavelengths,
+                    input_spectrum=spectrum,
+                    **parameters
+                )
+            else:
+                spectrum_tmp = []
+                wavelengths_tmp = None
+
+                for i, wavelength_shift in enumerate(wavelengths):
+                    spectrum_tmp.append([])
+                    wavelengths_tmp, spectrum_tmp[-1] = self.rebin_spectrum(
+                        input_wavelengths=wavelength_shift,
+                        input_spectrum=spectrum,
+                        **parameters
+                    )
+
+                spectrum = np.asarray(spectrum_tmp)
+
+            wavelengths = wavelengths_tmp
+
+        if deformation_matrix is not None:
+            spectrum *= deformation_matrix
+
+        if noise_matrix is not None:
+            spectrum += noise_matrix
+
+        if reduce:
+            spectrum = self.get_reduced_spectrum(
+                spectrum=spectrum,
+                pipeline=self.pipeline,
+                **parameters
+            )
+
+        return wavelengths, spectrum
+
     def get_transit_spectrum_model(self, radtrans: Radtrans, parameters):
-        self.wavelengths, self.transit_radii = self.get_transit_spectrum(
+        self.wavelengths, self.transit_radii = self.calculate_transit_spectrum(
             radtrans=radtrans,
             temperatures=self.temperatures,
             mass_mixing_ratios=self.mass_mixing_ratios,
@@ -318,6 +507,66 @@ class BaseSpectralModel:
 
         return radtrans
 
+    @staticmethod
+    def pipeline(spectrum):
+        """Simplistic pipeline model. Do nothing.
+        To be updated when initializing an instance of retrieval model.
+
+        Args:
+            spectrum: a spectrum
+
+        Returns:
+            spectrum: the spectrum reduced by the pipeline
+        """
+        return spectrum
+
+    @staticmethod
+    def radiosity_erg_cm2radiosity_erg_hz(radiosity_erg_cm, wavelength):
+        """
+        Convert a radiosity from erg.s-1.cm-2.sr-1/cm to erg.s-1.cm-2.sr-1/Hz at a given wavelength.
+        Steps:
+            [cm] = c[cm.s-1] / [Hz]
+            => d[cm]/d[Hz] = d(c / [Hz])/d[Hz]
+            => d[cm]/d[Hz] = c / [Hz]**2
+            integral of flux must be conserved: radiosity_erg_cm * d[cm] = radiosity_erg_hz * d[Hz]
+            radiosity_erg_hz = radiosity_erg_cm * d[cm]/d[Hz]
+            => radiosity_erg_hz = radiosity_erg_cm * wavelength**2 / c
+
+        Args:
+            radiosity_erg_cm: (erg.s-1.cm-2.sr-1/cm)
+            wavelength: (cm)
+
+        Returns:
+            (erg.s-1.cm-2.sr-1/cm) the radiosity in converted units
+        """
+        return radiosity_erg_cm * wavelength ** 2 / nc.c
+
+    @staticmethod
+    def radiosity_erg_hz2radiosity_erg_cm(radiosity_erg_hz, frequency):
+        """
+        Convert a radiosity from erg.s-1.cm-2.sr-1/Hz to erg.s-1.cm-2.sr-1/cm at a given frequency.
+        Steps:
+            [cm] = c[cm.s-1] / [Hz]
+            => d[cm]/d[Hz] = d(c / [Hz])/d[Hz]
+            => d[cm]/d[Hz] = c / [Hz]**2
+            => d[Hz]/d[cm] = [Hz]**2 / c
+            integral of flux must be conserved: radiosity_erg_cm * d[cm] = radiosity_erg_hz * d[Hz]
+            radiosity_erg_cm = radiosity_erg_hz * d[Hz]/d[cm]
+            => radiosity_erg_cm = radiosity_erg_hz * frequency**2 / c
+
+        Args:
+            radiosity_erg_hz: (erg.s-1.cm-2.sr-1/Hz)
+            frequency: (Hz)
+
+        Returns:
+            (erg.s-1.cm-2.sr-1/cm) the radiosity in converted units
+        """
+        return radiosity_erg_hz * frequency ** 2 / nc.c
+
+    @staticmethod
+    def rebin_spectrum(input_wavelengths, input_spectrum, output_wavelengths, **kwargs):
+        return output_wavelengths, fr.rebin_spectrum(input_wavelengths, input_spectrum, output_wavelengths)
+
     def save(self, file):
         pass
         # TODO save and load functions
@@ -329,10 +578,43 @@ class BaseSpectralModel:
         #     )
         #     dataset.attrs['units'] = f'{wavelengths_units}'
 
+    @staticmethod
+    def scale_spectrum(spectrum, star_radius, planet_radius=None, star_spectral_radiosities=None, mode='emission',
+                       **kwargs):
+        if mode == 'emission':
+            if planet_radius is None or star_spectral_radiosities is None:
+                missing = []
+
+                if planet_radius is None:
+                    missing.append('planet_radius')
+
+                if star_spectral_radiosities is None:
+                    missing.append('star_spectral_radiosities')
+
+                joint = "', '".join(missing)
+
+                raise TypeError(f"missing {len(missing)} positional arguments: '{joint}'")
+
+            return 1 + spectrum / star_spectral_radiosities * (planet_radius / star_radius) ** 2
+        elif mode == 'transmission':
+            return 1 - (spectrum / star_radius) ** 2
+        else:
+            raise ValueError(f"mode must be 'emission' or 'transmission', not '{mode}'")
+
+    @staticmethod
+    def shift_wavelengths(wavelengths_rest, relative_velocities, **kwargs):
+        wavelengths_shift = np.zeros((relative_velocities.size, wavelengths_rest.size))
+
+        for i, relative_velocity in enumerate(relative_velocities):
+            wavelengths_shift[i] = doppler_shift(wavelengths_rest, relative_velocity)
+
+        return wavelengths_shift
+
     def update_spectral_calculation_parameters(self, radtrans: Radtrans, **kwargs):
         self.temperatures, self.mass_mixing_ratios, self.mean_molar_masses, self.model_parameters = \
             self.get_spectral_calculation_parameters(
                 pressures=radtrans.press * 1e-6,  # cgs to bar
+                wavelengths=nc.c / radtrans.freq * 1e4,  # Hz to um
                 **kwargs
             )
 
@@ -1266,10 +1548,23 @@ class Planet:
 
     @staticmethod
     def calculate_planet_radial_velocity(planet_max_radial_orbital_velocity, planet_orbital_inclination,
-                                         orbital_phases):
+                                         orbital_longitude):
+        """Calculate the planet radial velocity as seen by an observer.
+
+        Args:
+            planet_max_radial_orbital_velocity: maximum radial velocity for an inclination angle of 90 degree
+            planet_orbital_inclination: (degree) angle between the normal of the planet orbital plane and the axis of
+                observation, i.e. 90 degree: edge view, 0 degree: top view
+            orbital_longitude: (degree) angle between the closest point from the observer on the planet orbit and the
+                planet position, i.e. if the planet orbital inclination is 0 degree, 0 degree: mid primary transit
+                point, 180 degree: mid secondary eclipse point
+
+        Returns:
+
+        """
         kp = planet_max_radial_orbital_velocity * np.sin(np.deg2rad(planet_orbital_inclination))  # (cm.s-1)
 
-        return kp * np.sin(2 * np.pi * orbital_phases)
+        return kp * np.sin(np.deg2rad(orbital_longitude))
 
     @staticmethod
     def calculate_orbital_velocity(star_mass, semi_major_axis):
@@ -2073,14 +2368,14 @@ class SpectralModel:
 
         data = np.loadtxt(star_radiosity_filename)
         star_wavelength = data[:, 0] * 1e6  # m to um
-        star_radiosity = data[:, 1] * 1e8 * np.pi  # erg.s-1.cm-2.sr-1/A to erg.s-1.cm-2/cm
+        star_radiosities = data[:, 1] * 1e8 * np.pi  # erg.s-1.cm-2.sr-1/A to erg.s-1.cm-2/cm
 
         print('Calculating eclipse depth...')
         # TODO fix stellar flux calculated multiple time if do_scat_emis is True
         wavelengths, planet_radiosity = self.calculate_emission_spectrum(atmosphere, planet)
-        star_radiosity = fr.rebin_spectrum(star_wavelength, star_radiosity, wavelengths)
+        star_radiosities = fr.rebin_spectrum(star_wavelength, star_radiosities, wavelengths)
 
-        eclipse_depth = (planet_radiosity * planet.radius ** 2) / (star_radiosity * planet.star_radius ** 2)
+        eclipse_depth = (planet_radiosity * planet.radius ** 2) / (star_radiosities * planet.star_radius ** 2)
 
         return wavelengths, eclipse_depth, planet_radiosity
 
@@ -2198,13 +2493,13 @@ class SpectralModel:
 
         star_data[:, 0] *= 1e4  # cm to um
 
-        star_radiosity = fr.rebin_spectrum(
+        star_radiosities = fr.rebin_spectrum(
             star_data[:, 0],
             star_data[:, 1],
             wavelengths
         )
 
-        return star_radiosity
+        return star_radiosities
 
     def get_phoenix_star_spectral_radiosity(self, planet: Planet):
         return self._get_phoenix_star_spectral_radiosity(planet.star_effective_temperature, self.wavelengths)
@@ -2418,6 +2713,27 @@ class SpectralModel:
                 model_suffix, atmosphere, temperature_profile, mass_fractions, calculate_transmission_spectrum,
                 calculate_emission_spectrum, calculate_eclipse_depth
             )
+
+    @staticmethod
+    def radiosity_erg_cm2radiosity_erg_hz(radiosity_erg_cm, wavelength):
+        """
+        Convert a radiosity from erg.s-1.cm-2.sr-1/cm to erg.s-1.cm-2.sr-1/Hz at a given wavelength.
+        Steps:
+            [cm] = c[cm.s-1] / [Hz]
+            => d[cm]/d[Hz] = d(c / [Hz])/d[Hz]
+            => d[cm]/d[Hz] = c / [Hz]**2
+            integral of flux must be conserved: radiosity_erg_cm * d[cm] = radiosity_erg_hz * d[Hz]
+            radiosity_erg_hz = radiosity_erg_cm * d[cm]/d[Hz]
+            => radiosity_erg_hz = radiosity_erg_cm * wavelength**2 / c
+
+        Args:
+            radiosity_erg_cm: (erg.s-1.cm-2.sr-1/cm)
+            wavelength: (cm)
+
+        Returns:
+            (erg.s-1.cm-2.sr-1/cm) the radiosity in converted units
+        """
+        return radiosity_erg_cm * wavelength ** 2 / nc.c
 
     @staticmethod
     def radiosity_erg_hz2radiosity_erg_cm(radiosity_erg_hz, frequency):
@@ -2673,10 +2989,13 @@ class SpectralModel2(BaseSpectralModel):
         self.orbital_phases = orbital_phases
 
     @staticmethod
-    def _get_equilibrium_mass_mixing_ratios(pressures, temperatures, co_ratio, log10_metallicity,
-                                            line_species, included_line_species,
-                                            carbon_pressure_quench=None, imposed_mass_mixing_ratios=None):
+    def _calculate_equilibrium_mass_mixing_ratios(pressures, temperatures, co_ratio, log10_metallicity,
+                                                  line_species, included_line_species,
+                                                  carbon_pressure_quench=None, imposed_mass_mixing_ratios=None):
         from petitRADTRANS.poor_mans_nonequ_chem import poor_mans_nonequ_chem as pm  # import is here because it is long to load
+
+        if imposed_mass_mixing_ratios is None:
+            imposed_mass_mixing_ratios = {}
 
         if np.size(co_ratio) == 1:
             co_ratios = np.ones_like(pressures) * co_ratio
@@ -2706,7 +3025,10 @@ class SpectralModel2(BaseSpectralModel):
         mass_mixing_ratios = {}
 
         if included_line_species == 'all':
-            included_line_species = copy.copy(line_species)
+            included_line_species = []
+
+            for line_species_name in line_species:
+                included_line_species.append(line_species_name.split('_', 1)[0])
 
         for key in equilibrium_mass_mixing_ratios:
             found = False
@@ -2745,24 +3067,12 @@ class SpectralModel2(BaseSpectralModel):
 
         return mass_mixing_ratios
 
-    def calculate_orbital_phases(self, phase_start, orbital_period):
-        self.orbital_phases = Planet.get_orbital_phases(
-            phase_start=phase_start,
-            orbital_period=orbital_period,
-            times=self.times
-        )
-
-    def calculate_star_spectral_radiosity(self):
-        self.star_spectral_radiosities = self._get_phoenix_star_spectral_radiosity(
-            star_effective_temperature=self.star_effective_temperature,
-            wavelengths=self.wavelengths
-        )
-
     @staticmethod
-    def get_mass_mixing_ratios(pressures, line_species=None,
-                               included_line_species='all', temperatures=None, co_ratio=0.55, log10_metallicity=0,
-                               carbon_pressure_quench=None,
-                               imposed_mass_mixing_ratios=None, heh2_ratio=0.324324, use_equilibrium_chemistry=False):
+    def calculate_mass_mixing_ratios(pressures, line_species=None,
+                                     included_line_species='all', temperatures=None, co_ratio=0.55, log10_metallicity=0,
+                                     carbon_pressure_quench=None,
+                                     imposed_mass_mixing_ratios=None, heh2_ratio=0.324324,
+                                     use_equilibrium_chemistry=False, verbose=False, **kwargs):
         """Initialize a model mass mixing ratios.
         Ensure that in any case, the sum of mass mixing ratios is equal to 1. Imposed mass mixing ratios are kept to
         their imposed value as long as the sum of the imposed values is lower or equal to 1. H2 and He are used as
@@ -2820,7 +3130,7 @@ class SpectralModel2(BaseSpectralModel):
 
         # Chemical equilibrium
         if use_equilibrium_chemistry:
-            mass_mixing_ratios_equilibrium = SpectralModel2._get_equilibrium_mass_mixing_ratios(
+            mass_mixing_ratios_equilibrium = SpectralModel2._calculate_equilibrium_mass_mixing_ratios(
                 pressures=pressures,
                 temperatures=temperatures,
                 co_ratio=co_ratio,
@@ -2849,8 +3159,9 @@ class SpectralModel2(BaseSpectralModel):
         for i in range(np.size(m_sum_imposed_species)):
             if m_sum_imposed_species[i] > 1:
                 # TODO changing retrieved mmr might come problematic in some retrievals (retrieved value not corresponding to actual value in model)
-                print(f"Warning: sum of mass mixing ratios of imposed species ({m_sum_imposed_species}) is > 1, "
-                      f"correcting...")
+                if verbose:
+                    warnings.warn(f"sum of mass mixing ratios of imposed species ({m_sum_imposed_species}) is > 1, "
+                                  f"correcting...")
 
                 for species in imposed_mass_mixing_ratios:
                     mass_mixing_ratios[species][i] /= m_sum_imposed_species[i]
@@ -2882,8 +3193,18 @@ class SpectralModel2(BaseSpectralModel):
 
             # Only take into account non-imposed species and ignore imposed species
             if not found:
-                mass_mixing_ratios[species] = mass_mixing_ratios_equilibrium[species]
-                m_sum_species += mass_mixing_ratios_equilibrium[species]
+                if mass_mixing_ratios_equilibrium is None:
+                    if verbose:
+                        warnings.warn(
+                            f"line species '{species}' initialised to {sys.float_info.min} ; "
+                            f"to remove this warning set use_equilibrium_chemistry to True "
+                            f"or add '{species}' and the desired mass mixing ratio to imposed_mass_mixing_ratios"
+                        )
+
+                    mass_mixing_ratios[species] = sys.float_info.min
+                else:
+                    mass_mixing_ratios[species] = mass_mixing_ratios_equilibrium[species]
+                    m_sum_species += mass_mixing_ratios_equilibrium[species]
 
         # Ensure that the sum of mass mixing ratios of all species is = 1
         m_sum_total = m_sum_species + m_sum_imposed_species
@@ -2916,8 +3237,9 @@ class SpectralModel2(BaseSpectralModel):
 
             for i in range(np.size(m_sum_total)):
                 if m_sum_total[i] > 1:
-                    print(f"Warning: sum of species mass fraction ({m_sum_species[i]} + {m_sum_imposed_species[i]}) "
-                          f"is > 1, correcting...")
+                    if verbose:
+                        warnings.warn(f"sum of species mass fraction ({m_sum_species[i]} + {m_sum_imposed_species[i]}) "
+                                      f"is > 1, correcting...")
 
                     for species in mass_mixing_ratios:
                         if species not in imposed_mass_mixing_ratios:
@@ -2951,102 +3273,86 @@ class SpectralModel2(BaseSpectralModel):
 
         return mass_mixing_ratios
 
-    def get_relative_velocities(self, planet_max_radial_orbital_velocity, planet_orbital_inclination,
-                                system_observer_radial_velocities, planet_rest_frame_shift):
-        if -sys.float_info.min < planet_max_radial_orbital_velocity < sys.float_info.min:
-            relative_velocities = 0.0
+    @staticmethod
+    def calculate_spectral_parameters(temperature_profile_function, mass_mixing_ratios_function,
+                                      mean_molar_masses_function, spectral_parameters_function, **kwargs):
+        temperatures = temperature_profile_function(
+            **kwargs
+        )
+
+        mass_mixing_ratios = mass_mixing_ratios_function(
+            temperatures=temperatures,  # use the newly calculated temperature profile to obtain the mass mixing ratios
+            **kwargs
+        )
+
+        # Find the mean molar mass in each layer
+        mean_molar_mass = mean_molar_masses_function(
+            mass_mixing_ratios=mass_mixing_ratios,
+            **kwargs
+        )
+
+        model_parameters = spectral_parameters_function(
+            **kwargs
+        )
+
+        return temperatures, mass_mixing_ratios, mean_molar_mass, model_parameters
+
+    @staticmethod
+    def calculate_temperature_profile(pressures, temperature_profile_mode='isothermal', temperature=None,
+                                      intrinsic_temperature=None, planet_surface_gravity=None, metallicity=None,
+                                      guillot_temperature_profile_gamma=0.4,
+                                      guillot_temperature_profile_kappa_ir_z0=0.01, **kwargs):
+        if temperature is None:
+            raise TypeError(f"missing required argument 'temperature'")
+
+        if temperature_profile_mode == 'isothermal':
+            if isinstance(temperature, (float, int)):
+                temperatures = np.ones(np.shape(pressures)) * temperature
+            elif np.size(temperature) == np.size(pressures):
+                temperatures = np.asarray(temperature)
+            else:
+                raise ValueError(f"could not initialize isothermal temperature profile ; "
+                                 f"possible inputs are float, int, "
+                                 f"or a 1-D array of the same size of parameter 'pressures' ({np.size(pressures)})")
+        elif temperature_profile_mode == 'guillot':
+            temperatures = guillot_metallic_temperature_profile(
+                pressures=pressures,
+                gamma=guillot_temperature_profile_gamma,
+                surface_gravity=planet_surface_gravity,
+                intrinsic_temperature=intrinsic_temperature,
+                equilibrium_temperature=temperature,
+                kappa_ir_z0=guillot_temperature_profile_kappa_ir_z0,
+                metallicity=metallicity
+            )
         else:
-            relative_velocities = Planet.calculate_planet_radial_velocity(
-                planet_max_radial_orbital_velocity=planet_max_radial_orbital_velocity,
-                planet_orbital_inclination=planet_orbital_inclination,
-                orbital_phases=self.orbital_phases
-            )
+            raise ValueError(f"mode must be 'isothermal' or 'guillot', but was '{temperature_profile_mode}'")
 
-        relative_velocities += system_observer_radial_velocities + planet_rest_frame_shift  # planet + system velocity
+        return temperatures
 
-        return relative_velocities
-
-    def get_shifted_spectrum_model(self, radtrans: Radtrans, parameters, mode='transit'):
-        _, _, = self.get_spectrum_model(
-            radtrans=radtrans,
-            parameters=parameters,
-            mode=mode
+    def calculate_orbital_phases(self, phase_start, orbital_period):
+        self.orbital_phases = Planet.get_orbital_phases(
+            phase_start=phase_start,
+            orbital_period=orbital_period,
+            times=self.times
         )
 
-        relative_velocities = self.get_relative_velocities(
-            planet_max_radial_orbital_velocity=parameters['planet_max_radial_orbital_velocity'],
-            planet_orbital_inclination=parameters['planet_orbital_inclination'],
-            system_observer_radial_velocities=parameters['system_observer_radial_velocities'],
-            planet_rest_frame_shift=parameters['planet_rest_frame_shift'],
-        )
-
-        spectra = convolve_shift_rebin(
-            input_wavelengths=self.wavelengths,
-            input_spectrum=self.transit_radii,
-            output_wavelengths=self.wavelengths_rest,
-            new_resolving_power=self.resolving_power_rest,
-            relative_velocities=relative_velocities
-        )
-
-        if mode == 'emission':
-            self.shifted_spectral_radiosities = spectra
-
-            return self.wavelengths_rest, self.shifted_spectral_radiosities
-        elif mode == 'transmission':
-            self.shifted_transit_radii = spectra
-
-            return self.wavelengths_rest, self.shifted_transit_radii
-
-    def get_scaled_shifted_spectrum_model(self, radtrans: Radtrans, parameters, mode='transit'):
-        wavelengths, spectrum = self.get_shifted_spectrum_model(
-            radtrans=radtrans,
-            parameters=parameters,
-            mode=mode
-        )
-
-        if mode == 'emission':
-            star_relative_velocities = self.get_relative_velocities(
-                planet_max_radial_orbital_velocity=0.0,
-                planet_orbital_inclination=0.0,
-                system_observer_radial_velocities=parameters['system_observer_radial_velocities'],
-                planet_rest_frame_shift=parameters['planet_rest_frame_shift'],
-            )
-
-            self.shifted_star_spectral_radiosities = convolve_shift_rebin(
-                input_wavelengths=self.wavelengths,
-                input_spectrum=self.transit_radii,
-                output_wavelengths=self.wavelengths_rest,
-                new_resolving_power=self.resolving_power_rest,
-                relative_velocities=star_relative_velocities
-            )
-
-            return wavelengths, self.scale_spectrum(
-                spectrum=spectrum,
-                star_radius=parameters['star_radius'],
-                planet_radius=parameters['planet_radius'],
-                star_spectral_radiosity=self.shifted_star_spectral_radiosities,
-                mode=mode
-            )
-        elif mode == 'transmission':
-            return wavelengths, self.scale_spectrum(
-                spectrum=spectrum,
-                star_radius=parameters['star_radius'],
-                mode=mode
-            )
-
-    def get_spectral_calculation_parameters(self, pressures=None, temperature=None, line_species=None,
+    def get_spectral_calculation_parameters(self, pressures=None, wavelengths=None,
+                                            temperature_profile_mode='isothermal',
+                                            temperature=None, line_species=None,
                                             included_line_species='all',
                                             imposed_mass_mixing_ratios=None,
                                             intrinsic_temperature=None, planet_surface_gravity=None, metallicity=None,
                                             guillot_temperature_profile_gamma=0.4,
                                             guillot_temperature_profile_kappa_ir_z0=0.01,
                                             co_ratio=0.55, carbon_pressure_quench=None, heh2_ratio=0.324324,
-                                            use_equilibrium_chemistry=False, **parameters
+                                            use_equilibrium_chemistry=False, **kwargs
                                             ):
         """Initialize the temperature profile, mass mixing ratios and mean molar mass of a model.
 
         Args:
             pressures:
+            wavelengths:
+            temperature_profile_mode:
             temperature:
             line_species:
             included_line_species:
@@ -3067,138 +3373,37 @@ class SpectralModel2(BaseSpectralModel):
         if pressures is None:
             pressures = self.pressures
 
-        temperatures = self.get_temperature_profile(
+        if metallicity is not None:
+            log10_metallicity = np.log10(metallicity)
+        else:
+            log10_metallicity = None
+
+        return self.calculate_spectral_parameters(
+            temperature_profile_function=self.calculate_temperature_profile,
+            mass_mixing_ratios_function=self.calculate_mass_mixing_ratios,
+            mean_molar_masses_function=self.calculate_mean_molar_masses,
+            spectral_parameters_function=self.calculate_model_parameters,
+            # Temperature profile parameters
             pressures=pressures,
+            temperature_profile_mode=temperature_profile_mode,
             temperature=temperature,
             intrinsic_temperature=intrinsic_temperature,
-            surface_gravity=planet_surface_gravity,
-            metallicity=metallicity,
-            guillot_temperature_profile_gamma=guillot_temperature_profile_gamma,
-            guillot_temperature_profile_kappa_ir_z0=guillot_temperature_profile_kappa_ir_z0
-        )
-
-        mass_mixing_ratios = self.get_mass_mixing_ratios(
-            pressures=pressures,
-            line_species=line_species,
-            included_line_species=included_line_species,
-            temperatures=temperatures,
-            co_ratio=co_ratio,
-            log10_metallicity=np.log10(metallicity),
-            carbon_pressure_quench=carbon_pressure_quench,
-            imposed_mass_mixing_ratios=imposed_mass_mixing_ratios,
-            heh2_ratio=heh2_ratio,
-            use_equilibrium_chemistry=use_equilibrium_chemistry
-        )
-
-        # Find the mean molar mass in each layer
-        mean_molar_mass = self.get_mean_molar_masses(mass_mixing_ratios)
-
-        model_parameters = self.get_model_parameters(
-            temperature=temperature,
-            included_line_species=included_line_species,
-            imposed_mass_mixing_ratios=imposed_mass_mixing_ratios,
-            intrinsic_temperature=intrinsic_temperature,
-            surface_gravity=planet_surface_gravity,
+            planet_surface_gravity=planet_surface_gravity,
             metallicity=metallicity,
             guillot_temperature_profile_gamma=guillot_temperature_profile_gamma,
             guillot_temperature_profile_kappa_ir_z0=guillot_temperature_profile_kappa_ir_z0,
+            # MMR parameters
+            line_species=line_species,
+            included_line_species=included_line_species,
             co_ratio=co_ratio,
+            log10_metallicity=log10_metallicity,
             carbon_pressure_quench=carbon_pressure_quench,
+            imposed_mass_mixing_ratios=imposed_mass_mixing_ratios,
             heh2_ratio=heh2_ratio,
             use_equilibrium_chemistry=use_equilibrium_chemistry,
-            **parameters
+            wavelengths=wavelengths,
+            **kwargs
         )
-
-        return temperatures, mass_mixing_ratios, mean_molar_mass, model_parameters
-
-    @staticmethod
-    def get_temperature_profile(pressures, temperature=None,
-                                intrinsic_temperature=None, surface_gravity=None, metallicity=None,
-                                guillot_temperature_profile_gamma=0.4, guillot_temperature_profile_kappa_ir_z0=0.01):
-        if temperature is None:
-            raise TypeError(f"missing required argument 'temperature'")
-
-        if intrinsic_temperature is not None:  # TODO change condition to include more cases
-            temperatures = SpectralModel.get_guillot_metallic_temperature_profile(
-                pressures=pressures,
-                gamma=guillot_temperature_profile_gamma,
-                surface_gravity=surface_gravity,
-                intrinsic_temperature=intrinsic_temperature,
-                equilibrium_temperature=temperature,
-                kappa_ir_z0=guillot_temperature_profile_kappa_ir_z0,
-                metallicity=metallicity
-            )
-        elif isinstance(temperature, (float, int)):
-            temperatures = np.ones(np.shape(pressures)) * temperature
-        elif np.size(temperature) == np.size(pressures):
-            temperatures = np.asarray(temperature)
-        else:
-            raise ValueError(f"could not initialize temperature profile; "
-                             f"possible inputs are float, int, "
-                             f"or a 1-D array of the same size of parameter 'pressures' ({np.size(pressures)})")
-
-        return temperatures
-
-    @staticmethod
-    def get_guillot_metallic_temperature_profile(pressures, gamma, surface_gravity,
-                                                 intrinsic_temperature, equilibrium_temperature, kappa_ir_z0,
-                                                 metallicity=None):
-        """Get a Guillot temperature profile depending on metallicity.
-
-        Args:
-            pressures: (bar) pressures of the profile
-            gamma: ratio between visual and infrated opacity
-            surface_gravity: (cm.s-2) surface gravity
-            intrinsic_temperature: (K) intrinsic temperature
-            equilibrium_temperature: (K) equilibrium temperature
-            kappa_ir_z0: (cm2.s-1) infrared opacity
-            metallicity: ratio of heavy elements abundance over H abundance with respect to the solar ratio
-
-        Returns:
-            temperatures: (K) the temperature at each pressures of the atmosphere
-        """
-        # TODO move to physics
-        if metallicity is not None:
-            kappa_ir = kappa_ir_z0 * metallicity
-        else:
-            kappa_ir = kappa_ir_z0
-
-        temperatures = guillot_global(
-            pressure=pressures,
-            kappa_ir=kappa_ir,
-            gamma=gamma,
-            grav=surface_gravity,
-            t_int=intrinsic_temperature,
-            t_equ=equilibrium_temperature
-        )
-
-        return temperatures
-
-    @staticmethod
-    def scale_spectrum(spectrum, star_radius, planet_radius=None, star_spectral_radiosity=None, mode='transmission'):
-        if mode == 'emission':
-            return 1 + spectrum / star_spectral_radiosity * (planet_radius / star_radius) ** 2
-        elif mode == 'transmission':
-            return 1 - (spectrum / star_radius) ** 2
-        else:
-            raise ValueError(f"mode must be 'emission' or 'transmission', not '{mode}'")
-
-    @staticmethod
-    def _get_phoenix_star_spectral_radiosity(star_effective_temperature, wavelengths):
-        star_data = get_PHOENIX_spec(star_effective_temperature)
-        star_data[:, 1] = radiosity_erg_hz2radiosity_erg_cm(
-            star_data[:, 1], nc.c / star_data[:, 0]
-        )
-
-        star_data[:, 0] *= 1e4  # cm to um
-
-        star_radiosity = fr.rebin_spectrum(
-            star_data[:, 0],
-            star_data[:, 1],
-            wavelengths
-        )
-
-        return star_radiosity
 
     def update_spectral_calculation_parameters(self, radtrans: Radtrans, **parameters):
         pressures = radtrans.press * 1e-6  # cgs to bar
@@ -3209,24 +3414,28 @@ class SpectralModel2(BaseSpectralModel):
             spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities
 
             if spec in parameters:
+                # TODO move that to RetrievalSpectralModel
                 imposed_mass_mixing_ratios[species] = 10 ** parameters[spec] * np.ones_like(pressures)
+
+        kwargs = {}
+
+        for parameter, value in parameters.items():
+            # TODO move that to RetrievalSpectralModel
+            if 'log10_' in parameter:
+                kwargs[parameter.split('log10_', 1)[-1]] = 10 ** value
+            else:
+                kwargs[parameter] = copy.copy(value)
+
+                if parameter == 'imposed_mass_mixing_ratios':
+                    for spec, mass_mixing_ratio in imposed_mass_mixing_ratios.items():
+                        kwargs[parameter][spec] = mass_mixing_ratio
 
         self.temperatures, self.mass_mixing_ratios, self.mean_molar_masses, self.model_parameters = \
             self.get_spectral_calculation_parameters(
                 pressures=pressures,
-                temperature=parameters['temperature'],
+                wavelengths=nc.c / radtrans.freq * 1e4,  # Hz to um
                 line_species=radtrans.line_species,
-                included_line_species=parameters['included_line_species'],
-                imposed_mass_mixing_ratios=imposed_mass_mixing_ratios,
-                intrinsic_temperature=parameters['intrinsic_temperature'],
-                planet_surface_gravity=10 ** parameters['log10_surface_gravity'],
-                metallicity=10 ** parameters['log10_metallicity'],
-                guillot_temperature_profile_gamma=parameters['guillot_temperature_profile_gamma'],
-                guillot_temperature_profile_kappa_ir_z0=parameters['guillot_temperature_profile_kappa_ir_z0'],
-                co_ratio=10 ** parameters['log10_co_ratio'],
-                carbon_pressure_quench=parameters['log10_carbon_pressure_quench'],
-                heh2_ratio=parameters['heh2_ratio'],
-                use_equilibrium_chemistry=parameters['use_equilibrium_chemistry']
+                **kwargs
             )
 
         # Adapt chemical names to line species names, as required by Retrieval
@@ -3665,6 +3874,10 @@ class RetrievalSpectralModel2(SpectralModel2):
     def __log10_to_parameter(parameter, parameter_value):
         return parameter.split('log10', 1)[-1], 10 ** parameter_value
 
+    @staticmethod
+    def dict_to_param(dictionary):
+        return {key: Param(value) for key, value in dictionary.items()}
+
     def get_parameters_dict(self):
         parameters_dict = {}
 
@@ -3688,40 +3901,6 @@ class RetrievalSpectralModel2(SpectralModel2):
         return self.dict_to_param(parameters_dict)
 
     @staticmethod
-    def param_to_dict(parameters):
-        return {key: value.value for key, value in parameters.items()}
-
-    @staticmethod
-    def dict_to_param(dictionary):
-        return {key: Param(value) for key, value in dictionary.items()}
-
-    @staticmethod
-    def get_reduced_spectrum(spectrum, pipeline, **kwargs):
-        if 'data' in kwargs:
-            if isinstance(kwargs['data'], np.ma.core.MaskedArray):
-                spectrum = np.ma.masked_array(spectrum)
-                spectrum.mask = copy.copy(kwargs['data'].mask)
-
-        return pipeline(spectrum, **kwargs)
-
-    def spectrum_model(self, radtrans: Radtrans, parameters, mode='transmission'):
-        return self.get_scaled_shifted_spectrum_model(
-            radtrans=radtrans,
-            parameters=parameters,
-            mode=mode
-        )
-
-    def retrieval_model(self, radtrans: Radtrans, parameters, pt_plot_mode=None, AMR=False, mode='transit'):
-        parameter_dict = self.param_to_dict(parameters)
-        wavelengths, spectra = self.spectrum_model(
-            radtrans=radtrans,
-            parameters=parameter_dict,
-            mode=mode
-        )
-
-        return wavelengths, self.get_reduced_spectrum(np.array([spectra]), self.pipeline, **parameter_dict)
-
-    @staticmethod
     def get_wavelengths_boundaries(wavelengths_boundaries, min_radial_velocity=0.0, max_radial_velocity=0.0):
         """Get wavelength boundaries for a source moving between two radial velocities with respect to the observer.
         A negative velocity means that the source is going toward the observer. A positive velocity means the source is
@@ -3741,17 +3920,107 @@ class RetrievalSpectralModel2(SpectralModel2):
         ]
 
     @staticmethod
-    def pipeline(spectrum):
-        """Simplistic pipeline model. Do nothing.
-        To be updated when initializing an instance of retrieval model.
+    def init_retrieval_configuration(retrieval_name, parameters, retrieved_parameters, prior_functions,
+                                     observed_spectra, observations_uncertainties, retrieval_model, prt_object,
+                                     pressures=None, run_mode='retrieval', amr=False, scattering=False):
+        run_configuration = RetrievalConfig(
+            retrieval_name=retrieval_name,
+            run_mode=run_mode,
+            AMR=amr,
+            scattering=scattering,  # scattering is automatically included for transmission spectra
+            pressures=pressures
+            # TODO add the other parameters if they are relevant
+        )
 
-        Args:
-            spectrum: a spectrum
+        # Fixed parameters
+        i_retrieved = 0
 
-        Returns:
-            spectrum: the spectrum reduced by the pipeline
-        """
-        return spectrum
+        for name, value in parameters.items():
+            if name not in retrieved_parameters:
+                run_configuration.add_parameter(
+                    name=name,
+                    free=False,
+                    value=value.value,  # TODO no need to use .value?
+                    transform_prior_cube_coordinate=None
+                )
+
+        for i, name in enumerate(retrieved_parameters):
+            run_configuration.add_parameter(
+                name=name,
+                free=True,
+                value=None,
+                transform_prior_cube_coordinate=prior_functions[i_retrieved]
+            )
+
+        # Remove masked values if necessary to speed up retrieval
+        if hasattr(observed_spectra, 'mask'):
+            print('Taking care of mask...')
+            data_ = []
+            error_ = []
+            mask_ = copy.copy(observed_spectra.mask)
+            lengths = []
+
+            for i in range(observed_spectra.shape[0]):
+                data_.append([])
+                error_.append([])
+
+                for j in range(observed_spectra.shape[1]):
+                    data_[i].append(np.array(
+                        observed_spectra[i, j, ~mask_[i, j, :]]
+                    ))
+                    error_[i].append(np.array(observations_uncertainties[i, j, ~mask_[i, j, :]]))
+                    lengths.append(data_[i][j].size)
+
+            # Handle jagged arrays
+            if np.all(np.asarray(lengths) == lengths[0]):
+                data_ = np.asarray(data_)
+                error_ = np.asarray(error_)
+            else:
+                print("Array is jagged, generating object array...")
+                data_ = np.asarray(data_, dtype=object)
+                error_ = np.asarray(error_, dtype=object)
+        else:
+            data_ = observed_spectra
+            error_ = observations_uncertainties
+            mask_ = None
+
+        # Load data
+        # TODO add multiple data (see JWST config)
+        run_configuration.add_data(
+            name='test',
+            path=None,
+            model_generating_function=retrieval_model,
+            opacity_mode=prt_object.mode,  # TODO this might be mostly useless
+            pRT_object=prt_object,
+            wlen=nc.c / prt_object.freq * 1e4,  # TODO this might be mostly useless
+            flux=data_,
+            flux_error=error_,
+            mask=mask_
+        )
+
+        return run_configuration
+
+    @staticmethod
+    def param_to_dict(parameters):
+        return {key: value.value for key, value in parameters.items()}
+
+    def retrieval_model(self, radtrans: Radtrans, parameters, pt_plot_mode=None, AMR=False, mode='transit',
+                        update_parameters=False, scale=False, shift=False, convolve=False, rebin=False, reduce=False
+                        ):
+        parameter_dict = self.param_to_dict(parameters)
+        wavelengths, spectra = self.get_spectrum_model(
+            radtrans=radtrans,
+            parameters=parameter_dict,
+            mode=mode,
+            update_parameters=update_parameters,
+            scale=scale,
+            shift=shift,
+            convolve=convolve,
+            rebin=rebin,
+            reduce=reduce
+        )
+
+        return wavelengths, spectra
 
 
 def get_orbital_phases(phase_start, orbital_period, dit, ndit, return_times=False):

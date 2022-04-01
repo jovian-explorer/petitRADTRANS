@@ -206,6 +206,40 @@ def guillot_global_ret(pressure, delta, gamma, t_int, t_equ):
     return temperature
 
 
+def guillot_metallic_temperature_profile(pressures, gamma, surface_gravity,
+                                         intrinsic_temperature, equilibrium_temperature, kappa_ir_z0,
+                                         metallicity=None):
+    """Get a Guillot temperature profile depending on metallicity.
+
+    Args:
+        pressures: (bar) pressures of the profile
+        gamma: ratio between visual and infrated opacity
+        surface_gravity: (cm.s-2) surface gravity
+        intrinsic_temperature: (K) intrinsic temperature
+        equilibrium_temperature: (K) equilibrium temperature
+        kappa_ir_z0: (cm2.s-1) infrared opacity
+        metallicity: ratio of heavy elements abundance over H abundance with respect to the solar ratio
+
+    Returns:
+        temperatures: (K) the temperature at each pressures of the atmosphere
+    """
+    if metallicity is not None:
+        kappa_ir = kappa_ir_z0 * metallicity
+    else:
+        kappa_ir = kappa_ir_z0
+
+    temperatures = guillot_global(
+        pressure=pressures,
+        kappa_ir=kappa_ir,
+        gamma=gamma,
+        grav=surface_gravity,
+        t_int=intrinsic_temperature,
+        t_equ=equilibrium_temperature
+    )
+
+    return temperatures
+
+
 def guillot_modif(pressure, delta, gamma, t_int, t_equ, ptrans, alpha):
     """Modified Guillot P-T formula"""
     return guillot_global_ret(

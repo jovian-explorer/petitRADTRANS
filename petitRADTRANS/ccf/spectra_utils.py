@@ -28,12 +28,12 @@ def convolve(input_wavelengths, input_spectrum, new_resolving_power):
     # Compute resolving power of the model
     # In petitRADTRANS, the wavelength grid is log-spaced, so the resolution is constant as a function of wavelength
     model_resolving_power = np.mean(
-        (input_wavelengths[1:] + input_wavelengths[:-1]) / (2.0 * np.diff(input_wavelengths))
+        (input_wavelengths[1:] + input_wavelengths[:-1]) / (2 * np.diff(input_wavelengths))
     )
 
     # Calculate the sigma to be used in the gauss filter in units of input wavelength bins
     # Delta lambda of resolution element is the FWHM of the instrument's LSF (here: a gaussian)
-    sigma_lsf_gauss_filter = model_resolving_power / new_resolving_power / (2. * np.sqrt(2. * np.log(2.)))
+    sigma_lsf_gauss_filter = model_resolving_power / new_resolving_power / (2 * np.sqrt(2 * np.log(2)))
 
     convolved_spectrum = gaussian_filter1d(
         input=input_spectrum,

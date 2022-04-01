@@ -1293,9 +1293,9 @@ class Radtrans(_read_opacities.ReadOpacities):
                 Tstar (float):
                     the stellar temperature in K.
                 distance (float):
-                    the semi-major axis of the planet in AU.
+                    the semi-major axis of the planet in cm.
                 Rstar (float):
-                    if specified, uses this radius in Solar radii
+                    if specified, uses this radius in cm
                     to scale the flux, otherwise it uses PHOENIX radius.
         """
         # TODO this could be static

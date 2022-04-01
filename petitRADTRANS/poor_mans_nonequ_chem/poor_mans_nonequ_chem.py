@@ -3,12 +3,14 @@ Created on Mon May 29 14:44:35 2017
 
 @author: Paul Mollière
 """
-import numpy as np
-import h5py
-import os
-from .chem_fortran_util import chem_fortran_util as cfu
 import copy as cp
+import os
+
+import h5py
+import numpy as np
+
 from petitRADTRANS.config import petitradtrans_config
+from petitRADTRANS.poor_mans_nonequ_chem.chem_fortran_util import chem_fortran_util as cfu
 
 path = petitradtrans_config['Paths']['pRT_input_data_path']
 
@@ -72,7 +74,11 @@ def __chem_table_dat2h5():
 
 
 def __load_mass_mixing_ratios():
-    with h5py.File(f"{path}{os.path.sep}abundance_files{os.path.sep}mass_mixing_ratios.h5", 'r') as f:
+    mass_mixing_ratios_file = f'{path}{os.path.sep}abundance_files{os.path.sep}mass_mixing_ratios.h5'
+
+    print(f"Loading chemical equilibrium mass mixing ratio table from file '{mass_mixing_ratios_file}'...")
+
+    with h5py.File(mass_mixing_ratios_file, 'r') as f:
         feh = f['iron_to_hydrogen_ratios'][()]
         co = f['carbon_to_oxygen_ratios'][()]
         temperatures = f['temperatures'][()]
