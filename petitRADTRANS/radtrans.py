@@ -1225,7 +1225,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     scattering is considered. If not specified, the direct
                     light contribution is not calculated.
                 Rstar (Optional[float]):
-                    The radius of the star in Solar radii. If specified,
+                    The radius of the star in cm. If specified,
                     used to scale the to scale the stellar flux,
                     otherwise it uses PHOENIX radius.
                 semimajoraxis (Optional[float]):
