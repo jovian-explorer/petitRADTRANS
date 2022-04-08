@@ -622,7 +622,7 @@ subroutine calc_radius(struc_len,press,gravity,rho,P0_cgs, &
                 (press(i_str+1)-press(i_str))/R_pl**2d0
         end if
      end do
-     R0 = 1d0/R_pl-R0
+     R0 = 1d0/R_pl -R0
      radius = radius + R0
      radius = 1d0/radius
 
