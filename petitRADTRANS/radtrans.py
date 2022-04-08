@@ -7,7 +7,7 @@ import sys
 
 import h5py
 import numpy as np
-from scipy import interpolate
+from scipy.interpolate import interp1d
 
 from petitRADTRANS.config import petitradtrans_config
 from petitRADTRANS import _read_opacities
@@ -35,36 +35,6 @@ class Radtrans(_read_opacities.ReadOpacities):
         continuum_opacities (Optional):
             list of strings, denoting which continuum absorber species to
             include.
-        H2H2CIA (Optional[bool]):
-            Will be ``False`` by default.
-            If ``True``, will add H2-H2 Collision induced
-            absoprtion as continuum absorber (alternatively, put ``'H2-H2'``
-            into continuum_species list).
-        H2HeCIA (Optional[bool]):
-            Will be ``False`` by default.
-            If ``True``, will add H2-He Collision induced
-            absoprtion as continuum absorber (alternatively, put ``'H2-He'``
-            into continuum_species list).
-        N2N2CIA (Optional[bool]):
-            Will be ``False`` by default.
-            If ``True``, will add N2-N2 Collision induced
-            absoprtion as continuum absorber (alternatively, put ``'N2-N2'``
-            into continuum_species list).
-        O2O2CIA (Optional[bool]):
-            Will be ``False`` by default.
-            If ``True``, will add O2-O2 Collision induced
-            absoprtion as continuum absorber (alternatively, put ``'O2-O2'``
-            into continuum_species list).
-        N2O2CIA (Optional[bool]):
-             Will be ``False`` by default.
-             If ``True``, will add N2-O2 Collision induced
-             absoprtion as continuum absorber (alternatively, put ``'N2-O2'``
-             into continuum_species list).
-        CO2CO2CIA (Optional[bool]):
-            Will be ``False`` by default.
-            If ``True``, will add CO2-CO2 Collision induced
-            absoprtion as continuum absorber (alternatively, put ``'CO2-CO2'``
-            into continuum_species list).
         wlen_bords_micron (Optional):
             list containing left and right border of wavelength region to be
             considered, in micron. If nothing else is specified, it will be
@@ -102,12 +72,6 @@ class Radtrans(_read_opacities.ReadOpacities):
             rayleigh_species=None,
             cloud_species=None,
             continuum_opacities=None,
-            H2H2CIA=False,  # TODO remove these as they are redundant with continuum_opacities
-            H2HeCIA=False,
-            N2N2CIA=False,
-            CO2CO2CIA=False,
-            O2O2CIA=False,
-            N2O2CIA=False,
             wlen_bords_micron=None,
             mode='c-k',
             test_ck_shuffle_comp=False,
@@ -129,12 +93,6 @@ class Radtrans(_read_opacities.ReadOpacities):
             rayleigh_species:
             cloud_species:
             continuum_opacities:
-            H2H2CIA:
-            H2HeCIA:
-            N2N2CIA:
-            CO2CO2CIA:
-            O2O2CIA:
-            N2O2CIA:
             wlen_bords_micron:
             mode:
             test_ck_shuffle_comp:
@@ -199,30 +157,6 @@ class Radtrans(_read_opacities.ReadOpacities):
         # Cloud species to be considered
         self.cloud_species = cloud_species
 
-        # Include continuum opacities?
-        # Still allow for old way, when only CIA were continuum opacities
-        # TODO remove this and use continuum_opacities instead
-        self.H2H2CIA = H2H2CIA
-        self.H2HeCIA = H2HeCIA
-        self.N2N2CIA = N2N2CIA
-        self.O2O2CIA = O2O2CIA
-        self.CO2CO2CIA = CO2CO2CIA
-        self.N2O2CIA = N2O2CIA
-        self.Hminus = False
-
-        self.H2H2temp = 0
-        self.H2Hetemp = 0
-        self.N2N2temp = 0
-        self.O2O2temp = 0
-        self.CO2O2temp = 0
-        self.N2O2temp = 0
-        self.H2H2wlen = 0
-        self.H2Hewlen = 0
-        self.N2N2wlen = 0
-        self.O2O2wlen = 0
-        self.CO2CO2wlen = 0
-        self.N2O2wlen = 0
-
         # Read in the angle (mu) grid for the emission spectral calculations.
         buffer = np.genfromtxt(os.path.join(self.path_input_data, 'opa_input_files', 'mu_points.dat'))
         self.mu, self.w_gauss_mu = buffer[:, 0], buffer[:, 1]
@@ -232,24 +166,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.gray_opacity = None
         self.scat = False
 
-        # Check what is supposed to be included.
-        if len(continuum_opacities) > 0:
-            for c in continuum_opacities:
-                if c == 'H2-H2':
-                    self.H2H2CIA = True
-                elif c == 'H2-He':
-                    self.H2HeCIA = True
-                elif c == 'N2-N2':
-                    self.N2N2CIA = True
-                elif c == 'O2-O2':
-                    self.O2O2CIA = True
-                elif c == 'CO2-CO2':
-                    self.CO2CO2CIA = True
-                elif c == 'N2-O2':
-                    self.N2O2CIA = True
-                elif c == 'H-':
-                    self.Hminus = True
-
+        # Read in frequency grid
         # Any opacities there at all?
         if len(line_species) + len(rayleigh_species) + len(cloud_species) + len(continuum_opacities) > 0:
             self.absorbers_present = True
@@ -283,7 +200,7 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         # Initialize pressure-dependent parameters
         self.press, self.continuum_opa, self.continuum_opa_scat, self.continuum_opa_scat_emis, \
-            self.contr_em, self.contr_tr, self.mmw, \
+            self.contr_em, self.contr_tr, self.radius_hse, self.mmw, \
             self.line_struc_kappas, self.line_struc_kappas_comb, \
             self.total_tau, self.line_abundances, self.cloud_mass_fracs, self.r_g = \
             self._init_pressure_dependent_parameters(pressures=pressures)
@@ -324,80 +241,44 @@ class Radtrans(_read_opacities.ReadOpacities):
             self.read_cloud_opas(self.path_input_data)
 
         # CIA
-        if self.H2H2CIA:
-            print('  Read CIA opacities for H2-H2...')
-            self.cia_h2h2_lambda, self.cia_h2h2_temp, \
-                self.cia_h2h2_alpha_grid, self.H2H2temp, self.H2H2wlen = \
-                fi.cia_read('H2H2', self.path_input_data)
-            self.cia_h2h2_alpha_grid = np.array(self.cia_h2h2_alpha_grid,
-                                                dtype='d', order='F')
-            self.cia_h2h2_temp = self.cia_h2h2_temp[:self.H2H2temp]
-            self.cia_h2h2_lambda = self.cia_h2h2_lambda[:self.H2H2wlen]
-            self.cia_h2h2_alpha_grid = \
-                self.cia_h2h2_alpha_grid[:self.H2H2wlen, :self.H2H2temp]
+        self.CIA_species = {}
+        self.Hminus = False
 
-        if self.H2HeCIA:
-            print('  Read CIA opacities for H2-He...')
-            self.cia_h2he_lambda, self.cia_h2he_temp, self.cia_h2he_alpha_grid, \
-                self.H2Hetemp, self.H2Hewlen = fi.cia_read('H2He', self.path_input_data)
-            self.cia_h2he_alpha_grid = np.array(self.cia_h2he_alpha_grid,
-                                                dtype='d', order='F')
-            self.cia_h2he_temp = self.cia_h2he_temp[:self.H2Hetemp]
-            self.cia_h2he_lambda = self.cia_h2he_lambda[:self.H2Hewlen]
-            self.cia_h2he_alpha_grid = \
-                self.cia_h2he_alpha_grid[:self.H2Hewlen, :self.H2Hetemp]
+        if len(continuum_opacities) > 0:
+            for c in continuum_opacities:
+                mol = c.split('-')
 
-        if self.N2N2CIA:
-            print('  Read CIA opacities for N2-N2...')
-            self.cia_n2n2_lambda, self.cia_n2n2_temp, \
-                self.cia_n2n2_alpha_grid, self.N2N2temp, self.N2N2wlen = \
-                fi.cia_read('N2-N2', self.path_input_data)
-            self.cia_n2n2_alpha_grid = np.array(self.cia_n2n2_alpha_grid,
-                                                dtype='d', order='F')
-            self.cia_n2n2_temp = self.cia_n2n2_temp[:self.N2N2temp]
-            self.cia_n2n2_lambda = self.cia_n2n2_lambda[:self.N2N2wlen]
-            self.cia_n2n2_alpha_grid = \
-                self.cia_n2n2_alpha_grid[:self.N2N2wlen, :self.N2N2temp]
+                if not c == 'H-':
+                    print(f"  Read CIA opacities for {c}...")
+                    cia_directory = os.path.join(self.path_input_data, 'opacities', 'continuum', 'CIA', c)
 
-        if self.O2O2CIA:
-            print('  Read CIA opacities for O2-O2...')
-            self.cia_o2o2_lambda, self.cia_o2o2_temp, \
-                self.cia_o2o2_alpha_grid, self.O2O2temp, self.O2O2wlen = \
-                fi.cia_read('O2-O2', self.path_input_data)
-            self.cia_o2o2_alpha_grid = np.array(self.cia_o2o2_alpha_grid,
-                                                dtype='d', order='F')
-            self.cia_o2o2_temp = self.cia_o2o2_temp[:self.O2O2temp]
-            self.cia_o2o2_lambda = self.cia_o2o2_lambda[:self.O2O2wlen]
-            self.cia_o2o2_alpha_grid = \
-                self.cia_o2o2_alpha_grid[:self.O2O2wlen, :self.O2O2temp]
+                    if os.path.isdir(cia_directory) is False:
+                        raise ValueError(f"CIA directory '{cia_directory}' do not exists.")
+                    else:
+                        weight = 1
 
-        if self.CO2CO2CIA:
-            print('  Read CIA opacities for CO2-CO2...')
-            self.cia_co2co2_lambda, self.cia_co2co2_temp, \
-                self.cia_co2co2_alpha_grid, self.CO2CO2temp, self.CO2CO2wlen = \
-                fi.cia_read('CO2-CO2', self.path_input_data)
-            self.cia_co2co2_alpha_grid = np.array(self.cia_co2co2_alpha_grid,
-                                                  dtype='d', order='F')
-            self.cia_co2co2_temp = self.cia_co2co2_temp[:self.CO2CO2temp]
-            self.cia_co2co2_lambda = self.cia_co2co2_lambda[:self.CO2CO2wlen]
-            self.cia_co2co2_alpha_grid = \
-                self.cia_co2co2_alpha_grid[:self.CO2CO2wlen, :self.CO2CO2temp]
+                        for m in mol:
+                            weight = weight * nc.molecular_weight[m]
 
-        if self.N2O2CIA:
-            print('  Read CIA opacities for N2-O2...')
-            self.cia_n2o2_lambda, self.cia_n2o2_temp, \
-                self.cia_n2o2_alpha_grid, self.N2O2temp, self.N2O2wlen = \
-                fi.cia_read('N2-O2', self.path_input_data)
-            self.cia_n2o2_alpha_grid = np.array(self.cia_n2o2_alpha_grid,
-                                                dtype='d', order='F')
-            self.cia_n2o2_temp = self.cia_n2o2_temp[:self.N2O2temp]
-            self.cia_n2o2_lambda = self.cia_n2o2_lambda[:self.N2O2wlen]
-            self.cia_n2o2_alpha_grid = \
-                self.cia_n2o2_alpha_grid[:self.N2O2wlen, :self.N2O2temp]
-
-        if self.H2H2CIA or self.H2HeCIA or self.N2N2CIA or self.O2O2CIA \
-                or self.N2O2CIA or self.CO2CO2CIA:
-            print(' Done.\n')
+                        print(c, cia_directory, self.path_input_data, os.path.isdir(cia_directory), os.path.isfile(cia_directory + '/' + f'CIA_{c}_final.dat'))
+                        cia_lambda, cia_temp, cia_alpha_grid, \
+                            cia_temp_dims, cia_lambda_dims = fi.cia_read(c, self.path_input_data)
+                        cia_alpha_grid = np.array(cia_alpha_grid, dtype='d', order='F')
+                        cia_temp = cia_temp[:cia_temp_dims]
+                        cia_lambda = cia_lambda[:cia_lambda_dims]
+                        cia_alpha_grid = cia_alpha_grid[:cia_lambda_dims, :cia_temp_dims]
+                        species = {
+                            'id': c,
+                            'molecules': mol,
+                            'weight': weight,
+                            'lambda': cia_lambda,
+                            'temperature': cia_temp,
+                            'alpha': cia_alpha_grid
+                        }
+                        self.CIA_species[c] = species
+                else:
+                    self.Hminus = True
+            print('Done.\n')
 
     def _check_cloud_effect(self, mass_mixing_ratios):
         """
@@ -551,6 +432,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         continuum_opa_scat_emis = np.zeros((self.freq_len, p_len), dtype='d', order='F')
         contr_em = np.zeros((p_len, self.freq_len), dtype='d', order='F')
         contr_tr = np.zeros((p_len, self.freq_len), dtype='d', order='F')
+        radius_hse = np.zeros((p_len, self.freq_len), dtype='d', order='F')
 
         mmw = np.zeros(p_len)
 
@@ -582,7 +464,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             cloud_mass_fracs = None
             r_g = None
 
-        return press, continuum_opa, continuum_opa_scat, continuum_opa_scat_emis, contr_em, contr_tr, mmw, \
+        return press, continuum_opa, continuum_opa_scat, continuum_opa_scat_emis, contr_em, contr_tr, radius_hse, mmw, \
             line_struc_kappas, line_struc_kappas_comb, total_tau, line_abundances, cloud_mass_fracs, r_g
 
     @staticmethod
@@ -609,7 +491,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                 order), in units of bar. Will be converted to cgs internally.
         """
         self.press, self.continuum_opa, self.continuum_opa_scat, self.continuum_opa_scat_emis, \
-            self.contr_em, self.contr_tr, self.mmw, \
+            self.contr_em, self.contr_tr, self.radius_hse, self.mmw, \
             self.line_struc_kappas, self.line_struc_kappas_comb, \
             self.total_tau, self.line_abundances, self.cloud_mass_fracs, self.r_g = \
             self._init_pressure_dependent_parameters(pressures=P)
@@ -620,7 +502,6 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         if len(self.line_species) > 0:
             for i_spec in range(len(self.line_species)):
-                #print(np.shape(self.line_struc_kappas), 'i', np.shape(self.line_grid_kappas_custom_PT[self.line_species[i_spec]]))
                 self.line_struc_kappas[:, :, i_spec, :] = fi.interpol_opa_ck(
                     self.press,
                     temp,
@@ -633,28 +514,29 @@ class Radtrans(_read_opacities.ReadOpacities):
         else:
             self.line_struc_kappas = np.zeros_like(self.line_struc_kappas)
 
-    def interpolate_cia(self, CIA_cpair_lambda, CIA_cpair_temp, CIA_cpair_alpha_grid, mfrac, mu_part):
-        factor = (mfrac / mu_part) ** 2 * self.mmw / nc.amu / (nc.L0 ** 2) * self.press / nc.kB / self.temp
-        x = CIA_cpair_temp
-        y = CIA_cpair_lambda
-        z = CIA_cpair_alpha_grid
-        f = interpolate.interp2d(x, y, z, kind='linear')
+    def interpolate_cia(self, key, mfrac):
+        mu_part = np.sqrt(self.CIA_species[key]['weight'])
+        factor = (mfrac/mu_part) ** 2 * self.mmw / nc.amu / (nc.L0**2) * self.press / nc.kB / self.temp
+
+        x = self.CIA_species[key]['temperature']
+        y = self.CIA_species[key]['lambda']
+        z = self.CIA_species[key]['alpha']
+
         xnew = self.temp
-        ynew = nc.c / self.freq
+        ynew = nc.c/self.freq
 
-        # !--------------
-        # !-- CHANGE to rather giving
-        # !-- the opacity at the largest / smallest
-        # !-- temperature grid point if temperature
-        # !-- is smaller or larger than the min / max
-        # !-- grid temperature!
-        # !--------------
-        # ^^^^^^^^^^^
-        # interp2d uses already the nearest neigbour extrapolation!
-        # if the temperature is outside the grid, it uses the nearest
-        # available point directly (not extrapolating its value)
+        if x.shape[0] > 1:
+            # Interpolation on temperatures for each wavelength point
+            f = interp1d(x, z, kind='linear', bounds_error=False, fill_value=(z[:, 0], z[:, -1]), axis=1)
+            z_temp2 = f(xnew)
 
-        return np.multiply(f(xnew, ynew), factor)
+            f1 = interp1d(y, z_temp2, kind='linear', bounds_error=False, fill_value=sys.float_info.min, axis=0)
+            znew = f1(ynew)
+            # znew = np.where(znew < 1.00001e-16, 0, znew)
+
+            return np.multiply(znew, factor)
+        else:
+            raise ValueError(f"petitRADTRANS require a rectangular CIA table, table shape was {x.shape}")
 
     def mix_opa_tot(self, abundances, mmw, gravity,
                     sigma_lnorm=None, fsed=None, Kzz=None,
@@ -677,41 +559,14 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.continuum_opa_scat_emis = np.zeros_like(self.continuum_opa_scat_emis)
 
         # Calc. CIA opacity
-        if self.H2H2CIA:
-            self.continuum_opa = self.continuum_opa + \
-                                 self.interpolate_cia(self.cia_h2h2_lambda,
-                                                      self.cia_h2h2_temp, self.cia_h2h2_alpha_grid,
-                                                      abundances['H2'], 2.)
+        for key in self.CIA_species.keys():
+            abund = 1
 
-        if self.H2HeCIA:
-            self.continuum_opa = self.continuum_opa + \
-                                 self.interpolate_cia(self.cia_h2he_lambda,
-                                                      self.cia_h2he_temp, self.cia_h2he_alpha_grid,
-                                                      np.sqrt(abundances['H2'] * abundances['He']), np.sqrt(8.))
+            for m in self.CIA_species[key]['molecules']:
+                abund = abund * abundances[m]
 
-        if self.N2N2CIA:
             self.continuum_opa = self.continuum_opa + \
-                                 self.interpolate_cia(self.cia_n2n2_lambda,
-                                                      self.cia_n2n2_temp, self.cia_n2n2_alpha_grid,
-                                                      abundances['N2'], 28.)
-
-        if self.O2O2CIA:
-            self.continuum_opa = self.continuum_opa + \
-                                 self.interpolate_cia(self.cia_o2o2_lambda,
-                                                      self.cia_o2o2_temp, self.cia_o2o2_alpha_grid,
-                                                      abundances['O2'], 32.)
-
-        if self.N2O2CIA:
-            self.continuum_opa = self.continuum_opa + \
-                                 self.interpolate_cia(self.cia_n2o2_lambda,
-                                                      self.cia_n2o2_temp, self.cia_n2o2_alpha_grid,
-                                                      np.sqrt(abundances['N2'] * abundances['O2']), np.sqrt(896.))
-
-        if self.CO2CO2CIA:
-            self.continuum_opa = self.continuum_opa + \
-                                 self.interpolate_cia(self.cia_co2co2_lambda,
-                                                      self.cia_co2co2_temp, self.cia_co2co2_alpha_grid,
-                                                      abundances['CO2'], 44.)
+                self.interpolate_cia(key, np.sqrt(abund))
 
         # Calc. H- opacity
         if self.Hminus:
@@ -1087,7 +942,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             #
             #             f.write(line)
 
-            #raise ValueError('!')
+            # raise ValueError('!')
             # Only use 0 index for species because for lbl or test_ck_shuffle_comp = True
             # everything has been moved into the 0th index
             self.flux, self.contr_em = fs.feautrier_rad_trans(
@@ -1133,26 +988,36 @@ class Radtrans(_read_opacities.ReadOpacities):
         # Calculate the transmission spectrum
         if ((self.mode == 'lbl') or self.test_ck_shuffle_comp) \
                 and (int(len(self.line_species)) > 1):
-            self.transm_rad, self.radius_hse = fs.calc_transm_spec(self.line_struc_kappas[:, :, :1, :], self.temp,
-                                                  self.press, gravity, mmw, P0_bar, R_pl,
-                                                  self.w_gauss, self.scat,
-                                                  self.continuum_opa_scat, variable_gravity)
+            self.transm_rad, self.radius_hse = fs.calc_transm_spec(
+                self.line_struc_kappas[:, :, :1, :], self.temp,
+                self.press, gravity, mmw, P0_bar, R_pl,
+                self.w_gauss, self.scat,
+                self.continuum_opa_scat, variable_gravity
+            )
+
             if contribution:
-                self.contr_tr, self.radius_hse = fs.calc_transm_spec_contr(self.line_struc_kappas[:, :, :1, :], self.temp,
-                                                          self.press, gravity, mmw, P0_bar, R_pl,
-                                                          self.w_gauss, self.transm_rad ** 2., self.scat,
-                                                          self.continuum_opa_scat, variable_gravity)
+                self.contr_tr, self.radius_hse = fs.calc_transm_spec_contr(
+                    self.line_struc_kappas[:, :, :1, :], self.temp,
+                    self.press, gravity, mmw, P0_bar, R_pl,
+                    self.w_gauss, self.transm_rad ** 2., self.scat,
+                    self.continuum_opa_scat, variable_gravity
+                )
         else:
-            self.transm_rad, self.radius_hse = fs.calc_transm_spec(self.line_struc_kappas, self.temp,
-                                                  self.press, gravity, mmw, P0_bar, R_pl,
-                                                  self.w_gauss, self.scat,
-                                                  self.continuum_opa_scat, variable_gravity)
+            self.transm_rad, self.radius_hse = fs.calc_transm_spec(
+                self.line_struc_kappas, self.temp,
+                self.press, gravity, mmw, P0_bar, R_pl,
+                self.w_gauss, self.scat,
+                self.continuum_opa_scat, variable_gravity
+            )
+
             if contribution:
-                self.contr_tr, self.radius_hse = fs.calc_transm_spec_contr(self.line_struc_kappas, self.temp,
-                                                          self.press, gravity, mmw, P0_bar, R_pl,
-                                                          self.w_gauss, self.transm_rad ** 2.,
-                                                          self.scat,
-                                                          self.continuum_opa_scat, variable_gravity)
+                self.contr_tr, self.radius_hse = fs.calc_transm_spec_contr(
+                    self.line_struc_kappas, self.temp,
+                    self.press, gravity, mmw, P0_bar, R_pl,
+                    self.w_gauss, self.transm_rad ** 2.,
+                    self.scat,
+                    self.continuum_opa_scat, variable_gravity
+                )
 
     def calc_flux(self, temp, abunds, gravity, mmw, sigma_lnorm=None,
                   fsed=None, Kzz=None, radius=None,
