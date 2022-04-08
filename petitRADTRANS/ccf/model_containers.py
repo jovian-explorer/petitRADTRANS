@@ -321,6 +321,23 @@ class BaseSpectralModel:
 
         return convolved_spectrum
 
+    @staticmethod
+    def cnvl2(y, filter):
+        # TODO implement sliding convolution
+        yc = np.zeros(y.size + filter.shape[-1] - 1)
+        yp = copy.copy(yc)
+        filterc = np.zeros((yc.size, filter.shape[-1]))
+        yp[:y.size] = y
+        filterc[int(filter.shape[-1] / 2):y.size + int(filter.shape[-1] / 2), :] = filter
+        filterc[y.size + int(filter.shape[-1] / 2):, :] = filter[-1]
+        filterc[:int(filter.shape[-1] / 2), :] = filter[0]
+
+        for i, yy in enumerate(yp):
+            for j, g in enumerate(filterc[i, :np.min((i, filterc.shape[-1]))]):
+                yc[i] += yp[i - j] * g
+
+        return yc[int(filter.shape[-1] / 2):y.size + int(filter.shape[-1] / 2)]
+
     def get_parameters_dict(self):
         parameters_dict = {}
 
