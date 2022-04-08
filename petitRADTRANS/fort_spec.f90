@@ -639,7 +639,7 @@ subroutine calc_radius(struc_len,press,gravity,rho,P0_cgs, &
         if ((press(i_str+1) > P0_cgs) .AND. (press(i_str) <= P0_cgs)) then
            if (i_str <= struc_len-2) then
               R0 = radius(i_str+1) + integ_parab(press(i_str),press(i_str+1),press(i_str+2), &
-                   inv_rho(i_str),inv_rho(i_str+1),inv_rho(i_str+2),P0_cgs,press(i_str+1))/gravity
+                   inv_rho(i_str),inv_rho(i_str+1),inv_rho(i_str+2),P0_cgs,press(i_str+1))/gravityK
            else
               R0 = radius(i_str+1)+(1d0/rho(i_str)+1d0/rho(i_str+1))/(2d0*gravity)* &
                    (press(i_str+1)-P0_cgs)
