@@ -278,6 +278,9 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.haze_factor = None
         self.gray_opacity = None
 
+        # Initialize derived variables  TODO check if some of these can be made private variables instead of attributes
+        self.cloud_total_opa_retrieval_check = None
+
         ############################
         ############################
         # START Reading in opacities
@@ -346,13 +349,32 @@ class Radtrans(_read_opacities.ReadOpacities):
             print('Done.')
             print()
 
-
         #############################
         #############################
         # END Reading in opacities
         #############################
         #############################
 
+    def _check_cloud_effect(self, mass_mixing_ratios):
+        """
+        Check if the clouds have any effect, i.e. if the MMR is greater than 0.
+
+        Args:
+            mass_mixing_ratios: atmospheric mass mixing ratios
+
+        Returns:
+
+        """
+        add_cloud_opacity = False
+
+        if int(len(self.cloud_species)) > 0:
+            for i_spec in range(len(self.cloud_species)):
+                if np.any(mass_mixing_ratios[self.cloud_species[i_spec]] > 0):
+                    add_cloud_opacity = True  # add cloud opacity only if there are actually clouds
+
+                    break
+
+        return add_cloud_opacity
 
     def calc_borders(self,x):
         # Return bin borders for midpoints.
@@ -497,7 +519,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             self.continuum_opa = self.continuum_opa + self.gray_opacity
 
         # Add cloud opacity here, will modify self.continuum_opa
-        if int(len(self.cloud_species)) > 0:
+        if self._check_cloud_effect(abundances):  # add cloud opacity only if there is actually clouds
             self.scat = True
             self.calc_cloud_opacity(abundances, mmw, gravity, \
                                         sigma_lnorm, fsed, Kzz, radius, \
@@ -620,6 +642,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                 print("You must provide a value for the Hansen distribution width, b_hans!")
                 b_hans = None
                 sys.exit(15)
+
         for i_spec in range(int(len(self.cloud_species))):
             self.cloud_mass_fracs[:,i_spec] = \
               abundances[self.cloud_species[i_spec]]
@@ -643,7 +666,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                 fs.calc_hansen_opas(rho,self.rho_cloud_particles, \
                                     self.cloud_mass_fracs,self.r_g,b_hans, \
                                     self.cloud_rad_bins,self.cloud_radii, \
-                                    self.cloud_lambdas, \
+                                    # self.cloud_lambdas, \
                                     self.cloud_specs_abs_opa, \
                                     self.cloud_specs_scat_opa, \
                                     self.cloud_aniso)
@@ -676,12 +699,13 @@ class Radtrans(_read_opacities.ReadOpacities):
                         self.temp,mmw,fseds, \
                         self.cloud_mass_fracs, \
                         b_hans,Kzz)
+
                 cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
                 fs.calc_hansen_opas(rho,self.rho_cloud_particles, \
                                         self.cloud_mass_fracs, \
                                         self.r_g,b_hans, \
                                         self.cloud_rad_bins,self.cloud_radii, \
-                                        self.cloud_lambdas, \
+                                        #self.cloud_lambdas, \
                                         self.cloud_specs_abs_opa, \
                                         self.cloud_specs_scat_opa, \
                                         self.cloud_aniso)
@@ -1000,7 +1024,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                                 self.w_gauss,self.scat, \
                                 self.continuum_opa_scat,variable_gravity)
             if contribution:
-                self.contr_tr, self.radius_hse = fs.calc_transm_spec_contr(self.line_struc_kappas[:,:,:1,:], self.temp, \
+                self.contr_tr = fs.calc_transm_spec_contr(self.line_struc_kappas[:,:,:1,:], self.temp, \
                                 self.press,gravity,mmw,P0_bar,R_pl, \
                                 self.w_gauss,self.transm_rad**2.,self.scat, \
                                 self.continuum_opa_scat,variable_gravity)
@@ -1010,7 +1034,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                                     self.w_gauss,self.scat, \
                                     self.continuum_opa_scat,variable_gravity)
             if contribution:
-                self.contr_tr, self.radius_hse = fs.calc_transm_spec_contr(self.line_struc_kappas,self.temp, \
+                self.contr_tr = fs.calc_transm_spec_contr(self.line_struc_kappas,self.temp, \
                                     self.press,gravity,mmw,P0_bar,R_pl, \
                                     self.w_gauss,self.transm_rad**2., \
                                     self.scat, \
@@ -1159,7 +1183,9 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         if not self.skip_RT_step:
             self.calc_RT(contribution)
-            self.calc_tau_cloud(gravity)
+
+            if self._check_cloud_effect(abunds):
+                self.calc_tau_cloud(gravity)
 
             if ((self.mode == 'lbl') or self.test_ck_shuffle_comp) \
               and (int(len(self.line_species)) > 1):

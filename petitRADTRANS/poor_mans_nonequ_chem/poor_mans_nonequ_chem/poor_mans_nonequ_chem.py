@@ -100,4 +100,3 @@ def interpol_abundances(COs_goal_in, FEHs_goal_in, temps_goal_in, pressures_goal
             abundances['H2O'] = h2o_abb
 
     return abundances
-

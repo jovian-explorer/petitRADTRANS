@@ -8,6 +8,7 @@ import numpy as np
 import glob, h5py
 import copy as cp
 
+
 class ReadOpacities:
 
     def read_line_opacities(self, index, arr_min, arr_max):
