@@ -24,9 +24,8 @@ def sigma_hm_ff(lambda_angstroem, temp, P_e):
         f1 = 15.2827 - 9.2846 * np.log10(lamb_use) + \
           1.99381*np.log10(lamb_use)**2. \
           - 0.142631*np.log10(lamb_use)**3.
-        f2 = 0. # -197.789 + 190.266 * np.log10(lamb_use) - 67.9775*np.log10(lamb_use)**2. \
-                # + 10.6913*np.log10(lamb_use)**3. - 0.625151*np.log10(lamb_use)*4.
-        # Once last term was commented out agreement was good. Otherwise opacity was way too large.
+        f2 = -197.789 + 190.266 * np.log10(lamb_use) - 67.9775*np.log10(lamb_use)**2. \
+                 + 10.6913*np.log10(lamb_use)**3. - 0.625151*np.log10(lamb_use)**4.
 
         retVal = np.zeros_like(lambda_angstroem)
         retVal[index] = 1e-26*P_e*1e1**(f0+f1*np.log10(theta)+ \
