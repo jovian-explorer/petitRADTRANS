@@ -33,12 +33,12 @@ class Data:
         model_resolution : float
             Will be ``None`` by default.  The resolution of the c-k opacity tables in pRT.
             This will generate a new c-k table using exo-k. The default (and maximum)
-            correlated k resolution in pRT is :math:`\lambda/\Delta \lambda > 1000` (R=500).
+            correlated k resolution in pRT is :math:`\\lambda/\\Delta \\lambda > 1000` (R=500).
             Lowering the resolution will speed up the computation.
             If integer positive value, and if ``opacities == 'lbl'`` is ``True``, then this
             will sample the the high-resolution opacities at the specified resolution.
             This may be desired in the case where medium-resolution spectra are
-            required with a :math:`\lambda/\Delta \lambda > 1000`, but much smaller than
+            required with a :math:`\\lambda/\\Delta \\lambda > 1000`, but much smaller than
             :math:`10^6`, which is the resolution of the ``lbl`` mode. In this case it
             may make sense to carry out the calculations with lbl_opacity_sampling = 10e5,
             for example, and then rebinning to the final desired resolution:
@@ -478,7 +478,7 @@ class Data:
             input_flux : numpy.ndarray
                 The flux as computed by the model
             instrument_res : float
-                :math:`\lambda/\Delta \lambda`, the width of the gaussian kernel to convolve with the model spectrum.
+                :math:`\\lambda/\\Delta \\lambda`, the width of the gaussian kernel to convolve with the model spectrum.
 
         Returns:
             flux_lsf
