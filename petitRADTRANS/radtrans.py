@@ -8,6 +8,7 @@ import sys
 import h5py
 import numpy as np
 from scipy.interpolate import interp1d
+import warnings
 
 from petitRADTRANS.config import petitradtrans_config
 from petitRADTRANS import _read_opacities
@@ -44,9 +45,9 @@ class Radtrans(_read_opacities.ReadOpacities):
             computation time.
         mode (Optional[string]):
             if equal to ``'c-k'``: use low-resolution mode, at
-            :math:`\lambda/\Delta \lambda = 1000`, with the correlated-k
+            :math:`\\lambda/\\Delta \\lambda = 1000`, with the correlated-k
             assumption. if equal to ``'lbl'``: use high-resolution mode, at
-            :math:`\lambda/\Delta \lambda = 10^6`, with a line-by-line
+            :math:`\\lambda/\\Delta \\lambda = 10^6`, with a line-by-line
             treatment.
         do_scat_emis (Optional[bool]):
             Will be ``False`` by default.
@@ -57,7 +58,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             ``mode == 'lbl'`` is ``True``, then this will only consider every
             lbl_opacity_sampling-nth point of the high-resolution opacities.
             This may be desired in the case where medium-resolution spectra are
-            required with a :math:`\lambda/\Delta \lambda > 1000`, but much smaller than
+            required with a :math:`\\lambda/\\Delta \\lambda > 1000`, but much smaller than
             :math:`10^6`, which is the resolution of the ``lbl`` mode. In this case it
             may make sense to carry out the calculations with lbl_opacity_sampling = 10,
             for example, and then rebinning to the final desired resolution:
@@ -165,6 +166,8 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.haze_factor = None
         self.gray_opacity = None
         self.scat = False
+        self.cloud_scaling_factor = None
+        self.scaling_physicality = None
 
         # Read in frequency grid
         # Any opacities there at all?
@@ -190,6 +193,8 @@ class Radtrans(_read_opacities.ReadOpacities):
             self.border_freqs = None
             self.border_lambda_angstroem = None
             arr_min = None
+
+        self.skip_RT_step = False
 
         index = None
         arr_max = None
@@ -260,7 +265,6 @@ class Radtrans(_read_opacities.ReadOpacities):
                         for m in mol:
                             weight = weight * nc.molecular_weight[m]
 
-                        print(c, cia_directory, self.path_input_data, os.path.isdir(cia_directory), os.path.isfile(cia_directory + '/' + f'CIA_{c}_final.dat'))
                         cia_lambda, cia_temp, cia_alpha_grid, \
                             cia_temp_dims, cia_lambda_dims = fi.cia_read(c, self.path_input_data)
                         cia_alpha_grid = np.array(cia_alpha_grid, dtype='d', order='F')
@@ -607,17 +611,55 @@ class Radtrans(_read_opacities.ReadOpacities):
             if self.do_scat_emis:
                 self.continuum_opa_scat_emis += add_term
 
-        # Opacity input from outside?
-        if give_absorption_opacity is not None:
-            self.continuum_opa += give_absorption_opacity(nc.c / self.freq * 1e4, self.press * 1e-6)
+        # Check if hack_cloud_photospheric_tau is used with
+        # a single cloud model. Combining cloud opacities
+        # from different models is currently not supported
+        # with the hack_cloud_photospheric_tau parameter
+        if len(self.cloud_species) > 0 and self.__hack_cloud_photospheric_tau is not None:
+            if give_absorption_opacity is not None or give_scattering_opacity is not None:
+                raise ValueError("The hack_cloud_photospheric_tau can only be "
+                                 "used in combination with a single cloud model. "
+                                 "Either use a physical cloud model by choosing "
+                                 "cloud_species or use parametrized cloud "
+                                 "opacities with the give_absorption_opacity "
+                                 "and give_scattering_opacity parameters.")
 
-        if give_scattering_opacity is not None:
-            add_term = give_scattering_opacity(nc.c / self.freq * 1e4, self.press * 1e-6)
-            self.continuum_opa_scat += \
-                add_term
+        # Add optional absorption opacity from outside
+        if give_absorption_opacity is None:
+            if self.__hack_cloud_photospheric_tau is not None:
+                if not hasattr(self, "hack_cloud_total_abs"):
+                    opa_shape = (self.freq.shape[0], self.press.shape[0])
+                    self.__hack_cloud_total_abs = np.zeros(opa_shape)
+
+        else:
+            cloud_abs = give_absorption_opacity(nc.c/self.freq/1e-4, self.press*1e-6)
+            self.continuum_opa += cloud_abs
+
+            if self.__hack_cloud_photospheric_tau is not None:
+                # This assumes a single cloud model that is
+                # given by the parametrized opacities from
+                # give_absorption_opacity and give_scattering_opacity
+                self.__hack_cloud_total_abs = cloud_abs
+
+        # Add optional scatting opacity from outside
+        if give_scattering_opacity is None:
+            if self.__hack_cloud_photospheric_tau is not None:
+                if not hasattr(self, "hack_cloud_total_scat_aniso"):
+                    opa_shape = (self.freq.shape[0], self.press.shape[0])
+                    self.__hack_cloud_total_scat_aniso = np.zeros(opa_shape)
+
+        else:
+            cloud_scat = give_scattering_opacity(nc.c/self.freq/1e-4, self.press*1e-6)
+            self.continuum_opa_scat += cloud_scat
+
             if self.do_scat_emis:
-                self.continuum_opa_scat_emis += \
-                    add_term
+                self.continuum_opa_scat_emis += cloud_scat
+
+            if self.__hack_cloud_photospheric_tau is not None:
+                # This assumes a single cloud model that is
+                # given by the parametrized opacities from
+                # give_absorption_opacity and give_scattering_opacity
+                self.__hack_cloud_total_scat_aniso = cloud_scat
 
         # Interpolate line opacities, combine with continuum oacities
         self.line_struc_kappas = fi.mix_opas_ck(self.line_abundances,
@@ -782,7 +824,6 @@ class Radtrans(_read_opacities.ReadOpacities):
                 block4 = True
 
                 ab = np.ones_like(self.line_abundances)
-                cloud_scaling_factor = None
 
                 # BLOCK 1, subtract cloud, calc. tau for gas only
                 if block1:
@@ -852,57 +893,55 @@ class Radtrans(_read_opacities.ReadOpacities):
                                 ..., np.newaxis], axis=0) / \
                                                     (self.freq[-1] - self.freq[0]) / 2.
 
-                    from scipy.interpolate import interp1d
-
-                    # import pylab as plt
+                    # Interpolate the pressure where the optical
+                    # depth of cloud-free atmosphere is 1.0
 
                     press_bol_clear = interp1d(optical_depth_integ, self.press)
-                    p_phot_clear = press_bol_clear(1.)
 
+                    try:
+                        p_phot_clear = press_bol_clear(1.)
+                    except ValueError:
+                        p_phot_clear = self.press[-1]
+
+                    # Interpolate the optical depth of the
+                    # cloud-only atmosphere at the pressure
+                    # of the cloud-free photosphere
                     tau_bol_cloud = interp1d(self.press, optical_depth_cloud_integ)
                     tau_cloud_at_phot_clear = tau_bol_cloud(p_phot_clear)
 
-                    photo_press = np.zeros(self.freq_len)
-                    photo_press_cloud = np.zeros(self.freq_len)
-
-                    for i in range(len(photo_press)):
-                        press_interp = interp1d(optical_depth[i, :], self.press)
-                        photo_press[i] = press_interp(1.)
-                        press_interp = interp1d(optical_depth_cloud[i, :], self.press)
-
-                        try:
-                            photo_press_cloud[i] = press_interp(1.)
-                        except ValueError:  # TODO check if ValueError is expected here
-                            photo_press_cloud[i] = 1e3 * 1e6
-
                     # Apply cloud scaling
-                    cloud_scaling_factor = self.__hack_cloud_photospheric_tau / tau_cloud_at_phot_clear
-                    print(f"Applied cloud scaling: {cloud_scaling_factor}")
+                    self.cloud_scaling_factor = self.__hack_cloud_photospheric_tau / tau_cloud_at_phot_clear
 
-                    max_rescaling = 1e100
-                    for f in self.fsed.keys():
-                        mr = 2. * (self.fsed[f] + 1.)
-                        max_rescaling = min(max_rescaling, mr)
+                    if len(self.fsed) > 0:
+                        max_rescaling = 1e100
 
-                    print(f"Scaling_physicality: {cloud_scaling_factor / max_rescaling}")
+                        for f in self.fsed.keys():
+                            mr = 2.*(self.fsed[f]+1.)
+                            max_rescaling = min(max_rescaling, mr)
 
-                    # print('Block 3 done')
+                        self.scaling_physicality = self.cloud_scaling_factor/max_rescaling
+                        print(f"Scaling_physicality: {self.cloud_scaling_factor / max_rescaling}")
+                    else:
+                        self.scaling_physicality = None
 
                 # BLOCK 4, add scaled cloud back to opacities
                 if block4:
-                    # Get continuum scattering opacity, without clouds:
+                    # Get continuum scattering opacity, including clouds:
                     self.continuum_opa_scat_emis = self.continuum_opa_scat_emis + \
-                                                   cloud_scaling_factor * self.__hack_cloud_total_scat_aniso
+                                                   self.cloud_scaling_factor * self.__hack_cloud_total_scat_aniso
 
                     self.line_struc_kappas = \
                         fi.mix_opas_ck(ab, self.line_struc_kappas,
-                                       cloud_scaling_factor * self.__hack_cloud_total_abs)
+                                       self.cloud_scaling_factor * self.__hack_cloud_total_abs)
 
-                    # Calc. cloud-free optical depth
+                    # Calc. total optical depth, including clouds
                     self.total_tau[:, :, :1, :], self.photon_destruction_prob = \
-                        fs.calc_tau_g_tot_ck_scat(gravity,
-                                                  self.press, self.line_struc_kappas[:, :, :1, :],
-                                                  self.do_scat_emis, self.continuum_opa_scat_emis)
+                        fs.calc_tau_g_tot_ck_scat(
+                            gravity,
+                            self.press, self.line_struc_kappas[:, :, :1, :],
+                            self.do_scat_emis, self.continuum_opa_scat_emis
+                        )
+
             else:
                 self.total_tau[:, :, :1, :], self.photon_destruction_prob = \
                     fs.calc_tau_g_tot_ck_scat(gravity,
@@ -915,10 +954,15 @@ class Radtrans(_read_opacities.ReadOpacities):
                       ' destruction probability in the atmosphere to 1.')
                 self.photon_destruction_prob[np.isnan(self.photon_destruction_prob)] = 1.
 
+            # To handle cases when tau_cloud_at_Phot_clear = 0,
+            # therefore cloud_scaling_factor = inf,
+            # continuum_opa_scat_emis will contain nans and infs,
+            # and photon_destruction_prob contains only nans
             if len(self.photon_destruction_prob[np.isnan(self.photon_destruction_prob)]) > 0.:
                 print('Region of zero opacity detected, setting the photon'
                       ' destruction probability in this spectral range to 1.')
                 self.photon_destruction_prob[np.isnan(self.photon_destruction_prob)] = 1.
+                self.skip_RT_step = True
 
         else:
             self.total_tau = \
@@ -1170,20 +1214,26 @@ class Radtrans(_read_opacities.ReadOpacities):
                          give_absorption_opacity=give_absorption_opacity,
                          give_scattering_opacity=give_scattering_opacity)
         self.calc_opt_depth(gravity)
-        self.calc_RT(contribution)
 
-        if self._check_cloud_effect(abunds):
-            self.calc_tau_cloud(gravity)
+        if not self.skip_RT_step:
+            self.calc_RT(contribution)
 
-        if ((self.mode == 'lbl') or self.test_ck_shuffle_comp) \
-                and (int(len(self.line_species)) > 1):
+            if self._check_cloud_effect(abunds):
+                self.calc_tau_cloud(gravity)
 
-            if self.do_scat_emis:
-                self.tau_rosse = fs.calc_tau_g_tot_ck(
-                    gravity,
-                    self.press,
-                    self.kappa_rosseland.reshape(1, 1, 1, len(self.press))
-                ).reshape(len(self.press))
+            if ((self.mode == 'lbl') or self.test_ck_shuffle_comp) and (int(len(self.line_species)) > 1):
+                if self.do_scat_emis:
+                    self.tau_rosse = fs.calc_tau_g_tot_ck(
+                        gravity,
+                        self.press,
+                        self.kappa_rosseland.reshape(1, 1, 1, len(self.press))
+                    ).reshape(len(self.press))
+        else:
+            warnings.warn("Cloud rescaling lead to nan opacities, skipping RT calculation!")
+
+            self.flux = None
+            self.contr_em = None
+            self.skip_RT_step = False
 
     def get_star_spectrum(self, Tstar, distance, Rstar=None):
         """Method to get the PHOENIX spectrum of the star and rebin it

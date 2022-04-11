@@ -60,6 +60,8 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 - Function `contour_corner` not working when not giving optional arguments `parameter_ranges` and `parameter_plot_indices`.
 - True values not plotted in function `contour_corner`.
 - Function `get_MM` not working with e- and H-.
+- H- implementation.
+- Hack cloud photospheric tau behaviour.
 - Wrong docstrings in function `Radtrans.get_star_spectrum`.
 
 
