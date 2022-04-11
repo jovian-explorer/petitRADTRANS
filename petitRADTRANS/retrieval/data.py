@@ -2,7 +2,7 @@ import sys
 import os
 import numpy as np
 import logging
-from scipy.ndimage.filters import gaussian_filter
+from scipy.ndimage import gaussian_filter
 import petitRADTRANS.nat_cst as nc
 from .rebin_give_width import rebin_give_width
 
@@ -30,12 +30,12 @@ class Data:
         model_resolution : float
             Will be ``None`` by default.  The resolution of the c-k opacity tables in pRT.
             This will generate a new c-k table using exo-k. The default (and maximum)
-            correlated k resolution in pRT is :math:`\lambda/\Delta \lambda > 1000` (R=500).
+            correlated k resolution in pRT is :math:`\\lambda/\\Delta \\lambda > 1000` (R=500).
             Lowering the resolution will speed up the computation.
             If integer positive value, and if ``opacities == 'lbl'`` is ``True``, then this
             will sample the the high-resolution opacities at the specified resolution.
             This may be desired in the case where medium-resolution spectra are
-            required with a :math:`\lambda/\Delta \lambda > 1000`, but much smaller than
+            required with a :math:`\\lambda/\\Delta \\lambda > 1000`, but much smaller than
             :math:`10^6`, which is the resolution of the ``lbl`` mode. In this case it
             may make sense to carry out the calculations with lbl_opacity_sampling = 10e5,
             for example, and then rebinning to the final desired resolution:
@@ -126,10 +126,10 @@ class Data:
             logging.error("Please provide a model generating function or external reference for " + name + "!")
             sys.exit(8)
         if model_resolution is not None:
-            if opacity_mode is 'c_k' and model_resolution > 1000:
+            if opacity_mode == 'c_k' and model_resolution > 1000:
                 logging.warning("The maximum opacity for c-k mode is 1000!")
                 self.model_resolution = None
-            if opacity_mode is 'lbl' and model_resolution < 1000:
+            if opacity_mode == 'lbl' and model_resolution < 1000:
                 logging.warning("Your resolution is lower than R=1000, it's recommended to use 'c-k' mode.")
 
         # Optional, covariance and scaling
@@ -367,7 +367,7 @@ class Data:
             input_flux : numpy.ndarray
                 The flux as computed by the model
             instrument_res : float
-                :math:`\lambda/\Delta \lambda`, the width of the gaussian kernel to convolve with the model spectrum.
+                :math:`\\lambda/\\Delta \\lambda`, the width of the gaussian kernel to convolve with the model spectrum.
 
         Returns:
             flux_LSF
