@@ -19,14 +19,14 @@ def sigma_hm_ff(lambda_angstroem, temp, P_e):
         # Convert to Angstrom (from cgs)
         theta = 5040. / temp
 
-        f0 = -2.2763 - 1.6850 * np.log10(lamb_use) \
-            + 0.76661 * np.log10(lamb_use) ** 2. \
-            - 0.053346 * np.log10(lamb_use) ** 3.
-        f1 = 15.2827 - 9.2846 * np.log10(lamb_use) \
-            + 1.99381 * np.log10(lamb_use) ** 2. \
-            - 0.142631 * np.log10(lamb_use) ** 3.
-        f2 = 0.
-        # Once last term was commented out agreement was good. Otherwise opacity was way too large.
+        f0 = -2.2763 - 1.6850 * np.log10(lamb_use) + \
+          0.76661*np.log10(lamb_use)**2. \
+          - 0.053346*np.log10(lamb_use)**3.
+        f1 = 15.2827 - 9.2846 * np.log10(lamb_use) + \
+          1.99381*np.log10(lamb_use)**2. \
+          - 0.142631*np.log10(lamb_use)**3.
+        f2 = -197.789 + 190.266 * np.log10(lamb_use) - 67.9775*np.log10(lamb_use)**2. \
+                 + 10.6913*np.log10(lamb_use)**3. - 0.625151*np.log10(lamb_use)**4.
 
         ret_val = np.zeros_like(lambda_angstroem)
         ret_val[index] = 1e-26 * P_e * 1e1 ** (

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 - Possibility to initialize a `retrieval.Data` class without needing a file.
 - Possibility to initialize a `retrieval.Data` class with a `Radtrans` object, without the need to re-create one.
 - Possibility to initialize a `retrieval.Retrieval` class with a stellar spectrum, without the need to recalculate it.
+- Possibility to give scattering.
 - Support for 2D and 3D spectral array in retrievals.
 - Static function `retrieval.Retrieval._get_samples`, to get retrieval outputs without the need to initialize a `Retrieval`.
 - Gibson et al. 2021 log-likelihood calculation.
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 - Function to calculate the radius of a planet from its surface gravity and mass.
 - Option to use the NASA Exoplanet Archive "best mass" when generating a `Planet`.
 - Test suite.
+- Na2S and KCl clouds compatibility with free chemistry.
 - Module `configuration` to manage paths.
 - Module `version` to store petitRADTRANS version number.
 - Message when loading the `poor_mans_nonequ_chem` chemical equilibrium mass mixing ratios table.
@@ -42,7 +44,11 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 - Package structure.
 - Running mean now uses the faster `scipy.ndimage.filters.uniform_filter1d` implementation.
 - Tutorial updated.
+- Some cloud functions are more generic.
 - Character limit in retrieval output directory increased from 100 to 200.
+- Stricter scattering convergence criterion.
+- Switched to corr-k combination method without Monte Carlo noise (relevant for scattering mode).
+- CIAs are no more hard-coded.
 - Code clean-up.
 
 ### Removed
@@ -56,16 +62,6 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 - Function `get_MM` not working with e- and H-.
 - Wrong docstrings in function `Radtrans.get_star_spectrum`.
 
-## [2.3.5] - 2021-02-10
-
-
-## [2.3.4] - 2021-11-22
-### Changed
-- Switched to corr-k combination method without Monte Carlo noise (relevant for scattering mode).
-
-## [2.3.3] - 2021-11-16
-### Changed
-- Stricter scattering convergence criterion
 
 ---
 No changelog before version 2.4.0.
