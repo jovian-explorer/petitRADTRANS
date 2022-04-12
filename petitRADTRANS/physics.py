@@ -1,7 +1,7 @@
 """Stores useful physical functions.
 """
 import numpy as np
-from scipy.ndimage.filters import uniform_filter1d
+from scipy.ndimage import uniform_filter1d
 
 import petitRADTRANS.nat_cst as nc
 

@@ -351,7 +351,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             print('  Read CIA opacities for N2-N2...')
             self.cia_n2n2_lambda, self.cia_n2n2_temp, \
                 self.cia_n2n2_alpha_grid, self.N2N2temp, self.N2N2wlen = \
-                fi.cia_read('N2N2', self.path_input_data)
+                fi.cia_read('N2-N2', self.path_input_data)
             self.cia_n2n2_alpha_grid = np.array(self.cia_n2n2_alpha_grid,
                                                 dtype='d', order='F')
             self.cia_n2n2_temp = self.cia_n2n2_temp[:self.N2N2temp]
@@ -363,7 +363,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             print('  Read CIA opacities for O2-O2...')
             self.cia_o2o2_lambda, self.cia_o2o2_temp, \
                 self.cia_o2o2_alpha_grid, self.O2O2temp, self.O2O2wlen = \
-                fi.cia_read('O2O2', self.path_input_data)
+                fi.cia_read('O2-O2', self.path_input_data)
             self.cia_o2o2_alpha_grid = np.array(self.cia_o2o2_alpha_grid,
                                                 dtype='d', order='F')
             self.cia_o2o2_temp = self.cia_o2o2_temp[:self.O2O2temp]
@@ -375,7 +375,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             print('  Read CIA opacities for CO2-CO2...')
             self.cia_co2co2_lambda, self.cia_co2co2_temp, \
                 self.cia_co2co2_alpha_grid, self.CO2CO2temp, self.CO2CO2wlen = \
-                fi.cia_read('CO2CO2', self.path_input_data)
+                fi.cia_read('CO2-CO2', self.path_input_data)
             self.cia_co2co2_alpha_grid = np.array(self.cia_co2co2_alpha_grid,
                                                   dtype='d', order='F')
             self.cia_co2co2_temp = self.cia_co2co2_temp[:self.CO2CO2temp]
@@ -387,7 +387,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             print('  Read CIA opacities for N2-O2...')
             self.cia_n2o2_lambda, self.cia_n2o2_temp, \
                 self.cia_n2o2_alpha_grid, self.N2O2temp, self.N2O2wlen = \
-                fi.cia_read('N2O2', self.path_input_data)
+                fi.cia_read('N2-O2', self.path_input_data)
             self.cia_n2o2_alpha_grid = np.array(self.cia_n2o2_alpha_grid,
                                                 dtype='d', order='F')
             self.cia_n2o2_temp = self.cia_n2o2_temp[:self.N2O2temp]
