@@ -983,7 +983,7 @@ end subroutine add_rayleigh
 !!$ Subroutine to calculate the contribution function of the transmission spectrum
 
 subroutine calc_transm_spec_contr(total_kappa,temp,press,gravity,mmw,P0_bar,R_pl, &
-     w_gauss,transm_in,scat,continuum_opa_scat,var_grav,contr_tr,freq_len,struc_len,g_len,N_species)
+     w_gauss,transm_in,scat,continuum_opa_scat,var_grav,contr_tr,radius,freq_len,struc_len,g_len,N_species)
 
   use constants_block
   implicit none
@@ -999,10 +999,10 @@ subroutine calc_transm_spec_contr(total_kappa,temp,press,gravity,mmw,P0_bar,R_pl
   LOGICAL, intent(in)                         :: scat
   DOUBLE PRECISION, intent(in)                :: transm_in(freq_len)
   LOGICAL, intent(in)                         :: var_grav
-  DOUBLE PRECISION, intent(out)               :: contr_tr(struc_len,freq_len)
+  DOUBLE PRECISION, intent(out)               :: contr_tr(struc_len,freq_len), radius(struc_len)
 
   ! Internal
-  DOUBLE PRECISION                            :: P0_cgs, rho(struc_len), radius(struc_len)
+  DOUBLE PRECISION                            :: P0_cgs, rho(struc_len)
   INTEGER                                     :: i_str, i_freq,  i_spec, j_str, i_leave_str
   DOUBLE PRECISION                            :: alpha_t2(g_len,freq_len,N_species,struc_len-1)
   DOUBLE PRECISION                            :: t_graze(g_len,freq_len,N_species,struc_len), s_1, s_2, &
