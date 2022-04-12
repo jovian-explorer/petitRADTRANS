@@ -321,13 +321,13 @@ def guillot_free_emission(pRT_object,
         cname = cloud.split('_')[0]
         abundances[cname] = np.zeros_like(pRT_object.press)
         try:
-            abundances[cname][pressures < Pbases[cname]] = 10**parameters['log_X_cb_'+cname].value *\
-                        ((pressures[pressures <= Pbases[cname]]/Pbases[cname])**parameters['fsed'].value)
+            abundances[cname][pressures < pbases[cname]] = 10**parameters['log_X_cb_'+cname].value *\
+                        ((pressures[pressures <= pbases[cname]] / pbases[cname])**parameters['fsed'].value)
         except:
             print(cname)
-            print(f"{Pbases[cname]}")
+            print(f"{pbases[cname]}")
             print(f"{10**parameters['log_X_cb_'+cname].value}")
-            print(f"{(pressures[pressures <= Pbases[cname]]/Pbases[cname])**parameters['fsed'].value}\n")
+            print(f"{(pressures[pressures <= pbases[cname]] / pbases[cname])**parameters['fsed'].value}\n")
             return None,None
 
     # If in evaluation mode, and PTs are supposed to be plotted
