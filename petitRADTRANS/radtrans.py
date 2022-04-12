@@ -308,6 +308,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                 mol = c.split('-')
                 if not c == 'H-':
                     print('  Read CIA opacities for {0}...'.format(c))
+                    #print(self.path+'/opacities/continuum/CIA/'+c)
                     if  os.path.isdir(self.path+'/opacities/continuum/CIA/'+c) is False: #correct
                         print('ERROR: CIA folder not present. Please insert a valid CIA.',c)
                         sys.exit()

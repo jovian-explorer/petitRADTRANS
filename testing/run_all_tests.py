@@ -17,4 +17,4 @@ for script in scripts:
 #os.system('python test_clouds.py')
 #os.system('python test_scatter_intro.py')
 os.system('python test_analysis.py')
-os.system('python test_chemistry.py')
+#os.system('python test_chemistry.py')
