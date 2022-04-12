@@ -734,7 +734,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                 self.continuum_opa_scat_emis = self.continuum_opa_scat_emis + \
               add_term
 
-    def calc_opt_depth(self,gravity,cloud_wlen):
+    def calc_opt_depth(self,gravity,cloud_wlen = None):
         # Calculate optical depth for the total opacity.
         if ((self.mode == 'lbl') or self.test_ck_shuffle_comp):
 
@@ -1120,14 +1120,6 @@ class Radtrans(_read_opacities.ReadOpacities):
                     clouds from the top of the atmosphere down to the gas-only
                     photosphere. This parameter can be used for enforcing the
                     presence of clouds in the photospheric region.
-                cloud_wlen (Optional[Tuple[float, float]]):
-                    Tuple with the wavelength range (in micron) that is used
-                    for calculating the median optical depth of the clouds at
-                    gas-only photosphere and then scaling the cloud optical
-                    depth to the value of ``hack_cloud_photospheric_tau``. The
-                    range of ``cloud_wlen`` should with encompassed by
-                    ``wlen_bords_micron``. The full wavelength range is used
-                    when ``cloud_wlen=None``.
                 dist (Optional[string]):
                     The cloud particle size distribution to use.
                     Can be either 'lognormal' (default) or 'hansen'.
@@ -1161,6 +1153,14 @@ class Radtrans(_read_opacities.ReadOpacities):
                     It may be used to add simple cloud absorption laws, for example, which
                     have opacities that vary only slowly with wavelength, such that the current
                     model resolution is sufficient to resolve any variations.
+                cloud_wlen (Optional[Tuple[float, float]]):
+                    Tuple with the wavelength range (in micron) that is used
+                    for calculating the median optical depth of the clouds at
+                    gas-only photosphere and then scaling the cloud optical
+                    depth to the value of ``hack_cloud_photospheric_tau``. The
+                    range of ``cloud_wlen`` should be encompassed by
+                    ``wlen_bords_micron``. The full wavelength range is used
+                    when ``cloud_wlen=None``.
         '''
 
         self.hack_cloud_photospheric_tau = hack_cloud_photospheric_tau
@@ -1193,7 +1193,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                              give_absorption_opacity = give_absorption_opacity,
                              give_scattering_opacity = give_scattering_opacity)
 
-        self.calc_opt_depth(gravity, cloud_wlen)
+        self.calc_opt_depth(gravity,cloud_wlen)
 
         if not self.skip_RT_step:
             self.calc_RT(contribution)
