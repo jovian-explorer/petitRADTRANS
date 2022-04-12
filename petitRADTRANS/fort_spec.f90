@@ -1097,9 +1097,6 @@ subroutine calc_transm_spec_contr(total_kappa,temp,press,gravity,mmw,P0_bar,R_pl
      ! Get radius
      transm = transm+radius(struc_len)**2d0
      contr_tr(i_leave_str,:) = transm_in - transm
-
-     write(*,*) i_leave_str
-
   end do
 
   do i_freq = 1, freq_len

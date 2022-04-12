@@ -1024,7 +1024,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                                 self.w_gauss,self.scat, \
                                 self.continuum_opa_scat,variable_gravity)
             if contribution:
-                self.contr_tr = fs.calc_transm_spec_contr(self.line_struc_kappas[:,:,:1,:], self.temp, \
+                self.contr_tr, self.radius_hse = fs.calc_transm_spec_contr(self.line_struc_kappas[:,:,:1,:], self.temp, \
                                 self.press,gravity,mmw,P0_bar,R_pl, \
                                 self.w_gauss,self.transm_rad**2.,self.scat, \
                                 self.continuum_opa_scat,variable_gravity)
@@ -1034,7 +1034,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                                     self.w_gauss,self.scat, \
                                     self.continuum_opa_scat,variable_gravity)
             if contribution:
-                self.contr_tr = fs.calc_transm_spec_contr(self.line_struc_kappas,self.temp, \
+                self.contr_tr, self.radius_hse = fs.calc_transm_spec_contr(self.line_struc_kappas,self.temp, \
                                     self.press,gravity,mmw,P0_bar,R_pl, \
                                     self.w_gauss,self.transm_rad**2., \
                                     self.scat, \
