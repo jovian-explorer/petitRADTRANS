@@ -1,42 +1,60 @@
 from __future__ import print_function
-
+import astropy.constants as anc
 import numpy as np
+import scipy.constants as snc
+
 import os as os
 import sys
 
 # Natural constants
 # Everything is in cgs!
-c = 2.99792458e10
-G = 6.67384e-8
-kB = 1.3806488e-16
-sigma = 5.670373e-5
+# Defined constants
+c = snc.c * 1e2
+h = snc.h * 1e7
+kB = snc.k * 1e7
+nA = snc.N_A
+e = snc.e * np.sqrt(1e9 / (4 * snc.pi * snc.epsilon_0))
+
+# Measured constants
+G = snc.G * 1e3
+m_elec = snc.m_e * 1e3
+
+# Derived exact constants
+sigma = snc.sigma * 1e3
+L0 = snc.physical_constants['Loschmidt constant (273.15 K, 101.325 kPa)'][0] * 1e-6
+R = snc.R
+
+# Units definitions
 bar = 1e6
-atm = 1.01325e6
-losch = 2.68676e19
-h = h=6.62606957e-27
-r_sun = 6.955e10
-r_jup=7.1492e9
-r_jup_mean=6.9911e9
-m_jup = 1.89813e30
-m_sun = 1.9891e33
-AU = 1.49597871e13
-pc = 3.08567758e18
-amu = 1.66053892e-24
-nA = 6.0221413e23
-R = 8.3144598
-m_earth = 5.9722e27
-r_earth = 637813660.
-L0  = 2.68676e19
+atm = snc.atm * 1e1
+AU = snc.au * 1e2
+pc = snc.parsec * 1e2
+light_year = snc.light_year * 1e2
+amu = snc.physical_constants['atomic mass constant'][0] * 1e3
+
+# Astronomical constants
+r_sun = anc.R_sun.cgs.value
+r_jup = anc.R_jup.cgs.value
+r_earth = anc.R_earth.cgs.value
+m_sun = anc.M_sun.cgs.value
+m_jup = anc.M_jup.cgs.value
+m_earth = anc.M_earth.cgs.value
+l_sun = anc.L_sun.cgs.value
+
+r_jup_mean = 6.9911e9
+s_earth = 1.3654e6  # erg.s-1.cm-2, source: https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2010GL045777
+
 # Molecular weights in amu
-molecular_weight = {}
-molecular_weight['H2O'] = 18.
-molecular_weight['O2'] = 32.
-molecular_weight['N2'] = 28.
-molecular_weight['CH4'] = 16.
-molecular_weight['CO2'] = 44.
-molecular_weight['CO'] = 28.
-molecular_weight['H2'] = 2.
-molecular_weight['He'] = 4.
+molecular_weight = {
+    'H2O': 18.,
+    'O2': 32.,
+    'N2': 28.,
+    'CH4': 16.,
+    'CO2': 44.,
+    'CO': 28.,
+    'H2': 2.,
+    'He': 4.
+}
 
 def b(T,nu):
     ''' Returns the Planck function :math:`B_{\\nu}(T)` in units of
