@@ -12,5 +12,9 @@ for script in scripts:
         os.system('python '+script)
 '''
 
-os.system('python test_intro.py')
-os.system('python test_clouds.py')
+#os.system('python test_intro.py')
+#os.system('python test_high_res.py')
+#os.system('python test_clouds.py')
+#os.system('python test_scatter_intro.py')
+os.system('python test_analysis.py')
+os.system('python test_chemistry.py')

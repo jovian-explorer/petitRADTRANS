@@ -8,6 +8,3 @@ __status__ = "Development"
 __version__ = "2.1.0"
 
 from petitRADTRANS.radtrans import Radtrans
-
-
-

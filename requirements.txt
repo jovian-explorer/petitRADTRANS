@@ -9,3 +9,4 @@ scipy>=1.5
 molmass
 seaborn
 corner
+typing;python_version<"3.5"
