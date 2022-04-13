@@ -87,19 +87,6 @@ class Radtrans(_read_opacities.ReadOpacities):
             hack_cloud_photospheric_tau=None,
             path_input_data=os.environ.get("pRT_input_data_path")
     ):
-        """
-
-        Args:
-            line_species:
-            rayleigh_species:
-            cloud_species:
-            continuum_opacities:
-            wlen_bords_micron:
-            mode:
-            test_ck_shuffle_comp:
-            do_scat_emis:
-            lbl_opacity_sampling:
-        """
         self.path_input_data = path_input_data
 
         if self.path_input_data is None:
@@ -107,8 +94,14 @@ class Radtrans(_read_opacities.ReadOpacities):
                           f"Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via\n"
                           f">>> import os"
                           f">>> os.environ['pRT_input_data_path'] = 'absolute/path/of/the/folder/input_data'\n"
-                          f"before creating a Radtrans object or loading the nat_cst module."
+                          f"before creating a Radtrans object or loading the nat_cst module.\n"
+                          f"(this will become unnecessary in a future update)"
                           )
+        else:
+            warnings.warn(f"pRT_input_data_path was set by an environment variable. In a future update, the path to "
+                          f"the petitRADTRANS input_data will be set within a .ini file that will be automatically "
+                          f"generated into the user home directory (OS agnostic), inside a .petitradtrans directory",
+                          FutureWarning)
 
         if line_species is None:
             line_species = []

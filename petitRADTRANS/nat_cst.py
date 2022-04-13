@@ -101,12 +101,13 @@ def guillot_global(P,kappa_IR,gamma,grav,T_int,T_equ):
 
 pathinp = os.environ.get("pRT_input_data_path")
 if pathinp == None:
-    print('Path to input data not specified!')
-    print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
-    print('    import os')
-    print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
-    print('before creating a Radtrans object or loading the nat_cst module.')
-    sys.exit(1)
+    raise OSError(f"Path to input data not specified!\n"
+                  f"Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via\n"
+                  f">>> import os"
+                  f">>> os.environ['pRT_input_data_path'] = 'absolute/path/of/the/folder/input_data'\n"
+                  f"before creating a Radtrans object or loading the nat_cst module.\n"
+                  f"(this will become unnecessary in a future update)"
+                  )
 spec_path = pathinp + '/stellar_specs'
     
 description = np.genfromtxt(spec_path+'/stellar_params.dat')

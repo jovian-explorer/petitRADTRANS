@@ -157,13 +157,13 @@ class RetrievalConfig:
 
         prt_path = os.environ.get("pRT_input_data_path")
         if prt_path is None:
-            print('Path to input data not specified!')
-            print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
-            print('    import os')
-            print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
-            print('before creating a Radtrans object or loading the nat_cst module.')
-            logging.error("pRT_input_data_path variable not set")
-            sys.exit(1)
+            raise OSError(f"Path to input data not specified!\n"
+                          f"Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via\n"
+                          f">>> import os"
+                          f">>> os.environ['pRT_input_data_path'] = 'absolute/path/of/the/folder/input_data'\n"
+                          f"before creating a Radtrans object or loading the nat_cst module.\n"
+                          f"(this will become unnecessary in a future update)"
+                          )
 
         files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/lines/corr_k/")]
         files = set([f.split('_R_')[0] for f in files])
@@ -183,13 +183,13 @@ class RetrievalConfig:
 
         prt_path = os.environ.get("pRT_input_data_path")
         if prt_path is None:
-            print('Path to input data not specified!')
-            print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
-            print('    import os')
-            print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
-            print('before creating a Radtrans object or loading the nat_cst module.')
-            logging.error("pRT_input_data_path variable not set")
-            sys.exit(1)
+            raise OSError(f"Path to input data not specified!\n"
+                          f"Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via\n"
+                          f">>> import os"
+                          f">>> os.environ['pRT_input_data_path'] = 'absolute/path/of/the/folder/input_data'\n"
+                          f"before creating a Radtrans object or loading the nat_cst module.\n"
+                          f"(this will become unnecessary in a future update)"
+                          )
 
         files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/continuum/clouds/")]
         files = set(files)
@@ -203,13 +203,13 @@ class RetrievalConfig:
 
         prt_path = os.environ.get("pRT_input_data_path")
         if prt_path is None:
-            print('Path to input data not specified!')
-            print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
-            print('    import os')
-            print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
-            print('before creating a Radtrans object or loading the nat_cst module.')
-            logging.error("pRT_input_data_path variable not set")
-            sys.exit(1)
+            raise OSError(f"Path to input data not specified!\n"
+                          f"Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via\n"
+                          f">>> import os"
+                          f">>> os.environ['pRT_input_data_path'] = 'absolute/path/of/the/folder/input_data'\n"
+                          f"before creating a Radtrans object or loading the nat_cst module.\n"
+                          f"(this will become unnecessary in a future update)"
+                          )
 
         files = [f[0].split('/')[-1] for f in os.walk(prt_path + "/opacities/continuum/cia/")]
         files = set(files)
