@@ -446,19 +446,18 @@ class Radtrans(_read_opacities.ReadOpacities):
 
           x = self.CIA_species[key]['temperature']
           y = self.CIA_species[key]['lambda']
-          z = np.log10(self.CIA_species[key]['alpha'])
+          z = self.CIA_species[key]['alpha']
           xnew=self.temp
           ynew=nc.c/self.freq
-          z_temp=np.empty([y.shape[0],xnew.shape[0]])
 
           if x.shape[0]>1:
               #interpolation on temperatures per each wlen point
               f=interp1d(x,z,kind='linear',bounds_error=False,fill_value=(z[:,0],z[:,-1]),axis=1)
               z_temp2=f(xnew)
-              f1=interp1d(y,z_temp2,kind='linear',bounds_error=False,fill_value=(-16),axis=0)
+              f1=interp1d(y,z_temp2,kind='linear',bounds_error=False,fill_value=sys.float_info.min,axis=0)
 
-              znew=10**f1(ynew)
-              znew= np.where(znew<1.00001e-16,0,znew)
+              znew=f1(ynew)
+              # znew= np.where(znew<1.00001e-16,0,znew)
               return np.multiply(znew,factor)
           else:
               raise ValueError('ERROR! pRT needs a rectangular CIA table.')
