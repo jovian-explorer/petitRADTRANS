@@ -1,7 +1,6 @@
 from __future__ import division, print_function
 
 import copy
-import copy as cp
 import glob
 import os
 import sys
@@ -1789,7 +1788,7 @@ class Radtrans(_read_opacities.ReadOpacities):
 
             f.create_dataset('bin_centers', data=self.freq[::-1] / nc.c)
             f.create_dataset('bin_edges', data=self.border_freqs[::-1] / nc.c)
-            ret_opa_table = cp.copy(self.line_grid_kappas_custom_PT[spec])
+            ret_opa_table = copy.copy(self.line_grid_kappas_custom_PT[spec])
 
             # Mass to go from opacities to cross-sections
             ret_opa_table = ret_opa_table * nc.amu * masses[spec.split('_')[0]]
