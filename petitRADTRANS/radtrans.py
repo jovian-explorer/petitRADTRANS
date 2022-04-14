@@ -824,7 +824,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             if self.do_scat_emis:
                 self.continuum_opa_scat_emis = self.continuum_opa_scat_emis + add_term
 
-    def calc_opt_depth(self, gravity):
+    def calc_opt_depth(self, gravity, cloud_wlen=None):
         # Calculate optical depth for the total opacity.
         if self.mode == 'lbl' or self.test_ck_shuffle_comp:
             if self.__hack_cloud_photospheric_tau is not None:
@@ -882,21 +882,31 @@ class Radtrans(_read_opacities.ReadOpacities):
                 if block3:
                     median = True
 
+                    if cloud_wlen is None:
+                        # Use the full wavelength range for calculating the median
+                        # optical depth of the clouds
+                        wlen_select = np.ones(self.lambda_angstroem.shape[0], dtype=bool)
+
+                    else:
+                        # Use a smaller wavelength range for the median optical depth
+                        # The units of cloud_wlen are converted from micron to Angstroem
+                        wlen_select = (self.lambda_angstroem >= 1e4*cloud_wlen[0]) & \
+                                      (self.lambda_angstroem <= 1e4*cloud_wlen[1])
+
                     # Calculate the cloud-free optical depth per wavelength
                     w_gauss_photosphere = self.w_gauss[..., np.newaxis, np.newaxis]
                     optical_depth = np.sum(w_gauss_photosphere * self.total_tau[:, :, 0, :], axis=0)
 
                     if median:
-                        optical_depth_integ = np.median(optical_depth, axis=0)
+                        optical_depth_integ = np.median(optical_depth[wlen_select, :], axis=0)
                     else:
                         optical_depth_integ = np.sum(
                             (optical_depth[1:, :] + optical_depth[:-1, :]) * np.diff(self.freq)[..., np.newaxis],
                             axis=0) / (self.freq[-1] - self.freq[0]) / 2.
 
-                    optical_depth_cloud = np.sum(w_gauss_photosphere * total_tau_cloud[:, :, 0, :], axis=0)
-
+                    optical_depth_cloud = np.sum(w_gauss_photosphere*total_tau_cloud[:, :, 0, :], axis=0)
                     if median:
-                        optical_depth_cloud_integ = np.median(optical_depth_cloud, axis=0)
+                        optical_depth_cloud_integ = np.median(optical_depth_cloud[wlen_select, :], axis=0)
                     else:
                         optical_depth_cloud_integ = np.sum(
                             (optical_depth_cloud[1:, :] + optical_depth_cloud[:-1, :]) * np.diff(self.freq)[
@@ -1086,7 +1096,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                   dist="lognormal", a_hans=None, b_hans=None,
                   stellar_intensity=None,
                   give_absorption_opacity=None,
-                  give_scattering_opacity=None
+                  give_scattering_opacity=None,
+                  cloud_wlen=None
                   ):
         """ Method to calculate the atmosphere's emitted flux
         (emission spectrum).
@@ -1161,8 +1172,11 @@ class Radtrans(_read_opacities.ReadOpacities):
                     Inclination angle of the direct light with respect to
                     the normal to the atmosphere. Used only in the
                     non-isotropic geometry scenario.
-                hack_cloud_photospheric_tau:
-                    TODO docstring
+                hack_cloud_photospheric_tau (Optional[float]):
+                    Median optical depth (across ``wlen_bords_micron``) of the
+                    clouds from the top of the atmosphere down to the gas-only
+                    photosphere. This parameter can be used for enforcing the
+                    presence of clouds in the photospheric region.
                 dist (Optional[string]):
                     The cloud particle size distribution to use.
                     Can be either 'lognormal' (default) or 'hansen'.
@@ -1198,6 +1212,14 @@ class Radtrans(_read_opacities.ReadOpacities):
                     It may be used to add simple cloud absorption laws, for example, which
                     have opacities that vary only slowly with wavelength, such that the current
                     model resolution is sufficient to resolve any variations.
+                cloud_wlen (Optional[Tuple[float, float]]):
+                    Tuple with the wavelength range (in micron) that is used
+                    for calculating the median optical depth of the clouds at
+                    gas-only photosphere and then scaling the cloud optical
+                    depth to the value of ``hack_cloud_photospheric_tau``. The
+                    range of ``cloud_wlen`` should be encompassed by
+                    ``wlen_bords_micron``. The full wavelength range is used
+                    when ``cloud_wlen=None``.
         """
 
         self.__hack_cloud_photospheric_tau = hack_cloud_photospheric_tau
@@ -1208,6 +1230,16 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.geometry = geometry
         self.mu_star = np.cos(theta_star * np.pi / 180.)
         self.fsed = fsed
+        self.cloud_wlen = cloud_wlen
+
+        if self.cloud_wlen is not None and (
+            self.cloud_wlen[0] < 1e-4*self.lambda_angstroem[0] or
+                self.cloud_wlen[1] > 1e-4*self.lambda_angstroem[-1]):
+                raise ValueError('The wavelength range of cloud_wlen should '
+                                 'lie within the wavelength range of '
+                                 'self.lambda_angstroem, which is slightly '
+                                 'smaller than the wavelength range of '
+                                 'wlen_bords_micron.')
 
         if self.mu_star <= 0.:
             self.mu_star = 1e-8
