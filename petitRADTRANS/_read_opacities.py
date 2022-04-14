@@ -1,16 +1,17 @@
 from __future__ import division, print_function
 
-from . import fort_input as fi
-from . import nat_cst as nc
-from . import pyth_input as pyi
-
-import numpy as np
-import glob, h5py
 import copy as cp
+import glob
+
+import h5py
+import numpy as np
+
+from petitRADTRANS import fort_input as fi
+from petitRADTRANS import nat_cst as nc
+from petitRADTRANS import pyth_input as pyi
 
 
 class ReadOpacities:
-
     def read_line_opacities(self, index, arr_min, arr_max):
         # Reads in the line opacities for spectral calculation
 
