@@ -1235,11 +1235,11 @@ class Radtrans(_read_opacities.ReadOpacities):
         if self.cloud_wlen is not None and (
             self.cloud_wlen[0] < 1e-4*self.lambda_angstroem[0] or
                 self.cloud_wlen[1] > 1e-4*self.lambda_angstroem[-1]):
-                raise ValueError('The wavelength range of cloud_wlen should '
-                                 'lie within the wavelength range of '
-                                 'self.lambda_angstroem, which is slightly '
-                                 'smaller than the wavelength range of '
-                                 'wlen_bords_micron.')
+            raise ValueError('The wavelength range of cloud_wlen should '
+                             'lie within the wavelength range of '
+                             'self.lambda_angstroem, which is slightly '
+                             'smaller than the wavelength range of '
+                             'wlen_bords_micron.')
 
         if self.mu_star <= 0.:
             self.mu_star = 1e-8
