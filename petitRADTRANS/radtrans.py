@@ -1785,6 +1785,73 @@ class Radtrans(_read_opacities.ReadOpacities):
                     int(resolution)) + '.h5')
                 os.system('rm temp.h5')
 
+    def calc_radius_hydrostatic_equilibrium(self,
+                                            temperatures,
+                                            MMWs,
+                                            gravity,
+                                            P0,
+                                            R_pl,
+                                            variable_gravity = True,
+                                            pressures = None):
+
+        if pressures is None:
+            pressures = self.press
+        else:
+            pressures = pressures * 1e6
+        P0 = P0 * 1e6
+
+        rho = pressures*MMWs*nc.amu/nc.kB/temperatures
+        radius = fs.calc_radius(pressures,
+                                gravity,
+                                rho,
+                                P0,
+                                R_pl,
+                                variable_gravity)
+        return radius
+
+    def calc_pressure_hydrostatic_equilibrium(self,
+                                              MMW,
+                                              gravity,
+                                              R_pl,
+                                              P0,
+                                              temperature,
+                                              radii,
+                                              rk4=True):
+
+        P0 = P0*1e6
+        vs = 1. / radii
+        R_pl_sq = R_pl ** 2
+
+        def integrand(press):
+            temp = temperature(press)
+            mu = MMW(press, temp)
+            integ = mu * nc.amu * gravity * R_pl_sq / nc.kB / temp
+            return integ
+
+        pressures = [P0]
+        dvs = np.diff(vs)
+        press1 = P0
+        chi1 = np.log(P0)
+        for dv in dvs:
+            k1 = integrand(press1)
+            if rk4:
+                chi2 = chi1 + 0.5 * dv * k1
+                press2 = np.exp(chi2)
+                k2 = integrand(press2)
+                chi3 = chi1 + 0.5 * dv * k2
+                press3 = np.exp(chi3)
+                k3 = integrand(press3)
+                chi4 = chi1 + dv * k3
+                press4 = np.exp(chi4)
+                k4 = integrand(press4)
+                chi1 = chi1 + 1. / 6. * (k1 + 2 * k2 + 2 * k3 + k4) * dv
+            else:
+                chi1 = chi1 + dv * k1
+            press1 = np.exp(chi1)
+            pressures.append(press1)
+
+        return np.array(pressures)/1e6
+
 def py_calc_cloud_opas(rho,
                     rho_p,
                     cloud_mass_fracs,

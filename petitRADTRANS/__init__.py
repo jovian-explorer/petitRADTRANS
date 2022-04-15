@@ -5,6 +5,6 @@ __copyright__ = "Copyright 2016-2018, Paul Molliere"
 __maintainer__ = "Paul Molliere"
 __email__ = "molliere@strw.leidenunivl.nl"
 __status__ = "Development"
-__version__ = "2.1.0"
+__version__ = "2.3.10"
 
 from petitRADTRANS.radtrans import Radtrans
