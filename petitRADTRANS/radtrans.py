@@ -746,7 +746,6 @@ class Radtrans(_read_opacities.ReadOpacities):
             if dist == "lognormal":
                 self.r_g = fs.get_rg_n(gravity, rho, self.rho_cloud_particles,
                                        self.temp, mmw, fseds,
-                                       self.cloud_mass_fracs,
                                        sigma_lnorm, Kzz)
 
                 cloud_abs_opa_tot, cloud_scat_opa_tot, cloud_red_fac_aniso_tot = \
@@ -760,7 +759,6 @@ class Radtrans(_read_opacities.ReadOpacities):
             else:
                 self.r_g = fs.get_rg_n_hansen(gravity, rho, self.rho_cloud_particles,
                                               self.temp, mmw, fseds,
-                                              self.cloud_mass_fracs,
                                               b_hans, Kzz)
                 cloud_abs_opa_tot, cloud_scat_opa_tot, cloud_red_fac_aniso_tot = \
                     fs.calc_hansen_opas(
