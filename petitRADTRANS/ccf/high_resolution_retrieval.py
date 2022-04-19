@@ -285,7 +285,9 @@ def _get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=
         spectrum_model = simple_pipeline(
             spectral_data=spectrum_model0,
             airmass=parameters['airmass'].value,
-            data_uncertainties=parameters['data_uncertainties'].value
+            data_uncertainties=parameters['data_uncertainties'].value,
+            apply_throughput_removal=True,
+            apply_telluric_lines_removal=True
         )
     else:
         spectrum_model = spectrum_model0
@@ -419,7 +421,7 @@ def _pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations,
 
 
 def _radiosity_model(prt_object, parameters):
-    temperatures, abundances, mmw = _init_retrieval_model(prt_object, parameters)
+    temperatures, abundances, mmw = _init_retrieval_model_old(prt_object, parameters)
 
     # Calculate the spectrum
     prt_object.calc_flux(
@@ -504,8 +506,8 @@ def init_mock_observations(planet, line_species_str, mode,
 
     wavelengths_instrument = wavelengths_instrument[wh]
     instrument_snr = np.ma.masked_less_equal(instrument_snr, 1.0)
-    wavelengths_instrument = np.array([wavelengths_instrument])
-    instrument_snr = np.array([instrument_snr])
+    wavelengths_instrument = np.ma.masked_array([wavelengths_instrument])
+    instrument_snr = np.ma.masked_array([instrument_snr])
 
     # Number of DITs during the transit, we assume that we had the same number of DITs for the star alone
     ndit_half = int(np.ceil(planet.transit_duration / integration_times_ref[band]))  # actual NDIT is twice this value
@@ -524,6 +526,7 @@ def init_mock_observations(planet, line_species_str, mode,
     # Generate deformation arrays
     if telluric_transmittance is not None:
         print('Adding telluric transmittance...')
+        apply_telluric_lines_removal = True
         
         if isinstance(telluric_transmittance, str):  # TODO using variable types is quite bad, change that in definitive version
             telluric_data = np.loadtxt(telluric_transmittance)
@@ -532,6 +535,7 @@ def init_mock_observations(planet, line_species_str, mode,
                                                        wavelengths_instrument)
     else:
         print('No telluric transmittance')
+        apply_telluric_lines_removal = False
 
     if airmass is not None:
         print('Adding Airmass...')
@@ -563,6 +567,18 @@ def init_mock_observations(planet, line_species_str, mode,
             xp = np.linspace(0, 1, np.size(variable_throughput))
             x = np.linspace(0, 1, np.size(orbital_phases))
             variable_throughput = np.interp(x, xp, variable_throughput)
+        elif variable_throughput:
+            variable_throughput = -(np.linspace(-1, 1, np.size(orbital_phases)) - 0.1) ** 2 \
+                                  + np.random.default_rng().normal(loc=0, scale=0.1, size=orbital_phases.size)
+            variable_throughput -= np.min(variable_throughput)
+            variable_throughput /= np.max(variable_throughput)
+            variable_throughput = variable_throughput * 0.4 + 0.6
+        else:
+            load_dict = np.load(os.path.join(
+                load_from,
+                'run_parameters.npz'), allow_pickle=True)
+            variable_throughput = load_dict['true_parameters'][()]['variable_throughput'].value
+            del load_dict
     else:
         print('No variable throughput')
         apply_throughput_removal = False
@@ -600,7 +616,7 @@ def init_mock_observations(planet, line_species_str, mode,
     pressures, temperature, gravity, radius, star_radius, star_effective_temperature, \
         p0, p_cloud, mean_molar_mass, mass_fractions, \
         line_species, rayleigh_species, continuum_species, \
-        model = _init_model(planet, model_wavelengths_border[band], line_species_str)
+        model = _init_model_old(planet, model_wavelengths_border[band], line_species_str)
 
     if not os.path.isdir(retrieval_directory):
         os.mkdir(retrieval_directory)
@@ -696,7 +712,11 @@ def init_mock_observations(planet, line_species_str, mode,
             true_parameters, instrument_snr = load_all(load_from)
 
         # Check noise_matrix consistency
-        assert np.allclose(mock_observations_, mock_observations_without_noise + noise, atol=0.0, rtol=1e-15)
+        assert np.allclose(
+            mock_observations_,
+            mock_observations_without_noise * true_parameters['deformation_matrix'].value + noise,
+            atol=0.0, rtol=1e-15
+        )
 
         print("Mock observations noise_matrix consistency check OK")
 
@@ -796,7 +816,8 @@ def init_mock_observations(planet, line_species_str, mode,
         data_uncertainties=uncertainties,
         airmass=airmass,
         full=True,
-        apply_throughput_removal=apply_throughput_removal
+        apply_throughput_removal=apply_throughput_removal,
+        apply_telluric_lines_removal=apply_telluric_lines_removal,
     )
 
     uncertainties *= np.abs(reduction_matrix)
@@ -825,15 +846,22 @@ def init_mock_observations(planet, line_species_str, mode,
     ts = copy.copy(true_spectra)
     ts = np.ma.masked_where(mock_observations.mask, ts)
     fmt, mr0t, _ = simple_pipeline(
-        ts, airmass=airmass, data_uncertainties=true_parameters['data_uncertainties'].value, full=True
+        ts, airmass=airmass, data_uncertainties=true_parameters['data_uncertainties'].value, full=True,
+        apply_throughput_removal=apply_throughput_removal,
+        apply_telluric_lines_removal=apply_telluric_lines_removal
     )
     w, r = retrieval_model(model, true_parameters)
 
     fmtd, mr0td, _ = simple_pipeline(ts * true_parameters['deformation_matrix'].value, airmass=airmass,
                                      data_uncertainties=true_parameters['data_uncertainties'].value,
+                                     apply_throughput_removal=apply_throughput_removal,
+                                     apply_telluric_lines_removal=apply_telluric_lines_removal,
                                      full=True)
     fs, mr, _ = simple_pipeline(ts * true_parameters['deformation_matrix'].value + noise, airmass=airmass,
-                                data_uncertainties=true_parameters['data_uncertainties'].value, full=True)
+                                data_uncertainties=true_parameters['data_uncertainties'].value, full=True,
+                                apply_throughput_removal=apply_throughput_removal,
+                                apply_telluric_lines_removal=apply_telluric_lines_removal,
+                                )
 
     # Check pipeline validity
     assert np.allclose(r, ts * mr0t, atol=1e-14, rtol=1e-14)
@@ -1071,6 +1099,7 @@ def init_run(retrieval_name, prt_object, pressures, parameters, retrieved_specie
     retrieved_parameters = [
         'planet_max_radial_orbital_velocity',
         'planet_rest_frame_shift',
+        'temperature',
         # 'variable_throughput_coefficient'
     ]
 
@@ -1099,11 +1128,11 @@ def init_run(retrieval_name, prt_object, pressures, parameters, retrieved_specie
             x2=1e7
         )
 
-    def prior_vtc(x):
+    def prior_t(x):
         return uniform_prior(
             cube=x,
-            x1=0.995,
-            x2=1.005
+            x1=1000,
+            x2=2000
         )
 
     def log_prior(cube, abund_lim):
@@ -1129,6 +1158,12 @@ def init_run(retrieval_name, prt_object, pressures, parameters, retrieved_specie
         retrieved_parameters[1],
         True,
         transform_prior_cube_coordinate=prior_vr
+    )
+
+    run_definition_simple.add_parameter(
+        retrieved_parameters[2],
+        True,
+        transform_prior_cube_coordinate=prior_t
     )
 
     # run_definition_simple.add_parameter(
@@ -1271,6 +1306,30 @@ def save_all(directory, mock_observations, mock_observations_without_noise,
 
     np.savez_compressed(
         file=fname,
+        mock_observations=mock_observations,
+        mock_observations_mask=mock_observations.mask,
+        mock_observations_without_noise=mock_observations_without_noise,
+        noise=noise,
+        reduced_mock_observations=reduced_mock_observations,
+        reduced_mock_observations_mask=reduced_mock_observations.mask,
+        reduced_mock_observations_without_noise=reduced_mock_observations_without_noise,
+        log_l_tot=log_l_tot,
+        v_rest=v_rest,
+        kps=kps,
+        log_l_pseudo_retrieval=log_l_pseudo_retrieval,
+        wvl_pseudo_retrieval=wvl_pseudo_retrieval,
+        models_pseudo_retrieval=models_pseudo_retrieval,
+        instrument_snr=instrument_snr,
+        instrument_snr_mask=instrument_snr.mask,
+        true_parameters=true_parameters
+    )
+
+    p = copy.deepcopy(true_parameters)
+    for key, item in p.items():
+        p[key] = item.value
+
+    np.savez_compressed(
+        file=fname + '2',
         mock_observations=mock_observations,
         mock_observations_mask=mock_observations.mask,
         mock_observations_without_noise=mock_observations_without_noise,

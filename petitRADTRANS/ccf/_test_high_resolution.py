@@ -1180,7 +1180,10 @@ def load_all(directory):
 
     mock_observations = load_dict['mock_observations']
     mock_observations_without_noise = load_dict['mock_observations_without_noise']
-    noise = load_dict['noise_matrix']
+    try:
+        noise = load_dict['noise_matrix']
+    except NameError:
+        noise = load_dict['noise']
     reduced_mock_observations = load_dict['reduced_mock_observations']
     reduced_mock_observations_without_noise = load_dict['reduced_mock_observations_without_noise']
     log_l_tot = load_dict['log_l_tot']

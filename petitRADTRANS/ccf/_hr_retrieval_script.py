@@ -30,18 +30,18 @@ def main(sim_id=0):
 
     line_species_str = ['CO_all_iso', 'H2O_main_iso']
 
-    retrieval_name = f't{sim_id}l2_vttt_p_kp_vr_CO_H2O_79-80'
+    retrieval_name = f'e{sim_id}l3_vttt_p_t_kp_vr_CO_H2O_79-80'
     retrieval_directory = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval', retrieval_name))
 
-    mode = 'transit'
+    mode = 'eclipse'
     n_live_points = 100
     add_noise = True
 
     retrieval_directories = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval'))
 
-    # load_from = None
+    load_from = None
     # load_from = os.path.join(retrieval_directories, f't0_kp_vr_CO_H2O_79-80_{mode}_200lp_np')
-    load_from = os.path.join(retrieval_directories, f't{sim_id}_tt_p_kp_vr_CO_H2O_79-80_{mode}_30lp')
+    # load_from = os.path.join(retrieval_directories, f'e{sim_id}l3_vttt_p_kp_vr_CO_H2O_79-80_{mode}_100lp')
     # load_from = os.path.join(retrieval_directories, f't1_tt2_p_mr_kp_vr_CO_H2O_79-80_{mode}_100lp')
 
     band = 'M'
@@ -62,7 +62,8 @@ def main(sim_id=0):
     telluric_transmittance = \
         os.path.join(module_dir, 'metis', 'skycalc', 'transmission_3060m_4750-4850nm_R150k_FWHM1.5_default.dat')
     airmass = None #os.path.join(module_dir, 'metis', 'brogi_crires_test', 'air.npy')
-    variable_throughput = None#os.path.join(module_dir, 'metis', 'brogi_crires_test')
+    variable_throughput = True#os.path.join(module_dir, 'metis', 'brogi_crires_test')
+
 
     wavelengths_instrument = None
     instrument_snr = None
@@ -388,7 +389,7 @@ def main2(sim_id=0):
 
 if __name__ == '__main__':
     t0 = time.time()
-    for i in [96]:
+    for i in [1]:
         print(f'====\n sim {i + 1}')
         main(sim_id=i + 1)
         print(f'====\n')

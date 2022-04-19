@@ -167,7 +167,7 @@ def get_mock_secondary_eclipse_spectra(wavelength_model, spectrum_model, star_sp
     planet_radiosity = np.zeros((
         wavelength_instrument.shape[0], planet_velocities.size, wavelength_instrument.shape[1]
     ))
-    star_spectral_radiosity = np.zeros((
+    star_spectral_radiosity_ = np.zeros((
         wavelength_instrument.shape[0], planet_velocities.size, wavelength_instrument.shape[1]
     ))
 
@@ -182,7 +182,7 @@ def get_mock_secondary_eclipse_spectra(wavelength_model, spectrum_model, star_sp
             + planet_rest_frame_shift  # planet + system velocity
         )
 
-        star_spectral_radiosity[i, :, :] = convolve_shift_rebin(
+        star_spectral_radiosity_[i, :, :] = convolve_shift_rebin(
             wavelength_model,
             star_spectral_radiosity,
             instrument_resolving_power,
@@ -192,11 +192,13 @@ def get_mock_secondary_eclipse_spectra(wavelength_model, spectrum_model, star_sp
 
     planet_radiosity = np.moveaxis(planet_radiosity, 0, 1)  # TODO put these dimension operations into the rebin function
     planet_radiosity = np.reshape(planet_radiosity, (planet_velocities.size, wavelength_instrument.size))
-    star_spectral_radiosity = np.moveaxis(star_spectral_radiosity, 0, 1)
-    star_spectral_radiosity = np.reshape(star_spectral_radiosity, (planet_velocities.size, wavelength_instrument.size))
+    star_spectral_radiosity_ = np.moveaxis(star_spectral_radiosity_, 0, 1)
+    star_spectral_radiosity_ = np.reshape(
+        star_spectral_radiosity_, (planet_velocities.size, wavelength_instrument.size)
+    )
 
     # TODO add stellar reflection, dayside/nightside model ?
-    return 1 + (planet_radiosity * planet_radius ** 2) / (star_spectral_radiosity * star_radius ** 2)
+    return 1 + (planet_radiosity * planet_radius ** 2) / (star_spectral_radiosity_ * star_radius ** 2)
 
 
 def get_mock_transit_spectra(wavelength_model, transit_radius_model,
