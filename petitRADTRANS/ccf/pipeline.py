@@ -565,6 +565,65 @@ def remove_telluric_lines_mean(spectral_data, reduction_matrix, data_uncertainti
     return spectral_data_corrected, reduction_matrix, pipeline_uncertainties
 
 
+def remove_throughput_fit(spectral_data, reduction_matrix, wavelengths, data_uncertainties=None, mask_threshold=1e-16,
+                          polynomial_fit_degree=2):
+    """Remove variable throughput with a polynomial function.
+
+    Args:
+        spectral_data: spectral data to correct
+        reduction_matrix: matrix storing all the operations made to reduce the data
+        wavelengths: wavelengths of the data
+        data_uncertainties: uncertainties on the data
+        mask_threshold: mask wavelengths where the Earth atmospheric transmittance estimate is below this value
+        polynomial_fit_degree: degree of the polynomial fit of the Earth atmospheric transmittance
+
+    Returns:
+        Corrected spectral data, reduction matrix and uncertainties after correction
+    """
+    # Initialization
+    spectral_data_corrected, reduction_matrix, pipeline_uncertainties = __init_pipeline_outputs(
+        spectral_data, reduction_matrix, data_uncertainties
+    )
+
+    if data_uncertainties is not None:
+        weights = 1 / data_uncertainties
+    else:
+        weights = np.ones(spectral_data.shape)
+
+    throughput_fits = np.ma.zeros(spectral_data_corrected.shape)
+
+    # Correction
+    for i, det in enumerate(spectral_data):
+        wvl = wavelengths[i, 0, :]
+
+        # Fit each observation
+        for j, observation in enumerate(det):
+            fit_parameters = np.polynomial.Polynomial.fit(
+                x=wvl, y=observation, deg=polynomial_fit_degree, w=weights[i, j, :]
+            )
+            fit_function = np.polynomial.Polynomial(fit_parameters.convert().coef)
+            throughput_fits[i, j, :] = fit_function(wvl)
+
+        # Apply mask where estimate is lower than the threshold, as well as the data mask
+        throughput_fits[i, :, :] = np.ma.masked_where(
+            np.ones(throughput_fits[i].shape) * np.min(throughput_fits[i, :, :], axis=0) < mask_threshold,
+            throughput_fits[i, :, :]
+        )
+        throughput_fits[i, :, :] = np.ma.masked_where(
+            det.mask, throughput_fits[i, :, :]
+        )
+
+        # Apply correction
+        spectral_data_corrected[i, :, :] = det / throughput_fits[i, :, :]
+        reduction_matrix[i, :, :] /= throughput_fits[i, :, :]
+
+    # Propagation of uncertainties
+    if data_uncertainties is not None:
+        pipeline_uncertainties /= np.abs(throughput_fits)
+
+    return spectral_data_corrected, reduction_matrix, pipeline_uncertainties
+
+
 def remove_throughput_mean(spectral_data, reduction_matrix=None, data_uncertainties=None):
     """Correct for the variable throughput using the weighted arithmetic mean over wavelength.
 
@@ -608,7 +667,7 @@ def remove_throughput_mean(spectral_data, reduction_matrix=None, data_uncertaint
 
 
 def simple_pipeline(spectral_data, data_uncertainties=None,
-                    airmass=None, tellurics_mask_threshold=0.1, polynomial_fit_degree=1,
+                    wavelengths=None, airmass=None, tellurics_mask_threshold=0.1, polynomial_fit_degree=1,
                     apply_throughput_removal=True, apply_telluric_lines_removal=True, full=False, **kwargs):
     """Removes the telluric lines and variable throughput of some data.
     If airmass is None, the Earth atmospheric transmittance is assumed to be time-independent, so telluric transmittance
@@ -617,6 +676,7 @@ def simple_pipeline(spectral_data, data_uncertainties=None,
     Args:
         spectral_data: spectral data to correct
         data_uncertainties: uncertainties on the data
+        wavelengths: wavelengths of the data
         airmass: airmass of the data
         tellurics_mask_threshold: mask wavelengths where the Earth atmospheric transmittance estimate is below this value
         polynomial_fit_degree: degree of the polynomial fit of the Earth atmospheric transmittance
@@ -649,11 +709,21 @@ def simple_pipeline(spectral_data, data_uncertainties=None,
 
     # Apply corrections
     if apply_throughput_removal:
-        reduced_data, reduction_matrix, reduced_data_uncertainties = remove_throughput_mean(
-            spectral_data=spectral_data,
-            reduction_matrix=reduction_matrix,
-            data_uncertainties=reduced_data_uncertainties
-        )
+        if wavelengths is None:
+            reduced_data, reduction_matrix, reduced_data_uncertainties = remove_throughput_mean(
+                spectral_data=spectral_data,
+                reduction_matrix=reduction_matrix,
+                data_uncertainties=reduced_data_uncertainties
+            )
+        else:
+            reduced_data, reduction_matrix, reduced_data_uncertainties = remove_throughput_fit(
+                spectral_data=spectral_data,
+                reduction_matrix=reduction_matrix,
+                wavelengths=wavelengths,
+                data_uncertainties=reduced_data_uncertainties,
+                mask_threshold=1e-16,
+                polynomial_fit_degree=2
+            )
 
     if apply_telluric_lines_removal:
         if airmass is None:

@@ -2261,8 +2261,8 @@ class SpectralModel:
             gravity=10 ** parameters['log10_surface_gravity'].value,
             mmw=mean_molar_mass,
             Tstar=parameters['star_effective_temperature'].value,
-            Rstar=parameters['star_radius'].value / nc.r_sun,
-            semimajoraxis=parameters['semi_major_axis'].value / nc.AU,
+            Rstar=parameters['star_radius'].value,
+            semimajoraxis=parameters['semi_major_axis'].value,
             Pcloud=10 ** parameters['log10_cloud_pressure'].value,
             # stellar_intensity=parameters['star_spectral_radiosity'].value
         )
@@ -2405,8 +2405,8 @@ class SpectralModel:
             planet.surface_gravity,
             self.mass_fractions['MMW'],
             Tstar=planet.star_effective_temperature,
-            Rstar=planet.star_radius / nc.r_sun,
-            semimajoraxis=planet.orbit_semi_major_axis / nc.AU,
+            Rstar=planet.star_radius,
+            semimajoraxis=planet.orbit_semi_major_axis,
             Pcloud=self.p_cloud
         )
 

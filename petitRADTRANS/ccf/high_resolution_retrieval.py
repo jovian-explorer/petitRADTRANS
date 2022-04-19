@@ -430,8 +430,8 @@ def _radiosity_model(prt_object, parameters):
         10 ** parameters['log10_surface_gravity'].value,
         mmw,
         Tstar=parameters['star_effective_temperature'].value,
-        Rstar=parameters['star_radius'].value / nc.r_sun,
-        semimajoraxis=parameters['semi_major_axis'].value / nc.AU,
+        Rstar=parameters['star_radius'].value,
+        semimajoraxis=parameters['semi_major_axis'].value,
         Pcloud=10 ** parameters['log10_cloud_pressure'].value,
         #stellar_intensity=parameters['star_spectral_radiosity'].value
     )
@@ -1302,7 +1302,7 @@ def save_all(directory, mock_observations, mock_observations_without_noise,
     print('Saving...')
     # TODO save into HDF5, and better handling of runs (make a class, etc.)
 
-    fname = os.path.join(directory, 'run_parameters.npz')
+    fname = os.path.join(directory, 'run_parameters')
 
     np.savez_compressed(
         file=fname,
@@ -1330,20 +1330,5 @@ def save_all(directory, mock_observations, mock_observations_without_noise,
 
     np.savez_compressed(
         file=fname + '2',
-        mock_observations=mock_observations,
-        mock_observations_mask=mock_observations.mask,
-        mock_observations_without_noise=mock_observations_without_noise,
-        noise=noise,
-        reduced_mock_observations=reduced_mock_observations,
-        reduced_mock_observations_mask=reduced_mock_observations.mask,
-        reduced_mock_observations_without_noise=reduced_mock_observations_without_noise,
-        log_l_tot=log_l_tot,
-        v_rest=v_rest,
-        kps=kps,
-        log_l_pseudo_retrieval=log_l_pseudo_retrieval,
-        wvl_pseudo_retrieval=wvl_pseudo_retrieval,
-        models_pseudo_retrieval=models_pseudo_retrieval,
-        instrument_snr=instrument_snr,
-        instrument_snr_mask=instrument_snr.mask,
-        true_parameters=true_parameters
+        true_parameters=p
     )

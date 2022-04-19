@@ -1579,8 +1579,8 @@ def radiosity_model(prt_object, parameters):
         10 ** parameters['log_g'].value,
         mmw,
         Tstar=parameters['star_effective_temperature'].value,
-        Rstar=parameters['Rstar'].value / nc.r_sun,
-        semimajoraxis=parameters['semi_major_axis'].value / nc.AU,
+        Rstar=parameters['Rstar'].value,
+        semimajoraxis=parameters['semi_major_axis'].value,
         Pcloud=10 ** parameters['log_Pcloud'].value,
         #stellar_intensity=parameters['star_spectral_radiosity'].value
     )

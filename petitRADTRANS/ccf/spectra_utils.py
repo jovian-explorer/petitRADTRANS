@@ -127,8 +127,8 @@ def calculate_spectral_radiosity_spectrum(atmosphere: Radtrans, temperatures, ma
         gravity=planet_surface_gravity,
         mmw=mean_molar_mass,
         Tstar=star_effective_temperature,
-        Rstar=star_radius / nc.r_sun,
-        semimajoraxis=semi_major_axis / nc.AU,
+        Rstar=star_radius,
+        semimajoraxis=semi_major_axis,
         Pcloud=cloud_pressure,
         # stellar_intensity=parameters['star_spectral_radiosity'].value
     )
