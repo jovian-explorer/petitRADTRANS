@@ -9,7 +9,7 @@ import numpy as np
 
 from .context import petitRADTRANS
 
-version = "2.3.2"  # petitRADTRANS.version.version used to generate last tests
+version = "2.4.0"  # petitRADTRANS.version.version used to generate last tests
 
 tests_data_directory = os.path.join(os.path.dirname(__file__), 'data')
 tests_error_directory = os.path.join(os.path.dirname(__file__), 'errors')
@@ -53,6 +53,10 @@ reference_filenames = {
         'radtrans_correlated_k_emission_cloud_hansen_radius_ref',
     'correlated_k_emission_surface_scattering':
         'radtrans_correlated_k_emission_surface_scattering_ref',
+    'line_by_line_downsampled_transmission':
+        'radtrans_line_by_line_downsampled_transmission_ref',
+    'line_by_line_downsampled_emission':
+        'radtrans_line_by_line_downsampled_emission_ref',
     'line_by_line_transmission':
         'radtrans_line_by_line_transmission_ref',
     'line_by_line_emission':
@@ -145,6 +149,7 @@ def create_test_radtrans_config_file(filename):
                     'incidence_angle': 30  # (deg)
                 },
                 'spectrum_parameters': {
+                    'line_by_line_opacity_sampling': 4,
                     'line_species_correlated_k': [
                         'H2O_HITEMP',
                         'CH4'
@@ -156,7 +161,7 @@ def create_test_radtrans_config_file(filename):
                     'rayleigh_species': ['H2', 'He'],
                     'continuum_opacities': ['H2-H2', 'H2-He'],
                     'wavelength_range_correlated_k': [0.9, 1.2],
-                    'wavelength_range_line_by_line': [2.3000, 2.3025],
+                    'wavelength_range_line_by_line': [2.3000, 2.3025]
                 },
                 'cloud_parameters': {
                    'kappa_zero': 0.01,

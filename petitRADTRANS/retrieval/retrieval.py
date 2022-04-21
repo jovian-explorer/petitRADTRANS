@@ -289,7 +289,7 @@ class Retrieval:
                     free_parameter_names.append(self.parameters[pp].name)
                     n_params += 1
 
-            if max_iter is 0:
+            if max_iter == 0:
                 max_iter = None
             sampler = un.ReactiveNestedSampler(free_parameter_names,
                                                self.log_likelihood,
@@ -833,9 +833,9 @@ class Retrieval:
                 output files.
         """
         # Avoid loading if we just want the current retrievals output
-        if ret_name is "" and self.analyzer is not None:
+        if ret_name == "" and self.analyzer is not None:
             return self.analyzer
-        if ret_name is "":
+        if ret_name == "":
             ret_name = self.retrieval_name
         prefix = self.output_dir + 'out_PMN/'+ret_name+'_'
 
@@ -885,7 +885,7 @@ class Retrieval:
         return params
 
     def sample_teff(self,sample_dict,param_dict,ret_names = None,nsample = None,resolution=40):
-        """
+        r"""
         This function samples the outputs of a retrieval and computes Teff
         for each sample. For each sample, a model is computed at low resolution,
         and integrated to find the total radiant emittance, which is converted into

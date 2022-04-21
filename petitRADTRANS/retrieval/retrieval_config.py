@@ -499,7 +499,7 @@ class RetrievalConfig:
                 wbins = [0.95*wlow,1.05*whigh]
             else:
                 wbins = wlen_range_micron
-            if opacity_mode is 'lbl':
+            if opacity_mode == 'lbl':
                 logging.warning("Are you sure you want a high resolution model for photometry?")
             self.data[name] = Data(name,
                                     path,

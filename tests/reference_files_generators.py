@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from .context import petitRADTRANS
-from .utils import radtrans_parameters, reference_filenames, temperature_guillot_2010, version
+from .utils import radtrans_parameters, reference_filenames, temperature_guillot_2010, temperature_isothermal, version
 
 
 # Save functions
@@ -595,6 +595,40 @@ def create_radtrans_correlated_k_transmission_spectrum_cloud_calculated_radius_r
     )
 
 
+def create_radtrans_line_by_line_downsampled_emission_spectrum_ref(plot_figure=False):
+    from .test_radtrans_line_by_line_sampling import atmosphere_lbl_downsampled
+
+    atmosphere_lbl_downsampled.calc_flux(
+        temp=temperature_guillot_2010,
+        abunds=radtrans_parameters['mass_fractions'],
+        gravity=radtrans_parameters['planetary_parameters']['surface_gravity'],
+        mmw=radtrans_parameters['mean_molar_mass'],
+    )
+
+    __save_emission_spectrum(
+        reference_filenames['line_by_line_downsampled_emission'],
+        atmosphere_lbl_downsampled, plot_figure, 'Line-by-line downsampled emission spectrum'
+    )
+
+
+def create_radtrans_line_by_line_downsampled_transmission_spectrum_ref(plot_figure=False):
+    from .test_radtrans_line_by_line_sampling import atmosphere_lbl_downsampled
+
+    atmosphere_lbl_downsampled.calc_transm(
+        temp=temperature_isothermal,
+        abunds=radtrans_parameters['mass_fractions'],
+        gravity=radtrans_parameters['planetary_parameters']['surface_gravity'],
+        mmw=radtrans_parameters['mean_molar_mass'],
+        R_pl=radtrans_parameters['planetary_parameters']['radius'] * petitRADTRANS.nat_cst.r_jup_mean,
+        P0_bar=radtrans_parameters['planetary_parameters']['reference_pressure']
+    )
+
+    __save_transmission_spectrum(
+        reference_filenames['line_by_line_downsampled_transmission'],
+        atmosphere_lbl_downsampled, plot_figure, 'Line-by-line downsampled transmission spectrum'
+    )
+
+
 def create_radtrans_line_by_line_emission_spectrum_ref(plot_figure=False):
     from .test_radtrans_line_by_line import atmosphere_lbl
 
@@ -748,6 +782,8 @@ def create_all_comparison_files(plot_figure=False):
     create_radtrans_correlated_k_transmission_spectrum_cloud_calculated_radius_ref(plot_figure)
     create_radtrans_correlated_k_transmission_spectrum_cloud_calculated_radius_scattering_ref(plot_figure)
 
+    create_radtrans_line_by_line_downsampled_emission_spectrum_ref(plot_figure)
+    create_radtrans_line_by_line_downsampled_transmission_spectrum_ref(plot_figure)
     create_radtrans_line_by_line_emission_spectrum_ref(plot_figure)
     create_radtrans_line_by_line_transmission_spectrum_ref(plot_figure)
 
