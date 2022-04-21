@@ -202,11 +202,6 @@ class ReadOpacities:
                             self.line_grid_kappas_custom_PT[self.line_species[i_spec]][:, index_use, 0, :]
                         self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = ret_val
 
-                    # Down-sample opacities in lbl mode if requested
-                    if (self.mode == 'lbl') and (self.lbl_opacity_sampling is not None):
-                        self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
-                            self.line_grid_kappas_custom_PT[self.line_species[i_spec]] \
-                            [:, ::self.lbl_opacity_sampling, :]
                 else:  # read in the Exomol k-table by Katy Chubb if requested by the user
                     print('  Read line opacities of ' + self.line_species[i_spec] + '...')
 

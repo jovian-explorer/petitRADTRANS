@@ -594,7 +594,10 @@ def remove_throughput_fit(spectral_data, reduction_matrix, wavelengths, data_unc
 
     # Correction
     for i, det in enumerate(spectral_data):
-        wvl = wavelengths[i, 0, :]
+        if np.ndim(wavelengths) == 2:
+            wvl = wavelengths[i, :]
+        else:
+            wvl = wavelengths[i, 0, :]
 
         # Fit each observation
         for j, observation in enumerate(det):

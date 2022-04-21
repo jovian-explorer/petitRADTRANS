@@ -1,5 +1,6 @@
 from __future__ import division, print_function
 
+import copy
 import glob
 import os
 import sys
@@ -803,8 +804,10 @@ class Radtrans(_read_opacities.ReadOpacities):
         # Add Rayleigh scattering cross-sections
         for spec in self.rayleigh_species:
             haze_multiply = 1.
+
             if self.haze_factor is not None:
                 haze_multiply = self.haze_factor
+
             add_term = haze_multiply * fs.add_rayleigh(spec, abundances[spec],
                                                        self.lambda_angstroem,
                                                        self.mmw, self.temp, self.press)

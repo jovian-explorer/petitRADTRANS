@@ -30,10 +30,10 @@ def main(sim_id=0):
 
     line_species_str = ['CO_all_iso', 'H2O_main_iso']
 
-    retrieval_name = f'e{sim_id}l4_vttt_p_t_kp_vr_CO_H2O_79-80'
+    retrieval_name = f't{sim_id}l4_vttt_p_t_kp_vr_CO_H2O_79-80'
     retrieval_directory = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval', retrieval_name))
 
-    mode = 'eclipse'
+    mode = 'transit'
     n_live_points = 100
     add_noise = True
 

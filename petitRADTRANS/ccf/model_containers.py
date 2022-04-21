@@ -1511,7 +1511,7 @@ class Planet:
                 key = key[:i] + '_proper_motion_' + key[i + len('_pm'):]
 
             if not skip_unit_conversion:
-                value *= 3.6e-6 / nc.snc.year
+                value *= np.deg2rad(1e-3 / 3600 / nc.snc.year)
 
         elif key == 'hostname':
             key = 'host_name'
