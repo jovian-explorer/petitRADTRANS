@@ -12,12 +12,13 @@ import copy as cp
 
 path = os.environ.get("pRT_input_data_path")
 if path == None:
-    print('Path to input data not specified!')
-    print('Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via')
-    print('    import os')
-    print('    os.environ["pRT_input_data_path"] = "absolute/path/of/the/folder/input_data"')
-    print('before creating a Radtrans object or loading the nat_cst module.')
-    sys.exit(1)
+    raise OSError(f"Path to input data not specified!\n"
+                  f"Please set pRT_input_data_path variable in .bashrc / .bash_profile or specify path via\n"
+                  f">>> import os"
+                  f">>> os.environ['pRT_input_data_path'] = 'absolute/path/of/the/folder/input_data'\n"
+                  f"before creating a Radtrans object or loading the nat_cst module.\n"
+                  f"(this will become unnecessary in a future update)"
+                  )
 
 # Read in parameters of chemistry grid
 FEHs = np.genfromtxt(os.path.join(path, "abundance_files/FEHs.dat"))
@@ -100,4 +101,3 @@ def interpol_abundances(COs_goal_in, FEHs_goal_in, temps_goal_in, pressures_goal
             abundances['H2O'] = h2o_abb
 
     return abundances
-

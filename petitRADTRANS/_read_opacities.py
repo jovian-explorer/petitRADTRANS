@@ -1,15 +1,17 @@
 from __future__ import division, print_function
 
-from . import fort_input as fi
-from . import nat_cst as nc
-from . import pyth_input as pyi
-
-import numpy as np
-import glob, h5py
 import copy as cp
+import glob
+
+import h5py
+import numpy as np
+
+from petitRADTRANS import fort_input as fi
+from petitRADTRANS import nat_cst as nc
+from petitRADTRANS import pyth_input as pyi
+
 
 class ReadOpacities:
-
     def read_line_opacities(self, index, arr_min, arr_max):
         # Reads in the line opacities for spectral calculation
 
@@ -205,11 +207,6 @@ class ReadOpacities:
                         retVal[:, index_fill, 0, :] = \
                             self.line_grid_kappas_custom_PT[self.line_species[i_spec]][:,index_use,0,:]
                         self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = retVal
-
-                    # Down-sample opacities in lbl mode if requested
-                    if (self.mode == 'lbl') and (self.lbl_opacity_sampling != None):
-                        self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
-                            self.line_grid_kappas_custom_PT[self.line_species[i_spec]][:,::self.lbl_opacity_sampling,:]
 
                 # Read in the Exomol k-table by Katy Chubb if requested by the user
                 else:
