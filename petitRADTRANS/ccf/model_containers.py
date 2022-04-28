@@ -1602,6 +1602,57 @@ class Planet:
         return f"{planet_models_directory}{os.path.sep}planet_{name.replace(' ', '_')}.h5"
 
     @staticmethod
+    def get_simple_transit_curve(time_from_mid_transit, planet_radius, star_radius,
+                                 planet_orbital_velocity=None, star_mass=None, orbit_semi_major_axis=None):
+        """
+        Assume no inclination, circular orbit, observer infinitely far away, spherical objects, perfectly sharp and
+        black planet and perfectly sharp and uniformly luminous star.
+
+        Args:
+            time_from_mid_transit: (s) time from mid transit, 0 is the mid transit time, < 0 before and > 0 after
+            planet_radius: (cm) radius of the planet
+            star_radius: (cm) radius of the star
+            planet_orbital_velocity: (cm.s-1) planet velocity along its orbit.
+            star_mass: (g) mass of the star
+            orbit_semi_major_axis: (cm) planet orbit semi major axis
+
+        Returns:
+
+        """
+        if planet_orbital_velocity is None:
+            planet_orbital_velocity = Planet.calculate_orbital_velocity(star_mass, orbit_semi_major_axis)
+
+        planet_center_to_star_center = planet_orbital_velocity * time_from_mid_transit
+
+        if np.abs(planet_center_to_star_center) >= star_radius + planet_radius:
+            return 1.0  # planet is not transiting yet
+        elif np.abs(planet_center_to_star_center) <= star_radius - planet_radius:
+            return 1 - (planet_radius / star_radius) ** 2  # planet is fully transiting
+        else:
+            # Get the vertical coordinate intersection between the two discs
+            x_intersection = (star_radius ** 2 - planet_radius ** 2 + planet_center_to_star_center ** 2) \
+                             / (2 * planet_center_to_star_center)
+            y_intersection = np.sqrt(star_radius ** 2 - np.abs(x_intersection) ** 2)
+
+            # Get the half angle between the two intersection points and the center of each disc
+            theta_half_intersection_planet = np.arcsin(y_intersection / planet_radius)
+            theta_half_intersection_star = np.arcsin(y_intersection / star_radius)
+
+            if np.abs(planet_center_to_star_center) < star_radius:
+                theta_half_intersection_planet = np.pi - theta_half_intersection_planet
+
+            # Calculate the area of the sector between the 2 intersection point for the 2 discs
+            planet_sector_area = planet_radius ** 2 * theta_half_intersection_planet
+            star_sector_area = star_radius ** 2 * theta_half_intersection_star
+
+            # Calculate the area of the triangles formed by the 2 intersection points and the center of each disc
+            planet_triangle_area = 0.5 * planet_radius ** 2 * np.sin(2 * theta_half_intersection_planet)
+            star_triangle_area = 0.5 * star_radius ** 2 * np.sin(2 * theta_half_intersection_star)
+
+            return 1 - (planet_sector_area - planet_triangle_area + star_sector_area - star_triangle_area) \
+                / (np.pi * star_radius ** 2)
+
+    @staticmethod
     def get_orbital_phases(phase_start, orbital_period, times):
         """Calculate orbital phases assuming low eccentricity.
 
@@ -3289,6 +3340,25 @@ class SpectralModel2(BaseSpectralModel):
                         mass_mixing_ratios['He'][i] = mass_mixing_ratios['H2'][i] * heh2_ratio
 
         return mass_mixing_ratios
+
+    @staticmethod
+    def calculate_scaled_metallicity(planet_mass, star_metallicity=1.0, atmospheric_mixing=1.0, alpha=-0.68, beta=7.2):
+        """Calculate the scaled metallicity of a planet.
+        The relation used is a power law. Default parameters come from the source.
+
+        Source: Mordasini et al. 2014 (https://www.aanda.org/articles/aa/pdf/2014/06/aa21479-13.pdf)
+
+        Args:
+            planet_mass: (g) mass of the planet
+            star_metallicity: metallicity of the planet in solar metallicity
+            atmospheric_mixing: scaling factor [0, 1] representing how well metals are mixed in the atmosphere
+            alpha: power of the relation
+            beta: scaling factor of the relation
+
+        Returns:
+            An estimation of the planet atmospheric metallicity in solar metallicity.
+        """
+        return beta * (planet_mass / nc.m_jup) ** alpha * star_metallicity * atmospheric_mixing
 
     @staticmethod
     def calculate_spectral_parameters(temperature_profile_function, mass_mixing_ratios_function,

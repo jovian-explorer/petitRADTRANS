@@ -835,7 +835,7 @@ def main_hd(sim_id=0):
     line_species_str = ['CO_main_iso', 'CO_36', 'CH4_main_iso', 'H2O_main_iso']
     # line_species_str = ['CO_main_iso', 'CH4_main_iso', 'H2O_main_iso']
 
-    retrieval_name = f't{planet_name}{sim_id}_CO_no13CO_CH4_H2O_t_18-28'
+    retrieval_name = f't{planet_name}{sim_id}_12CO_13CO_CH4_H2O_t_20-23'
     retrieval_directory = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval', retrieval_name))
 
     mode = 'transit'
@@ -854,25 +854,26 @@ def main_hd(sim_id=0):
     wavelengths_borders = {
         # 'K': [1.8, 2.8],
         # 'K': [2.28, 2.42],
-        'K': [1.8, 2.8],
+        'K': [2.08, 2.3],
         # 'M': [4.79, 4.80]  # [4.5, 5.5],
     }
 
-    wrange_0 = wavelengths_borders[band] * np.array([1.001, 0.999])
-    Nwranges = 100
-    wranges = np.linspace(wrange_0[0], wrange_0[1], int(Nwranges + 1))
-    wavelengths_borders[band] = np.array([wranges[sim_id], wranges[sim_id + 1]])
+    # wrange_0 = wavelengths_borders[band] * np.array([1.001, 0.999])
+    # Nwranges = 100
+    # wranges = np.linspace(wrange_0[0], wrange_0[1], int(Nwranges + 1))
+    # wavelengths_borders[band] = np.array([wranges[sim_id], wranges[sim_id + 1]])
 
     integration_times_ref = {
         'K': 60,
         # 'M': 76.89
     }
 
-    snr_file = os.path.join(module_dir, 'metis', 'SimMETIS', 'HD_189733',
-                            f"ANDES_snrs.dat")
-    telluric_transmittance = None
-    airmass = None #os.path.join(module_dir, 'metis', 'brogi_crires_test', 'air.npy')
-    variable_throughput = None #os.path.join(module_dir, 'metis', 'brogi_crires_test')
+    snr_file = os.path.join(module_dir, 'andes', 'HD_189733', f"ANDES_snrs.dat")
+    telluric_transmittance = os.path.join(module_dir, 'andes', 'sky', 'sky', 'transmission',
+                                          f"transmission_1500_2500.dat")
+    # airmass = os.path.join(module_dir, 'carmenes', 'hd_189733_b', 'air.npy')
+    airmass = os.path.join(module_dir, 'andes', 'HD_189733', 'airmass_optimal.txt')
+    variable_throughput = os.path.join(module_dir, 'metis', 'brogi_crires_test')
 
     wavelengths_instrument = None
     instrument_snr = None
