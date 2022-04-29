@@ -4,15 +4,13 @@ from petitRADTRANS import Radtrans
 Chubb = False
 do_scat_emis = True
 
-import os
-os.environ["pRT_input_data_path"] = "/Applications/ownpy/petitRADTRANS/petitRADTRANS/input_data"
-
 if not Chubb:
     atmosphere = Radtrans(line_species = ['H2O', 'CO_all_iso', 'CH4', 'CO2', 'Na', 'K'], \
                           rayleigh_species = ['H2', 'He'], \
                           continuum_opacities = ['H2-H2', 'H2-He'], \
                           wlen_bords_micron = [1, 2.5], \
-                          do_scat_emis = do_scat_emis)
+                          do_scat_emis = do_scat_emis,
+                          path_input_data = "/Applications/ownpy/petitRADTRANS/petitRADTRANS/input_data")
 
 pressures = np.logspace(-6, 2, 100)
 atmosphere.setup_opa_structure(pressures)

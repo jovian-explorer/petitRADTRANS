@@ -4,7 +4,6 @@ import pylab as plt
 plt.rcParams['figure.figsize'] = (10, 6)
 
 import os
-os.environ["pRT_input_data_path"] = "/Users/molliere/Documents/programm_data/petitRADTRANS_public/input_data"
 
 from petitRADTRANS import Radtrans
 from petitRADTRANS import nat_cst as nc
@@ -20,7 +19,8 @@ atmosphere = Radtrans(line_species = ['H2O_HITEMP',
                       rayleigh_species = ['H2', 'He'],
                       continuum_opacities = ['H2-H2', 'H2-He'],
                       wlen_bords_micron = [0.3, 15],
-                      do_scat_emis = True)
+                      do_scat_emis = True,
+                      path_input_data = "/Users/molliere/Documents/programm_data/petitRADTRANS_public/input_data")
 
 pressures = np.logspace(-6, 2, 100)
 atmosphere.setup_opa_structure(pressures)

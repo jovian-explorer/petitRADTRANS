@@ -229,13 +229,13 @@ def npz2dat(file, new_resolution_power=60.0, relative_error=0.05, mode='transmis
 
 # Data files generation functions
 def create_guillot_2010_temperature_profile_ref(plot_figure=False):
-    temperature_guillot = petitRADTRANS.physics.guillot_global(
-        pressure=radtrans_parameters['pressures'],
-        kappa_ir=radtrans_parameters['temperature_guillot_2010_parameters']['infrared_mean_opacity'],
-        gamma=radtrans_parameters['temperature_guillot_2010_parameters']['gamma'],
-        grav=radtrans_parameters['planetary_parameters']['surface_gravity'],
-        t_int=radtrans_parameters['temperature_guillot_2010_parameters']['intrinsic_temperature'],
-        t_equ=radtrans_parameters['temperature_guillot_2010_parameters']['equilibrium_temperature']
+    temperature_guillot = petitRADTRANS.nat_cst.guillot_global(
+        radtrans_parameters['pressures'],
+        radtrans_parameters['temperature_guillot_2010_parameters']['infrared_mean_opacity'],
+        radtrans_parameters['temperature_guillot_2010_parameters']['gamma'],
+        radtrans_parameters['planetary_parameters']['surface_gravity'],
+        radtrans_parameters['temperature_guillot_2010_parameters']['intrinsic_temperature'],
+        radtrans_parameters['temperature_guillot_2010_parameters']['equilibrium_temperature']
     )
 
     __save_temperature_profile(
@@ -792,4 +792,4 @@ def create_all_comparison_files(plot_figure=False):
     create_radtrans_mass_fractions_c_o_ratios_ref(plot_figure)
     create_radtrans_mass_fractions_metallicities_ref(plot_figure)
 
-    create_mock_observation_transmission_spectrum(plot_figure)
+    #create_mock_observation_transmission_spectrum(plot_figure)

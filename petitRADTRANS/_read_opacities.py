@@ -166,7 +166,11 @@ class ReadOpacities:
                                                                    self.line_species[i_spec], \
                                                                    local_freq_len)
                     else:
-                        local_freq_len_full = self.freq_len_full
+                        if self.lbl_opacity_sampling is None:
+                            local_freq_len_full = self.freq_len
+                        else:
+                            local_freq_len_full = self.freq_len * self.lbl_opacity_sampling
+
                         local_g_len = self.g_len
 
                     self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
@@ -207,6 +211,12 @@ class ReadOpacities:
                         retVal[:, index_fill, 0, :] = \
                             self.line_grid_kappas_custom_PT[self.line_species[i_spec]][:,index_use,0,:]
                         self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = retVal
+
+                    # Down-sample opacities in lbl mode if requested
+                    if self.mode == 'lbl' and self.lbl_opacity_sampling is not None:
+                        self.line_grid_kappas_custom_PT[self.line_species[i_spec]] = \
+                            self.line_grid_kappas_custom_PT[
+                                self.line_species[i_spec]][:, ::self.lbl_opacity_sampling, :]
 
                 # Read in the Exomol k-table by Katy Chubb if requested by the user
                 else:

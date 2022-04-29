@@ -500,7 +500,7 @@ subroutine calc_transm_spec(total_kappa_in,temp,press,gravity,mmw,P0_bar,R_pl, &
         if (j_str > 1) then
            s_1 = s_2
         end if
-        s_2 = sqrt(radius(j_str+1)**2d0-radius(i_str)**2d0)
+        s_2 = sqrt(max(radius(j_str+1)**2d0-radius(i_str)**2d0,0d0))
         t_graze(:,:,:,i_str) = t_graze(:,:,:,i_str)+alpha_t2(:,:,:,j_str)*(s_1-s_2)
      end do
   end do
@@ -511,7 +511,7 @@ subroutine calc_transm_spec(total_kappa_in,temp,press,gravity,mmw,P0_bar,R_pl, &
            if (j_str > 1) then
               s_1 = s_2
            end if
-           s_2 = sqrt(radius(j_str+1)**2d0-radius(i_str)**2d0)
+           s_2 = sqrt(max(radius(j_str+1)**2d0-radius(i_str)**2d0,0d0))
            t_graze_scat(:,i_str) = t_graze_scat(:,i_str)+alpha_t2_scat(:,j_str)*(s_1-s_2)
         end do
      end do
@@ -1046,7 +1046,7 @@ subroutine calc_transm_spec_contr(total_kappa,temp,press,gravity,mmw,P0_bar,R_pl
            if (j_str > 1) then
               s_1 = s_2
            end if
-           s_2 = sqrt(radius(j_str+1)**2d0-radius(i_str)**2d0)
+           s_2 = sqrt(max(radius(j_str+1)**2d0-radius(i_str)**2d0,0d0))
            t_graze(:,:,:,i_str) = t_graze(:,:,:,i_str)+alpha_t2(:,:,:,j_str)*(s_1-s_2)
         end do
      end do
@@ -1057,7 +1057,7 @@ subroutine calc_transm_spec_contr(total_kappa,temp,press,gravity,mmw,P0_bar,R_pl
               if (j_str > 1) then
                  s_1 = s_2
               end if
-              s_2 = sqrt(radius(j_str+1)**2d0-radius(i_str)**2d0)
+              s_2 = sqrt(max(radius(j_str+1)**2d0-radius(i_str)**2d0,0d0))
               t_graze_scat(:,i_str) = t_graze_scat(:,i_str)+alpha_t2_scat(:,j_str)*(s_1-s_2)
            end do
         end do
