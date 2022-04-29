@@ -22,7 +22,7 @@ paper (`Mollière et al. 2019 <https://arxiv.org/abs/1904.11504>`_).
 License
 -------
 
-Copyright 2019-2020 Paul Mollière
+Copyright 2019-2022 Paul Mollière
 
 petitRADTRANS is available under the MIT licencse.
 See the LICENSE file for more information.
