@@ -13,7 +13,7 @@ import os,glob
 import sys,pdb
 from scipy import interpolate
 import h5py
-from Typing import Tuple, Array
+#from typing import Tuple, Array
 
 class Radtrans(_read_opacities.ReadOpacities):
     """ Class defining objects for carrying out spectral calculations for a
@@ -1793,18 +1793,18 @@ class Radtrans(_read_opacities.ReadOpacities):
                     int(resolution)) + '.h5')
                 os.system('rm temp.h5')
 def py_calc_cloud_opas(
-    rho: Array, # (M,)
-    rho_p: Array,  # (N,)
-    cloud_mass_fracs: Array,  # (M, N)
-    r_g: Array,  # (M, N)
-    sigma_n: float,
-    cloud_rad_bins: Array,  # (P + 1,)
-    cloud_radii: Array,  # (P,)
-    cloud_lambdas: Array,  # (Q,)
-    cloud_specs_abs_opa: Array,  # (P, Q, N)
-    cloud_specs_scat_opa: Array,  # (P, Q, N)
-    cloud_aniso: Array,  # (P, Q, N)
-) -> Tuple[Array, Array]:
+    rho, # (M,)
+    rho_p,  # (N,)
+    cloud_mass_fracs,  # (M, N)
+    r_g,  # (M, N)
+    sigma_n,
+    cloud_rad_bins,  # (P + 1,)
+    cloud_radii,  # (P,)
+    cloud_lambdas,  # (Q,)
+    cloud_specs_abs_opa,  # (P, Q, N)
+    cloud_specs_scat_opa,  # (P, Q, N)
+    cloud_aniso,  # (P, Q, N)
+):
     r""""
     This function reimplements calc_cloud_opas from fort_spec.f90. For some reason
     it runs faster in python than in fortran, so we'll use this from now on.

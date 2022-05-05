@@ -7,6 +7,7 @@ os.environ["OMP_NUM_THREADS"] = "1"
 import numpy as np
 import copy as cp
 import pymultinest
+
 import json
 import logging
 from scipy.stats import binned_statistic
@@ -65,7 +66,7 @@ class Retrieval:
                  ultranest = False,
                  sampling_efficiency = None,\
                  const_efficiency_mode = None, \
-                 n_live_points = None,
+                 min_num_live_points = None,
                  resume = None,
                  bayes_factor_species = None,
                  corner_plot_names = None,
@@ -105,7 +106,7 @@ class Retrieval:
         # Pymultinest stuff
         self.sampling_efficiency = sampling_efficiency
         self.const_efficiency_mode = const_efficiency_mode
-        self.n_live_points = n_live_points
+        self.min_num_live_points = min_num_live_points
         self.resume = resume
         self.analyzer = None
 
@@ -145,13 +146,15 @@ class Retrieval:
     def run(self,
             sampling_efficiency = 0.8,
             const_efficiency_mode = True,
-            n_live_points = 4000,
+            min_num_live_points = 4000,
             log_z_convergence = 0.5,
             step_sampler = False,
             warmstart_max_tau=0.5,
             n_iter_before_update=50,
             resume = True,
-            max_iter = 0):
+            max_iters = 0,
+            frac_remain=0.1,
+            Lepsilon=0.3):
         """
         Run mode for the class. Uses pynultinest to sample parameter space
         and produce standard PMN outputs.
@@ -163,7 +166,7 @@ class Retrieval:
                 comparison.
             const_efficiency_mode : Bool
                 pymultinest constant efficiency mode
-            n_live_points : Int
+            min_num_live_points : Int
                 Number of live points to use in pymultinest, or the minimum number of live points to
                 use for the Ultranest reactive sampler.
             log_z_convergence : float
@@ -178,9 +181,9 @@ class Retrieval:
         if self.sampling_efficiency is not None:
             logging.warning("Setting sampling_efficiency as a class variable will be deprecated. Use the run method arguments.")
             sampling_efficiency = self.sampling_efficiency
-        if self.n_live_points:
-            logging.warning("Setting n_live_points as a class variable will be deprecated. Use the run method arguments.")
-            n_live_points = self.n_live_points
+        if self.min_num_live_points:
+            logging.warning("Setting min_num_live_points as a class variable will be deprecated. Use the run method arguments.")
+            min_num_live_points = self.min_num_live_points
         if self.resume is not None:
             logging.warning("Setting resume as a class variable will be deprecated. Use the run method arguments.")
             resume = self.resume
@@ -188,12 +191,14 @@ class Retrieval:
             logging.warning("Setting const_efficiency_mode as a class variable will be deprecated. Use the run method arguments.")
             const_efficiency_mode = self.const_efficiency_mode
         if self.ultranest:
-            self._run_ultranest(n_live_points,
-                                log_z_convergence,
-                                step_sampler,
-                                warmstart_max_tau,
-                                resume,
-                                max_iter)
+            self._run_ultranest(min_num_live_points = min_num_live_points,
+                                log_z_convergence = log_z_convergence,
+                                step_sampler = step_sampler,
+                                warmstart_max_tau = warmstart_max_tau,
+                                resume = resume,
+                                max_iters = max_iters,
+                                frac_remain = frac_remain,
+                                Lepsilon =Lepsilon)
             return
         if const_efficiency_mode and sampling_efficiency > 0.1:
             logging.warning("Sampling efficiency should be ~ 0.05 if you're using constant efficiency mode!")
@@ -223,9 +228,9 @@ class Retrieval:
                             sampling_efficiency = sampling_efficiency,
                             const_efficiency_mode = const_efficiency_mode,
                             evidence_tolerance = log_z_convergence,
-                            n_live_points = n_live_points,
+                            n_live_points = min_num_live_points,
                             n_iter_before_update = n_iter_before_update,
-                            max_iter = max_iter)
+                            max_iter = max_iters)
         self.analyzer = pymultinest.Analyzer(n_params = n_params,
                                              outputfiles_basename = prefix)
         s = self.analyzer.get_stats()
@@ -250,18 +255,20 @@ class Retrieval:
             print(fmts % (p, med, sigma))
 
     def _run_ultranest(self,
-                       n_live_points = 4000,
-                       log_z_convergence = 0.5,
-                       step_sampler = True,
-                       warmstart_max_tau=0.5,
-                       resume = True,
-                       max_iter = 0):
+                       min_num_live_points,
+                       log_z_convergence,
+                       step_sampler,
+                       warmstart_max_tau,
+                       resume,
+                       max_iters,
+                       frac_remain,
+                       Lepsilon):
         """
         Run mode for the class. Uses ultranest to sample parameter space
         and produce standard outputs.
 
         Args:
-            n_live_points : Int
+            min_num_live_points : Int
                 The minimum number of live points to
                 use for the Ultranest reactive sampler.
             log_z_convergence : float
@@ -289,28 +296,32 @@ class Retrieval:
                     free_parameter_names.append(self.parameters[pp].name)
                     n_params += 1
 
-            if max_iter is 0:
-                max_iter = None
+            if max_iters == 0:
+                max_iters = None
             sampler = un.ReactiveNestedSampler(free_parameter_names,
                                                self.log_likelihood,
                                                self.prior_ultranest,
                                                log_dir=self.output_dir + "out_" + self.retrieval_name,
                                                warmstart_max_tau=warmstart_max_tau,
-                                               resume=resume,
-                                               max_iters = max_iter)
+                                               resume=resume)
             if step_sampler:
-                try:
-                    import ultranest.stepsampler
-                    sampler.run(min_num_live_points=400,
-                            max_n_calls = 400000,
-                            region_class =  RobustEllipsoidRegion)
-                    sampler.stepsampler = ultranest.stepsampler.RegionSliceSampler(nsteps=n_live_points,
-                                                                                   adaptive_nsteps='move-distance')
-                except:
-                    logging.error("Could not use step sampling!")
-            sampler.run(min_num_live_points=n_live_points,
-                        dlogz = log_z_convergence,
-                        region_class =  RobustEllipsoidRegion)
+                #try:
+                import ultranest.stepsampler
+                #    #sampler.run(min_num_live_points=400,
+                #    #        max_n_calls = 400000,
+                #    #        region_class =  RobustEllipsoidRegion)
+                sampler.stepsampler = ultranest.stepsampler.SliceSampler(nsteps=50,
+                                                                         adaptive_nsteps='move-distance',
+                                                                         generate_direction=ultranest.stepsampler.generate_mixture_random_direction)
+                #except:
+                #    logging.error("Could not use step sampling!")
+                #    sys.exit(13)
+            sampler.run(min_num_live_points = min_num_live_points,
+                       dlogz = log_z_convergence,
+                       max_iters = max_iters,
+                       frac_remain = frac_remain,
+                       Lepsilon = Lepsilon,
+                       region_class =  RobustEllipsoidRegion)
             sampler.print_results()
             sampler.plot_corner()
 
@@ -833,9 +844,9 @@ class Retrieval:
                 output files.
         """
         # Avoid loading if we just want the current retrievals output
-        if ret_name is "" and self.analyzer is not None:
+        if ret_name == "" and self.analyzer is not None:
             return self.analyzer
-        if ret_name is "":
+        if ret_name == "":
             ret_name = self.retrieval_name
         prefix = self.output_dir + 'out_PMN/'+ret_name+'_'
 

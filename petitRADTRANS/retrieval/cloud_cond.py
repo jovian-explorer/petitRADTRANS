@@ -237,7 +237,7 @@ def return_T_cond_Fe_comb(FeH, CO, MMW = 2.33):
 
 def return_T_cond_Fe_free(XFe, MMW = 2.33):
 
-    T = np.linspace(100.,10000.,1000)
+    T = np.linspace(100.,12000.,1200)
     # Taken from Ackerman & Marley (2001)
     # including their erratum
     P_vap = lambda x: np.exp(15.71 - 47664./x)
@@ -245,7 +245,7 @@ def return_T_cond_Fe_free(XFe, MMW = 2.33):
 
 def return_T_cond_Fe_l_free(XFe, MMW = 2.33):
 
-    T = np.linspace(100.,10000.,1000)
+    T = np.linspace(100.,12000.,1200)
     # Taken from Ackerman & Marley (2001)
     # including their erratum
     P_vap = lambda x: np.exp(9.86 - 37120./x)
@@ -407,17 +407,19 @@ def simple_cdf_Fe(press, temp, FeH, CO, MMW = 2.33):
 
     return P_cloud
 def simple_cdf_Fe_free(press, temp, XFe, MMW = 2.33):
-
     Pc, Tc = return_T_cond_Fe_comb_free(XFe, MMW)
     index = (Pc > 1e-8) & (Pc < 1e5)
     Pc, Tc = Pc[index], Tc[index]
     tcond_p = interp1d(Pc, Tc)
-    #print(Pc, press)
-    Tcond_on_input_grid = tcond_p(press)
-
+    try:
+        Tcond_on_input_grid = tcond_p(press)
+    except:
+        print(Pc)
+        return np.min(press)
     Tdiff = Tcond_on_input_grid - temp
     diff_vec = Tdiff[1:]*Tdiff[:-1]
     ind_cdf = (diff_vec < 0.)
+
     if len(diff_vec[ind_cdf]) > 0:
         P_clouds = (press[1:]+press[:-1])[ind_cdf]/2.
         P_cloud = P_clouds[-1]
