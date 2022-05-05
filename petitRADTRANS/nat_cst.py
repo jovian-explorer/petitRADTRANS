@@ -282,9 +282,6 @@ def make_press_temp(rad_trans_params):
 
     return press_new, temp_new
 
-
-
-
 ### Function to make temp
 def make_press_temp_iso(rad_trans_params):
 
@@ -299,3 +296,85 @@ def make_press_temp_iso(rad_trans_params):
     press_new      = press_many_new[index_new][::2]
 
     return press_new, temp_new
+
+
+# Future functions
+def convolve_rebin(input_wavelengths, input_flux,
+                   instrument_resolving_power, pixel_sampling, instrument_wavelength_range):
+    from scipy.ndimage import gaussian_filter1d
+    import petitRADTRANS.fort_rebin as fr
+    """
+    Function to convolve observation with instrument obs and rebin to pixels of detector.
+    Create mock observation for high-res spectrograph.
+
+    Args:
+        input_wavelengths: (cm) wavelengths of the input spectrum
+        input_flux: flux of the input spectrum
+        instrument_resolving_power: resolving power of the instrument
+        pixel_sampling: number of pixels per resolution elements (i.e. how many px in one LSF FWHM, usually 2)
+        instrument_wavelength_range: (um) wavelength range of the instrument
+
+    Returns:
+        flux_lsf: flux altered by the instrument's LSF
+        freq_out: (Hz) frequencies of the rebinned flux, in descending order
+        flux_rebin: the rebinned flux
+    """
+    # From talking to Ignas: delta lambda of resolution element is the FWHM of the instrument's LSF (here: a gaussian)
+    sigma_lsf = 1. / instrument_resolving_power / (2. * np.sqrt(2. * np.log(2.)))
+
+    # The input resolution of petitCODE is 1e6, but just compute
+    # it to be sure, or more versatile in the future.
+    # Also, we have a log-spaced grid, so the resolution is constant
+    # as a function of wavelength
+    model_resolving_power = np.mean(
+        (input_wavelengths[1:] + input_wavelengths[:-1]) / (2. * np.diff(input_wavelengths))
+    )
+
+    # Calculate the sigma to be used in the gauss filter in units of input frequency bins
+    sigma_lsf_gauss_filter = sigma_lsf * model_resolving_power
+
+    flux_lsf = gaussian_filter1d(
+        input=input_flux,
+        sigma=sigma_lsf_gauss_filter,
+        mode='reflect'
+    )
+
+    if np.size(instrument_wavelength_range) == 2:  # TODO check if this is still working
+        wavelength_out_borders = np.logspace(
+            np.log10(instrument_wavelength_range[0]),
+            np.log10(instrument_wavelength_range[1]),
+            int(pixel_sampling * instrument_resolving_power
+                * np.log(instrument_wavelength_range[1] / instrument_wavelength_range[0]))
+        )
+        wavelengths_out = (wavelength_out_borders[1:] + wavelength_out_borders[:-1]) / 2.
+    elif np.size(instrument_wavelength_range) > 2:
+        wavelengths_out = instrument_wavelength_range
+    else:
+        raise ValueError(f"instrument wavelength must be of size 2 or more, "
+                         f"but is of size {np.size(instrument_wavelength_range)}: {instrument_wavelength_range}")
+
+    flux_rebin = fr.rebin_spectrum(input_wavelengths, flux_lsf, wavelengths_out)
+
+    return flux_lsf, wavelengths_out, flux_rebin
+
+
+def radiosity_erg_hz2radiosity_erg_cm(radiosity_erg_hz, frequency):
+    """Convert a radiosity from erg.s-1.cm-2.sr-1/Hz to erg.s-1.cm-2.sr-1/cm at a given frequency.  # TODO move to physics
+
+    Steps:
+        [cm] = c[cm.s-1] / [Hz]
+        => d[cm]/d[Hz] = d(c / [Hz])/d[Hz]
+        => d[cm]/d[Hz] = c / [Hz]**2
+        => d[Hz]/d[cm] = [Hz]**2 / c
+        integral of flux must be conserved: radiosity_erg_cm * d[cm] = radiosity_erg_hz * d[Hz]
+        radiosity_erg_cm = radiosity_erg_hz * d[Hz]/d[cm]
+        => radiosity_erg_cm = radiosity_erg_hz * frequency**2 / c
+
+    Args:
+        radiosity_erg_hz: (erg.s-1.cm-2.sr-1/Hz)
+        frequency: (Hz)
+
+    Returns:
+        (erg.s-1.cm-2.sr-1/cm) the radiosity in converted units
+    """
+    return radiosity_erg_hz * frequency ** 2 / c

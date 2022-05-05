@@ -173,14 +173,19 @@ def npz2dat(file, new_resolution_power=60.0, relative_error=0.05, mode='transmis
         mode:
             How to read the .npz file ('emission'|'transmission')
     """
-    from petitRADTRANS.ccf.mock_observation import convolve_rebin
+    # from petitRADTRANS.ccf.mock_observation import convolve_rebin
+    from petitRADTRANS.nat_cst import convolve_rebin, radiosity_erg_hz2radiosity_erg_cm
 
     npz_data = np.load(file)
 
     wavelength = npz_data['wavelength']
 
     if mode == 'emission':
-        flux = petitRADTRANS.ccf.spectra_utils.radiosity_erg_hz2radiosity_erg_cm(
+        # flux = petitRADTRANS.ccf.spectra_utils.radiosity_erg_hz2radiosity_erg_cm(
+        #     npz_data['spectral_radiosity'],
+        #     petitRADTRANS.nat_cst.c * 1e4 / wavelength  # um to Hz
+        # )  # future
+        flux = radiosity_erg_hz2radiosity_erg_cm(
             npz_data['spectral_radiosity'],
             petitRADTRANS.nat_cst.c * 1e4 / wavelength  # um to Hz
         )
@@ -229,13 +234,21 @@ def npz2dat(file, new_resolution_power=60.0, relative_error=0.05, mode='transmis
 
 # Data files generation functions
 def create_guillot_2010_temperature_profile_ref(plot_figure=False):
+    # temperature_guillot = petitRADTRANS.physics.guillot_global(
+    #     pressure=radtrans_parameters['pressures'],
+    #     kappa_ir=radtrans_parameters['temperature_guillot_2010_parameters']['infrared_mean_opacity'],
+    #     gamma=radtrans_parameters['temperature_guillot_2010_parameters']['gamma'],
+    #     grav=radtrans_parameters['planetary_parameters']['surface_gravity'],
+    #     t_int=radtrans_parameters['temperature_guillot_2010_parameters']['intrinsic_temperature'],
+    #     t_equ=radtrans_parameters['temperature_guillot_2010_parameters']['equilibrium_temperature']
+    # )  # future
     temperature_guillot = petitRADTRANS.nat_cst.guillot_global(
-        radtrans_parameters['pressures'],
-        radtrans_parameters['temperature_guillot_2010_parameters']['infrared_mean_opacity'],
-        radtrans_parameters['temperature_guillot_2010_parameters']['gamma'],
-        radtrans_parameters['planetary_parameters']['surface_gravity'],
-        radtrans_parameters['temperature_guillot_2010_parameters']['intrinsic_temperature'],
-        radtrans_parameters['temperature_guillot_2010_parameters']['equilibrium_temperature']
+        P=radtrans_parameters['pressures'],
+        kappa_IR=radtrans_parameters['temperature_guillot_2010_parameters']['infrared_mean_opacity'],
+        gamma=radtrans_parameters['temperature_guillot_2010_parameters']['gamma'],
+        grav=radtrans_parameters['planetary_parameters']['surface_gravity'],
+        T_int=radtrans_parameters['temperature_guillot_2010_parameters']['intrinsic_temperature'],
+        T_equ=radtrans_parameters['temperature_guillot_2010_parameters']['equilibrium_temperature']
     )
 
     __save_temperature_profile(
@@ -792,4 +805,4 @@ def create_all_comparison_files(plot_figure=False):
     create_radtrans_mass_fractions_c_o_ratios_ref(plot_figure)
     create_radtrans_mass_fractions_metallicities_ref(plot_figure)
 
-    #create_mock_observation_transmission_spectrum(plot_figure)
+    create_mock_observation_transmission_spectrum(plot_figure)

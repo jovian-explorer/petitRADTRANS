@@ -71,11 +71,11 @@ def setup_function():
 
     setup(
         name='petitRADTRANS',
-        version='2.4.0',
+        version='2.4.1',
         description='Exoplanet spectral synthesis tool for retrievals',
         long_description=open(os.path.join(
           os.path.dirname(__file__), 'README.rst')).read(),
-        #long_description_content_type='test/x-rst',
+        # long_description_content_type='test/x-rst',
         url='https://gitlab.com/mauricemolli/petitRADTRANS',
         author='Paul Mollière',
         author_email='molliere@mpia.de',
