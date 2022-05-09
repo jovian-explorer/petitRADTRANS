@@ -2,14 +2,13 @@ from __future__ import division, print_function
 
 import copy as cp
 import glob
-import h5py
-import os
 
+import h5py
 import numpy as np
 
-from . import nat_cst as nc
-from . import pyth_input as pyi
-from .fort_input import fort_input as fi
+from petitRADTRANS import fort_input as fi
+from petitRADTRANS import nat_cst as nc
+from petitRADTRANS import pyth_input as pyi
 
 
 class ReadOpacities:

@@ -1,9 +1,6 @@
 import numpy as np
 from petitRADTRANS import Radtrans
 
-import os
-os.environ["pRT_input_data_path"] = "/Users/molliere/Documents/programm_data/petitRADTRANS_public/input_data"
-
 atmosphere = Radtrans(line_species = ['H2O_HITEMP', 'CO_all_iso_HITEMP', 'CH4', 'CO2', 'Na_allard', 'K_allard'], \
                           rayleigh_species = ['H2', 'He'], \
                           continuum_opacities = ['H2-H2', 'H2-He'], \

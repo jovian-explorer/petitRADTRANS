@@ -4,11 +4,12 @@ import copy
 import glob
 import os
 import sys
+import warnings
 
 import h5py
 import numpy as np
 from scipy.interpolate import interp1d
-import warnings
+
 
 from petitRADTRANS.config import petitradtrans_config
 from petitRADTRANS import _read_opacities
@@ -524,6 +525,8 @@ class Radtrans(_read_opacities.ReadOpacities):
         x = self.CIA_species[key]['temperature']
         y = self.CIA_species[key]['lambda']
         z = self.CIA_species[key]['alpha']
+        z[z < sys.float_info.min] = sys.float_info.min
+        z = np.log10(self.CIA_species[key]['alpha'])
 
         xnew = self.temp
         ynew = nc.c/self.freq
@@ -533,9 +536,12 @@ class Radtrans(_read_opacities.ReadOpacities):
             f = interp1d(x, z, kind='linear', bounds_error=False, fill_value=(z[:, 0], z[:, -1]), axis=1)
             z_temp2 = f(xnew)
 
-            f1 = interp1d(y, z_temp2, kind='linear', bounds_error=False, fill_value=sys.float_info.min, axis=0)
-            znew = f1(ynew)
-            # znew = np.where(znew < 1.00001e-16, 0, znew)
+            f1 = interp1d(
+              y, z_temp2, kind='linear', bounds_error=False, fill_value=(np.log10(sys.float_info.min)), axis=0
+            )
+
+            znew = 10 ** f1(ynew)
+            znew = np.where(znew < sys.float_info.min, 0, znew)
 
             return np.multiply(znew, factor)
         else:
@@ -553,6 +559,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         # according to mass fractions (abundances),
         # also add continuum opacities, i.e. clouds, CIA...
         self.mmw = mmw
+        self.scat = False
 
         for i_spec in range(len(self.line_species)):
             self.line_abundances[:, i_spec] = abundances[self.line_species[i_spec]]
@@ -614,7 +621,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         # a single cloud model. Combining cloud opacities
         # from different models is currently not supported
         # with the hack_cloud_photospheric_tau parameter
-        if len(self.cloud_species) > 0 and self.__hack_cloud_photospheric_tau is not None:
+        if len(self.cloud_species) > 0 and self.hack_cloud_photospheric_tau is not None:
             if give_absorption_opacity is not None or give_scattering_opacity is not None:
                 raise ValueError("The hack_cloud_photospheric_tau can only be "
                                  "used in combination with a single cloud model. "
@@ -747,6 +754,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             if dist == "lognormal":
                 self.r_g = fs.get_rg_n(gravity, rho, self.rho_cloud_particles,
                                        self.temp, mmw, fseds,
+                                       self.cloud_mass_fracs,
                                        sigma_lnorm, Kzz)
 
                 cloud_abs_opa_tot, cloud_scat_opa_tot, cloud_red_fac_aniso_tot = \
@@ -760,6 +768,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             else:
                 self.r_g = fs.get_rg_n_hansen(gravity, rho, self.rho_cloud_particles,
                                               self.temp, mmw, fseds,
+                                              self.cloud_mass_fracs,
                                               b_hans, Kzz)
                 cloud_abs_opa_tot, cloud_scat_opa_tot, cloud_red_fac_aniso_tot = \
                     fs.calc_hansen_opas(
@@ -783,9 +792,9 @@ class Radtrans(_read_opacities.ReadOpacities):
         if self.do_scat_emis:
             self.continuum_opa_scat_emis += cloud_abs_plus_scat_aniso - cloud_abs
 
-            if self.__hack_cloud_photospheric_tau is not None:
-                self.__hack_cloud_total_scat_aniso = cloud_abs_plus_scat_aniso - cloud_abs
-                self.__hack_cloud_total_abs = cloud_abs
+            if self.hack_cloud_photospheric_tau is not None:
+                self.hack_cloud_total_scat_aniso = cloud_abs_plus_scat_aniso - cloud_abs
+                self.hack_cloud_total_abs = cloud_abs
 
         self.continuum_opa_scat += cloud_abs_plus_scat_no_aniso - cloud_abs
 
@@ -807,7 +816,6 @@ class Radtrans(_read_opacities.ReadOpacities):
 
             if self.haze_factor is not None:
                 haze_multiply = self.haze_factor
-
             add_term = haze_multiply * fs.add_rayleigh(spec, abundances[spec],
                                                        self.lambda_angstroem,
                                                        self.mmw, self.temp, self.press)
@@ -818,7 +826,7 @@ class Radtrans(_read_opacities.ReadOpacities):
     def calc_opt_depth(self, gravity, cloud_wlen=None):
         # Calculate optical depth for the total opacity.
         if self.mode == 'lbl' or self.test_ck_shuffle_comp:
-            if self.__hack_cloud_photospheric_tau is not None:
+            if self.hack_cloud_photospheric_tau is not None:
                 block1 = True
                 block2 = True
                 block3 = True
@@ -830,10 +838,10 @@ class Radtrans(_read_opacities.ReadOpacities):
                 if block1:
                     # Get continuum scattering opacity, without clouds:
                     self.continuum_opa_scat_emis = self.continuum_opa_scat_emis - \
-                                                   self.__hack_cloud_total_scat_aniso
+                                                   self.hack_cloud_total_scat_aniso
 
                     self.line_struc_kappas = fi.mix_opas_ck(ab,
-                                                            self.line_struc_kappas, -self.__hack_cloud_total_abs)
+                                                            self.line_struc_kappas, -self.hack_cloud_total_abs)
 
                     # Calc. cloud-free optical depth
                     self.total_tau[:, :, :1, :], self.photon_destruction_prob = \
@@ -854,13 +862,13 @@ class Radtrans(_read_opacities.ReadOpacities):
                         ab = np.ones_like(self.line_abundances)
 
                     mock_line_cloud_continuum_only = \
-                        fi.mix_opas_ck(ab, mock_line_cloud_continuum_only, self.__hack_cloud_total_abs)
+                        fi.mix_opas_ck(ab, mock_line_cloud_continuum_only, self.hack_cloud_total_abs)
 
                     # Calc. optical depth of cloud only
                     total_tau_cloud[:, :, :1, :], photon_destruction_prob_cloud = \
                         fs.calc_tau_g_tot_ck_scat(gravity,
                                                   self.press, mock_line_cloud_continuum_only[:, :, :1, :],
-                                                  self.do_scat_emis, self.__hack_cloud_total_scat_aniso)
+                                                  self.do_scat_emis, self.hack_cloud_total_scat_aniso)
 
                     if (not block1 and not block3) and not block4:
                         print("Cloud only (for tests purposes...)!")
@@ -869,7 +877,7 @@ class Radtrans(_read_opacities.ReadOpacities):
 
                 # BLOCK 3, calc. photospheric position of atmo without cloud,
                 # determine cloud optical depth there, compare to
-                # __hack_cloud_photospheric_tau, calculate scaling ratio
+                # hack_cloud_photospheric_tau, calculate scaling ratio
                 if block3:
                     median = True
 
@@ -922,7 +930,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     tau_cloud_at_phot_clear = tau_bol_cloud(p_phot_clear)
 
                     # Apply cloud scaling
-                    self.cloud_scaling_factor = self.__hack_cloud_photospheric_tau / tau_cloud_at_phot_clear
+                    self.cloud_scaling_factor = self.hack_cloud_photospheric_tau / tau_cloud_at_phot_clear
 
                     if len(self.fsed) > 0:
                         max_rescaling = 1e100
@@ -940,11 +948,11 @@ class Radtrans(_read_opacities.ReadOpacities):
                 if block4:
                     # Get continuum scattering opacity, including clouds:
                     self.continuum_opa_scat_emis = self.continuum_opa_scat_emis + \
-                                                   self.cloud_scaling_factor * self.__hack_cloud_total_scat_aniso
+                                                   self.cloud_scaling_factor * self.hack_cloud_total_scat_aniso
 
                     self.line_struc_kappas = \
                         fi.mix_opas_ck(ab, self.line_struc_kappas,
-                                       self.cloud_scaling_factor * self.__hack_cloud_total_abs)
+                                       self.cloud_scaling_factor * self.hack_cloud_total_abs)
 
                     # Calc. total optical depth, including clouds
                     self.total_tau[:, :, :1, :], self.photon_destruction_prob = \
@@ -1424,7 +1432,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     have opacities that vary only slowly with wavelength, such that the current
                     model resolution is sufficient to resolve any variations.
         """
-        self.__hack_cloud_photospheric_tau = None
+        self.hack_cloud_photospheric_tau = None
         self.Pcloud = Pcloud
         self.gray_opacity = gray_opacity
         self.interpolate_species_opa(temp)
@@ -1831,6 +1839,72 @@ class Radtrans(_read_opacities.ReadOpacities):
                 int(resolution)) + '.h5')
             os.system('rm temp.h5')
 
+    def calc_radius_hydrostatic_equilibrium(self,
+                                            temperatures,
+                                            MMWs,
+                                            gravity,
+                                            P0,
+                                            R_pl,
+                                            variable_gravity = True,
+                                            pressures = None):
+
+        if pressures is None:
+            pressures = self.press
+        else:
+            pressures = pressures * 1e6
+        P0 = P0 * 1e6
+
+        rho = pressures*MMWs*nc.amu/nc.kB/temperatures
+        radius = fs.calc_radius(pressures,
+                                gravity,
+                                rho,
+                                P0,
+                                R_pl,
+                                variable_gravity)
+        return radius
+
+    def calc_pressure_hydrostatic_equilibrium(self,
+                                              MMW,
+                                              gravity,
+                                              R_pl,
+                                              P0,
+                                              temperature,
+                                              radii,
+                                              rk4=True):
+
+        P0 = P0*1e6
+        vs = 1. / radii
+        R_pl_sq = R_pl ** 2
+
+        def integrand(press):
+            temp = temperature(press)
+            mu = MMW(press, temp)
+            integ = mu * nc.amu * gravity * R_pl_sq / nc.kB / temp
+            return integ
+
+        pressures = [P0]
+        dvs = np.diff(vs)
+        press1 = P0
+        chi1 = np.log(P0)
+        for dv in dvs:
+            k1 = integrand(press1)
+            if rk4:
+                chi2 = chi1 + 0.5 * dv * k1
+                press2 = np.exp(chi2)
+                k2 = integrand(press2)
+                chi3 = chi1 + 0.5 * dv * k2
+                press3 = np.exp(chi3)
+                k3 = integrand(press3)
+                chi4 = chi1 + dv * k3
+                press4 = np.exp(chi4)
+                k4 = integrand(press4)
+                chi1 = chi1 + 1. / 6. * (k1 + 2 * k2 + 2 * k3 + k4) * dv
+            else:
+                chi1 = chi1 + dv * k1
+            press1 = np.exp(chi1)
+            pressures.append(press1)
+
+        return np.array(pressures)/1e6
 
 def py_calc_cloud_opas(rho,
                        rho_p,
