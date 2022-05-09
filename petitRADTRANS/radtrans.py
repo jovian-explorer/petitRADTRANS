@@ -1245,7 +1245,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                          dist=dist, a_hans=a_hans, b_hans=b_hans,
                          give_absorption_opacity=give_absorption_opacity,
                          give_scattering_opacity=give_scattering_opacity)
-        self.calc_opt_depth(gravity)
+        self.calc_opt_depth(gravity, cloud_wlen = cloud_wlen)
 
         if not self.skip_RT_step:
             self.calc_RT(contribution)
