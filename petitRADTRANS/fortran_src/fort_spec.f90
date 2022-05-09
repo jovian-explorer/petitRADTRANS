@@ -1518,8 +1518,8 @@ module fort_spec
         !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-        subroutine get_rg_N(gravity,rho,rho_p,temp,MMW,frain, &
-             sigma_n,Kzz,r_g,struc_len,N_cloud_spec)
+        subroutine get_rg_N(gravity, rho, rho_p, temp, MMW, frain, &
+             sigma_n, Kzz, r_g, struc_len, N_cloud_spec)
 
           use constants_block
           implicit none
@@ -1582,7 +1582,7 @@ module fort_spec
         end subroutine get_rg_N
 
         subroutine get_rg_n_hansen(gravity,rho,rho_p,temp,MMW,frain, &
-           b_h,Kzz,a_h,struc_len,N_cloud_spec)
+                b_h,Kzz,a_h,struc_len,N_cloud_spec)
             use constants_block
             
             implicit none

@@ -2,11 +2,12 @@ from __future__ import division, print_function
 
 import copy as cp
 import glob
+import os
 
 import h5py
 import numpy as np
 
-from petitRADTRANS import fort_input as fi
+from petitRADTRANS.fort_input import fort_input as fi
 from petitRADTRANS import nat_cst as nc
 from petitRADTRANS import pyth_input as pyi
 

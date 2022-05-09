@@ -229,9 +229,9 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.tau_rosse = None
 
         # Initialize special variables
-        self.__hack_cloud_total_scat_aniso = None
-        self.__hack_cloud_total_abs = None
-        self.__hack_cloud_photospheric_tau = hack_cloud_photospheric_tau
+        self.hack_cloud_total_scat_aniso = None
+        self.hack_cloud_total_abs = None
+        self.hack_cloud_photospheric_tau = hack_cloud_photospheric_tau
 
         # TODO instead of reading lines here, do it in a separate function
         # START Reading in opacities
@@ -632,27 +632,27 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         # Add optional absorption opacity from outside
         if give_absorption_opacity is None:
-            if self.__hack_cloud_photospheric_tau is not None:
+            if self.hack_cloud_photospheric_tau is not None:
                 if not hasattr(self, "hack_cloud_total_abs"):
                     opa_shape = (self.freq.shape[0], self.press.shape[0])
-                    self.__hack_cloud_total_abs = np.zeros(opa_shape)
+                    self.hack_cloud_total_abs = np.zeros(opa_shape)
 
         else:
             cloud_abs = give_absorption_opacity(nc.c/self.freq/1e-4, self.press*1e-6)
             self.continuum_opa += cloud_abs
 
-            if self.__hack_cloud_photospheric_tau is not None:
+            if self.hack_cloud_photospheric_tau is not None:
                 # This assumes a single cloud model that is
                 # given by the parametrized opacities from
                 # give_absorption_opacity and give_scattering_opacity
-                self.__hack_cloud_total_abs = cloud_abs
+                self.hack_cloud_total_abs = cloud_abs
 
         # Add optional scatting opacity from outside
         if give_scattering_opacity is None:
-            if self.__hack_cloud_photospheric_tau is not None:
+            if self.hack_cloud_photospheric_tau is not None:
                 if not hasattr(self, "hack_cloud_total_scat_aniso"):
                     opa_shape = (self.freq.shape[0], self.press.shape[0])
-                    self.__hack_cloud_total_scat_aniso = np.zeros(opa_shape)
+                    self.hack_cloud_total_scat_aniso = np.zeros(opa_shape)
 
         else:
             cloud_scat = give_scattering_opacity(nc.c/self.freq/1e-4, self.press*1e-6)
@@ -661,11 +661,11 @@ class Radtrans(_read_opacities.ReadOpacities):
             if self.do_scat_emis:
                 self.continuum_opa_scat_emis += cloud_scat
 
-            if self.__hack_cloud_photospheric_tau is not None:
+            if self.hack_cloud_photospheric_tau is not None:
                 # This assumes a single cloud model that is
                 # given by the parametrized opacities from
                 # give_absorption_opacity and give_scattering_opacity
-                self.__hack_cloud_total_scat_aniso = cloud_scat
+                self.hack_cloud_total_scat_aniso = cloud_scat
 
         # Interpolate line opacities, combine with continuum oacities
         self.line_struc_kappas = fi.mix_opas_ck(self.line_abundances,
@@ -754,7 +754,6 @@ class Radtrans(_read_opacities.ReadOpacities):
             if dist == "lognormal":
                 self.r_g = fs.get_rg_n(gravity, rho, self.rho_cloud_particles,
                                        self.temp, mmw, fseds,
-                                       self.cloud_mass_fracs,
                                        sigma_lnorm, Kzz)
 
                 cloud_abs_opa_tot, cloud_scat_opa_tot, cloud_red_fac_aniso_tot = \
@@ -768,7 +767,6 @@ class Radtrans(_read_opacities.ReadOpacities):
             else:
                 self.r_g = fs.get_rg_n_hansen(gravity, rho, self.rho_cloud_particles,
                                               self.temp, mmw, fseds,
-                                              self.cloud_mass_fracs,
                                               b_hans, Kzz)
                 cloud_abs_opa_tot, cloud_scat_opa_tot, cloud_red_fac_aniso_tot = \
                     fs.calc_hansen_opas(
@@ -1222,7 +1220,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                     when ``cloud_wlen=None``.
         """
 
-        self.__hack_cloud_photospheric_tau = hack_cloud_photospheric_tau
+        self.hack_cloud_photospheric_tau = hack_cloud_photospheric_tau
         self.Pcloud = Pcloud
         self.kappa_zero = kappa_zero
         self.gamma_scat = gamma_scat
