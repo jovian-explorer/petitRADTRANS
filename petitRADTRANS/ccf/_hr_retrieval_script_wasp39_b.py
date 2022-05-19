@@ -6,6 +6,7 @@ Try:
     sudo mpiexec -n N --allow-run-as-root ...
 If for some reason the script crashes.
 """
+import argparse
 import os.path
 import sys
 import time
@@ -21,6 +22,18 @@ from petitRADTRANS.ccf.spectra_utils import load_snr_file
 from petitRADTRANS.retrieval import Retrieval
 from petitRADTRANS.retrieval.plotting import contour_corner
 import matplotlib.pyplot as plt
+
+
+# Arguments definition
+parser = argparse.ArgumentParser(
+    description='Launch HR retrieval script'
+)
+
+parser.add_argument(
+    '--planet',
+    default='HD 189733 b',
+    help='planet name '
+)
 
 
 def main(sim_id=0):
@@ -827,11 +840,12 @@ def main_hd(sim_id=0):
 
     module_dir = os.path.abspath(os.path.dirname(__file__))
 
-    planet_name = 'HD 189733 b'
+    star_name = 'WASP-82'
+    planet_name = star_name + ' b'
     planet = Planet.get(planet_name)
 
-    # Paul's setup
-    planet.equilibrium_temperature = 1209
+    # Paul's setup for HD 189733 b
+    # planet.equilibrium_temperature = 1209
 
     # line_species_str = ['CO_main_iso', 'CO_36', 'CH4_main_iso', 'H2O_main_iso']
     line_species_str = ['CO_main_iso', 'CH4_main_iso', 'H2O_main_iso']
@@ -887,11 +901,10 @@ def main_hd(sim_id=0):
         # 'M': 76.89
     }
 
-    snr_file = os.path.join(module_dir, 'andes', 'HD_189733', f"ANDES_snrs.dat")
+    snr_file = os.path.join(module_dir, 'andes', star_name.replace(' ', '_'), f"ANDES_snrs.npz")
     telluric_transmittance = os.path.join(module_dir, 'andes', 'sky', 'sky', 'transmission',
                                           f"transmission_1500_2500.dat")
-    # airmass = os.path.join(module_dir, 'carmenes', 'hd_189733_b', 'air.npy')
-    airmass = os.path.join(module_dir, 'andes', 'HD_189733', 'airmass_optimal.txt')
+    airmass = os.path.join(module_dir, 'andes', star_name.replace(' ', '_'), 'airmass_optimal.txt')
     variable_throughput = os.path.join(module_dir, 'metis', 'brogi_crires_test')
 
     wavelengths_instrument = None
@@ -1156,11 +1169,147 @@ def main_hd2(sim_id=0):
                 )
 
 
+def main_hd3(planet, sim_id):
+    from mpi4py import MPI
+
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    n_proc = comm.Get_size()
+
+    planet = a
+
+    module_dir = os.path.abspath(os.path.dirname(__file__))
+
+    mode = 'transit'
+    n_live_points = 100
+
+    star_names = [
+        'HD 189733',
+        'WASP-82',
+        'HAT-P-46',
+        'TOI-1130',
+        'LHS 1140'
+    ]
+
+    planet_names = []
+    planets = []
+
+    for star_name in star_names:
+        planet_names.append(star_name + ' b')
+        planets.append(Planet.get(planet_names[-1]))
+
+        if planets[-1].name == 'HD 189733 b':  # Paul's setup for HD 189733
+            planets[-1].equilibrium_temperature = 1209
+
+    line_species_strs = [
+        ['CO_main_iso', 'CO_36', 'CH4_main_iso', 'H2O_main_iso'],
+        ['CO_main_iso', 'CH4_main_iso', 'H2O_main_iso'],
+        ['CO_36', 'CH4_main_iso', 'H2O_main_iso'],
+        ['CO_main_iso', 'CO_36', 'H2O_main_iso'],
+        ['CO_main_iso', 'CO_36', 'CH4_main_iso']
+    ]
+
+    retrieval_base_names = []
+
+    for planet in planets:
+        for line_species_str in line_species_strs:
+            retrieval_species_names = []
+
+            for species in line_species_str:
+                species.replace('main_iso', '')
+                retrieval_species_names.append(species)
+
+            retrieval_base_names.append(
+                f"{planet.name.lower().replace(' ', '_')}_"
+                f"t_1.8-2.5um_"
+                f"{'_'.join(retrieval_species_names)}_"
+            )
+
+    if not os.path.isdir(
+            os.path.join(module_dir, '..', '__tmp', 'test_retrieval', 'bins_' + planet_name.lower().replace(' ', '_'))
+    ):
+        os.mkdir(
+            os.path.join(module_dir, '..', '__tmp', 'test_retrieval', 'bins_' + planet_name.lower().replace(' ', '_'))
+        )
+
+    add_noise = False
+
+    retrieval_directories = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval'))
+
+    load_from = None
+    # load_from = os.path.join(retrieval_directories, f't0_kp_vr_CO_H2O_79-80_{mode}_200lp_np')
+    # load_from = os.path.join(retrieval_directories, f't{sim_id}_vttt_p_kp_vr_CO_H2O_79-80_{mode}_30lp')
+    # load_from = os.path.join(retrieval_directories, f't1_tt2_p_mr_kp_vr_CO_H2O_79-80_{mode}_100lp')
+
+    band = 'K'
+
+    wavelengths_borders = {
+        'K': [1.8, 2.8],
+        # 'K': [2.28, 2.42],
+        # 'K': [2.15, 2.4],
+        # 'M': [4.79, 4.80]  # [4.5, 5.5],
+    }
+
+    wrange_0 = wavelengths_borders[band] * np.array([1.001, 0.999])
+    Nwranges = 100
+    wranges = np.linspace(wrange_0[0], wrange_0[1], int(Nwranges + 1))
+    wavelengths_borders[band] = np.array([wranges[sim_id], wranges[sim_id + 1]])
+
+    if wavelengths_borders[band][-1] > 2.5:
+        print("End of transmission file")
+        return 0
+
+    integration_times_ref = {
+        'K': 60,
+        # 'M': 76.89
+    }
+
+    snr_file = os.path.join(module_dir, 'andes', star_name.replace(' ', '_'), f"ANDES_snrs.npz")
+    telluric_transmittance = os.path.join(module_dir, 'andes', 'sky', 'sky', 'transmission',
+                                          f"transmission_1500_2500.dat")
+    # airmass = os.path.join(module_dir, 'carmenes', 'hd_189733_b', 'air.npy')
+    airmass = os.path.join(module_dir, 'andes', star_name.replace(' ', '_'), 'airmass_optimal.txt')
+    variable_throughput = os.path.join(module_dir, 'metis', 'brogi_crires_test')
+
+    wavelengths_instrument = None
+    instrument_snr = None
+    plot = True
+    instrument_resolving_power = 1e5
+
+    for j, ls_str in enumerate(line_species_str):
+        if rank == j:
+            print(f"rank {j}, line list {ls_str}, wrange = {wavelengths_borders[band]}")
+            # Initialize parameters
+            retrieval_directory = os.path.abspath(
+                os.path.join(module_dir, '..', '__tmp', 'test_retrieval',
+                             'bins_' + planet_name.lower().replace(' ', '_'),
+                             retrieval_names[j])
+            )
+
+            retrieval_name, retrieval_directory, \
+                model, pressures, true_parameters, line_species, rayleigh_species, continuum_species, \
+                retrieval_model, \
+                wavelength_instrument, reduced_mock_observations, error \
+                = init_mock_observations(
+                    planet, ls_str, mode,
+                    retrieval_directory, retrieval_names[j], n_live_points,
+                    add_noise, band, wavelengths_borders, integration_times_ref,
+                    wavelengths_instrument=wavelengths_instrument, instrument_snr=instrument_snr, snr_file=snr_file,
+                    telluric_transmittance=telluric_transmittance, airmass=airmass,
+                    variable_throughput=variable_throughput,
+                    instrument_resolving_power=instrument_resolving_power,
+                    load_from=load_from, plot=plot
+                )
+
+
 if __name__ == '__main__':
     t0 = time.time()
-    for i in [56]:#range(100):
+
+    args = parser.parse_args()
+
+    for i in range(100):
         print(f'====\n sim {i + 1}')
-        main_hd(sim_id=i + 1)
+        main_hd3(planet=args.planet, sim_id=i + 1)
         print(f'====\n')
         plt.close('all')
     # main(sim_id=16)

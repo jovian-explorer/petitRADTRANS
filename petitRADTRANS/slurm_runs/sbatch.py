@@ -1,4 +1,4 @@
-"""Handle slurm sbatch files
+"""Make slurm sbatch files.
 """
 
 
@@ -11,14 +11,14 @@ def get_line_separator(line):
         line: any string ending with a line separator
 
     Returns:
-        linesep: the line separator as a string
+        linesep: the line separator as a string, or None if no valid line separator was found
     """
     linesep = line.encode('unicode_escape').rsplit(b'\\', 2)[-2:]
 
-    if linesep[0] == b'r':  # CRLF
+    if len(linesep) == 1:  # no line separator
+        return None
+    elif linesep[0] == b'r':  # CRLF
         linesep = '\r\n'
-    elif len(linesep) == 1:
-        raise ValueError(f"line {line} has no line separator")
     else:  # CR or LF
         if linesep[1] != b'r' and linesep[1] != b'n':
             raise ValueError(f"'\\{linesep[1].decode('unicode_escape')}' is not a valid line separator "
@@ -31,8 +31,7 @@ def get_line_separator(line):
 
 
 def make_srun_script_from_template(filename, template_filename, job_name='petitRADTRANS_job', nodes=1, tasks_per_node=1,
-                                   cpus_per_task=1,
-                                   time='0-00:01:00'):
+                                   cpus_per_task=1, time='0-00:01:00', srun_lines=None):
     """Make a new srun script file from a template file, updating some options.
     The template script has to be a working slurm script. All the #SBATCH option lines must be at the beginning of the
     template script.
@@ -45,6 +44,8 @@ def make_srun_script_from_template(filename, template_filename, job_name='petitR
         tasks_per_node: number of tasks to be invoked on each node, equivalent to the number of processes for MPI
         cpus_per_task: number of processors per task, relevant when launching application with a required number of CPUs
         time: (days-hours:minutes:seconds) total job run time limit
+        srun_lines: if None, do nothing; otherwise, if a srun line is present in the template, modify it, else add the
+                    lines at the end of the script. Must be a list of strings ending with a line separator.
     """
     # Read template
     with open(template_filename, 'r') as f:
@@ -67,20 +68,24 @@ def make_srun_script_from_template(filename, template_filename, job_name='petitR
     # Check template first lines
     if lines[0][:11] != '#!/bin/bash':
         lines.insert(0, '#!/bin/bash' + file_linesep)
+        n_lines += 1
 
     if lines[1] != file_linesep:
         lines.insert(1, file_linesep)
+        n_lines += 1
 
     # Find the SBATCH options first line
-    for i_line in range(n_lines):
+    for i_line in range(2, n_lines):
         if lines[i_line][:8] == '#SBATCH ':
             break
 
     # Change relevant options to new values
-    if i_line == n_lines:  # no option found
+    if i_line == n_lines - 1:  # no option found
         print(f"no #SBATCH option found in template file, adding required ones")
-        for sbatch_option in list(sbatch_options_found.keys())[::-1]:  # invert to insert in the same order as the dict
+
+        for sbatch_option in list(sbatch_options_found.keys())[::-1]:  # reverse to keep the dict key order during ins.
             lines.insert(2, sbatch_option)
+            n_lines += 1
     else:  # some options found, replace with new values
         # Initialization
         option_found = []
@@ -91,7 +96,7 @@ def make_srun_script_from_template(filename, template_filename, job_name='petitR
 
         for i_line in range(i_line_option, n_lines):
             # Breaking conditions
-            if i_line > n_lines:
+            if i_line > n_lines - 1:
                 break
 
             if lines[i_line][:8] != '#SBATCH ' and lines[i_line] != file_linesep:
@@ -109,10 +114,9 @@ def make_srun_script_from_template(filename, template_filename, job_name='petitR
                         lines.pop(i_line)
                         n_lines -= 1
 
-                        if i_line + 1 == n_lines:
-                            break
-                        elif i_line > n_lines:
-                            i_line = n_lines
+                        if i_line >= n_lines - 1:
+                            i_line = n_lines - 1
+
                             break
                         else:
                             continue
@@ -123,10 +127,6 @@ def make_srun_script_from_template(filename, template_filename, job_name='petitR
 
                     break
 
-        if i_line == n_lines:
-            raise ValueError(f"template file '{template_filename}' must have more than just SBATCH options to run "
-                             f"anything!")
-
         # Add lacking options
         if not all(list(sbatch_options_found.values())):
             print('Adding lacking options')
@@ -134,6 +134,36 @@ def make_srun_script_from_template(filename, template_filename, job_name='petitR
             for sbatch_option, option_found in sbatch_options_found.items():
                 if not option_found:
                     lines.insert(i_line - 1, sbatch_option)
+                    n_lines += 1
+
+    if srun_lines is not None:
+        i_line_end_options = i_line
+
+        for i_line in range(i_line_end_options, n_lines):
+            if lines[i_line][:5] == 'srun ':
+                break
+
+        if i_line == n_lines - 1 and lines[-1][:5] != 'srun ':
+            print('No srun line found, adding requested ones')
+
+            # Add a line separator in case the template has no newline at end of file
+            last_line_linesep = get_line_separator(lines[-1])
+
+            if last_line_linesep is None:
+                lines[-1] += file_linesep
+                lines.append(file_linesep)  # add extra line jump for readability
+                n_lines += 1
+
+            for line in srun_lines:
+                lines.append(line)
+                n_lines += 1
+        else:
+            lines[i_line] = srun_lines[0]
+
+            if len(srun_lines) > 1:
+                for line in srun_lines[1:][::-1]:  # reverse to keep the list order during insertion
+                    lines.insert(i_line + 1, line)
+                    n_lines += 1
 
     # Write new file
     with open(filename, 'w') as f:
