@@ -59,7 +59,9 @@ ___________
 
 - Paul Mollière
 - Evert Nasedkin
+- Doriann Blain
 - Eleonora Alei
+- Tomas Stolker
 
 Contributors
 ________________
