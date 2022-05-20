@@ -546,8 +546,7 @@ def init_mock_observations(planet, line_species_str, mode,
         print('Adding variable throughput...')
         
         if isinstance(variable_throughput, str):
-            data_dir = os.path.abspath(os.path.join(variable_throughput))
-            variable_throughput = np.load(os.path.join(data_dir, 'algn.npy'))
+            variable_throughput = np.load(variable_throughput)
             variable_throughput = np.max(variable_throughput[0], axis=1)
             variable_throughput = variable_throughput / np.max(variable_throughput)
             xp = np.linspace(0, 1, np.size(variable_throughput))
@@ -603,6 +602,7 @@ def init_mock_observations(planet, line_species_str, mode,
         true_parameters = {
             'planet_radius': Param(radius),
             'planet_metallicity': Param(metallicity),
+            'pressures': Param(pressures),
             'temperature': Param(planet.equilibrium_temperature),
             'log10_cloud_pressure': Param(np.log10(p_cloud)),
             'log10_surface_gravity': Param(np.log10(gravity)),
@@ -673,7 +673,7 @@ def init_mock_observations(planet, line_species_str, mode,
 
         true_parameters['data'] = Param(mock_observations.data)
         true_parameters['data_mask'] = Param(mock_observations.mask)
-        true_parameters['true_noise'] = Param(np.array(noise))
+        true_parameters['noise_matrix'] = Param(np.array(noise))
 
         uncertainties = np.ones(mock_observations.shape) / instrument_snr.flatten()
         true_parameters['data_uncertainties'] = Param(np.array(copy.copy(uncertainties)))
@@ -716,7 +716,7 @@ def init_mock_observations(planet, line_species_str, mode,
         # Update uncertainties
         uncertainties = np.ones(mock_observations_.shape) / instrument_snr
         true_parameters['data_uncertainties'] = Param(copy.copy(uncertainties))
-        true_parameters['true_noise'] = Param(noise)
+        true_parameters['noise_matrix'] = Param(noise)
 
         # Update mock observations
         mock_observations = np.ma.asarray(copy.deepcopy(true_parameters['true_spectra'].value))
@@ -1050,8 +1050,9 @@ def init_mock_observations(planet, line_species_str, mode,
 
     # Remove parameters not necessary for retrieval
     del true_parameters['data']
-    del true_parameters['true_noise']
+    del true_parameters['noise_matrix']
     del true_parameters['deformation_matrix']
+    del true_parameters['pressures']
 
     return retrieval_name, retrieval_directory, \
         model, pressures, true_parameters, line_species, rayleigh_species, continuum_species, \
@@ -1304,11 +1305,12 @@ def save_all(directory, mock_observations, mock_observations_without_noise,
     #     true_parameters=true_parameters
     # )
     #
-    fname = os.path.join(directory, 'run_parameters2.npz')
+    fname = os.path.join(directory, 'model_parameters.npz')
 
     np.savez_compressed(
         file=fname,
-        true_parameters=tp
+        units='pressures: bar, wavelengths: um, species: log10 MMR, rest: cgs',
+        **tp
     )
 
 

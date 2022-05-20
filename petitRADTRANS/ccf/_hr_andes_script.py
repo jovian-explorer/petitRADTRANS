@@ -58,11 +58,38 @@ parser.add_argument(
     help='(um) maximum wavelength'
 )
 
+parser.add_argument(
+    '--no-rewrite',
+    action='store_false',
+    help='if activated, do not re-run retrievals already performed'
+)
+
+parser.add_argument(
+    '--resume',
+    action='store_true',
+    help='if activated, resume retrievals'
+)
+
 
 def init_and_run_retrieval(comm, rank, planet, line_species_str, mode, retrieval_directory, retrieval_name,
                            n_live_points, add_noise, wavelengths_borders, integration_times_ref, wavelengths_instrument,
                            instrument_snr, snr_file, telluric_transmittance, airmass, variable_throughput,
-                           instrument_resolving_power, load_from, plot):
+                           instrument_resolving_power, load_from, plot, rewrite=True, resume=False):
+    run_time_file = os.path.join(retrieval_directory, 'run_time.npz')
+
+    if not rewrite and os.path.isfile(run_time_file):
+        if rank == 0:
+            print(f"Retrieval '{retrieval_name}' already performed, skipping")
+
+        comm.barrier()
+
+        return
+    elif os.path.isfile(run_time_file):
+        if rank == 0:
+            print(f"Re-running already performed retrieval '{retrieval_name}'...")
+
+    t_start = time.time()
+
     # Initialize models
     if rank == 0:
         retrieval_name, retrieval_directory, \
@@ -168,7 +195,7 @@ def init_and_run_retrieval(comm, rank, planet, line_species_str, mode, retrieval
     retrieval_directory = comm.bcast(retrieval_directory, root=0)
 
     if rank == 0:
-        print("Bcasting done !!!")
+        print("Bcasting done!")
 
     # Initialize retrieval
     run_definitions = init_run(**retrieval_parameters)
@@ -185,11 +212,20 @@ def init_and_run_retrieval(comm, rank, planet, line_species_str, mode, retrieval
         sampling_efficiency=0.8,
         n_live_points=n_live_points,
         const_efficiency_mode=False,
-        resume=False
+        resume=resume
     )
 
+    # Save the time needed to perform the retrieval, can also be used to test if the retrieval ended correctly
+    if rank == 0:
+        np.savez_compressed(
+            run_time_file,
+            run_time_units='s',
+            run_time=time.time() - t_start
+        )
 
-def main_hd(planet_name, output_directory, additional_data_directory, wavelength_min, wavelength_max):
+
+def main(planet_name, output_directory, additional_data_directory, wavelength_min, wavelength_max,
+         rewrite=True, resume=False):
     # MPI initialization
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -203,13 +239,9 @@ def main_hd(planet_name, output_directory, additional_data_directory, wavelength
     instrument_snr = None
     plot = False
     instrument_resolving_power = 1e5
+    integration_times_ref = 60
 
     load_from = None
-
-    integration_times_ref = {
-        'K': 60,
-        # 'M': 76.89
-    }
 
     line_species_strs = [
         ['CO_main_iso', 'CO_36', 'CH4_main_iso', 'H2O_main_iso'],
@@ -233,7 +265,11 @@ def main_hd(planet_name, output_directory, additional_data_directory, wavelength
         retrieval_species_names = []
 
         for species in line_species_str:
-            species.replace('main_iso', '')
+            species = species.replace('_main_iso', '')
+
+            if species == 'CO_36':
+                species = '13CO'
+
             retrieval_species_names.append(species)
 
         retrieval_base_names.append(
@@ -251,8 +287,9 @@ def main_hd(planet_name, output_directory, additional_data_directory, wavelength
     telluric_transmittance = os.path.join(additional_data_directory, 'sky', 'transmission',
                                           f"transmission_1500_2500.dat")
     airmass = os.path.join(additional_data_directory, star_name.replace(' ', '_'), 'airmass_optimal.txt')
-    variable_throughput = os.path.join(additional_data_directory, 'brogi_crires_test')
+    variable_throughput = os.path.join(additional_data_directory, 'brogi_crires', 'algn.npy')
 
+    # Retrievals
     for j, line_species_str in enumerate(line_species_strs):
         retrieval_directory = os.path.abspath(
             os.path.join(retrieval_output_directory, retrieval_base_names[j])
@@ -262,7 +299,7 @@ def main_hd(planet_name, output_directory, additional_data_directory, wavelength
             comm, rank, planet, line_species_str, mode, retrieval_directory, retrieval_base_names[j],
             n_live_points, add_noise, wavelengths_borders, integration_times_ref, wavelengths_instrument,
             instrument_snr, snr_file, telluric_transmittance, airmass, variable_throughput,
-            instrument_resolving_power, load_from, plot
+            instrument_resolving_power, load_from, plot, rewrite, resume
         )
 
 
@@ -271,12 +308,14 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    main_hd(
+    main(
         planet_name=args.planet,
         output_directory=args.output_directory,
         additional_data_directory=args.additional_data_directory,
         wavelength_min=args.wavelength_min,
-        wavelength_max=args.wavelength_max
+        wavelength_max=args.wavelength_max,
+        rewrite=args.no_rewrite,
+        resume=args.resume
     )
 
     print(f"Done in {time.time() - t0} s.")

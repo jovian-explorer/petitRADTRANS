@@ -80,8 +80,8 @@ def make_srun_script_from_template(filename, template_filename, job_name='petitR
             break
 
     # Change relevant options to new values
-    if i_line == n_lines - 1:  # no option found
-        print(f"no #SBATCH option found in template file, adding required ones")
+    if i_line == n_lines - 1 and lines[i_line][:8] != '#SBATCH ':  # no option found
+        print(f"No #SBATCH option found in template file, adding required ones")
 
         for sbatch_option in list(sbatch_options_found.keys())[::-1]:  # reverse to keep the dict key order during ins.
             lines.insert(2, sbatch_option)
@@ -109,7 +109,7 @@ def make_srun_script_from_template(filename, template_filename, job_name='petitR
                 if lines[i_line][:len(sbatch_option_base)] == sbatch_option_base:
                     # Handle duplicates
                     if option_found:
-                        print(f"option '{sbatch_option_base}' duplicated in template file, "
+                        print(f"Option '{sbatch_option_base}' duplicated in template file, "
                               f"removing duplicate")
                         lines.pop(i_line)
                         n_lines -= 1
@@ -136,6 +136,7 @@ def make_srun_script_from_template(filename, template_filename, job_name='petitR
                     lines.insert(i_line - 1, sbatch_option)
                     n_lines += 1
 
+    # Add srun lines
     if srun_lines is not None:
         i_line_end_options = i_line
 
@@ -143,8 +144,8 @@ def make_srun_script_from_template(filename, template_filename, job_name='petitR
             if lines[i_line][:5] == 'srun ':
                 break
 
-        if i_line == n_lines - 1 and lines[-1][:5] != 'srun ':
-            print('No srun line found, adding requested ones')
+        if i_line >= n_lines - 1 and lines[-1][:5] != 'srun ':
+            print('No srun line found in template, adding requested ones')
 
             # Add a line separator in case the template has no newline at end of file
             last_line_linesep = get_line_separator(lines[-1])

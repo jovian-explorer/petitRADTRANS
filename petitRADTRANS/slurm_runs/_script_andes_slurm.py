@@ -1,4 +1,14 @@
 """Script to generate SLURM run scripts.
+This script will try to use one CPU per run if there is not enough nodes to launch all the runs, while maximising the
+number of nodes used.
+
+Glossary:
+    - Cores are the number of hardware processing units (not threads) of a CPU. Cores communicate fast with each other.
+    - Runs corresponds to the execution of a single srun command on one or multiple cores (<=> tasks for MPI runs).
+    - CPUs are the hardware processors installed in one node. CPUs can communicate relatively fast within one node.
+    - Nodes are "separate" instances containing one or multiple CPUs. Nodes can communicate with each other, but slowly.
+    - Jobs are allocations of a number of nodes to execute one or several runs.
+    - Calls are the request of one or multiple jobs at once.
 
 Run with (one line):
     python _script_andes_slurm.py <path/to/template/file/script.bash> <path/to/python/script.py> \
@@ -12,6 +22,7 @@ Example (one line):
 
 import argparse
 from pathlib import Path
+import subprocess
 
 import numpy as np
 
@@ -55,7 +66,7 @@ parser.add_argument(
     '--nodes',
     type=int,
     default=1,
-    help='maximum number of nodes to allocate for the run'
+    help='maximum number of nodes to allocate for each job'
 )
 
 parser.add_argument(
@@ -71,6 +82,14 @@ parser.add_argument(
     default=2,
     help='number of processors per node'
 )
+
+parser.add_argument(
+    '--njobs-per-calls',
+    type=int,
+    default=1,
+    help='number of jobs to launch at the same time, use 0 or a negative value to put no limit'
+)
+
 
 parser.add_argument(
     '--wavelength-min',
@@ -91,6 +110,24 @@ parser.add_argument(
     type=int,
     default=100,
     help='number of wavelength bins within the wavelength range'
+)
+
+parser.add_argument(
+    '--job-base-name',
+    default='pRT_ANDES',
+    help='number of wavelength bins within the wavelength range'
+)
+
+parser.add_argument(
+    '--no-rewrite',
+    action='store_false',
+    help='if activated, do not re-run retrievals already performed'
+)
+
+parser.add_argument(
+    '--resume',
+    action='store_true',
+    help='if activated, resume retrievals'
 )
 
 
@@ -117,12 +154,16 @@ def fair_share(array, n_entities, append_within_existing=True):
     elements_per_entities = int(np.floor(array.size / n_entities))
     n_leftover_elements = (array.size - elements_per_entities * n_entities)
 
-    shared_array = list(
-        array[:array.size - n_leftover_elements].reshape(
-            n_entities, elements_per_entities
+    if array.size > n_leftover_elements:
+        shared_array = list(
+            array[:array.size - n_leftover_elements].reshape(
+                n_entities, elements_per_entities
+            )
         )
-    )
-    leftover_elements = array[array.size - n_leftover_elements:]
+        leftover_elements = array[array.size - n_leftover_elements:]
+    else:
+        shared_array = [array]
+        leftover_elements = np.array([])
 
     if leftover_elements.size > 0:
         if append_within_existing:
@@ -130,7 +171,7 @@ def fair_share(array, n_entities, append_within_existing=True):
                 shared_array[np.mod(i, n_entities)] = np.append(shared_array[i], leftover_element)
         else:
             if array.size - n_leftover_elements <= n_entities:
-                shared_array[-1] = np.append(shared_array[-1], leftover_elements)
+                shared_array[0] = np.append(shared_array[0], leftover_elements)
             else:
                 shared_array.append(leftover_elements)
 
@@ -138,64 +179,109 @@ def fair_share(array, n_entities, append_within_existing=True):
 
 
 def main(python_script, template_filename, output_directory, additional_data_directory, planets, n_nodes,
-         n_cores_per_cpus, n_cpus_per_nodes, wavelength_min, wavelength_max, n_wavelength_bins,
-         job_basename='pRT_ANDES'):
+         n_cores_per_cpus, n_cpus_per_nodes, n_jobs_per_calls, wavelength_min, wavelength_max, n_wavelength_bins,
+         job_basename='pRT_ANDES', rewrite=True, resume=False):
     # Generate bins array
     wavelengths_borders = [wavelength_min, wavelength_max]
 
     wavelength_bins = wavelengths_borders * np.array([1.001, 0.999])
     wavelength_bins = np.linspace(wavelength_bins[0], wavelength_bins[1], int(n_wavelength_bins + 1))
 
-    # Split bins by nodes, will use the same configuration for each planet
-    sim_ids = np.linspace(1, n_wavelength_bins, n_wavelength_bins, dtype=int)
+    # Split bins/retrievals/runs by nodes, will use the same configuration for each planet
+    run_ids = np.linspace(1, n_wavelength_bins, n_wavelength_bins, dtype=int)
 
-    node_sims = fair_share(sim_ids, n_nodes, append_within_existing=True)
+    nodes_runs = fair_share(run_ids, n_nodes, append_within_existing=True)
 
     # Split bins by processors within each node, to get the list of jobs per node
     # Communication-wise it is more efficient to keep each run within a unique CPU, at the cost of slower individual run
-    node_jobs_sims = []
+    nodes_jobs_runs = []
 
-    for i, node_sim in enumerate(node_sims):
-        n_jobs_per_node = np.max((int(np.floor(node_sim.size / n_cpus_per_nodes)), n_cpus_per_nodes))
-        print(node_sim.size, node_sim, n_cpus_per_nodes, n_jobs_per_node)
-        node_jobs_sims.append(fair_share(node_sim, n_jobs_per_node, append_within_existing=False))
+    for i, node_runs in enumerate(nodes_runs):
+        n_jobs_per_node_min = np.max((int(np.floor(node_runs.size / n_cpus_per_nodes)), n_cpus_per_nodes))
+        nodes_jobs_runs.append(fair_share(node_runs, n_jobs_per_node_min, append_within_existing=False))
 
-    print(node_jobs_sims)
+    # Make run script files
+    n_jobs_node = [len(node) for node in nodes_jobs_runs]  # number of jobs in each node
+    n_jobs_node_max = np.max(n_jobs_node)
+
+    if n_jobs_per_calls <= 0:
+        print("All the jobs will be called at once.")
+        n_jobs_per_calls = n_jobs_node_max
 
     for planet in planets:
-        for i, node_jobs in enumerate(node_jobs_sims):
-            for j, jobs in enumerate(node_jobs):
-                tasks_per_node = n_cpus_per_nodes * n_cores_per_cpus  # using one node only
-                srun_lines = []
+        job_names = []
+        tasks_per_node = n_cpus_per_nodes * n_cores_per_cpus
+        n_nodes_current_job = n_nodes
 
-                for small_job in jobs:
-                    print(wavelength_bins)
+        # Loop over the number of jobs
+        for i_job in range(n_jobs_node_max):
+            srun_lines = []
+
+            # Look for the corresponding job in each node
+            for i, node_jobs in enumerate(nodes_jobs_runs):
+                if i_job >= n_jobs_node[i]:  # node has fewer jobs than the maximum number of jobs
+                    n_nodes_current_job -= 1  # one less node is required for this job
+
+                    continue
+
+                node_job = node_jobs[i_job]
+
+                # Have one run per CPU instead of one run per node
+                for cpu_run in node_job:
                     srun_lines.append(
-                        f"srun mpiexec -n {int(tasks_per_node / jobs.size)} python3 {python_script} "
+                        f"srun mpiexec -n {int(tasks_per_node / node_job.size)} python3 {python_script} "
                         f"--planet '{planet}' "
                         f"--output-directory '{output_directory}' "
                         f"--additional-data-directory '{additional_data_directory}' "
-                        f"--wavelength-min {wavelength_bins[small_job - 1]} "
-                        f"--wavelength-max {wavelength_bins[small_job]}\n"
+                        f"--wavelength-min {wavelength_bins[cpu_run - 1]} "
+                        f"--wavelength-max {wavelength_bins[cpu_run]}"
                     )
 
-                print(planet,i,j, jobs, srun_lines)
+                    if rewrite is False:
+                        srun_lines[-1] += f" --no-rewrite"
 
-                make_srun_script_from_template(
-                    filename=f"{job_basename}_{planet.lower().replace(' ', '_')}_job{(i + 1) * j}.batch",
-                    template_filename=template_filename,
-                    job_name=f"{job_basename}_{planet.lower().replace(' ', '_')}_job{(i + 1) * j}",
-                    nodes=1,  # nodes per job
-                    tasks_per_node=tasks_per_node,
-                    cpus_per_task=1,
-                    time='0-12:00:00',
-                    srun_lines=srun_lines
-                )
+                    if resume is True:
+                        srun_lines[-1] += f" --resume"
+
+                    srun_lines[-1] += '\n'
+
+            # Make the script with all the runs
+            job_names.append(f"{job_basename}_{planet.lower().replace(' ', '_')}_job{i_job}")
+            i_job += 1
+
+            make_srun_script_from_template(
+                filename=job_names[-1] + '.sbatch',
+                template_filename=template_filename,
+                job_name=job_names[-1],
+                nodes=n_nodes_current_job,  # nodes per job
+                tasks_per_node=tasks_per_node,
+                cpus_per_task=1,
+                time='0-12:00:00',
+                srun_lines=srun_lines
+            )
+
+        # Submit jobs
+        command_line = ''
+        i_job = 0
+
+        while i_job < n_jobs_node_max:
+            for i in range(n_jobs_per_calls):
+                command_line += f"sbatch {job_names[i_job] + '.sbatch'}"
+
+                if i == n_jobs_per_calls - 1:
+                    # subprocess.run(command_line, shell=True)
+                    print(command_line)
+                    command_line = ''
+                    # TODO wait for the end of the execution command, then get the log L/log Z and put it into a file
+
+                else:
+                    command_line += ' && '  # assume that the script are launched from linux
+
+                i_job += 1
 
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    print(args.__dict__)
 
     main(
         python_script=args.python_script,
@@ -206,8 +292,11 @@ if __name__ == '__main__':
         n_nodes=args.nodes,
         n_cores_per_cpus=args.ncores_per_cpus,
         n_cpus_per_nodes=args.ncpus_per_nodes,
+        n_jobs_per_calls=args.njobs_per_calls,
         wavelength_min=args.wavelength_min,
         wavelength_max=args.wavelength_max,
         n_wavelength_bins=args.nwavelength_bins,
-        job_basename='pRT_ANDES'
+        job_basename=args.job_base_name,
+        rewrite=args.no_rewrite,
+        resume=args.resume
     )
