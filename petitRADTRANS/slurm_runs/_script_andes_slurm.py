@@ -4,7 +4,7 @@ number of nodes used.
 
 Glossary:
     - Cores are the number of hardware processing units (not threads) of a CPU. Cores communicate fast with each other.
-    - Runs corresponds to the execution of a single srun command on one or multiple cores (<=> tasks for MPI runs).
+    - Runs corresponds to the execution of a single srun command on one or multiple cores <=> tasks for MPI runs.
     - CPUs are the hardware processors installed in one node. CPUs can communicate relatively fast within one node.
     - Nodes are "separate" instances containing one or multiple CPUs. Nodes can communicate with each other, but slowly.
     - Jobs are allocations of a number of nodes to execute one or several runs.
@@ -21,6 +21,7 @@ Example (one line):
 """
 
 import argparse
+import os.path
 from pathlib import Path
 import subprocess
 
@@ -90,7 +91,6 @@ parser.add_argument(
     help='number of jobs to launch at the same time, use 0 or a negative value to put no limit'
 )
 
-
 parser.add_argument(
     '--wavelength-min',
     type=float,
@@ -108,7 +108,7 @@ parser.add_argument(
 parser.add_argument(
     '--nwavelength-bins',
     type=int,
-    default=100,
+    default=71,
     help='number of wavelength bins within the wavelength range'
 )
 
@@ -131,6 +131,7 @@ parser.add_argument(
 )
 
 
+# Functions
 def fair_share(array, n_entities, append_within_existing=True):
     """Split the elements of an array into a given number of entities.
 
@@ -209,6 +210,7 @@ def main(python_script, template_filename, output_directory, additional_data_dir
         n_jobs_per_calls = n_jobs_node_max
 
     for planet in planets:
+        job_basename_planet = f"{job_basename}_{planet.lower().replace(' ', '_')}"
         job_names = []
         tasks_per_node = n_cpus_per_nodes * n_cores_per_cpus
         n_nodes_current_job = n_nodes
@@ -246,7 +248,7 @@ def main(python_script, template_filename, output_directory, additional_data_dir
                     srun_lines[-1] += '\n'
 
             # Make the script with all the runs
-            job_names.append(f"{job_basename}_{planet.lower().replace(' ', '_')}_job{i_job}")
+            job_names.append(f"{job_basename_planet}_job{i_job}")
             i_job += 1
 
             make_srun_script_from_template(
@@ -260,7 +262,18 @@ def main(python_script, template_filename, output_directory, additional_data_dir
                 srun_lines=srun_lines
             )
 
+        # Save jobs configuration
+        # This file can be used to easily collect the results after the call
+        print(f"Saving jobs configuration for planet {planet}...")
+        np.savez_compressed(
+            file=os.path.join(output_directory, job_basename_planet + '.npz'),
+            planet=planet,
+            python_script=python_script,
+            wavelength_bins=wavelength_bins
+        )
+
         # Submit jobs
+        print(f"Submitting jobs for planet {planet}...")
         command_line = ''
         i_job = 0
 
@@ -269,10 +282,11 @@ def main(python_script, template_filename, output_directory, additional_data_dir
                 command_line += f"sbatch {job_names[i_job] + '.sbatch'}"
 
                 if i == n_jobs_per_calls - 1:
-                    # subprocess.run(command_line, shell=True)
-                    print(command_line)
+                    subprocess.run(command_line, shell=True)
+                    # subprocess.run(f"echo '{command_line}'", shell=True)
                     command_line = ''
-                    # TODO wait for the end of the execution command, then get the log L/log Z and put it into a file
+
+                    # TODO wait for the end of the execution command, then get the log L/log Z and put it into a file (but probably not here)
 
                 else:
                     command_line += ' && '  # assume that the script are launched from linux

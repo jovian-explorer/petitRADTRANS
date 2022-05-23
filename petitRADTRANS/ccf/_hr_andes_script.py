@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 from mpi4py import MPI
 
-from petitRADTRANS.ccf.high_resolution_retrieval_HD_189733_b import init_mock_observations, init_run
+from petitRADTRANS.ccf.high_resolution_retrieval_HD_189733_b import init_mock_observations, init_run, get_retrieval_name
 from petitRADTRANS.ccf.model_containers import Planet
 from petitRADTRANS.radtrans import Radtrans
 from petitRADTRANS.retrieval import Retrieval
@@ -273,9 +273,14 @@ def main(planet_name, output_directory, additional_data_directory, wavelength_mi
             retrieval_species_names.append(species)
 
         retrieval_base_names.append(
-            f"{planet.name.lower().replace(' ', '_')}_"
-            f"{mode}_{wavelength_min:.3f}-{wavelength_max:.3f}um_"
-            f"{'_'.join(retrieval_species_names)}_{n_live_points}lp"
+            get_retrieval_name(
+                planet=planet,
+                mode=mode,
+                wavelength_min=wavelength_min,
+                wavelength_max=wavelength_max,
+                retrieval_species_names=retrieval_species_names,
+                n_live_points=n_live_points
+            )
         )
 
     retrieval_output_directory = os.path.join(output_directory, 'bins_' + planet_name.lower().replace(' ', '_'))

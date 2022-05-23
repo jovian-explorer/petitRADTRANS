@@ -186,44 +186,44 @@ def _get_deformation_matrix(telluric_transmittance, variable_throughput, shape):
     return np.ma.masked_array([telluric_matrix * vt_matrix])
 
 
-def _get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=False, apply_pipeline=True):
-    wlen_model, planet_radiosity = _radiosity_model(prt_object, parameters)
-
-    planet_velocities = Planet.calculate_planet_radial_velocity(
-        parameters['planet_max_radial_orbital_velocity'].value,
-        parameters['planet_orbital_inclination'].value,
-        np.rad2deg(2 * np.pi * parameters['orbital_phases'].value)
-    )
-
-    spectrum_model = get_mock_secondary_eclipse_spectra(
-        wavelength_model=wlen_model,
-        spectrum_model=planet_radiosity,
-        star_spectral_radiosity=parameters['star_spectral_radiosity'].value,
-        planet_radius=parameters['planet_radius'].value,
-        star_radius=parameters['star_radius'].value,
-        wavelength_instrument=parameters['wavelengths_instrument'].value,
-        instrument_resolving_power=parameters['instrument_resolving_power'].value,
-        planet_velocities=planet_velocities,
-        system_observer_radial_velocities=parameters['system_observer_radial_velocities'].value,
-        planet_rest_frame_shift=parameters['planet_rest_frame_shift'].value
-    )
-
-    # TODO generation of multiple-detector models
-
-    # Add data mask to be as close as possible as the data when performing the pipeline
-    spectrum_model0 = np.ma.masked_array([spectrum_model])
-    spectrum_model0.mask = copy.copy(parameters['data'].value.mask)
-
-    if apply_pipeline:
-        spectrum_model = simple_pipeline(
-            spectral_data=spectrum_model0,
-            airmass=parameters['airmass'].value,
-            data_uncertainties=parameters['data_uncertainties'].value
-        )
-    else:
-        spectrum_model = spectrum_model0
-
-    return parameters['wavelengths_instrument'].value, spectrum_model
+# def _get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=False, apply_pipeline=True):
+#     wlen_model, planet_radiosity = _radiosity_model(prt_object, parameters)
+#
+#     planet_velocities = Planet.calculate_planet_radial_velocity(
+#         parameters['planet_max_radial_orbital_velocity'].value,
+#         parameters['planet_orbital_inclination'].value,
+#         np.rad2deg(2 * np.pi * parameters['orbital_phases'].value)
+#     )
+#
+#     spectrum_model = get_mock_secondary_eclipse_spectra(
+#         wavelength_model=wlen_model,
+#         spectrum_model=planet_radiosity,
+#         star_spectral_radiosity=parameters['star_spectral_radiosity'].value,
+#         planet_radius=parameters['planet_radius'].value,
+#         star_radius=parameters['star_radius'].value,
+#         wavelength_instrument=parameters['wavelengths_instrument'].value,
+#         instrument_resolving_power=parameters['instrument_resolving_power'].value,
+#         planet_velocities=planet_velocities,
+#         system_observer_radial_velocities=parameters['system_observer_radial_velocities'].value,
+#         planet_rest_frame_shift=parameters['planet_rest_frame_shift'].value
+#     )
+#
+#     # TODO generation of multiple-detector models
+#
+#     # Add data mask to be as close as possible as the data when performing the pipeline
+#     spectrum_model0 = np.ma.masked_array([spectrum_model])
+#     spectrum_model0.mask = copy.copy(parameters['data'].value.mask)
+#
+#     if apply_pipeline:
+#         spectrum_model = simple_pipeline(
+#             spectral_data=spectrum_model0,
+#             airmass=parameters['airmass'].value,
+#             data_uncertainties=parameters['data_uncertainties'].value
+#         )
+#     else:
+#         spectrum_model = spectrum_model0
+#
+#     return parameters['wavelengths_instrument'].value, spectrum_model
 
 
 def _get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=False, apply_pipeline=True):
@@ -314,7 +314,8 @@ def _pseudo_retrieval(parameters, kps, v_rest, model, reduced_mock_observations,
         mask_ = np.zeros(reduced_mock_observations.shape, dtype=bool)
 
     if mode == 'eclipse':
-        retrieval_model = _get_secondary_eclipse_retrieval_model
+        raise NotImplementedError(f"eclipse mode not yet implemented")  # TODO
+        # retrieval_model = _get_secondary_eclipse_retrieval_model
     elif mode == 'transit':
         retrieval_model = _get_transit_retrieval_model
     else:
@@ -382,28 +383,10 @@ def _transit_radius_model(prt_object, parameters):
     return wlen_model, planet_transit_radius
 
 
-def load_airmassorg_data(file):
-    with open(file, 'r') as f:
-        jd_times = []
-        altitudes = []
-
-        for line in f:
-            line = line.strip()
-            cols = line.split('\t')
-
-            jd_times.append(float(cols[3]))
-
-            altitude = cols[4]
-            altitude = altitude[:4]
-            altitudes.append(float(altitude))
-
-    jd_times = np.array(jd_times)
-    times = (jd_times - jd_times[0]) * nc.snc.day
-
-    altitudes = np.array(altitudes)
-    airmasses = 1 / np.cos(np.deg2rad(90 - altitudes))
-
-    return times, airmasses
+def get_retrieval_name(planet, mode, wavelength_min, wavelength_max, retrieval_species_names, n_live_points):
+    return f"{planet.name.lower().replace(' ', '_')}_" \
+           f"{mode}_{wavelength_min:.3f}-{wavelength_max:.3f}um_" \
+           f"{'_'.join(retrieval_species_names)}_{n_live_points}lp"
 
 
 # Useful functions
@@ -576,7 +559,8 @@ def init_mock_observations(planet, line_species_str, mode,
 
     # Select which model to use
     if mode == 'eclipse':
-        retrieval_model = _get_secondary_eclipse_retrieval_model
+        raise NotImplementedError(f"eclipse mode not yet implemented")  # TODO (just cp the radiosity model)
+        # retrieval_model = _get_secondary_eclipse_retrieval_model
     elif mode == 'transit':
         retrieval_model = _get_transit_retrieval_model
     else:
@@ -733,7 +717,8 @@ def init_mock_observations(planet, line_species_str, mode,
         # Generate and save mock observations
         print('True spectrum calculation...')
         if mode == 'eclipse':
-            true_wavelengths, true_spectrum = _radiosity_model(model, true_parameters)
+            raise NotImplementedError(f"eclipse mode not yet implemented")  # TODO (just cp the radiosity model)
+            # true_wavelengths, true_spectrum = _radiosity_model(model, true_parameters)
         elif mode == 'transit':
             true_wavelengths, true_spectrum = _transit_radius_model(model, true_parameters)
         else:
@@ -1209,6 +1194,30 @@ def init_run(retrieval_name, prt_object, pressures, parameters, retrieved_specie
     )
 
     return run_definition_simple
+
+
+def load_airmassorg_data(file):
+    with open(file, 'r') as f:
+        jd_times = []
+        altitudes = []
+
+        for line in f:
+            line = line.strip()
+            cols = line.split('\t')
+
+            jd_times.append(float(cols[3]))
+
+            altitude = cols[4]
+            altitude = altitude[:4]
+            altitudes.append(float(altitude))
+
+    jd_times = np.array(jd_times)
+    times = (jd_times - jd_times[0]) * nc.snc.day
+
+    altitudes = np.array(altitudes)
+    airmasses = 1 / np.cos(np.deg2rad(90 - altitudes))
+
+    return times, airmasses
 
 
 def load_all(directory):
