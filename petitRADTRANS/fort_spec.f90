@@ -2636,6 +2636,7 @@ subroutine feautrier_pt_it(border_freqs, &
      H_star, &
      abs_S, &
      radiative_surface_heating, &
+     albedo, &
      freq_len_p_1, &
      struc_len, &
      N_mu, &
@@ -2663,7 +2664,7 @@ subroutine feautrier_pt_it(border_freqs, &
   DOUBLE PRECISION, INTENT(OUT)   :: contr_em(struc_len,freq_len_p_1-1)
   DOUBLE PRECISION, INTENT(OUT)   :: J_bol(struc_len), H_bol(struc_len), &
           eddington_F(struc_len), eddington_Psi, kappa_J(struc_len), kappa_H(struc_len), &
-          H_star(freq_len_p_1-1,struc_len), abs_S(struc_len), radiative_surface_heating
+          H_star(freq_len_p_1-1,struc_len), abs_S(struc_len), radiative_surface_heating, albedo
   CHARACTER*20, intent(in)        :: geom
 
   ! Internal
@@ -2694,7 +2695,7 @@ subroutine feautrier_pt_it(border_freqs, &
                                      H_star_scat(N_g,freq_len_p_1-1,struc_len), &
                                      J_star_scat(N_g,freq_len_p_1-1,struc_len)
   LOGICAL                         :: planetary_ave, dayside_ave
-  DOUBLE PRECISION                :: abs_S_nu(struc_len)
+  DOUBLE PRECISION                :: abs_S_nu(struc_len), H_bol_ini
 
   ! ALI
   DOUBLE PRECISION                :: lambda_loc(N_g,freq_len_p_1-1,struc_len)
@@ -2985,8 +2986,9 @@ subroutine feautrier_pt_it(border_freqs, &
 
                 ! TEST PAUL SCAT
                 if (k .EQ. struc_len - 1) then
-                   I_plus_surface(j, l, i) = &
-                        I_J(struc_len,j)  - deriv1
+                       I_plus_surface(j, l, i) = &
+                            I_J(struc_len,j)  - deriv1
+                           !I_J(struc_len,j)  - deriv1
                 end if
                 ! END TEST PAUL SCAT
              end do
@@ -3166,6 +3168,7 @@ subroutine feautrier_pt_it(border_freqs, &
     eddington_Psi = H_bol(1)/J_bol(1)
     kappa_J = kappa_J / J_bol
     kappa_H = kappa_H / H_bol
+    albedo = 0d0
   else
       J_star_scat = J_planet_scat
       H_star = 0d0
@@ -3189,6 +3192,12 @@ subroutine feautrier_pt_it(border_freqs, &
          end do
          abs_S = abs_S + abs_S_nu*(border_freqs(i)-border_freqs(i+1))
       end do
+
+      H_bol_ini = 0d0
+      do i = 1, freq_len_p_1-1
+         H_bol_ini = H_bol_ini+H_star_0(i)*(border_freqs(i)-border_freqs(i+1))
+      end do
+      albedo = -H_bol(1)/H_bol_ini
   end if
 
 end subroutine feautrier_pt_it
@@ -3971,7 +3980,7 @@ subroutine temp_iter(press, temp_in, T_int, gravity, kappa_H, kappa_J, eddington
      !-------------------------------
 
      if (do_conv) then
-        if ( (convergence_test .AND. start_conv) .OR. ((.NOT. convergence_test) .AND. i_iter > 10) ) then
+        if ( (convergence_test .AND. start_conv) .OR. ((.NOT. convergence_test) .AND. i_iter > 50) ) then
 
            if (press(i_str)*1d-6 > 1d-6) then
               if (((temp_out(i_str)-temp_out(i_str-1))/(press(i_str)-press(i_str-1)) * &
@@ -4024,5 +4033,11 @@ subroutine temp_iter(press, temp_in, T_int, gravity, kappa_H, kappa_J, eddington
   ! Flux balance, symbolically written
   ! F_surf = sigma * Tint**4 = sigma * emmisivity_use * Tsurf**4. - (planet_surf_heat_flux + stellar_surf_heat_flux)
   t_surf = ((stellar_surf_heat_flux + planet_surf_heat_flux +sig*T_int**4d0)/emissivity_use/sig)**0.25d0
+
+  write(*,*) '19-05-22: new: temp_out(struc_len) = t_surf is active!'
+  temp_out(struc_len) = t_surf
+  ! This leads to a constant surface temparature for optically thick atmos, which stays at the initial value.
+  ! I guess stellar_surf_heat_flux and planet_surf_heat_flux are locally calculated quantities, and in the high optical
+  ! depth case the atmo does not see what is happening in other layers, away from its own location.
 
 end subroutine temp_iter

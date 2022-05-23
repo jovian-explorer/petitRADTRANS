@@ -1879,7 +1879,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         # Spec (1)
         #print(self.reflectance)
 
-        self.flux, __, __, __, __, __, __, __, self.H_star, self.abs_S, self.stellar_surf_heat_flux = \
+        self.flux, __, __, __, __, __, __, __, self.H_star, self.abs_S, self.stellar_surf_heat_flux, self.albedo = \
                                        fs.feautrier_pt_it(self.border_freqs,
                                                           self.total_tau[:, :, 0, :],
                                                           np.zeros_like(self.temp),
@@ -1900,7 +1900,7 @@ class Radtrans(_read_opacities.ReadOpacities):
 
 
         self.flux, __, self.J_bol, __, self.eddington_F, self.eddington_Psi, self.kappa_J, self.kappa_H, __, __, \
-                   self.planet_surf_heat_flux = \
+                   self.planet_surf_heat_flux, __ = \
                         fs.feautrier_pt_it(self.border_freqs,
                                            self.total_tau[:, :, 0, :],
                                            self.temp,
@@ -1992,6 +1992,11 @@ class Radtrans(_read_opacities.ReadOpacities):
         for i in range(n_iter):
 
             i_iter = i
+
+            f_imposed = T_int ** 4. + Tstar ** 4. * (Rstar / 2 / semimajoraxis) ** 2.
+            f_meas = np.sum(-np.diff(self.freq) * (self.flux[1:] + self.flux[:-1]) / 2.) / nc.sigma / (
+                        1 - self.albedo)
+            print('Flux convergence: '+str((f_imposed - f_meas) / f_imposed * 100)+'%')
 
             print(i_iter, t_surf)
 

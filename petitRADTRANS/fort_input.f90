@@ -706,7 +706,7 @@ subroutine CIA_read(cpair,opacity_path_str,CIA_cpair_lambda, &
   ! ELALEI allowing the tables to have whatever shape
   !BUT the PYTHON CODE NEEDS TO TRIM THE OUTPUTS ACCORDING TO temp AND WLEN SO I CREATE NEW OUTPUTS
   open(unit=10,file=trim(adjustl(opacity_path_str)) &
-       //'/opacities/continuum/CIA/'//trim(adjustl(cpair))//'/temps.dat')
+       //'/opacities/continuum/CIA_pre_Eleonora/'//trim(adjustl(cpair))//'/temps.dat')
   i=0
   do
      i =i+1
@@ -718,7 +718,7 @@ subroutine CIA_read(cpair,opacity_path_str,CIA_cpair_lambda, &
   temp=i-1
 
   open(unit=11,file=trim(adjustl(opacity_path_str)) &
-       //'/opacities/continuum/CIA/'//trim(adjustl(cpair)) &
+       //'/opacities/continuum/CIA_pre_Eleonora/'//trim(adjustl(cpair)) &
        //'/CIA_'//trim(adjustl(cpair))//'_final.dat')
   read(11,*)
   read(11,*)
@@ -732,7 +732,7 @@ subroutine CIA_read(cpair,opacity_path_str,CIA_cpair_lambda, &
   close(11)
 
   open(unit=11,file=trim(adjustl(opacity_path_str)) &
-       //'/opacities/continuum/CIA/'//trim(adjustl(cpair)) &
+       //'/opacities/continuum/CIA_pre_Eleonora/'//trim(adjustl(cpair)) &
        //'/CIA_'//trim(adjustl(cpair))//'_final.dat')
   read(11,*)
   read(11,*)
