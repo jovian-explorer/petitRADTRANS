@@ -22,6 +22,18 @@ from petitRADTRANS.radtrans import Radtrans
 from petitRADTRANS.retrieval import RetrievalConfig
 from petitRADTRANS.retrieval.util import calc_MMW, uniform_prior
 
+all_species = [
+    'CO_main_iso',
+    'CO_36',
+    'CH4_main_iso',
+    'H2S_main_iso',
+    'K',
+    'NH3_main_iso',
+    'Na_allard_new',
+    'PH3_main_iso',
+    'H2O_main_iso'
+]
+
 
 class Param:
     def __init__(self, value):
@@ -50,8 +62,6 @@ def _init_model(planet, w_bords, line_species_str, p0=1e-2):
     rayleigh_species = ['H2', 'He']
     continuum_species = ['H2-H2', 'H2-He', 'H-']
 
-    print('mass', line_species, planet.mass, gravity)
-
     metallicity = SpectralModel2.calculate_scaled_metallicity(planet.mass, 10**planet.star_metallicity, 1.0)
     mass_fractions = SpectralModel2.calculate_mass_mixing_ratios(
         pressures=pressures,
@@ -66,22 +76,22 @@ def _init_model(planet, w_bords, line_species_str, p0=1e-2):
 
     for species in line_species:
         spec = species.split('_', 1)[0]
-        print(spec, species)
 
         if spec in mass_fractions:
-            if species not in mass_fractions:
+            if species not in mass_fractions and species != 'K':
                 mass_fractions[species] = mass_fractions[spec]
 
-            del mass_fractions[spec]
+            if species != 'K':
+                del mass_fractions[spec]
 
     if 'CO_36' in line_species_str:
         if 'CO_main_iso' in mass_fractions:
             mass_fractions['CO_36'] = mass_fractions['CO_main_iso'] * 0.01
-            mass_fractions['CO_main_iso'] *= 0.99
+            mass_fractions['CO_main_iso'] = mass_fractions['CO_main_iso'] - mass_fractions['CO_36']
         else:
             co = copy.copy(mass_fractions['CO_36'])
             mass_fractions['CO_36'] = co * 0.01
-            mass_fractions['CO'] = co * 0.99
+            mass_fractions['CO'] = co - mass_fractions['CO_36']
 
     mean_molar_mass = calc_MMW(mass_fractions)
 
@@ -137,10 +147,11 @@ def _init_retrieval_model(prt_object, parameters):
         spec = species.split('_', 1)[0]
 
         if spec in abundances:
-            if species not in abundances:
+            if species not in abundances and species != 'K':
                 abundances[species] = abundances[spec]
 
-            del abundances[spec]
+            if species != 'K':
+                del abundances[spec]
 
     # heh2_ratio = abundances['He'] / abundances['H2']
     #
@@ -571,7 +582,7 @@ def init_mock_observations(planet, line_species_str, mode,
         p0, p_cloud, mean_molar_mass, mass_fractions, metallicity, \
         line_species, rayleigh_species, continuum_species, \
         model = _init_model(planet, model_wavelengths_border,
-                            line_species_str=['CO_main_iso', 'CO_36', 'CH4_main_iso', 'H2O_main_iso'])
+                            line_species_str=all_species)
 
     assert np.allclose(np.sum(list(mass_fractions.values()), axis=0), 1.0, atol=1e-14, rtol=1e-14)
     print('Mass fractions physicality check OK')

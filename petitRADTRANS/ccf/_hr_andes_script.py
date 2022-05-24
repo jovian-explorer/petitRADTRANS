@@ -9,14 +9,15 @@ N: number of cores in parallel run for PyMultiNest/MPI (tasks for slurm).
 planet_name: planet name (e.g. 'HD 189733 b')
 """
 import argparse
+import json
 import os.path
 import time
 from pathlib import Path
 
 import numpy as np
-from mpi4py import MPI
 
-from petitRADTRANS.ccf.high_resolution_retrieval_HD_189733_b import init_mock_observations, init_run, get_retrieval_name
+from petitRADTRANS.ccf.high_resolution_retrieval_HD_189733_b import all_species, init_mock_observations, init_run, \
+    get_retrieval_name
 from petitRADTRANS.ccf.model_containers import Planet
 from petitRADTRANS.radtrans import Radtrans
 from petitRADTRANS.retrieval import Retrieval
@@ -59,6 +60,19 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '--mode',
+    default='transit',
+    help='spectral model mode, eclipse or transit'
+)
+
+parser.add_argument(
+    '--n-live-points',
+    type=int,
+    default=100,
+    help='number of live points to use in the retrieval'
+)
+
+parser.add_argument(
     '--no-rewrite',
     action='store_false',
     help='if activated, do not re-run retrievals already performed'
@@ -69,6 +83,195 @@ parser.add_argument(
     action='store_true',
     help='if activated, resume retrievals'
 )
+
+parser.add_argument(
+    '--get-results',
+    action='store_true',
+    help='if activated, do not run the retrievals, get the results of multiple retrievals and store them in a file'
+)
+
+parser.add_argument(
+    '--jobs-config-filename',
+    help='filename of the jobs config file, used only with --get-results to get the results'
+)
+
+line_species_strs = [  # TODO put that into a file
+    all_species,
+    ['CO_main_iso', 'CH4_main_iso', 'H2S_main_iso', 'K', 'NH3_main_iso', 'Na_allard_new', 'PH3_main_iso', 'H2O_main_iso'],
+    ['CO_36', 'CH4_main_iso', 'H2S_main_iso', 'K', 'NH3_main_iso', 'Na_allard_new', 'PH3_main_iso', 'H2O_main_iso'],
+    ['CO_main_iso', 'CO_36', 'H2S_main_iso', 'K', 'NH3_main_iso', 'Na_allard_new', 'PH3_main_iso', 'H2O_main_iso'],
+    ['CO_main_iso', 'CO_36', 'CH4_main_iso', 'H2S_main_iso', 'K', 'NH3_main_iso', 'Na_allard_new', 'PH3_main_iso'],
+    ['CO_main_iso', 'CO_36', 'CH4_main_iso', 'K', 'NH3_main_iso', 'Na_allard_new', 'PH3_main_iso', 'H2O_main_iso'],
+    ['CO_main_iso', 'CO_36', 'CH4_main_iso', 'H2S_main_iso', 'NH3_main_iso', 'Na_allard_new', 'PH3_main_iso', 'H2O_main_iso'],
+    ['CO_main_iso', 'CO_36', 'CH4_main_iso', 'H2S_main_iso', 'K', 'Na_allard_new', 'PH3_main_iso', 'H2O_main_iso'],
+    ['CO_main_iso', 'CO_36', 'CH4_main_iso', 'H2S_main_iso', 'K', 'NH3_main_iso', 'PH3_main_iso', 'H2O_main_iso'],
+    ['CO_main_iso', 'CO_36', 'CH4_main_iso', 'H2S_main_iso', 'K', 'NH3_main_iso', 'Na_allard_new', 'H2O_main_iso']
+]
+
+
+def get_log_evidences(planet_name, output_directory, mode, n_live_points, jobs_config_filename):
+    planet = Planet.get(planet_name)
+
+    retrieval_output_directory = get_retrievals_directory(
+        planet_name=planet_name,
+        output_directory=output_directory
+    )
+
+    jobs_configuration = np.load(jobs_config_filename)
+    wavelength_bins = jobs_configuration['wavelength_bins']
+
+    # Get the log Ls and log Zs of the retrievals
+    model_shape = (len(line_species_strs), wavelength_bins.size - 1)
+
+    log_ls = np.zeros(model_shape)
+    chi2s = np.zeros(model_shape)
+
+    log_zs = np.zeros(model_shape)
+    log_zs_err = np.zeros(model_shape)
+    nested_sampling_log_zs = np.zeros(model_shape)
+    nested_sampling_log_zs_err = np.zeros(model_shape)
+    nested_importance_sampling_log_zs = np.zeros(model_shape)
+    nested_importance_sampling_log_zs_err = np.zeros(model_shape)
+
+    # Empty arrays because number of modes in each retrieval is unknown and can vary
+    modes_strictly_local_log_zs = np.empty(model_shape, dtype=object)
+    modes_strictly_local_log_zs_err = np.empty(model_shape, dtype=object)
+    modes_local_log_zs = np.empty(model_shape, dtype=object)
+    modes_local_log_zs_err = np.empty(model_shape, dtype=object)
+
+    for i in range(wavelength_bins.size - 1):
+        print(f"Fetching bin {i}: {wavelength_bins[i]}-{wavelength_bins[i + 1]}...")
+
+        model_retrievals_names = get_retrieval_base_names(
+            planet_name=planet,
+            mode=mode,
+            wavelength_min=wavelength_bins[i],
+            wavelength_max=wavelength_bins[i + 1],
+            n_live_points=n_live_points
+        )
+
+        for j, model_retrievals_name in enumerate(model_retrievals_names):
+            retrieval_base_name = os.path.join(
+                retrieval_output_directory,
+                model_retrievals_name
+            )
+
+            model_parameters = np.load(os.path.join(retrieval_base_name, 'model_parameters.npz'))
+            log_ls[j, i] = model_parameters['true_log_l']
+            chi2s[j, i] = model_parameters['true_chi2']
+
+            with open(os.path.join(retrieval_base_name, 'out_PMN', model_retrievals_name + '_stats.json'), 'r') as f:
+                stats = json.load(f)
+
+            modes = np.empty(len(stats['modes']), dtype=object)
+
+            for m in stats['modes']:
+                modes[m['index']] = m
+
+            modes_strictly_local_log_z = np.zeros(modes.size)
+            modes_strictly_local_log_z_err = np.zeros(modes.size)
+            modes_local_log_z = np.zeros(modes.size)
+            modes_local_log_z_err = np.zeros(modes.size)
+
+            for k, m in enumerate(modes):
+                modes_strictly_local_log_z[k] = m['strictly local log-evidence']
+                modes_strictly_local_log_z_err[k] = m['strictly local log-evidence error']
+                modes_local_log_z[k] = m['local log-evidence']
+                modes_local_log_z_err[k] = m['local log-evidence error']
+
+            modes_strictly_local_log_zs[j, i] = modes_strictly_local_log_z
+            modes_strictly_local_log_zs_err[j, i] = modes_strictly_local_log_z_err
+            modes_local_log_zs[j, i] = modes_local_log_z
+            modes_local_log_zs_err[j, i] = modes_local_log_z_err
+
+            log_zs[j, i] = stats['global evidence']
+            log_zs_err[j, i] = stats['global evidence error']
+            nested_sampling_log_zs[j, i] = stats['nested sampling global log-evidence']
+            nested_sampling_log_zs_err[j, i] = stats['nested sampling global log-evidence error']
+            nested_importance_sampling_log_zs[j, i] = stats['nested importance sampling global log-evidence']
+            nested_importance_sampling_log_zs_err[j, i] = stats['nested importance sampling global log-evidence error']
+
+    result_filename = os.path.join(retrieval_output_directory, 'log_evidences.npz')
+
+    print(f"Saving log-evidences in file '{result_filename}'")
+
+    np.savez_compressed(
+        file=result_filename,
+        planet=planet_name,
+        models=[str(species_included) for species_included in line_species_strs],
+        wavelength_bins=wavelength_bins,
+        true_log_likelihoods=log_ls,
+        true_chi2s=chi2s,
+        global_log_evidences=log_zs,
+        global_log_evidences_error=log_zs_err,
+        nested_sampling_global_log_evidences=nested_sampling_log_zs,
+        nested_sampling_global_log_evidences_error=nested_sampling_log_zs_err,
+        nested_importance_sampling_global_log_evidences=nested_importance_sampling_log_zs,
+        nested_importance_sampling_global_log_evidences_error=nested_importance_sampling_log_zs_err,
+    )
+
+    # Saving modes log Zs into a separate file to avoid pickle usage in the global log Zs file
+    result_filename = os.path.join(retrieval_output_directory, 'mode_log_evidences.json')
+    print(f"Saving modes log-evidences in file '{result_filename}'")
+
+    save_dict = {}
+
+    for i, model in enumerate(line_species_strs):
+        model = str(model)
+        save_dict[model] = {}
+
+        for j, wavelength in enumerate(wavelength_bins[:-1]):
+            save_dict[model][wavelength] = {}
+
+            for k in range(len(modes_strictly_local_log_zs[i, j])):
+                save_dict[model][wavelength][k] = {
+                    'strictly local log-evidence': modes_strictly_local_log_zs[i, j][k],
+                    'strictly local log-evidence error': modes_strictly_local_log_zs_err[i, j][k],
+                    'local log-evidence': modes_local_log_zs[i, j][k],
+                    'local log-evidence error': modes_local_log_zs_err[i, j][k],
+                }
+
+    with open(result_filename, 'w') as f:
+        json.dump(
+            obj=save_dict,
+            fp=f
+        )
+
+
+def get_retrieval_base_names(planet_name, mode, wavelength_min, wavelength_max, n_live_points,
+                             ls_strs=None):
+    if ls_strs is None:
+        ls_strs = line_species_strs
+
+    retrieval_base_names = []
+
+    for line_species_str in ls_strs:
+        retrieval_species_names = []
+
+        for species in line_species_str:
+            species = species.replace('_main_iso', '')
+
+            if species == 'CO_36':
+                species = '13CO'
+
+            retrieval_species_names.append(species)
+
+        retrieval_base_names.append(
+            get_retrieval_name(
+                planet=planet_name,
+                mode=mode,
+                wavelength_min=wavelength_min,
+                wavelength_max=wavelength_max,
+                retrieval_species_names=retrieval_species_names,
+                n_live_points=n_live_points
+            )
+        )
+
+    return retrieval_base_names
+
+
+def get_retrievals_directory(planet_name, output_directory):
+    return os.path.join(output_directory, 'bins_' + planet_name.lower().replace(' ', '_'))
 
 
 def init_and_run_retrieval(comm, rank, planet, line_species_str, mode, retrieval_directory, retrieval_name,
@@ -87,6 +290,9 @@ def init_and_run_retrieval(comm, rank, planet, line_species_str, mode, retrieval
     elif os.path.isfile(run_time_file):
         if rank == 0:
             print(f"Re-running already performed retrieval '{retrieval_name}'...")
+    else:
+        if rank == 0:
+            print(f"Running retrieval '{retrieval_name}'")
 
     t_start = time.time()
 
@@ -225,31 +431,25 @@ def init_and_run_retrieval(comm, rank, planet, line_species_str, mode, retrieval
 
 
 def main(planet_name, output_directory, additional_data_directory, wavelength_min, wavelength_max,
+         mode, n_live_points,
          rewrite=True, resume=False):
+    from mpi4py import MPI
+
+    print('Initializing...')
     # MPI initialization
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
 
     # Manual initialization
-    mode = 'transit'
-    n_live_points = 15
-    add_noise = False
+    instrument_resolving_power = 1e5
+    integration_times_ref = 60  # (s) for ANDES, this is (until more thoughts are put into this) an arbitrary value
 
+    add_noise = False
     wavelengths_instrument = None
     instrument_snr = None
     plot = False
-    instrument_resolving_power = 1e5
-    integration_times_ref = 60
 
     load_from = None
-
-    line_species_strs = [
-        ['CO_main_iso', 'CO_36', 'CH4_main_iso', 'H2O_main_iso'],
-        ['CO_main_iso', 'CH4_main_iso', 'H2O_main_iso'],
-        ['CO_36', 'CH4_main_iso', 'H2O_main_iso'],
-        ['CO_main_iso', 'CO_36', 'H2O_main_iso'],
-        ['CO_main_iso', 'CO_36', 'CH4_main_iso']
-    ]
 
     # Initialization
     wavelengths_borders = [wavelength_min, wavelength_max]
@@ -283,10 +483,14 @@ def main(planet_name, output_directory, additional_data_directory, wavelength_mi
             )
         )
 
-    retrieval_output_directory = os.path.join(output_directory, 'bins_' + planet_name.lower().replace(' ', '_'))
+    retrieval_output_directory = get_retrievals_directory(
+        planet_name=planet_name,
+        output_directory=output_directory
+    )
 
-    if not os.path.isdir(retrieval_output_directory):
-        os.mkdir(retrieval_output_directory)
+    if rank == 0:
+        if not os.path.isdir(retrieval_output_directory):
+            os.mkdir(retrieval_output_directory)
 
     snr_file = os.path.join(additional_data_directory, star_name.replace(' ', '_'), f"ANDES_snrs.npz")
     telluric_transmittance = os.path.join(additional_data_directory, 'sky', 'transmission',
@@ -313,14 +517,25 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    main(
-        planet_name=args.planet,
-        output_directory=args.output_directory,
-        additional_data_directory=args.additional_data_directory,
-        wavelength_min=args.wavelength_min,
-        wavelength_max=args.wavelength_max,
-        rewrite=args.no_rewrite,
-        resume=args.resume
-    )
+    if not args.get_results:
+        main(
+            planet_name=args.planet,
+            output_directory=args.output_directory,
+            additional_data_directory=args.additional_data_directory,
+            wavelength_min=args.wavelength_min,
+            wavelength_max=args.wavelength_max,
+            mode=args.mode,
+            n_live_points=args.n_live_points,
+            rewrite=args.no_rewrite,
+            resume=args.resume
+        )
+    else:
+        get_log_evidences(
+            planet_name=args.planet,
+            output_directory=args.output_directory,
+            mode=args.mode,
+            n_live_points=args.n_live_points,
+            jobs_config_filename=args.jobs_config_filename
+        )
 
     print(f"Done in {time.time() - t0} s.")
