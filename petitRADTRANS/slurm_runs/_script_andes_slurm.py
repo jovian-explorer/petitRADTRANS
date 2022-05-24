@@ -7,6 +7,7 @@ Glossary:
     - Runs corresponds to the execution of a single srun command on one or multiple cores <=> tasks for MPI runs.
     - CPUs are the hardware processors installed in one node. CPUs can communicate relatively fast within one node.
     - Nodes are "separate" instances containing one or multiple CPUs. Nodes can communicate with each other, but slowly.
+    - Clusters are ensembles of nodes.
     - Jobs are allocations of a number of nodes to execute one or several runs.
     - Calls are the request of one or multiple jobs at once.
 
@@ -108,7 +109,7 @@ parser.add_argument(
 parser.add_argument(
     '--nwavelength-bins',
     type=int,
-    default=71,
+    default=70,
     help='number of wavelength bins within the wavelength range'
 )
 
@@ -128,6 +129,12 @@ parser.add_argument(
     '--resume',
     action='store_true',
     help='if activated, resume retrievals'
+)
+
+parser.add_argument(
+    '--no-mpi-control',
+    action='store_false',
+    help='if activated, assume that the cluster crashes when trying to call mpi'
 )
 
 
@@ -181,11 +188,11 @@ def fair_share(array, n_entities, append_within_existing=True):
 
 def main(python_script, template_filename, output_directory, additional_data_directory, planets, n_nodes,
          n_cores_per_cpus, n_cpus_per_nodes, n_jobs_per_calls, wavelength_min, wavelength_max, n_wavelength_bins,
-         job_basename='pRT_ANDES', rewrite=True, resume=False):
+         job_basename='pRT_ANDES', rewrite=True, resume=False, mpi_control=True):
     # Generate bins array
     wavelengths_borders = [wavelength_min, wavelength_max]
 
-    wavelength_bins = wavelengths_borders * np.array([1.001, 0.999])
+    wavelength_bins = wavelengths_borders #* np.array([1.05, 0.95])
     wavelength_bins = np.linspace(wavelength_bins[0], wavelength_bins[1], int(n_wavelength_bins + 1))
 
     # Split bins/retrievals/runs by nodes, will use the same configuration for each planet
@@ -196,6 +203,11 @@ def main(python_script, template_filename, output_directory, additional_data_dir
     # Split bins by processors within each node, to get the list of jobs per node
     # Communication-wise it is more efficient to keep each run within a unique CPU, at the cost of slower individual run
     nodes_jobs_runs = []
+
+    if not mpi_control:
+        print("No MPI control, forcing the use of all the node CPUs")
+        n_cores_per_cpus *= n_cpus_per_nodes
+        n_cpus_per_nodes = 1
 
     for i, node_runs in enumerate(nodes_runs):
         n_jobs_per_node_min = np.max((int(np.floor(node_runs.size / n_cpus_per_nodes)), n_cpus_per_nodes))
@@ -228,10 +240,15 @@ def main(python_script, template_filename, output_directory, additional_data_dir
 
                 node_job = node_jobs[i_job]
 
+                if mpi_control:
+                    run_command = f"mpiexec -n {int(tasks_per_node / node_job.size)}"
+                else:
+                    run_command = f"srun -N 1 -n {tasks_per_node}"
+
                 # Have one run per CPU instead of one run per node
                 for cpu_run in node_job:
                     srun_lines.append(
-                        f"srun mpiexec -n {int(tasks_per_node / node_job.size)} python3 {python_script} "
+                        f"{run_command} python3 {python_script} "
                         f"--planet '{planet}' "
                         f"--output-directory '{output_directory}' "
                         f"--additional-data-directory '{additional_data_directory}' "
@@ -245,7 +262,9 @@ def main(python_script, template_filename, output_directory, additional_data_dir
                     if resume is True:
                         srun_lines[-1] += f" --resume"
 
-                    srun_lines[-1] += '\n'
+                    srun_lines[-1] += ' &\n'
+
+            srun_lines.append('\nwait\n\nexit 0\n')
 
             # Make the script with all the runs
             job_names.append(f"{job_basename_planet}_job{i_job}")
@@ -264,9 +283,11 @@ def main(python_script, template_filename, output_directory, additional_data_dir
 
         # Save jobs configuration
         # This file can be used to easily collect the results after the call
-        print(f"Saving jobs configuration for planet {planet}...")
+        jobs_config_file = os.path.join(output_directory, job_basename_planet + '.npz')
+
+        print(f"Saving jobs configuration for planet {planet} in file '{jobs_config_file}'...")
         np.savez_compressed(
-            file=os.path.join(output_directory, job_basename_planet + '.npz'),
+            file=jobs_config_file,
             planet=planet,
             python_script=python_script,
             wavelength_bins=wavelength_bins
@@ -282,12 +303,9 @@ def main(python_script, template_filename, output_directory, additional_data_dir
                 command_line += f"sbatch {job_names[i_job] + '.sbatch'}"
 
                 if i == n_jobs_per_calls - 1:
-                    subprocess.run(command_line, shell=True)
-                    # subprocess.run(f"echo '{command_line}'", shell=True)
+                    # subprocess.run(command_line, shell=True)
+                    subprocess.run(f"echo '{command_line}'", shell=True)
                     command_line = ''
-
-                    # TODO wait for the end of the execution command, then get the log L/log Z and put it into a file (but probably not here)
-
                 else:
                     command_line += ' && '  # assume that the script are launched from linux
 
@@ -312,5 +330,6 @@ if __name__ == '__main__':
         n_wavelength_bins=args.nwavelength_bins,
         job_basename=args.job_base_name,
         rewrite=args.no_rewrite,
-        resume=args.resume
+        resume=args.resume,
+        mpi_control=args.no_mpi_control
     )
