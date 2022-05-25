@@ -1993,9 +1993,8 @@ class Radtrans(_read_opacities.ReadOpacities):
 
             i_iter = i
 
-            f_imposed = T_int ** 4. + Tstar ** 4. * (Rstar / 2 / semimajoraxis) ** 2.
-            f_meas = np.sum(-np.diff(self.freq) * (self.flux[1:] + self.flux[:-1]) / 2.) / nc.sigma / (
-                        1 - self.albedo)
+            f_imposed = (T_int ** 4. + Tstar ** 4. * (Rstar / 2 / semimajoraxis) ** 2. * (1 - self.albedo)) * nc.sigma
+            f_meas = np.sum(-np.diff(self.freq) * (self.flux[1:] + self.flux[:-1]) / 2.)
             print('Flux convergence: '+str((f_imposed - f_meas) / f_imposed * 100)+'%')
 
             print(i_iter, t_surf)
