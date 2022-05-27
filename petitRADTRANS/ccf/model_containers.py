@@ -253,7 +253,8 @@ class BaseSpectralModel:
 
     @staticmethod
     def calculate_transit_spectrum(radtrans: Radtrans, temperatures, mass_mixing_ratios, mean_molar_masses,
-                                   planet_surface_gravity, reference_pressure, planet_radius, **kwargs):
+                                   planet_surface_gravity, reference_pressure, planet_radius, cloud_pressure=None,
+                                   **kwargs):
         """Wrapper of Radtrans.calc_transm that output wavelengths in um and transit radius in cm.
         # TODO move to Radtrans or outside of object
 
@@ -265,6 +266,7 @@ class BaseSpectralModel:
             mean_molar_masses:
             reference_pressure:
             planet_radius:
+            cloud_pressure:
 
         Returns:
 
@@ -277,6 +279,7 @@ class BaseSpectralModel:
             mmw=mean_molar_masses,
             P0_bar=reference_pressure,
             R_pl=planet_radius,
+            Pcloud=cloud_pressure,
             # **kwargs  # TODO add kwargs once arguments names are made unambiguous
         )
 
@@ -358,9 +361,10 @@ class BaseSpectralModel:
             line_species=self.line_species,
             rayleigh_species=self.rayleigh_species,
             continuum_opacities=self.continuum_opacities,
-            lbl_opacity_sampling=self.lbl_opacity_sampling,
+            cloud_species=None,
+            opacity_mode=self.opacity_mode,
             do_scat_emis=self.do_scat_emis,
-            opacity_mode=self.opacity_mode
+            lbl_opacity_sampling=self.lbl_opacity_sampling
         )
 
     @staticmethod
@@ -426,14 +430,7 @@ class BaseSpectralModel:
             raise ValueError(f"mode must be 'emission' or 'transmission', not '{mode}'")
 
         wavelengths = copy.copy(self.wavelengths)
-
-        if scale:
-            spectrum = self.scale_spectrum(
-                spectrum=spectrum,
-                mode=mode,
-                **parameters
-            )
-
+        # TODO transform star spectral radiosity as well in emission mode
         if shift:
             wavelengths = self.shift_wavelengths(
                 wavelengths_rest=wavelengths,
@@ -477,6 +474,13 @@ class BaseSpectralModel:
 
             wavelengths = wavelengths_tmp
 
+        if scale:
+            spectrum = self.scale_spectrum(
+                spectrum=spectrum,
+                mode=mode,
+                **parameters
+            )
+
         if deformation_matrix is not None:
             spectrum *= deformation_matrix
 
@@ -517,10 +521,9 @@ class BaseSpectralModel:
             wlen_bords_micron=wavelengths_boundaries,
             mode=opacity_mode,
             do_scat_emis=do_scat_emis,
-            lbl_opacity_sampling=lbl_opacity_sampling
+            lbl_opacity_sampling=lbl_opacity_sampling,
+            pressures=pressures
         )
-
-        radtrans.setup_opa_structure(pressures)
 
         return radtrans
 
@@ -1408,7 +1411,7 @@ class Planet:
             key = key.replace('_tranmid', '_transit_midpoint_time')
 
             if not skip_unit_conversion:
-                value *= nc.snc.hour
+                value *= nc.snc.day
         elif '_trandur' in key:
             key = key.replace('_trandur', '_transit_duration')
 
@@ -1776,6 +1779,38 @@ class Planet:
         errors = calculate_uncertainty(partial_derivatives, uncertainties)  # lower and upper errors
 
         return radius, errors[1], -errors[0]
+
+    @staticmethod
+    def surface_gravity2mass(surface_gravity, radius,
+                             surface_gravity_error_upper=0., surface_gravity_error_lower=0.,
+                             radius_error_upper=0., radius_error_lower=0.):
+        """
+        Convert the surface gravity of a planet to its mass.
+        Args:
+            surface_gravity: (cm.s-2) surface gravity of the planet
+            radius: (cm) radius of the planet
+            surface_gravity_error_upper: (cm.s-2) upper error on the planet surface gravity
+            surface_gravity_error_lower: (cm.s-2) lower error on the planet surface gravity
+            radius_error_upper: (cm) upper error on the planet radius
+            radius_error_lower: (cm) lower error on the planet radius
+
+        Returns:
+            (g) the mass of the planet, and its upper and lower error
+        """
+        mass = surface_gravity / nc.G * radius ** 2
+
+        partial_derivatives = np.array([
+            mass / surface_gravity,  # dm/dg
+            2 * mass / radius  # dm/dr
+        ])
+        uncertainties = np.abs(np.array([
+            [surface_gravity_error_lower, surface_gravity_error_upper],
+            [radius_error_lower, radius_error_upper]
+        ]))
+
+        errors = calculate_uncertainty(partial_derivatives, uncertainties)  # lower and upper errors
+
+        return surface_gravity, errors[1], -errors[0]
 
 
 class SimplePlanet(Planet):
@@ -3137,9 +3172,11 @@ class SpectralModel2(BaseSpectralModel):
 
     @staticmethod
     def calculate_mass_mixing_ratios(pressures, line_species=None,
-                                     included_line_species='all', temperatures=None, co_ratio=0.55, log10_metallicity=0,
-                                     carbon_pressure_quench=None,
+                                     included_line_species='all', temperatures=None, co_ratio=0.55,
+                                     log10_metallicity=None, carbon_pressure_quench=None,
                                      imposed_mass_mixing_ratios=None, heh2_ratio=0.324324,
+                                     planet_mass=None, planet_radius=None, planet_surface_gravity=None,
+                                     star_metallicity=1.0, atmospheric_mixing=1.0, alpha=-0.68, beta=7.2,
                                      use_equilibrium_chemistry=False, verbose=False, **kwargs):
         """Initialize a model mass mixing ratios.
         Ensure that in any case, the sum of mass mixing ratios is equal to 1. Imposed mass mixing ratios are kept to
@@ -3170,6 +3207,13 @@ class SpectralModel2(BaseSpectralModel):
             carbon_pressure_quench: (bar) pressure where the carbon species are quenched, used with equilibrium chemistry
             imposed_mass_mixing_ratios: imposed mass mixing ratios
             heh2_ratio: H2 over He mass mixing ratio
+            planet_mass: (g) mass of the planet; if None, planet mass is calculated from planet radius and surface gravity, used to calulate metallicity
+            planet_radius: (cm) radius of the planet, used to calculate the mass
+            planet_surface_gravity: (cm.s-2) surface gravity of the planet, used to calculate the mass
+            star_metallicity: (solar metallicity) metallicity of the planet's star, used to calulate metallicity
+            atmospheric_mixing: scaling factor [0, 1] representing how well metals are mixed in the atmosphere, used to calulate metallicity
+            alpha: power of the mass-metallicity relation
+            beta: scaling factor of the mass-metallicity relation
             use_equilibrium_chemistry: if True, use pRT equilibrium chemistry module
 
         Returns:
@@ -3198,6 +3242,35 @@ class SpectralModel2(BaseSpectralModel):
 
         # Chemical equilibrium
         if use_equilibrium_chemistry:
+            # Calculate metallicity
+            if log10_metallicity is None:
+                if verbose:
+                    print(f"log10 metallicity set to None, calculating it using scaled metallicity...")
+
+                if planet_mass is None:
+                    if planet_radius is None or planet_surface_gravity is None:
+                        raise ValueError(f"both planet radius ({planet_radius}) "
+                                         f"and surface gravity ({planet_surface_gravity}) "
+                                         f"are required to calculate planet mass")
+                    elif planet_radius <= 0:
+                        raise ValueError(f"cannot calculate planet mass from surface gravity with a radius <= 0")
+
+                    planet_mass = Planet.surface_gravity2mass(
+                        surface_gravity=planet_surface_gravity,
+                        radius=planet_radius
+                    )
+
+                log10_metallicity = np.log10(
+                    SpectralModel2.calculate_scaled_metallicity(
+                        planet_mass=planet_mass,
+                        star_metallicity=star_metallicity,
+                        atmospheric_mixing=atmospheric_mixing,
+                        alpha=alpha,
+                        beta=beta
+                    )[0]
+                )
+
+            # Interpolate chemical equilibrium
             mass_mixing_ratios_equilibrium = SpectralModel2._calculate_equilibrium_mass_mixing_ratios(
                 pressures=pressures,
                 temperatures=temperatures,
@@ -3313,14 +3386,20 @@ class SpectralModel2(BaseSpectralModel):
                         if species not in imposed_mass_mixing_ratios:
                             mass_mixing_ratios[species][i] = \
                                 mass_mixing_ratios[species][i] * (1 - m_sum_imposed_species[i]) / m_sum_species[i]
-
+                elif m_sum_total[i] == 0:
+                    if verbose:
+                        print(f"sum of species mass fraction ({m_sum_species[i]} + {m_sum_imposed_species[i]}) "
+                              f"is 0")
                 elif m_sum_total[i] < 1:
                     # Fill atmosphere with H2 and He
                     # TODO there might be a better filling species, N2?
                     if h2_in_imposed_mass_mixing_ratios and he_in_imposed_mass_mixing_ratios:
-                        # Use imposed He/H2 ratio
-                        heh2_ratio = 10 ** imposed_mass_mixing_ratios['He'][i] \
-                                     / 10 ** imposed_mass_mixing_ratios['H2'][i]
+                        if imposed_mass_mixing_ratios['H2'][i] > 0:
+                            # Use imposed He/H2 ratio
+                            heh2_ratio = 10 ** imposed_mass_mixing_ratios['He'][i] \
+                                         / 10 ** imposed_mass_mixing_ratios['H2'][i]
+                        else:
+                            heh2_ratio = None
 
                     if h2_in_mass_mixing_ratios and he_in_mass_mixing_ratios:
                         # Use calculated He/H2 ratio
