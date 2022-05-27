@@ -700,12 +700,17 @@ class Retrieval:
                         dd.scale_factor = self.parameters[de_name + "_scale_factor"].value
 
                     if dede.external_pRT_reference == name:
+                        if spectrum_model is None:
+                            return -1e99
+
+                        if np.isnan(spectrum_model).any():
+                            return -1e99
+
                         log_likelihood += dede.get_chisq(
                             wlen_model,
                             spectrum_model,
                             self.plotting
                         )
-
         if log_likelihood + log_prior < -9e99:
             return -1e99
 

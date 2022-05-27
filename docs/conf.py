@@ -28,9 +28,7 @@ copyright = u'2019-2020, Paul Molli\u00E8re'
 author = u'Paul Molli\u00E8re'
 
 # The full version, including alpha/beta/rc tags
-release = version
-# The short X.Y version
-version = version.rsplit('.', 1)[0]
+release = '2.4.2'
 
 
 # -- General configuration ---------------------------------------------------
