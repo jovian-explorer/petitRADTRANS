@@ -114,7 +114,8 @@ class Retrieval:
         self.param_dict = {}
         # Set up pretty plotting
         if pRT_plot_style:
-            import petitRADTRANS.retrieval.plot_style  # TODO improve so that it doesn't break matplotlib
+            pass
+
         self.prt_plot_style = pRT_plot_style
         # Path to input opacities
         self.path = petitradtrans_config['Paths']['pRT_input_data_path']
@@ -616,6 +617,7 @@ class Retrieval:
                     if np.isnan(spectrum_model).any():
                         return -1e99
 
+                    # Calculate log likelihood
                     # TODO uniformize convolve/rebin handling
                     if dd.flux.dtype == 'O':
                         if np.ndim(dd.flux) == 1:
@@ -670,13 +672,16 @@ class Retrieval:
                             raise ValueError(f"observations have {np.ndim(dd.flux)} dimensions, but must have 1 to 3")
                 else:
                     # Get the PT profile
-                    if name == self.rd.plot_kwargs["take_PTs_from"]:
+                    if name == self.rd.plot_kwargs['take_PTs_from']:
                         pressures, temperatures = \
                             dd.model_generating_function(dd.pRT_object,
                                                          self.parameters,
                                                          self.PT_plot_mode,
                                                          AMR=self.rd.AMR)
                         return pressures, temperatures
+                    else:
+                        raise ValueError(f"in PT plot mode data name '{name}' "
+                                         f"must be equal to '{self.rd.plot_kwargs['take_PTs_from']}'")
 
                 # Save sampled outputs if necessary.
                 if self.run_mode == 'evaluate':
@@ -691,9 +696,14 @@ class Retrieval:
                         )
 
                         self.best_fit_specs[name] = [wlen_model, spectrum_model]
+            else:
+                # TODO what exactly is going on here? Why the double loop on the same items?
+                # Definition here to avoid possible reference before assignment
+                spectrum_model = None
+                wlen_model = None
 
-            # Check for data using the same pRT object,
-            # calculate log_likelihood
+            # Check for data using the same pRT object
+            # Calculate log likelihood
             for de_name, dede in self.data.items():
                 if dede.external_pRT_reference is not None:
                     if dede.scale:
@@ -711,6 +721,7 @@ class Retrieval:
                             spectrum_model,
                             self.plotting
                         )
+
         if log_likelihood + log_prior < -9e99:
             return -1e99
 
