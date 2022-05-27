@@ -1375,3 +1375,48 @@ def save_log_l(file, wavelengths, log_ls):
         wavelengths=wavelengths,
         **log_ls
     )
+
+
+def plot_log_evidences(file, key='global_log_evidences', label_prefix='', reset_colors=True, delta=True, **kwargs):
+    import matplotlib.pyplot as plt
+
+    if reset_colors:
+        plt.gca().set_prop_cycle(None)
+
+    data = np.load(file)
+
+    full_model = data['models'][0].replace('[', '').replace(']', '').replace("'", '').split(', ')
+
+    for i, model in enumerate(data['models']):
+        if i == 0 and delta:
+            continue
+
+        label = 'full'
+        model = model.replace('[', '').replace(']', '').replace("'", '').split(', ')
+
+        for species in full_model:
+            if species not in model:
+                if species == 'CO_36':
+                    species = '13CO'
+                else:
+                    species = species.split('_', 1)[0]
+
+                if label == 'full':
+                    label = f"no {species}"
+                else:
+                    label += f", {species}"
+
+        if delta:
+            values = data[key][0] - data[key][i]
+        else:
+            values = data[key][i]
+
+        plt.semilogy(data['wavelength_bins'][:-1], values,
+                     label=label_prefix + label, **kwargs)
+
+    plt.xlabel(r'Wavelength ($\mu$m)')
+    plt.ylabel(fr"$\Delta$ {key.replace('_', ' ')}")
+    plt.title(f"{data['planet']}")
+    plt.legend()
+
+

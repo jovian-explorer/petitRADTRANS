@@ -79,7 +79,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             do_scat_emis=False,
             lbl_opacity_sampling=None,
             pressures=None,
-            temperatures=None,
+            temperatures=None,  # TODO temperatures not redefined in functions
             stellar_intensity=None,
             geometry='dayside_ave',
             mu_star=1.,
@@ -573,7 +573,23 @@ class Radtrans(_read_opacities.ReadOpacities):
             abund = 1
 
             for m in self.CIA_species[key]['molecules']:
-                abund = abund * abundances[m]
+                if m in abundances:
+                    abund = abund * abundances[m]
+                else:
+                    found = False
+
+                    for species_ in abundances:
+                        species = species_.split('_', 1)[0]
+
+                        if species == m:
+                            abund = abund * abundances[species_]
+                            found = True
+
+                            break
+
+                    if not found:
+                        raise ValueError(f"species {m} of CIA '{key}' not found in mass mixing ratios dict "
+                                         f"(listed species: {list(abundances.keys())})")
 
             self.continuum_opa = self.continuum_opa + \
                 self.interpolate_cia(key, np.sqrt(abund))

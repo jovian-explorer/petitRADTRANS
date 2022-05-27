@@ -114,6 +114,25 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '--mode',
+    default='transit',
+    help='spectral model mode, eclipse or transit'
+)
+
+parser.add_argument(
+    '--n-live-points',
+    type=int,
+    default=100,
+    help='number of live points to use in the retrieval'
+)
+
+parser.add_argument(
+    '--co2',
+    action='store_true',
+    help='if activated, switch to the full CO2 atmosphere mode'
+)
+
+parser.add_argument(
     '--job-base-name',
     default='pRT_ANDES',
     help='number of wavelength bins within the wavelength range'
@@ -188,6 +207,7 @@ def fair_share(array, n_entities, append_within_existing=True):
 
 def main(python_script, template_filename, output_directory, additional_data_directory, planets, n_nodes,
          n_cores_per_cpus, n_cpus_per_nodes, n_jobs_per_calls, wavelength_min, wavelength_max, n_wavelength_bins,
+         mode, n_live_points, co2_mode,
          job_basename='pRT_ANDES', rewrite=True, resume=False, mpi_control=True):
     # Generate bins array
     wavelengths_borders = [wavelength_min, wavelength_max]
@@ -253,13 +273,18 @@ def main(python_script, template_filename, output_directory, additional_data_dir
                         f"--output-directory '{output_directory}' "
                         f"--additional-data-directory '{additional_data_directory}' "
                         f"--wavelength-min {wavelength_bins[cpu_run - 1]} "
-                        f"--wavelength-max {wavelength_bins[cpu_run]}"
+                        f"--wavelength-max {wavelength_bins[cpu_run]} "
+                        f"--mode '{mode}' "
+                        f"--n-live-points {n_live_points}"
                     )
 
-                    if rewrite is False:
+                    if co2_mode:
+                        srun_lines[-1] += f" --co2"
+
+                    if not rewrite:
                         srun_lines[-1] += f" --no-rewrite"
 
-                    if resume is True:
+                    if resume:
                         srun_lines[-1] += f" --resume"
 
                     srun_lines[-1] += ' &\n'
@@ -328,6 +353,9 @@ if __name__ == '__main__':
         wavelength_min=args.wavelength_min,
         wavelength_max=args.wavelength_max,
         n_wavelength_bins=args.nwavelength_bins,
+        mode=args.mode,
+        n_live_points=args.n_live_points,
+        co2_mode=args.co2,
         job_basename=args.job_base_name,
         rewrite=args.no_rewrite,
         resume=args.resume,
