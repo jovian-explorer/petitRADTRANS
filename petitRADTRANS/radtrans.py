@@ -1263,7 +1263,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         else:
             warnings.warn("Cloud rescaling lead to nan opacities, skipping RT calculation!")
 
-            self.flux = None
+            self.flux = np.ones_like(self.freq) * np.nan
             self.contr_em = None
             self.skip_RT_step = False
 
