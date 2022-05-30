@@ -74,11 +74,17 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '--n-transits',
+    type=float,
+    default=1.0,
+    help='number of planetary transits'
+)
+
+parser.add_argument(
     '--co2',
     action='store_true',
     help='if activated, switch to the full CO2 atmosphere mode'
 )
-
 
 parser.add_argument(
     '--no-rewrite',
@@ -122,7 +128,8 @@ line_species_strs_co2 = [
 ]
 
 
-def get_log_evidences(planet_name, output_directory, mode, n_live_points, jobs_config_filename, line_species):
+def get_log_evidences(planet_name, output_directory, mode, n_live_points, n_transits,
+                      jobs_config_filename, line_species):
     planet = Planet.get(planet_name)
 
     retrieval_output_directory = get_retrievals_directory(
@@ -158,12 +165,13 @@ def get_log_evidences(planet_name, output_directory, mode, n_live_points, jobs_c
         print(f"Fetching bin {i + 1}/{wavelength_bins.size - 1}: {wavelength_bins[i]}-{wavelength_bins[i + 1]} um...")
 
         model_retrievals_names = get_retrieval_base_names(
-            planet_name=planet,
+            planet=planet,
             mode=mode,
             wavelength_min=wavelength_bins[i],
             wavelength_max=wavelength_bins[i + 1],
             n_live_points=n_live_points,
-            line_species=line_species
+            line_species=line_species,
+            exposure_time=planet.transit_duration * n_transits
         )
 
         for j, model_retrievals_name in enumerate(model_retrievals_names):
@@ -210,8 +218,16 @@ def get_log_evidences(planet_name, output_directory, mode, n_live_points, jobs_c
             nested_importance_sampling_log_zs[j, i] = stats['nested importance sampling global log-evidence']
             nested_importance_sampling_log_zs_err[j, i] = stats['nested importance sampling global log-evidence error']
 
-    file_basename = f"{planet_name.lower().replace(' ', '_')}_{mode}_{n_live_points}lp_"
-    result_filename = os.path.join(retrieval_output_directory, file_basename + 'log_evidences.npz')
+    file_basename = get_retrieval_base_names(
+        planet=planet,
+        mode=mode,
+        wavelength_min=wavelength_bins[0],
+        wavelength_max=wavelength_bins[-1],
+        n_live_points=n_live_points,
+        exposure_time=planet.transit_duration * n_transits,
+        line_species=line_species
+    )[0] + f"_{len(line_species)}bins_log_evidences.npz"
+    result_filename = os.path.join(retrieval_output_directory, file_basename )
 
     print(f"Saving log-evidences in file '{result_filename}'")
 
@@ -220,6 +236,7 @@ def get_log_evidences(planet_name, output_directory, mode, n_live_points, jobs_c
         planet=planet_name,
         mode=mode,
         n_live_points=n_live_points,
+        n_transits=n_transits,
         models=[str(species_included) for species_included in line_species],
         wavelength_bins=wavelength_bins,
         true_log_likelihoods=log_ls,
@@ -261,7 +278,7 @@ def get_log_evidences(planet_name, output_directory, mode, n_live_points, jobs_c
         )
 
 
-def get_retrieval_base_names(planet_name, mode, wavelength_min, wavelength_max, n_live_points,
+def get_retrieval_base_names(planet, mode, wavelength_min, wavelength_max, n_live_points, exposure_time,
                              line_species=None):
     if line_species is None:
         line_species = line_species_strs
@@ -281,12 +298,13 @@ def get_retrieval_base_names(planet_name, mode, wavelength_min, wavelength_max, 
 
         retrieval_base_names.append(
             get_retrieval_name(
-                planet=planet_name,
+                planet=planet,
                 mode=mode,
                 wavelength_min=wavelength_min,
                 wavelength_max=wavelength_max,
                 retrieval_species_names=retrieval_species_names,
-                n_live_points=n_live_points
+                n_live_points=n_live_points,
+                exposure_time=exposure_time
             )
         )
 
@@ -298,7 +316,8 @@ def get_retrievals_directory(planet_name, output_directory):
 
 
 def init_and_run_retrieval(comm, rank, planet, line_species_str, mode, retrieval_directory, retrieval_name,
-                           n_live_points, add_noise, wavelengths_borders, integration_times_ref, wavelengths_instrument,
+                           n_live_points, add_noise, wavelengths_borders, integration_times_ref, n_transits,
+                           wavelengths_instrument,
                            instrument_snr, snr_file, telluric_transmittance, airmass, variable_throughput,
                            instrument_resolving_power, load_from, plot, retrieved_species=None, co2_mode=False,
                            rewrite=True, resume=False):
@@ -340,6 +359,7 @@ def init_and_run_retrieval(comm, rank, planet, line_species_str, mode, retrieval
                 add_noise=add_noise,
                 wavelengths_borders=wavelengths_borders,
                 integration_times_ref=integration_times_ref,
+                n_transits=n_transits,
                 wavelengths_instrument=wavelengths_instrument,
                 instrument_snr=instrument_snr,
                 snr_file=snr_file,
@@ -466,7 +486,7 @@ def init_and_run_retrieval(comm, rank, planet, line_species_str, mode, retrieval
 
 
 def main(planet_name, output_directory, additional_data_directory, wavelength_min, wavelength_max,
-         mode, n_live_points, co2_mode=False,
+         mode, n_live_points, n_transits=1.0, co2_mode=False,
          rewrite=True, resume=False):
     from mpi4py import MPI
 
@@ -519,7 +539,8 @@ def main(planet_name, output_directory, additional_data_directory, wavelength_mi
                 wavelength_min=wavelength_min,
                 wavelength_max=wavelength_max,
                 retrieval_species_names=retrieval_species_names,
-                n_live_points=n_live_points
+                n_live_points=n_live_points,
+                exposure_time=planet.transit_duration * n_transits
             )
         )
 
@@ -551,7 +572,7 @@ def main(planet_name, output_directory, additional_data_directory, wavelength_mi
 
         init_and_run_retrieval(
             comm, rank, planet, line_species_str, mode, retrieval_directory, retrieval_base_names[j],
-            n_live_points, add_noise, wavelengths_borders, integration_times_ref, wavelengths_instrument,
+            n_live_points, add_noise, wavelengths_borders, integration_times_ref, n_transits, wavelengths_instrument,
             instrument_snr, snr_file, telluric_transmittance, airmass, variable_throughput,
             instrument_resolving_power, load_from, plot, retrieved_species, co2_mode, rewrite, resume
         )
@@ -571,6 +592,7 @@ if __name__ == '__main__':
             wavelength_max=args.wavelength_max,
             mode=args.mode,
             n_live_points=args.n_live_points,
+            n_transits=args.n_transits,
             co2_mode=args.co2,
             rewrite=args.no_rewrite,
             resume=args.resume
@@ -586,6 +608,7 @@ if __name__ == '__main__':
             output_directory=args.output_directory,
             mode=args.mode,
             n_live_points=args.n_live_points,
+            n_transits=args.n_transits,
             jobs_config_filename=args.jobs_config_filename,
             line_species=line_strs
         )

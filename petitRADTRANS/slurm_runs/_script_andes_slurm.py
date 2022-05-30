@@ -127,6 +127,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '--n-transits',
+    type=float,
+    default=1.0,
+    help='number of planetary transits'
+)
+
+parser.add_argument(
     '--co2',
     action='store_true',
     help='if activated, switch to the full CO2 atmosphere mode'
@@ -207,7 +214,7 @@ def fair_share(array, n_entities, append_within_existing=True):
 
 def main(python_script, template_filename, output_directory, additional_data_directory, planets, n_nodes,
          n_cores_per_cpus, n_cpus_per_nodes, n_jobs_per_calls, wavelength_min, wavelength_max, n_wavelength_bins,
-         mode, n_live_points, co2_mode,
+         mode, n_live_points, n_transits, co2_mode,
          job_basename='pRT_ANDES', rewrite=True, resume=False, mpi_control=True):
     # Generate bins array
     wavelengths_borders = [wavelength_min, wavelength_max]
@@ -241,6 +248,13 @@ def main(python_script, template_filename, output_directory, additional_data_dir
         print("All the jobs will be called at once.")
         n_jobs_per_calls = n_jobs_node_max
 
+    # Re-adjust nodes per run attribution
+    if n_jobs_node_max < n_nodes:
+        n_nodes_per_run = int(np.floor(n_nodes / n_jobs_node_max))
+        n_nodes = n_nodes_per_run
+    else:
+        n_nodes_per_run = 1
+
     for planet in planets:
         job_basename_planet = f"{job_basename}_{planet.lower().replace(' ', '_')}"
         job_names = []
@@ -263,7 +277,7 @@ def main(python_script, template_filename, output_directory, additional_data_dir
                 if mpi_control:
                     run_command = f"mpiexec -n {int(tasks_per_node / node_job.size)}"
                 else:
-                    run_command = f"srun -N 1 -n {tasks_per_node}"
+                    run_command = f"srun -N {n_nodes_per_run} -n {tasks_per_node * n_nodes_per_run}"
 
                 # Have one run per CPU instead of one run per node
                 for cpu_run in node_job:
@@ -275,7 +289,8 @@ def main(python_script, template_filename, output_directory, additional_data_dir
                         f"--wavelength-min {wavelength_bins[cpu_run - 1]} "
                         f"--wavelength-max {wavelength_bins[cpu_run]} "
                         f"--mode '{mode}' "
-                        f"--n-live-points {n_live_points}"
+                        f"--n-live-points {n_live_points} "
+                        f"--n-transits {n_transits}"
                     )
 
                     if co2_mode:
@@ -308,7 +323,15 @@ def main(python_script, template_filename, output_directory, additional_data_dir
 
         # Save jobs configuration
         # This file can be used to easily collect the results after the call
-        jobs_config_file = os.path.join(output_directory, job_basename_planet + '.npz')
+        if co2_mode:
+            atm = 'co2'
+        else:
+            atm = 'h2he'
+
+        jobs_config_file = os.path.join(output_directory, job_basename_planet +
+                                        f"_{n_transits}t_"
+                                        f"{wavelength_min:.3f}-{wavelength_max:.3f}um_{n_wavelength_bins}bins_" \
+                                        f"{atm}_{n_live_points}lp" + '.npz')
 
         print(f"Saving jobs configuration for planet {planet} in file '{jobs_config_file}'...")
         np.savez_compressed(
@@ -355,6 +378,7 @@ if __name__ == '__main__':
         n_wavelength_bins=args.nwavelength_bins,
         mode=args.mode,
         n_live_points=args.n_live_points,
+        n_transits=args.n_transits,
         co2_mode=args.co2,
         job_basename=args.job_base_name,
         rewrite=args.no_rewrite,

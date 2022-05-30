@@ -394,16 +394,17 @@ def _transit_radius_model(prt_object, parameters):
     return wlen_model, planet_transit_radius
 
 
-def get_retrieval_name(planet, mode, wavelength_min, wavelength_max, retrieval_species_names, n_live_points):
+def get_retrieval_name(planet, mode, wavelength_min, wavelength_max, retrieval_species_names, n_live_points,
+                       exposure_time):
     return f"{planet.name.lower().replace(' ', '_')}_" \
-           f"{mode}_{wavelength_min:.3f}-{wavelength_max:.3f}um_" \
+           f"{mode}_{exposure_time:.3e}s_{wavelength_min:.3f}-{wavelength_max:.3f}um_" \
            f"{'_'.join(retrieval_species_names)}_{n_live_points}lp"
 
 
 # Useful functions
 def init_mock_observations(planet, line_species_str, mode,
                            retrieval_directory, retrieval_name,
-                           add_noise, wavelengths_borders, integration_times_ref,
+                           add_noise, wavelengths_borders, integration_times_ref, n_transits=1.0,
                            wavelengths_instrument=None, instrument_snr=None, snr_file=None,
                            telluric_transmittance=None, airmass=None, variable_throughput=None,
                            instrument_resolving_power=1e5,
@@ -450,7 +451,11 @@ def init_mock_observations(planet, line_species_str, mode,
 
     if ndit_half > 1:
         print(f"Matching SNR to number of NDIT (SNR is assumed to be given for 2 times the transit duration)")  # for pre and post transit
-        instrument_snr = instrument_snr / np.sqrt(ndit_half * 2)
+        instrument_snr /= np.sqrt(ndit_half * 2)
+
+    if n_transits != 1.0:
+        print(f"Adjusting SNR for {n_transits} transits (SNR is assumed to be given for 1 transit)")
+        instrument_snr *= np.sqrt(n_transits)
 
     wavelengths_instrument = wavelengths_instrument[wh]
     instrument_snr = np.ma.masked_less_equal(instrument_snr, 1.0)
@@ -610,6 +615,7 @@ def init_mock_observations(planet, line_species_str, mode,
             'planet_rest_frame_shift': Param(0.0),
             'planet_orbital_inclination': Param(planet.orbital_inclination),
             'orbital_phases': Param(orbital_phases),
+            'integration_time': Param(integration_times_ref),
             'airmass': Param(airmass),
             'instrument_resolving_power': Param(instrument_resolving_power),
             'wavelengths_instrument': Param(wavelengths_instrument),
