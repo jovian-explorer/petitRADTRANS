@@ -226,8 +226,9 @@ def get_log_evidences(planet_name, output_directory, mode, n_live_points, n_tran
         n_live_points=n_live_points,
         exposure_time=planet.transit_duration * n_transits,
         line_species=line_species
-    )[0] + f"_{len(line_species)}bins_log_evidences.npz"
-    result_filename = os.path.join(retrieval_output_directory, file_basename )
+    )[0] + f"_{len(line_species) - 1}bins_"
+
+    result_filename = os.path.join(retrieval_output_directory, file_basename + "log_evidences.npz")
 
     print(f"Saving log-evidences in file '{result_filename}'")
 

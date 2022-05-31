@@ -330,7 +330,7 @@ def main(python_script, template_filename, output_directory, additional_data_dir
 
         jobs_config_file = os.path.join(output_directory, job_basename_planet +
                                         f"_{n_transits}t_"
-                                        f"{wavelength_min:.3f}-{wavelength_max:.3f}um_{n_wavelength_bins}bins_" \
+                                        f"{wavelength_min:.3f}-{wavelength_max:.3f}um_{n_wavelength_bins - 1}bins_" \
                                         f"{atm}_{n_live_points}lp" + '.npz')
 
         print(f"Saving jobs configuration for planet {planet} in file '{jobs_config_file}'...")
