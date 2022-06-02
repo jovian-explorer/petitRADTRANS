@@ -164,8 +164,12 @@ class Data:
                 else:
                     self.loadtxt(path_to_observations)
 
-                self.wlen_range_pRT = [0.95 * self.wlen[0], \
+                if wlen_range_micron is not None:
+                    self.wlen_range_pRT = wlen_range_micron
+                else:
+                    self.wlen_range_pRT = [0.95 * self.wlen[0], \
                                     1.05 * self.wlen[-1]]
+
                 if wlen_bins is not None:
                     self.wlen_bins = wlen_bins
                 else:
