@@ -19,6 +19,7 @@ import numpy as np
 from petitRADTRANS.ccf.high_resolution_retrieval_HD_189733_b import all_species, init_mock_observations, init_run, \
     get_retrieval_name
 from petitRADTRANS.ccf.high_resolution_retrieval_TRAPPIST_1_b import init_mock_observations_co2
+from petitRADTRANS.ccf.high_resolution_retrieval_TRAPPIST_1_b_telluric import init_mock_observations_co2t
 from petitRADTRANS.ccf.model_containers import Planet
 from petitRADTRANS.radtrans import Radtrans
 from petitRADTRANS.retrieval import Retrieval
@@ -126,6 +127,8 @@ line_species_strs_co2 = [
     ['CO2_main_iso'],
     []
 ]
+
+telluric_bias = False  # must be False by default; if True, telluric lines won't be removed from the data and will be added to the model
 
 
 def get_log_evidences(planet_name, output_directory, mode, n_live_points, n_transits,
@@ -309,6 +312,9 @@ def get_retrieval_base_names(planet, mode, wavelength_min, wavelength_max, n_liv
             )
         )
 
+        if telluric_bias:
+            retrieval_base_names[-1] += '_tb'
+
     return retrieval_base_names
 
 
@@ -339,7 +345,12 @@ def init_and_run_retrieval(comm, rank, planet, line_species_str, mode, retrieval
             print(f"Running retrieval '{retrieval_name}'")
 
     if co2_mode:
-        init_mo = init_mock_observations_co2
+        if not telluric_bias:
+            init_mo = init_mock_observations_co2
+        else:
+            import warnings
+            warnings.warn("Telluric lines won't be removed!")
+            init_mo = init_mock_observations_co2t
     else:
         init_mo = init_mock_observations
 
@@ -520,30 +531,15 @@ def main(planet_name, output_directory, additional_data_directory, wavelength_mi
     else:
         line_species = line_species_strs
 
-    retrieval_base_names = []
-
-    for line_species_str in line_species:
-        retrieval_species_names = []
-
-        for species in line_species_str:
-            species = species.replace('_main_iso', '')
-
-            if species == 'CO_36':
-                species = '13CO'
-
-            retrieval_species_names.append(species)
-
-        retrieval_base_names.append(
-            get_retrieval_name(
-                planet=planet,
-                mode=mode,
-                wavelength_min=wavelength_min,
-                wavelength_max=wavelength_max,
-                retrieval_species_names=retrieval_species_names,
-                n_live_points=n_live_points,
-                exposure_time=planet.transit_duration * n_transits
-            )
-        )
+    retrieval_base_names = get_retrieval_base_names(
+        planet=planet,
+        mode=mode,
+        wavelength_min=wavelengths_borders[0],
+        wavelength_max=wavelengths_borders[1],
+        n_live_points=n_live_points,
+        line_species=line_species,
+        exposure_time=planet.transit_duration * n_transits
+    )
 
     retrieval_output_directory = get_retrievals_directory(
         planet_name=planet_name,

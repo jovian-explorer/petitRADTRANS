@@ -77,6 +77,9 @@ def main(sim_id=0):
         # 'M': 76.89
     }
 
+    wavelengths_borders = wavelengths_borders[band]
+    integration_times_ref = integration_times_ref[band]
+
     setting = '2192'
 
     snr_file = os.path.join(module_dir, 'crires',
@@ -98,14 +101,24 @@ def main(sim_id=0):
             retrieval_model, \
             wavelength_instrument, reduced_mock_observations, error \
             = init_mock_observations(
-                planet, line_species_str, mode,
-                retrieval_directory, retrieval_name, n_live_points,
-                add_noise, band, wavelengths_borders, integration_times_ref,
-                wavelengths_instrument=wavelengths_instrument, instrument_snr=instrument_snr, snr_file=snr_file,
-                telluric_transmittance=telluric_transmittance, airmass=airmass,
+                planet=planet,
+                line_species_str=line_species_str,
+                mode=mode,
+                retrieval_directory=retrieval_directory,
+                retrieval_name=retrieval_name,
+                add_noise=add_noise,
+                wavelengths_borders=wavelengths_borders,
+                integration_times_ref=integration_times_ref,
+                n_transits=1,
+                wavelengths_instrument=wavelengths_instrument,
+                instrument_snr=instrument_snr,
+                snr_file=snr_file,
+                telluric_transmittance=telluric_transmittance,
+                airmass=airmass,
                 variable_throughput=variable_throughput,
                 instrument_resolving_power=instrument_resolving_power,
-                load_from=load_from, plot=plot
+                load_from=load_from,
+                plot=plot
             )
 
         retrieval_parameters = {
@@ -901,11 +914,14 @@ def main_hd(sim_id=0):
         # 'M': 76.89
     }
 
+    wavelengths_borders = wavelengths_borders[band]
+    integration_times_ref = integration_times_ref[band]
+
     snr_file = os.path.join(module_dir, 'andes', star_name.replace(' ', '_'), f"ANDES_snrs.npz")
-    telluric_transmittance = os.path.join(module_dir, 'andes', 'sky', 'sky', 'transmission',
+    telluric_transmittance = os.path.join(module_dir, 'andes', 'sky', 'transmission',
                                           f"transmission_1500_2500.dat")
     airmass = os.path.join(module_dir, 'andes', star_name.replace(' ', '_'), 'airmass_optimal.txt')
-    variable_throughput = os.path.join(module_dir, 'metis', 'brogi_crires_test')
+    variable_throughput = os.path.join(module_dir, 'metis', 'brogi_crires_test', 'algn.npy')
 
     wavelengths_instrument = None
     instrument_snr = None
@@ -920,8 +936,8 @@ def main_hd(sim_id=0):
             wavelength_instrument, reduced_mock_observations, error \
             = init_mock_observations(
                 planet, line_species_str, mode,
-                retrieval_directory, retrieval_name, n_live_points,
-                add_noise, band, wavelengths_borders, integration_times_ref,
+                retrieval_directory, retrieval_name,
+                add_noise, wavelengths_borders[band], integration_times_ref[band],
                 wavelengths_instrument=wavelengths_instrument, instrument_snr=instrument_snr, snr_file=snr_file,
                 telluric_transmittance=telluric_transmittance, airmass=airmass,
                 variable_throughput=variable_throughput,

@@ -30,15 +30,14 @@ planet_models_directory = os.path.abspath(os.path.dirname(__file__) + os.path.se
 
 class BaseSpectralModel:
     # TODO ideally this should inherit from Radtrans, but it cannot be done right now because when Radtrans is init, it takes ages to load opacity data
-    def __init__(self, wavelengths_boundaries, pressures, temperatures=None,
+    def __init__(self, pressures, temperatures=None,
                  mass_mixing_ratios=None, mean_molar_masses=None,
                  line_species=None, rayleigh_species=None, continuum_opacities=None, cloud_species=None,
                  opacity_mode='lbl', do_scat_emis=True, lbl_opacity_sampling=1,
-                 wavelengths=None, transit_radii=None, spectral_radiosities=None,
+                 wavelengths_boundaries=None, wavelengths=None, transit_radii=None, spectral_radiosities=None,
                  times=None,
                  **model_parameters):
         # Atmosphere/Radtrans parameters
-        self.wavelengths_boundaries = wavelengths_boundaries
         self.pressures = pressures
         self.lbl_opacity_sampling = lbl_opacity_sampling
         self.do_scat_emis = do_scat_emis
@@ -80,6 +79,23 @@ class BaseSpectralModel:
         # Other model parameters
         self.model_parameters = model_parameters
 
+        print('output_wavelengths' in self.model_parameters, 'output_wavelengths' in model_parameters)
+
+        if 'output_wavelengths' in self.model_parameters:
+            self.wavelengths_boundaries = self.get_optimal_wavelength_boundaries(
+                output_wavelengths=self.model_parameters['output_wavelengths']
+            )
+
+            if wavelengths_boundaries is not None:
+                print(f"Overriding wavelengths boundaries")
+        else:
+            if wavelengths_boundaries is None:
+                raise TypeError(f"key 'output_wavelengths' not in attribute model_parameters: "
+                                f"{self.__class__.__name__}.__init__() missing required argument "
+                                f"'wavelengths_boundaries'")
+
+            self.wavelengths_boundaries = wavelengths_boundaries
+
     @staticmethod
     def calculate_mass_mixing_ratios(pressures, **kwargs):
         """Template for mass mixing ratio profile function.
@@ -96,6 +112,13 @@ class BaseSpectralModel:
             species: mass_mixing_ratio * np.ones(np.size(pressures))
             for species, mass_mixing_ratio in kwargs['imposed_mass_mixing_ratios'].items()
         }
+
+    @staticmethod
+    def calculate_max_radial_orbital_velocity(star_mass, semi_major_axis, **kwargs):
+        return Planet.calculate_orbital_velocity(
+            star_mass=star_mass,
+            semi_major_axis=semi_major_axis
+        )
 
     @staticmethod
     def calculate_mean_molar_masses(mass_mixing_ratios, **kwargs):
@@ -115,6 +138,12 @@ class BaseSpectralModel:
         if 'star_spectral_radiosities' in kwargs:
             if kwargs['star_spectral_radiosities'] is None:
                 kwargs['star_spectral_radiosities'] = BaseSpectralModel.calculate_star_spectral_radiosity(
+                    **kwargs
+                )
+
+        if 'planet_max_radial_orbital_velocity' in kwargs:
+            if kwargs['planet_max_radial_orbital_velocity'] is None:
+                kwargs['planet_max_radial_orbital_velocity'] = BaseSpectralModel.calculate_max_radial_orbital_velocity(
                     **kwargs
                 )
 
@@ -340,6 +369,17 @@ class BaseSpectralModel:
                 yc[i] += yp[i - j] * g
 
         return yc[int(filter.shape[-1] / 2):y.size + int(filter.shape[-1] / 2)]
+
+    def get_optimal_wavelength_boundaries(self, output_wavelengths):
+        rebin_required_interval = [
+            output_wavelengths[0] - (output_wavelengths[1] - output_wavelengths[0]) / 2,
+            output_wavelengths[-1] + (output_wavelengths[-1] - output_wavelengths[-2]) / 2,
+        ]
+
+        rebin_required_interval[0] -= 10 ** (np.floor(np.log10(rebin_required_interval[0])) - sys.float_info.dig)
+        rebin_required_interval[1] += 10 ** (np.floor(np.log10(rebin_required_interval[1])) - sys.float_info.dig)
+
+        return rebin_required_interval
 
     def get_parameters_dict(self):
         parameters_dict = {}
@@ -3174,7 +3214,7 @@ class SpectralModel2(BaseSpectralModel):
     def calculate_mass_mixing_ratios(pressures, line_species=None,
                                      included_line_species='all', temperatures=None, co_ratio=0.55,
                                      log10_metallicity=None, carbon_pressure_quench=None,
-                                     imposed_mass_mixing_ratios=None, heh2_ratio=0.324324,
+                                     imposed_mass_mixing_ratios=None, heh2_ratio=0.324324, c13c12_ratio=0.01,
                                      planet_mass=None, planet_radius=None, planet_surface_gravity=None,
                                      star_metallicity=1.0, atmospheric_mixing=1.0, alpha=-0.68, beta=7.2,
                                      use_equilibrium_chemistry=False, verbose=False, **kwargs):
@@ -3207,6 +3247,7 @@ class SpectralModel2(BaseSpectralModel):
             carbon_pressure_quench: (bar) pressure where the carbon species are quenched, used with equilibrium chemistry
             imposed_mass_mixing_ratios: imposed mass mixing ratios
             heh2_ratio: H2 over He mass mixing ratio
+            c13c12_ratio: 13C over 12C mass mixing ratio in equilibrium chemistry
             planet_mass: (g) mass of the planet; if None, planet mass is calculated from planet radius and surface gravity, used to calulate metallicity
             planet_radius: (cm) radius of the planet, used to calculate the mass
             planet_surface_gravity: (cm.s-2) surface gravity of the planet, used to calculate the mass
@@ -3215,6 +3256,7 @@ class SpectralModel2(BaseSpectralModel):
             alpha: power of the mass-metallicity relation
             beta: scaling factor of the mass-metallicity relation
             use_equilibrium_chemistry: if True, use pRT equilibrium chemistry module
+            verbose: if True, print additional information
 
         Returns:
             A dictionary containing the mass mixing ratios.
@@ -3281,6 +3323,22 @@ class SpectralModel2(BaseSpectralModel):
                 carbon_pressure_quench=carbon_pressure_quench,
                 imposed_mass_mixing_ratios=imposed_mass_mixing_ratios
             )
+
+            # TODO more general handling of isotopologues (use smarter species names)
+            if 'CO_main_iso' in line_species and 'CO_all_iso' in line_species:
+                raise ValueError(f"cannot add main isotopologue and all isotopologues of CO at the same time")
+
+            if 'CO_all_iso' not in line_species:
+                co_mass_mixing_ratio = copy.copy(mass_mixing_ratios_equilibrium['CO'])
+
+                if 'CO_main_iso' in line_species:
+                    mass_mixing_ratios_equilibrium['CO'] = co_mass_mixing_ratio / (1 + c13c12_ratio)
+                    mass_mixing_ratios_equilibrium['CO_36'] = \
+                        co_mass_mixing_ratio - mass_mixing_ratios_equilibrium['CO']
+                elif 'CO_36' in line_species:
+                    mass_mixing_ratios_equilibrium['CO_36'] = co_mass_mixing_ratio / (1 + 1 / c13c12_ratio)
+                    mass_mixing_ratios_equilibrium['CO'] = \
+                        co_mass_mixing_ratio - mass_mixing_ratios_equilibrium['CO_36']
 
             if imposed_mass_mixing_ratios == {}:
                 imposed_mass_mixing_ratios = copy.copy(mass_mixing_ratios_equilibrium)
@@ -3609,10 +3667,11 @@ class SpectralModel2(BaseSpectralModel):
             spec = species.split('_', 1)[0]
 
             if spec in self.mass_mixing_ratios:
-                if species not in self.mass_mixing_ratios:
+                if species not in self.mass_mixing_ratios and species != 'K':
                     self.mass_mixing_ratios[species] = self.mass_mixing_ratios[spec]
 
-                del self.mass_mixing_ratios[spec]
+                if species != 'K':  # TODO fix this K special case by choosing smarter opacities names
+                    del self.mass_mixing_ratios[spec]
 
 
 class RetrievalSpectralModel(SpectralModel):
