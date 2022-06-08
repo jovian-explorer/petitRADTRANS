@@ -28,7 +28,7 @@ copyright = u'2019-2020, Paul Molli\u00E8re'
 author = u'Paul Molli\u00E8re'
 
 # The full version, including alpha/beta/rc tags
-release = '2.4.2'
+release = version
 
 
 # -- General configuration ---------------------------------------------------

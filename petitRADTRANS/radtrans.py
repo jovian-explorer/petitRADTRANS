@@ -1892,7 +1892,10 @@ class Radtrans(_read_opacities.ReadOpacities):
 
         def integrand(press):
             temp = temperature(press)
-            mu = MMW(press, temp)
+            mu = MMW(press / 1e6, temp)
+            if not np.isscalar(mu):
+                mu = mu[0]
+
             integ = mu * nc.amu * gravity * R_pl_sq / nc.kB / temp
             return integ
 
