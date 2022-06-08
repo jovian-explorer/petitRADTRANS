@@ -397,6 +397,9 @@ class Radtrans(_read_opacities.ReadOpacities):
             g_len = 1
 
             # Read in the frequency range of the opacity data
+            if self.lbl_opacity_sampling is not None:
+                freq_len += self.lbl_opacity_sampling - 1
+
             wlen = fi.read_wlen(arr_min, freq_len, path_length)
             freq = nc.c / wlen
 

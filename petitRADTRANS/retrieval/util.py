@@ -227,7 +227,8 @@ def teff_calc(waves,model,dist=1.0,r_pl=1.0):
     #print(summed)
     return (summed.value)**0.25
 
-def bin_species_exok(species,resolution):
+
+def bin_species_exok(species, resolution):
     """
     This function uses exo-k to bin the c-k table of a
     single species to a desired (lower) spectral resolution.
@@ -238,21 +239,30 @@ def bin_species_exok(species,resolution):
         resolution : int
             The desired spectral resolving power.
     """
-    from petitRADTRANS import Radtrans
-    prt_path = os.environ.get("pRT_input_data_path")
-    atmosphere = Radtrans(line_species = species,
-                            wlen_bords_micron = [0.1, 251.])
-    ck_path = prt_path + 'opacities/lines/corr_k/'
+    from petitRADTRANS.radtrans import Radtrans
+    from petitRADTRANS.config import petitradtrans_config
+
+    prt_path = petitradtrans_config['Paths']['prt_input_data_path']
+    atmosphere = Radtrans(
+        line_species=species,
+        wlen_bords_micron=[0.1, 251.]
+    )
+    ck_path = os.path.join(prt_path, 'opacities/lines/corr_k/')
+
     print("Saving to " + ck_path)
     print("Resolution: ", resolution)
+
     masses = {}
+
     for spec in species:
         masses[spec.split('_')[0]] = getMM(spec)
-    atmosphere.write_out_rebin(int(resolution),
-                                path = ck_path,
-                                species = species,
-                                masses = masses)
-    return
+
+    atmosphere.write_out_rebin(
+        resolution=int(resolution),
+        path=ck_path,
+        species=species,
+        masses=masses
+    )
 
 ########################
 # File Formatting

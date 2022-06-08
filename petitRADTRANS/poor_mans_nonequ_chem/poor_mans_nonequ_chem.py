@@ -107,6 +107,12 @@ def interpol_abundances(COs_goal_in, FEHs_goal_in, temps_goal_in, pressures_goal
     co_ratios_goal, fehs_goal, temps_goal, pressures_goal = \
         cp.copy(COs_goal_in), cp.copy(FEHs_goal_in), cp.copy(temps_goal_in), cp.copy(pressures_goal_in)
 
+    co_ratios_goal, fehs_goal, temps_goal, pressures_goal = \
+        np.array(co_ratios_goal).reshape(-1), \
+        np.array(fehs_goal).reshape(-1), \
+        np.array(temps_goal).reshape(-1), \
+        np.array(pressures_goal).reshape(-1)
+
     # Apply boundary treatment
     co_ratios_goal[co_ratios_goal <= np.min(COs)] = np.min(COs) + 1e-6
     co_ratios_goal[co_ratios_goal >= np.max(COs)] = np.max(COs) - 1e-6
