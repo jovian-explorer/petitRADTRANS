@@ -9,7 +9,7 @@ import numpy as np
 
 from .context import petitRADTRANS
 
-version = "2.4.1"  # petitRADTRANS.version.version used to generate last tests
+version = "2.4.5"  # petitRADTRANS.version.version used to generate last tests
 
 tests_data_directory = os.path.join(os.path.dirname(__file__), 'data')
 tests_error_directory = os.path.join(os.path.dirname(__file__), 'errors')
