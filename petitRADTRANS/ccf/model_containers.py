@@ -79,12 +79,19 @@ class BaseSpectralModel:
         # Other model parameters
         self.model_parameters = model_parameters
 
-        print('output_wavelengths' in self.model_parameters, 'output_wavelengths' in model_parameters)
-
         if 'output_wavelengths' in self.model_parameters:
-            self.wavelengths_boundaries = self.get_optimal_wavelength_boundaries(
-                output_wavelengths=self.model_parameters['output_wavelengths']
-            )
+            if 'relative_velocities' in self.model_parameters:
+                self.model_parameters['relative_velocities'], \
+                    self.model_parameters['planet_max_radial_orbital_velocity'] = \
+                    self.__calculate_radial_velocities_wrap(
+                        calculate_max_radial_orbital_velocity_function=self.calculate_max_radial_orbital_velocity,
+                        calculate_relative_velocities_function=self.calculate_relative_velocities,
+                        **self.model_parameters
+                    )
+            else:
+                self.model_parameters['relative_velocities'] = np.zeros(1)
+
+            self.wavelengths_boundaries = self.get_optimal_wavelength_boundaries()
 
             if wavelengths_boundaries is not None:
                 print(f"Overriding wavelengths boundaries")
@@ -95,6 +102,33 @@ class BaseSpectralModel:
                                 f"'wavelengths_boundaries'")
 
             self.wavelengths_boundaries = wavelengths_boundaries
+
+    @staticmethod
+    def __calculate_radial_velocities_wrap(calculate_max_radial_orbital_velocity_function,
+                                           calculate_relative_velocities_function, **kwargs):
+        if 'planet_max_radial_orbital_velocity' in kwargs:
+            if kwargs['planet_max_radial_orbital_velocity'] is None:
+                planet_max_radial_orbital_velocity = calculate_max_radial_orbital_velocity_function(
+                    **kwargs
+                )
+            else:
+                planet_max_radial_orbital_velocity = kwargs['planet_max_radial_orbital_velocity']
+        else:
+            planet_max_radial_orbital_velocity = calculate_max_radial_orbital_velocity_function(
+                **kwargs
+            )
+
+        if 'relative_velocities' in kwargs:
+            if kwargs['relative_velocities'] is None:
+                relative_velocities = calculate_relative_velocities_function(
+                    **kwargs
+                )
+            else:
+                relative_velocities = kwargs['relative_velocities']
+        else:
+            relative_velocities = None
+
+        return relative_velocities, planet_max_radial_orbital_velocity
 
     @staticmethod
     def calculate_mass_mixing_ratios(pressures, **kwargs):
@@ -141,24 +175,27 @@ class BaseSpectralModel:
                     **kwargs
                 )
 
-        if 'planet_max_radial_orbital_velocity' in kwargs:
-            if kwargs['planet_max_radial_orbital_velocity'] is None:
-                kwargs['planet_max_radial_orbital_velocity'] = BaseSpectralModel.calculate_max_radial_orbital_velocity(
-                    **kwargs
-                )
-
-        if 'relative_velocities' in kwargs:
-            if kwargs['relative_velocities'] is None:
-                kwargs['relative_velocities'] = BaseSpectralModel.calculate_relative_velocities(
+        if 'planet_max_radial_orbital_velocity' in kwargs or 'relative_velocities' in kwargs:
+            kwargs['relative_velocities'], kwargs['planet_max_radial_orbital_velocity'] = \
+                BaseSpectralModel.__calculate_radial_velocities_wrap(
+                    calculate_max_radial_orbital_velocity_function=
+                    BaseSpectralModel.calculate_max_radial_orbital_velocity,
+                    calculate_relative_velocities_function=
+                    BaseSpectralModel.calculate_relative_velocities,
                     **kwargs
                 )
 
         return kwargs
 
     @staticmethod
-    def calculate_relative_velocities(planet_max_radial_orbital_velocity, orbital_longitudes=None,
-                                      planet_orbital_inclination=None, system_observer_radial_velocities=None,
+    def calculate_relative_velocities(orbital_longitudes=None, planet_orbital_inclination=None,
+                                      planet_max_radial_orbital_velocity=None, system_observer_radial_velocities=None,
                                       planet_rest_frame_shift=0.0, **kwargs):
+        if planet_max_radial_orbital_velocity is None:
+            planet_max_radial_orbital_velocity = BaseSpectralModel.calculate_max_radial_orbital_velocity(
+                **kwargs
+            )
+
         if -sys.float_info.min < planet_max_radial_orbital_velocity < sys.float_info.min:
             relative_velocities = 0.0
         else:
@@ -370,11 +407,45 @@ class BaseSpectralModel:
 
         return yc[int(filter.shape[-1] / 2):y.size + int(filter.shape[-1] / 2)]
 
-    def get_optimal_wavelength_boundaries(self, output_wavelengths):
+    def get_optimal_wavelength_boundaries(self):
+        """Return the optimal wavelength boundaries for rebin on output wavelengths.
+        This minimises the number of wavelengths to load and over which to calculate the spectra.
+        Doppler shifting is also taken into account.
+
+        The SpectralModel must have in its model_parameters keys:
+            -  'output_wavelengths': (um) the wavelengths to rebin to
+
+        The SpectralModel can have in its model_parameters keys:
+            - 'relative_velocities' (cm.s-1) the velocities of the source relative to the observer, in that case the
+                wavelength range is increased to take into account Doppler shifting
+
+        Returns:
+            rebin_required_interval: (um) the optimal wavelengths boundaries for the spectrum
+        """
         rebin_required_interval = [
-            output_wavelengths[0] - (output_wavelengths[1] - output_wavelengths[0]) / 2,
-            output_wavelengths[-1] + (output_wavelengths[-1] - output_wavelengths[-2]) / 2,
+            self.model_parameters['output_wavelengths'][0]
+            - (self.model_parameters['output_wavelengths'][1] - self.model_parameters['output_wavelengths'][0]) / 2,
+            self.model_parameters['output_wavelengths'][-1]
+            + (self.model_parameters['output_wavelengths'][-1] - self.model_parameters['output_wavelengths'][-2]) / 2,
         ]
+
+        if 'relative_velocities' in self.model_parameters:
+            relative_velocities_tmp = copy.deepcopy(self.model_parameters['relative_velocities'])
+            del self.model_parameters['relative_velocities']  # tmp remove parameters to prevent multiple argument def
+
+            rebin_required_interval[0] = self.shift_wavelengths(
+                wavelengths_rest=np.array([rebin_required_interval[0]]),
+                relative_velocities=np.array([np.min(relative_velocities_tmp)]),
+                **self.model_parameters
+            )[0][0]
+
+            rebin_required_interval[1] = self.shift_wavelengths(
+                wavelengths_rest=np.array([rebin_required_interval[1]]),
+                relative_velocities=np.array([np.max(relative_velocities_tmp)]),
+                **self.model_parameters
+            )[0][0]
+
+            self.model_parameters['relative_velocities'] = relative_velocities_tmp
 
         rebin_required_interval[0] -= 10 ** (np.floor(np.log10(rebin_required_interval[0])) - sys.float_info.dig)
         rebin_required_interval[1] += 10 ** (np.floor(np.log10(rebin_required_interval[1])) - sys.float_info.dig)
@@ -470,6 +541,7 @@ class BaseSpectralModel:
             raise ValueError(f"mode must be 'emission' or 'transmission', not '{mode}'")
 
         wavelengths = copy.copy(self.wavelengths)
+
         # TODO transform star spectral radiosity as well in emission mode
         if shift:
             wavelengths = self.shift_wavelengths(
