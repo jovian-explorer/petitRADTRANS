@@ -30,10 +30,10 @@ planet_models_directory = os.path.abspath(os.path.dirname(__file__) + os.path.se
 
 class BaseSpectralModel:
     # TODO ideally this should inherit from Radtrans, but it cannot be done right now because when Radtrans is init, it takes ages to load opacity data
-    def __init__(self, pressures, temperatures=None,
-                 mass_mixing_ratios=None, mean_molar_masses=None,
+    def __init__(self, pressures,
                  line_species=None, rayleigh_species=None, continuum_opacities=None, cloud_species=None,
                  opacity_mode='lbl', do_scat_emis=True, lbl_opacity_sampling=1,
+                 temperatures=None, mass_mixing_ratios=None, mean_molar_masses=None,
                  wavelengths_boundaries=None, wavelengths=None, transit_radii=None, spectral_radiosities=None,
                  times=None,
                  **model_parameters):
@@ -79,29 +79,33 @@ class BaseSpectralModel:
         # Other model parameters
         self.model_parameters = model_parameters
 
-        if 'output_wavelengths' in self.model_parameters:
-            if 'relative_velocities' in self.model_parameters:
-                self.model_parameters['relative_velocities'], \
-                    self.model_parameters['planet_max_radial_orbital_velocity'] = \
-                    self.__calculate_radial_velocities_wrap(
-                        calculate_max_radial_orbital_velocity_function=self.calculate_max_radial_orbital_velocity,
-                        calculate_relative_velocities_function=self.calculate_relative_velocities,
-                        **self.model_parameters
-                    )
+        # Wavelength boundaries
+        if wavelengths_boundaries is None and self.wavelengths is not None:
+            wavelengths_boundaries = [np.min(self.wavelengths), np.max(self.wavelengths)]
+
+        if wavelengths_boundaries is None:
+            if 'output_wavelengths' in self.model_parameters:
+                if 'relative_velocities' in self.model_parameters \
+                        or 'orbital_longitudes' in self.model_parameters\
+                        or 'orbital_phases' in self.model_parameters:
+                    self.model_parameters['relative_velocities'], \
+                        self.model_parameters['planet_max_radial_orbital_velocity'], \
+                        self.model_parameters['orbital_longitudes'] = \
+                        self.__calculate_radial_velocities_wrap(
+                            calculate_max_radial_orbital_velocity_function=self.calculate_max_radial_orbital_velocity,
+                            calculate_relative_velocities_function=self.calculate_relative_velocities,
+                            **self.model_parameters
+                        )
+                else:
+                    self.model_parameters['relative_velocities'] = np.zeros(1)
+
+                wavelengths_boundaries = self.get_optimal_wavelength_boundaries()
             else:
-                self.model_parameters['relative_velocities'] = np.zeros(1)
+                raise TypeError(f"missing required argument "
+                                f"'wavelengths_boundaries', add this argument to manually set the boundaries or "
+                                f"add keyword argument 'output_wavelengths' to set the boundaries automatically")
 
-            self.wavelengths_boundaries = self.get_optimal_wavelength_boundaries()
-
-            if wavelengths_boundaries is not None:
-                print(f"Overriding wavelengths boundaries")
-        else:
-            if wavelengths_boundaries is None:
-                raise TypeError(f"key 'output_wavelengths' not in attribute model_parameters: "
-                                f"{self.__class__.__name__}.__init__() missing required argument "
-                                f"'wavelengths_boundaries'")
-
-            self.wavelengths_boundaries = wavelengths_boundaries
+        self.wavelengths_boundaries = wavelengths_boundaries
 
     @staticmethod
     def __calculate_radial_velocities_wrap(calculate_max_radial_orbital_velocity_function,
@@ -118,17 +122,31 @@ class BaseSpectralModel:
                 **kwargs
             )
 
+        if 'orbital_phases' in kwargs and 'orbital_longitudes' not in kwargs:
+            if kwargs['orbital_phases'] is not None:
+                orbital_longitudes = np.rad2deg(2 * np.pi * kwargs['orbital_phases'])
+            else:
+                orbital_longitudes = np.zeros(1)
+        else:
+            orbital_longitudes = np.zeros(1)
+
         if 'relative_velocities' in kwargs:
             if kwargs['relative_velocities'] is None:
                 relative_velocities = calculate_relative_velocities_function(
+                    orbital_longitudes=orbital_longitudes,
+                    planet_max_radial_orbital_velocity=planet_max_radial_orbital_velocity,
                     **kwargs
                 )
             else:
                 relative_velocities = kwargs['relative_velocities']
         else:
-            relative_velocities = None
+            relative_velocities = calculate_relative_velocities_function(
+                orbital_longitudes=orbital_longitudes,
+                planet_max_radial_orbital_velocity=planet_max_radial_orbital_velocity,
+                **kwargs
+            )
 
-        return relative_velocities, planet_max_radial_orbital_velocity
+        return relative_velocities, planet_max_radial_orbital_velocity, orbital_longitudes
 
     @staticmethod
     def calculate_mass_mixing_ratios(pressures, **kwargs):
@@ -175,8 +193,13 @@ class BaseSpectralModel:
                     **kwargs
                 )
 
-        if 'planet_max_radial_orbital_velocity' in kwargs or 'relative_velocities' in kwargs:
-            kwargs['relative_velocities'], kwargs['planet_max_radial_orbital_velocity'] = \
+        if 'planet_max_radial_orbital_velocity' in kwargs \
+                or 'relative_velocities' in kwargs \
+                or 'orbital_longitudes' in kwargs\
+                or 'orbital_phases' in kwargs:
+            kwargs['relative_velocities'], \
+                kwargs['planet_max_radial_orbital_velocity'], \
+                kwargs['orbital_longitudes'] = \
                 BaseSpectralModel.__calculate_radial_velocities_wrap(
                     calculate_max_radial_orbital_velocity_function=
                     BaseSpectralModel.calculate_max_radial_orbital_velocity,
@@ -185,11 +208,20 @@ class BaseSpectralModel:
                     **kwargs
                 )
 
+        if 'line_species' in kwargs:
+            del kwargs['line_species']
+
+        if 'pressures' in kwargs:
+            del kwargs['pressures']
+
+        if 'wavelengths' in kwargs:
+            del kwargs['wavelengths']
+
         return kwargs
 
     @staticmethod
-    def calculate_relative_velocities(orbital_longitudes=None, planet_orbital_inclination=None,
-                                      planet_max_radial_orbital_velocity=None, system_observer_radial_velocities=None,
+    def calculate_relative_velocities(orbital_longitudes, planet_orbital_inclination=90.0,
+                                      planet_max_radial_orbital_velocity=None, system_observer_radial_velocities=0.0,
                                       planet_rest_frame_shift=0.0, **kwargs):
         if planet_max_radial_orbital_velocity is None:
             planet_max_radial_orbital_velocity = BaseSpectralModel.calculate_max_radial_orbital_velocity(
@@ -275,14 +307,14 @@ class BaseSpectralModel:
             Tstar=star_effective_temperature,
             Pcloud=cloud_pressure,
             stellar_intensity=BaseSpectralModel.radiosity_erg_cm2radiosity_erg_hz(
-                star_spectral_radiosities, nc.c / radtrans.freq
+                star_spectral_radiosities, nc.c / radtrans.freq  # Hz to cm
             )
             # **kwargs  # TODO add kwargs once arguments names are made unambiguous
         )
 
         # Transform the outputs into the units of our data
         spectral_radiosity = BaseSpectralModel.radiosity_erg_hz2radiosity_erg_cm(radtrans.flux, radtrans.freq)
-        wavelengths = nc.c / radtrans.freq * 1e4  # cm to um
+        wavelengths = BaseSpectralModel.hz2um(radtrans.freq)
 
         return wavelengths, spectral_radiosity
 
@@ -298,7 +330,7 @@ class BaseSpectralModel:
         star_radiosities *= (star_radius / semi_major_axis) ** 2 / np.pi
 
         star_radiosities = BaseSpectralModel.radiosity_erg_hz2radiosity_erg_cm(
-            star_radiosities, nc.c / wavelengths * 1e4
+            star_radiosities, BaseSpectralModel.um2hz(wavelengths)
         )
 
         return star_radiosities
@@ -351,7 +383,7 @@ class BaseSpectralModel:
 
         # Convert into more useful units
         planet_transit_radius = copy.copy(radtrans.transm_rad)
-        wavelengths = nc.c / radtrans.freq * 1e4  # Hz to um
+        wavelengths = BaseSpectralModel.hz2um(radtrans.freq)
 
         return wavelengths, planet_transit_radius
 
@@ -407,6 +439,64 @@ class BaseSpectralModel:
 
         return yc[int(filter.shape[-1] / 2):y.size + int(filter.shape[-1] / 2)]
 
+    def get_instrument_model(self, wavelengths, spectrum, relative_velocities=None, shift=False, convolve=False, rebin=False):
+        if shift:
+            if 'relative_velocities' not in self.model_parameters:
+                raise TypeError(f"missing required parameter 'relative_velocities' for shifting")
+
+            relative_velocities_tmp = copy.deepcopy(self.model_parameters['relative_velocities'])
+            del self.model_parameters['relative_velocities']
+
+            if relative_velocities is None:
+                relative_velocities = copy.deepcopy(relative_velocities_tmp)
+
+            wavelengths = self.shift_wavelengths(
+                wavelengths_rest=wavelengths,
+                relative_velocities=relative_velocities,
+                **self.model_parameters
+            )
+
+            self.model_parameters['relative_velocities'] = relative_velocities_tmp
+
+        if convolve:
+            if np.ndim(wavelengths) <= 1:
+                spectrum = self.convolve(
+                    input_wavelengths=wavelengths,
+                    input_spectrum=spectrum,
+                    **self.model_parameters
+                )
+            else:
+                spectrum = self.convolve(
+                    input_wavelengths=wavelengths[0],  # assuming Doppler shifting doesn't change the resolving power
+                    input_spectrum=spectrum,
+                    **self.model_parameters
+                )
+
+        if rebin:
+            if np.ndim(wavelengths) <= 1:
+                wavelengths_tmp, spectrum = self.rebin_spectrum(
+                    input_wavelengths=wavelengths,
+                    input_spectrum=spectrum,
+                    **self.model_parameters
+                )
+            else:
+                spectrum_tmp = []
+                wavelengths_tmp = None
+
+                for i, wavelength_shift in enumerate(wavelengths):
+                    spectrum_tmp.append([])
+                    wavelengths_tmp, spectrum_tmp[-1] = self.rebin_spectrum(
+                        input_wavelengths=wavelength_shift,
+                        input_spectrum=spectrum,
+                        **self.model_parameters
+                    )
+
+                spectrum = np.asarray(spectrum_tmp)
+
+            wavelengths = wavelengths_tmp
+
+        return wavelengths, spectrum
+
     def get_optimal_wavelength_boundaries(self):
         """Return the optimal wavelength boundaries for rebin on output wavelengths.
         This minimises the number of wavelengths to load and over which to calculate the spectra.
@@ -422,6 +512,7 @@ class BaseSpectralModel:
         Returns:
             rebin_required_interval: (um) the optimal wavelengths boundaries for the spectrum
         """
+        # Re-bin requirement is an interval half a bin larger then re-binning interval
         rebin_required_interval = [
             self.model_parameters['output_wavelengths'][0]
             - (self.model_parameters['output_wavelengths'][1] - self.model_parameters['output_wavelengths'][0]) / 2,
@@ -429,24 +520,36 @@ class BaseSpectralModel:
             + (self.model_parameters['output_wavelengths'][-1] - self.model_parameters['output_wavelengths'][-2]) / 2,
         ]
 
+        # Take Doppler shifting into account
+        rebin_required_interval_shifted = copy.copy(rebin_required_interval)
+
         if 'relative_velocities' in self.model_parameters:
             relative_velocities_tmp = copy.deepcopy(self.model_parameters['relative_velocities'])
             del self.model_parameters['relative_velocities']  # tmp remove parameters to prevent multiple argument def
 
-            rebin_required_interval[0] = self.shift_wavelengths(
+            rebin_required_interval_shifted[0] = self.shift_wavelengths(
                 wavelengths_rest=np.array([rebin_required_interval[0]]),
-                relative_velocities=np.array([np.min(relative_velocities_tmp)]),
+                relative_velocities=np.array([
+                    -np.max(relative_velocities_tmp)
+                ]),
                 **self.model_parameters
             )[0][0]
 
-            rebin_required_interval[1] = self.shift_wavelengths(
+            rebin_required_interval_shifted[1] = self.shift_wavelengths(
                 wavelengths_rest=np.array([rebin_required_interval[1]]),
-                relative_velocities=np.array([np.max(relative_velocities_tmp)]),
+                relative_velocities=np.array([
+                    -np.min(relative_velocities_tmp)
+                ]),
                 **self.model_parameters
             )[0][0]
 
             self.model_parameters['relative_velocities'] = relative_velocities_tmp
 
+        # Ensure that non-shifted spectrum can still be re-binned
+        rebin_required_interval[0] = np.min((rebin_required_interval_shifted[0], rebin_required_interval[0]))
+        rebin_required_interval[1] = np.max((rebin_required_interval_shifted[1], rebin_required_interval[1]))
+
+        # Satisfy re-bin requirement by increasing the range by the smallest possible significant value
         rebin_required_interval[0] -= 10 ** (np.floor(np.log10(rebin_required_interval[0])) - sys.float_info.dig)
         rebin_required_interval[1] += 10 ** (np.floor(np.log10(rebin_required_interval[1])) - sys.float_info.dig)
 
@@ -515,26 +618,28 @@ class BaseSpectralModel:
 
         return self.wavelengths, self.spectral_radiosities
 
-    def get_spectrum_model(self, radtrans: Radtrans, parameters, mode='emission', update_parameters=False,
+    def get_spectrum_model(self, radtrans: Radtrans, mode='emission', parameters=None, update_parameters=False,
                            deformation_matrix=None, noise_matrix=None,
                            scale=False, shift=False, convolve=False, rebin=False, reduce=False):
+        if parameters is None:
+            parameters = self.model_parameters
+
         if update_parameters:
             self.update_spectral_calculation_parameters(
                 radtrans=radtrans,
                 **parameters
             )
-            parameters = copy.copy(self.model_parameters)
 
         if mode == 'emission':
             self.wavelengths, self.spectral_radiosities = self.get_spectral_radiosity_spectrum_model(
                 radtrans=radtrans,
-                parameters=parameters
+                parameters=self.model_parameters
             )
             spectrum = copy.copy(self.spectral_radiosities)
         elif mode == 'transmission':
             self.wavelengths, self.transit_radii = self.get_transit_spectrum_model(
                 radtrans=radtrans,
-                parameters=parameters
+                parameters=self.model_parameters
             )
             spectrum = copy.copy(self.transit_radii)
         else:
@@ -542,55 +647,48 @@ class BaseSpectralModel:
 
         wavelengths = copy.copy(self.wavelengths)
 
-        # TODO transform star spectral radiosity as well in emission mode
-        if shift:
-            wavelengths = self.shift_wavelengths(
-                wavelengths_rest=wavelengths,
-                **parameters
-            )
-
-        if convolve:
-            if np.ndim(wavelengths) <= 1:
-                spectrum = self.convolve(
-                    input_wavelengths=wavelengths,
-                    input_spectrum=spectrum,
-                    **parameters
-                )
-            else:
-                spectrum = self.convolve(
-                    input_wavelengths=wavelengths[0],  # assuming Doppler shifting doesn't change the resolving power
-                    input_spectrum=spectrum,
-                    **parameters
-                )
-
-        if rebin:
-            if np.ndim(wavelengths) <= 1:
-                wavelengths_tmp, spectrum = self.rebin_spectrum(
-                    input_wavelengths=wavelengths,
-                    input_spectrum=spectrum,
-                    **parameters
-                )
-            else:
-                spectrum_tmp = []
-                wavelengths_tmp = None
-
-                for i, wavelength_shift in enumerate(wavelengths):
-                    spectrum_tmp.append([])
-                    wavelengths_tmp, spectrum_tmp[-1] = self.rebin_spectrum(
-                        input_wavelengths=wavelength_shift,
-                        input_spectrum=spectrum,
-                        **parameters
-                    )
-
-                spectrum = np.asarray(spectrum_tmp)
-
-            wavelengths = wavelengths_tmp
+        wavelengths, spectrum = self.get_instrument_model(
+            wavelengths=wavelengths,
+            spectrum=spectrum,
+            shift=shift,
+            convolve=convolve,
+            rebin=rebin
+        )
 
         if scale:
+            if mode == 'emission':  # shift the star spectrum as well for scaling
+                if 'star_observed_spectral_radiosities' not in self.model_parameters:
+                    missing = []
+
+                    if 'star_spectral_radiosities' not in self.model_parameters:
+                        missing.append('star_spectral_radiosities')
+
+                    if shift:
+                        if 'system_observer_radial_velocities' not in self.model_parameters:
+                            if 'relative_velocities' in self.model_parameters:
+                                self.model_parameters['system_observer_radial_velocities'] = \
+                                    np.zeros(self.model_parameters['relative_velocities'].shape)
+                            else:
+                                missing.append('system_observer_radial_velocities')
+
+                    if len(missing) > 0:
+                        joint = "', '".join(missing)
+
+                        raise TypeError(f"missing {len(missing)} parameters for scaling: '{joint}'")
+
+                    _, self.model_parameters['star_observed_spectral_radiosities'] = self.get_instrument_model(
+                        wavelengths=copy.copy(self.wavelengths),
+                        spectrum=self.model_parameters['star_spectral_radiosities'],
+                        relative_velocities=self.model_parameters['system_observer_radial_velocities'],
+                        shift=shift,
+                        convolve=convolve,
+                        rebin=rebin
+                    )
+
             spectrum = self.scale_spectrum(
                 spectrum=spectrum,
                 mode=mode,
-                **parameters
+                **self.model_parameters
             )
 
         if deformation_matrix is not None:
@@ -603,7 +701,7 @@ class BaseSpectralModel:
             spectrum = self.get_reduced_spectrum(
                 spectrum=spectrum,
                 pipeline=self.pipeline,
-                **parameters
+                **self.model_parameters
             )
 
         return wavelengths, spectrum
@@ -618,6 +716,10 @@ class BaseSpectralModel:
         )
 
         return self.wavelengths, self.transit_radii
+
+    @staticmethod
+    def hz2um(frequency):
+        return nc.c / frequency * 1e4  # cm to um
 
     @staticmethod
     def init_radtrans(wavelengths_boundaries, pressures,
@@ -711,23 +813,23 @@ class BaseSpectralModel:
         #     dataset.attrs['units'] = f'{wavelengths_units}'
 
     @staticmethod
-    def scale_spectrum(spectrum, star_radius, planet_radius=None, star_spectral_radiosities=None, mode='emission',
-                       **kwargs):
+    def scale_spectrum(spectrum, star_radius, planet_radius=None, star_observed_spectral_radiosities=None,
+                       mode='emission', **kwargs):
         if mode == 'emission':
-            if planet_radius is None or star_spectral_radiosities is None:
+            if planet_radius is None or star_observed_spectral_radiosities is None:
                 missing = []
 
                 if planet_radius is None:
                     missing.append('planet_radius')
 
-                if star_spectral_radiosities is None:
+                if star_observed_spectral_radiosities is None:
                     missing.append('star_spectral_radiosities')
 
                 joint = "', '".join(missing)
 
                 raise TypeError(f"missing {len(missing)} positional arguments: '{joint}'")
 
-            return 1 + spectrum / star_spectral_radiosities * (planet_radius / star_radius) ** 2
+            return 1 + spectrum / star_observed_spectral_radiosities * (planet_radius / star_radius) ** 2
         elif mode == 'transmission':
             return 1 - (spectrum / star_radius) ** 2
         else:
@@ -742,11 +844,15 @@ class BaseSpectralModel:
 
         return wavelengths_shift
 
+    @staticmethod
+    def um2hz(wavelength):
+        return nc.c / (wavelength * 1e-4)  # um to cm
+
     def update_spectral_calculation_parameters(self, radtrans: Radtrans, **kwargs):
         self.temperatures, self.mass_mixing_ratios, self.mean_molar_masses, self.model_parameters = \
             self.get_spectral_calculation_parameters(
                 pressures=radtrans.press * 1e-6,  # cgs to bar
-                wavelengths=nc.c / radtrans.freq * 1e4,  # Hz to um
+                wavelengths=BaseSpectralModel.hz2um(radtrans.freq),
                 **kwargs
             )
 
@@ -2643,7 +2749,7 @@ class SpectralModel:
             stellar_spectral_radiance[1:, 0]  # in cm
         stellar_spectral_radiance = SpectralModel.radiosity_erg_hz2radiosity_erg_cm(
             stellar_spectral_radiance[1:, 1],
-            nc.c / wavelength_stellar
+            nc.c / wavelength_stellar  # cm to Hz
         )
 
         wavelength_stellar *= 1e-2  # cm to m
@@ -2703,7 +2809,7 @@ class SpectralModel:
     def _get_phoenix_star_spectral_radiosity(star_effective_temperature, wavelengths):
         star_data = get_PHOENIX_spec(star_effective_temperature)
         star_data[:, 1] = SpectralModel.radiosity_erg_hz2radiosity_erg_cm(
-            star_data[:, 1], nc.c / star_data[:, 0]
+            star_data[:, 1], nc.c / star_data[:, 0]  # cm to Hz
         )
 
         star_data[:, 0] *= 1e4  # cm to um
@@ -3164,16 +3270,12 @@ class SpectralModel2(BaseSpectralModel):
         'H2-He'
     ]
 
-    def __init__(self, wavelengths_boundaries, pressures, temperatures=None,
-                 mass_mixing_ratios=None, mean_molar_masses=None,
+    def __init__(self, pressures,
                  line_species=None, rayleigh_species=None, continuum_opacities=None, cloud_species=None,
                  opacity_mode='lbl', do_scat_emis=True, lbl_opacity_sampling=1,
-                 wavelengths=None, transit_radii=None, spectral_radiosities=None, times=None,
-                 star_spectral_radiosities=None, shifted_star_spectral_radiosities=None, star_effective_temperature=None,
-                 wavelengths_rest=None, resolving_power_rest=None,
-                 shifted_transit_radii=None, shifted_spectral_radiosities=None,
-                 orbital_phases=None,
-                 **model_parameters):
+                 temperatures=None, mass_mixing_ratios=None, mean_molar_masses=None,
+                 wavelengths_boundaries=None, wavelengths=None, transit_radii=None, spectral_radiosities=None,
+                 times=None, **model_parameters):
         super().__init__(
             wavelengths_boundaries=wavelengths_boundaries,
             pressures=pressures,
@@ -3193,15 +3295,6 @@ class SpectralModel2(BaseSpectralModel):
             times=times,
             **model_parameters
         )
-
-        self.star_spectral_radiosities = star_spectral_radiosities
-        self.shifted_star_spectral_radiosities = shifted_star_spectral_radiosities
-        self.star_effective_temperature = star_effective_temperature
-        self.wavelengths_rest = wavelengths_rest
-        self.resolving_power_rest = resolving_power_rest
-        self.shifted_transit_radii = shifted_transit_radii
-        self.shifted_spectral_radiosities = shifted_spectral_radiosities
-        self.orbital_phases = orbital_phases
 
     @staticmethod
     def _calculate_equilibrium_mass_mixing_ratios(pressures, temperatures, co_ratio, log10_metallicity,
@@ -3381,7 +3474,7 @@ class SpectralModel2(BaseSpectralModel):
                         atmospheric_mixing=atmospheric_mixing,
                         alpha=alpha,
                         beta=beta
-                    )[0]
+                    )
                 )
 
             # Interpolate chemical equilibrium
@@ -3674,30 +3767,15 @@ class SpectralModel2(BaseSpectralModel):
         else:
             log10_metallicity = None
 
+        for argument, value in locals().items():
+            if argument not in kwargs and argument != 'self':
+                kwargs[argument] = value
+
         return self.calculate_spectral_parameters(
             temperature_profile_function=self.calculate_temperature_profile,
             mass_mixing_ratios_function=self.calculate_mass_mixing_ratios,
             mean_molar_masses_function=self.calculate_mean_molar_masses,
             spectral_parameters_function=self.calculate_model_parameters,
-            # Temperature profile parameters
-            pressures=pressures,
-            temperature_profile_mode=temperature_profile_mode,
-            temperature=temperature,
-            intrinsic_temperature=intrinsic_temperature,
-            planet_surface_gravity=planet_surface_gravity,
-            metallicity=metallicity,
-            guillot_temperature_profile_gamma=guillot_temperature_profile_gamma,
-            guillot_temperature_profile_kappa_ir_z0=guillot_temperature_profile_kappa_ir_z0,
-            # MMR parameters
-            line_species=line_species,
-            included_line_species=included_line_species,
-            co_ratio=co_ratio,
-            log10_metallicity=log10_metallicity,
-            carbon_pressure_quench=carbon_pressure_quench,
-            imposed_mass_mixing_ratios=imposed_mass_mixing_ratios,
-            heh2_ratio=heh2_ratio,
-            use_equilibrium_chemistry=use_equilibrium_chemistry,
-            wavelengths=wavelengths,
             **kwargs
         )
 
@@ -3717,7 +3795,7 @@ class SpectralModel2(BaseSpectralModel):
 
         for parameter, value in parameters.items():
             # TODO move that to RetrievalSpectralModel
-            if 'log10_' in parameter:
+            if 'log10_' in parameter and value is not None:
                 kwargs[parameter.split('log10_', 1)[-1]] = 10 ** value
             else:
                 kwargs[parameter] = copy.copy(value)
@@ -3729,7 +3807,7 @@ class SpectralModel2(BaseSpectralModel):
         self.temperatures, self.mass_mixing_ratios, self.mean_molar_masses, self.model_parameters = \
             self.get_spectral_calculation_parameters(
                 pressures=pressures,
-                wavelengths=nc.c / radtrans.freq * 1e4,  # Hz to um
+                wavelengths=BaseSpectralModel.hz2um(radtrans.freq),
                 line_species=radtrans.line_species,
                 **kwargs
             )
