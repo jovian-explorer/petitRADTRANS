@@ -504,6 +504,7 @@ subroutine calc_transm_spec(total_kappa_in,temp,press,gravity,mmw,P0_bar,R_pl, &
         t_graze(:,:,:,i_str) = t_graze(:,:,:,i_str)+alpha_t2(:,:,:,j_str)*(s_1-s_2)
      end do
   end do
+  ! TODO: move if (scat) into upper loop? Otherwise s1 and s2 appear to be calculated twice, uncecessarily.
   if (scat) then
      do i_str = 2, struc_len
         s_1 = sqrt(radius(1)**2d0-radius(i_str)**2d0)
@@ -2241,7 +2242,7 @@ subroutine feautrier_rad_trans(border_freqs, &
    DOUBLE PRECISION                :: flux_old(freq_len_p_1-1), conv_val
   ! tridag variables
   DOUBLE PRECISION                :: a(struc_len),b(struc_len),c(struc_len),r(struc_len), &
-       planck(struc_len)
+       planck(struc_len), plancks(struc_len, freq_len_p_1-1)
   DOUBLE PRECISION                :: f1,f2,f3, deriv1, deriv2, I_plus, I_minus
 
   ! quantities for P-T structure iteration
@@ -2312,6 +2313,12 @@ subroutine feautrier_rad_trans(border_freqs, &
    end do
   end do
 
+  do i = 1, freq_len_p_1-1
+
+       call planck_f_lr(struc_len,temp(1:struc_len),border_freqs(i),border_freqs(i+1),r)
+       plancks(:, i) = r
+
+  end do
 
   do i_iter_scat = 1, iter_scat
 
@@ -2332,8 +2339,11 @@ subroutine feautrier_rad_trans(border_freqs, &
 
        r = 0
 
-       call planck_f_lr(struc_len,temp(1:struc_len),border_freqs(i),border_freqs(i+1),r)
-       planck = r
+       ! TODO: only needs to be calculated once, not for every scattering iteration: fix!
+       !call planck_f_lr(struc_len,temp(1:struc_len),border_freqs(i),border_freqs(i+1),r)
+       !planck = r
+       r = plancks(:, i)
+       planck = plancks(:, i)
 
        do l = 1, N_g
 
