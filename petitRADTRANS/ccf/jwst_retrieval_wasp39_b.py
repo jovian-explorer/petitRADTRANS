@@ -317,9 +317,9 @@ def _get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=
 
     if apply_pipeline:
         spectrum_model = simple_pipeline(
-            spectral_data=spectrum_model0,
+            spectrum=spectrum_model0,
             airmass=parameters['airmass'].value,
-            data_uncertainties=parameters['data_uncertainties'].value
+            uncertainties=parameters['data_uncertainties'].value
         )
     else:
         spectrum_model = spectrum_model0
@@ -366,9 +366,9 @@ def _get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=
 
     if apply_pipeline:
         spectrum_model = simple_pipeline(
-            spectral_data=spectrum_model0,
+            spectrum=spectrum_model0,
             airmass=parameters['airmass'].value,
-            data_uncertainties=parameters[f'data_uncertainties_{instrument_name}'].value,
+            uncertainties=parameters[f'data_uncertainties_{instrument_name}'].value,
             apply_throughput_removal=False
         )
     else:

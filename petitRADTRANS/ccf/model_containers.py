@@ -11,7 +11,7 @@ from astropy.table.table import Table
 from scipy.ndimage import gaussian_filter1d
 
 from petitRADTRANS import nat_cst as nc
-from petitRADTRANS.ccf.spectra_utils import convolve_shift_rebin
+from petitRADTRANS.ccf.pipeline import simple_pipeline
 from petitRADTRANS.ccf.utils import calculate_uncertainty, module_dir
 from petitRADTRANS.fort_rebin import fort_rebin as fr
 from petitRADTRANS.phoenix import get_PHOENIX_spec
@@ -80,36 +80,36 @@ class BaseSpectralModel:
         self.model_parameters = model_parameters
 
         # Wavelength boundaries
-        if wavelengths_boundaries is None and self.wavelengths is not None:
-            wavelengths_boundaries = [np.min(self.wavelengths), np.max(self.wavelengths)]
-
-        if wavelengths_boundaries is None:
-            if 'output_wavelengths' in self.model_parameters:
-                if 'relative_velocities' in self.model_parameters \
-                        or 'orbital_longitudes' in self.model_parameters\
-                        or 'orbital_phases' in self.model_parameters:
-                    self.model_parameters['relative_velocities'], \
-                        self.model_parameters['planet_max_radial_orbital_velocity'], \
-                        self.model_parameters['orbital_longitudes'] = \
-                        self.__calculate_radial_velocities_wrap(
-                            calculate_max_radial_orbital_velocity_function=self.calculate_max_radial_orbital_velocity,
-                            calculate_relative_velocities_function=self.calculate_relative_velocities,
-                            **self.model_parameters
-                        )
-                else:
-                    self.model_parameters['relative_velocities'] = np.zeros(1)
-
-                wavelengths_boundaries = self.get_optimal_wavelength_boundaries()
-            else:
+        if wavelengths_boundaries is None:  # calculate the optimal wavelength boundaries
+            if self.wavelengths is not None:
+                self.model_parameters['output_wavelengths'] = copy.deepcopy(self.wavelengths)
+            elif 'output_wavelengths' not in self.model_parameters:
                 raise TypeError(f"missing required argument "
                                 f"'wavelengths_boundaries', add this argument to manually set the boundaries or "
                                 f"add keyword argument 'output_wavelengths' to set the boundaries automatically")
 
+            # Calculate relative velocity to take Doppler shift into account
+            if 'relative_velocities' in self.model_parameters \
+                    or 'orbital_longitudes' in self.model_parameters \
+                    or 'orbital_phases' in self.model_parameters:
+                self.model_parameters['relative_velocities'], \
+                    self.model_parameters['planet_max_radial_orbital_velocity'], \
+                    self.model_parameters['orbital_longitudes'] = \
+                    self.__calculate_relative_velocities_wrap(
+                        calculate_max_radial_orbital_velocity_function=self.calculate_max_radial_orbital_velocity,
+                        calculate_relative_velocities_function=self.calculate_relative_velocities,
+                        **self.model_parameters
+                    )
+            else:
+                self.model_parameters['relative_velocities'] = np.zeros(1)
+
+            wavelengths_boundaries = self.get_optimal_wavelength_boundaries()
+
         self.wavelengths_boundaries = wavelengths_boundaries
 
     @staticmethod
-    def __calculate_radial_velocities_wrap(calculate_max_radial_orbital_velocity_function,
-                                           calculate_relative_velocities_function, **kwargs):
+    def __calculate_relative_velocities_wrap(calculate_max_radial_orbital_velocity_function,
+                                             calculate_relative_velocities_function, **kwargs):
         if 'planet_max_radial_orbital_velocity' in kwargs:
             if kwargs['planet_max_radial_orbital_velocity'] is None:
                 planet_max_radial_orbital_velocity = calculate_max_radial_orbital_velocity_function(
@@ -200,7 +200,7 @@ class BaseSpectralModel:
             kwargs['relative_velocities'], \
                 kwargs['planet_max_radial_orbital_velocity'], \
                 kwargs['orbital_longitudes'] = \
-                BaseSpectralModel.__calculate_radial_velocities_wrap(
+                BaseSpectralModel.__calculate_relative_velocities_wrap(
                     calculate_max_radial_orbital_velocity_function=
                     BaseSpectralModel.calculate_max_radial_orbital_velocity,
                     calculate_relative_velocities_function=
@@ -479,7 +479,7 @@ class BaseSpectralModel:
                     input_spectrum=spectrum,
                     **self.model_parameters
                 )
-            else:
+            elif np.ndim(wavelengths) == 2:
                 spectrum_tmp = []
                 wavelengths_tmp = None
 
@@ -491,7 +491,15 @@ class BaseSpectralModel:
                         **self.model_parameters
                     )
 
-                spectrum = np.asarray(spectrum_tmp)
+                spectrum = np.array(spectrum_tmp)
+
+                if np.ndim(spectrum) == 3:
+                    spectrum = np.moveaxis(spectrum, 0, 1)
+                elif np.ndim(spectrum) > 3:
+                    raise ValueError(f"spectrum must have at most 3 dimensions, but has {np.ndim(spectrum)}")
+            else:
+                raise ValueError(f"argument 'wavelength' must have at most 2 dimensions, "
+                                 f"but has {np.ndim(wavelengths)}")
 
             wavelengths = wavelengths_tmp
 
@@ -513,11 +521,12 @@ class BaseSpectralModel:
             rebin_required_interval: (um) the optimal wavelengths boundaries for the spectrum
         """
         # Re-bin requirement is an interval half a bin larger then re-binning interval
+        wavelengths_flat = self.model_parameters['output_wavelengths'].flatten()
         rebin_required_interval = [
-            self.model_parameters['output_wavelengths'][0]
-            - (self.model_parameters['output_wavelengths'][1] - self.model_parameters['output_wavelengths'][0]) / 2,
-            self.model_parameters['output_wavelengths'][-1]
-            + (self.model_parameters['output_wavelengths'][-1] - self.model_parameters['output_wavelengths'][-2]) / 2,
+            wavelengths_flat[0]
+            - (wavelengths_flat[1] - wavelengths_flat[0]) / 2,
+            wavelengths_flat[-1]
+            + (wavelengths_flat[-1] - wavelengths_flat[-2]) / 2,
         ]
 
         # Take Doppler shifting into account
@@ -583,11 +592,6 @@ class BaseSpectralModel:
 
     @staticmethod
     def get_reduced_spectrum(spectrum, pipeline, **kwargs):
-        if 'data' in kwargs:
-            if isinstance(kwargs['data'], np.ma.core.MaskedArray):
-                spectrum = np.ma.masked_array(spectrum)
-                spectrum.mask = copy.copy(kwargs['data'].mask)
-
         return pipeline(spectrum, **kwargs)
 
     def get_spectral_calculation_parameters(self, pressures=None, wavelengths=None, **kwargs):
@@ -629,6 +633,15 @@ class BaseSpectralModel:
                 radtrans=radtrans,
                 **parameters
             )
+
+        self.model_parameters['mode'] = mode
+        self.model_parameters['deformation_matrix'] = deformation_matrix
+        self.model_parameters['noise_matrix'] = noise_matrix
+        self.model_parameters['scale'] = scale
+        self.model_parameters['shift'] = shift
+        self.model_parameters['convolve'] = convolve
+        self.model_parameters['rebin'] = rebin
+        self.model_parameters['reduce'] = reduce
 
         if mode == 'emission':
             self.wavelengths, self.spectral_radiosities = self.get_spectral_radiosity_spectrum_model(
@@ -698,11 +711,21 @@ class BaseSpectralModel:
             spectrum += noise_matrix
 
         if reduce:
-            spectrum = self.get_reduced_spectrum(
-                spectrum=spectrum,
-                pipeline=self.pipeline,
-                **self.model_parameters
-            )
+            spectrum, self.model_parameters['reduction_matrix'], self.model_parameters['reduced_uncertainties'] = \
+                self.get_reduced_spectrum(
+                    spectrum=spectrum,
+                    pipeline=self.pipeline,
+                    wavelengths=wavelengths,
+                    **self.model_parameters
+                )
+        else:
+            self.model_parameters['reduction_matrix'] = np.ones(spectrum.shape)
+
+            if 'data_uncertainties' in self.model_parameters:
+                self.model_parameters['reduced_uncertainties'] = \
+                    copy.deepcopy(self.model_parameters['data_uncertainties'])
+            else:
+                self.model_parameters['reduced_uncertainties'] = None
 
         return wavelengths, spectrum
 
@@ -799,7 +822,25 @@ class BaseSpectralModel:
 
     @staticmethod
     def rebin_spectrum(input_wavelengths, input_spectrum, output_wavelengths, **kwargs):
-        return output_wavelengths, fr.rebin_spectrum(input_wavelengths, input_spectrum, output_wavelengths)
+        if np.ndim(output_wavelengths) <= 1:
+            return output_wavelengths, fr.rebin_spectrum(input_wavelengths, input_spectrum, output_wavelengths)
+        elif np.ndim(output_wavelengths) == 2:
+            spectra = []
+            lengths = []
+
+            for wavelengths in output_wavelengths:
+                spectra.append(fr.rebin_spectrum(input_wavelengths, input_spectrum, wavelengths))
+                lengths.append(spectra[-1].size)
+
+            if np.all(np.array(lengths) == lengths[0]):
+                spectra = np.array(spectra)
+            else:
+                spectra = np.array(spectra, dtype=object)
+
+            return output_wavelengths, spectra
+        else:
+            raise ValueError(f"parameter 'output_wavelengths' must have at most 2 dimensions, "
+                             f"but has {np.ndim(output_wavelengths)}")
 
     def save(self, file):
         pass
@@ -2028,7 +2069,7 @@ class Planet:
 
         errors = calculate_uncertainty(partial_derivatives, uncertainties)  # lower and upper errors
 
-        return surface_gravity, errors[1], -errors[0]
+        return mass, errors[1], -errors[0]
 
 
 class SimplePlanet(Planet):
@@ -2070,7 +2111,7 @@ class SimplePlanet(Planet):
             self.mass = mass
 
     @staticmethod
-    def surface_gravity2mass(surface_gravity, radius):
+    def surface_gravity2mass(surface_gravity, radius, **kwargs):
         return surface_gravity * radius ** 2 / nc.G
 
 
@@ -3297,6 +3338,44 @@ class SpectralModel2(BaseSpectralModel):
         )
 
     @staticmethod
+    def __calculate_metallicity_wrap(metallicity=None, log10_metallicity=None,
+                                     planet_mass=None, planet_radius=None, planet_surface_gravity=None,
+                                     star_metallicity=1.0, atmospheric_mixing=1.0, alpha=-0.68, beta=7.2,
+                                     verbose=False, **kwargs):
+        if log10_metallicity is None:
+            if metallicity is None:
+                if verbose:
+                    print(f"log10 metallicity set to None, calculating it using scaled metallicity...")
+
+                if planet_mass is None:
+                    if planet_radius is None or planet_surface_gravity is None:
+                        raise ValueError(f"both planet radius ({planet_radius}) "
+                                         f"and surface gravity ({planet_surface_gravity}) "
+                                         f"are required to calculate planet mass")
+                    elif planet_radius <= 0:
+                        raise ValueError(f"cannot calculate planet mass from surface gravity with a radius <= 0")
+
+                    planet_mass = Planet.surface_gravity2mass(
+                        surface_gravity=planet_surface_gravity,
+                        radius=planet_radius
+                    )[0]
+
+                metallicity = SpectralModel2.calculate_scaled_metallicity(
+                    planet_mass=planet_mass,
+                    star_metallicity=star_metallicity,
+                    atmospheric_mixing=atmospheric_mixing,
+                    alpha=alpha,
+                    beta=beta
+                )
+
+            if metallicity <= 0:
+                metallicity = sys.float_info.min
+
+            log10_metallicity = np.log10(metallicity)
+
+        return log10_metallicity, metallicity, planet_mass, star_metallicity, atmospheric_mixing, alpha, beta
+
+    @staticmethod
     def _calculate_equilibrium_mass_mixing_ratios(pressures, temperatures, co_ratio, log10_metallicity,
                                                   line_species, included_line_species,
                                                   carbon_pressure_quench=None, imposed_mass_mixing_ratios=None):
@@ -3451,30 +3530,22 @@ class SpectralModel2(BaseSpectralModel):
         if use_equilibrium_chemistry:
             # Calculate metallicity
             if log10_metallicity is None:
-                if verbose:
-                    print(f"log10 metallicity set to None, calculating it using scaled metallicity...")
+                if 'metallicity' in kwargs:
+                    metallicity = kwargs['metallicity']
+                else:
+                    metallicity = None
 
-                if planet_mass is None:
-                    if planet_radius is None or planet_surface_gravity is None:
-                        raise ValueError(f"both planet radius ({planet_radius}) "
-                                         f"and surface gravity ({planet_surface_gravity}) "
-                                         f"are required to calculate planet mass")
-                    elif planet_radius <= 0:
-                        raise ValueError(f"cannot calculate planet mass from surface gravity with a radius <= 0")
-
-                    planet_mass = Planet.surface_gravity2mass(
-                        surface_gravity=planet_surface_gravity,
-                        radius=planet_radius
-                    )
-
-                log10_metallicity = np.log10(
-                    SpectralModel2.calculate_scaled_metallicity(
-                        planet_mass=planet_mass,
-                        star_metallicity=star_metallicity,
-                        atmospheric_mixing=atmospheric_mixing,
-                        alpha=alpha,
-                        beta=beta
-                    )
+                log10_metallicity, _, _, _, _, _, _ = SpectralModel2.__calculate_metallicity_wrap(
+                    log10_metallicity=log10_metallicity,
+                    metallicity=metallicity,
+                    planet_mass=planet_mass,
+                    planet_radius=planet_radius,
+                    planet_surface_gravity=planet_surface_gravity,
+                    star_metallicity=star_metallicity,
+                    atmospheric_mixing=atmospheric_mixing,
+                    alpha=alpha,
+                    beta=beta,
+                    verbose=verbose
                 )
 
             # Interpolate chemical equilibrium
@@ -3725,6 +3796,17 @@ class SpectralModel2(BaseSpectralModel):
             times=self.times
         )
 
+    @staticmethod
+    def get_reduced_spectrum(spectrum, pipeline, **kwargs):
+        # simple_pipeline interface
+        if not hasattr(spectrum, 'mask'):
+            spectrum = np.ma.masked_array(spectrum)
+
+        reduced_data, reduction_matrix, reduced_data_uncertainties = \
+            pipeline(spectrum=spectrum, full=True, **kwargs)
+
+        return reduced_data, reduction_matrix, reduced_data_uncertainties
+
     def get_spectral_calculation_parameters(self, pressures=None, wavelengths=None,
                                             temperature_profile_mode='isothermal',
                                             temperature=None, line_species=None,
@@ -3764,6 +3846,14 @@ class SpectralModel2(BaseSpectralModel):
 
         if metallicity is not None:
             log10_metallicity = np.log10(metallicity)
+        elif use_equilibrium_chemistry:
+            log10_metallicity, metallicity, planet_mass, star_metallicity, atmospheric_mixing, alpha, beta = \
+                self.__calculate_metallicity_wrap(
+                    log10_metallicity=None,
+                    metallicity=metallicity,
+                    planet_surface_gravity=planet_surface_gravity,
+                    **kwargs
+                )
         else:
             log10_metallicity = None
 
@@ -3778,6 +3868,10 @@ class SpectralModel2(BaseSpectralModel):
             spectral_parameters_function=self.calculate_model_parameters,
             **kwargs
         )
+
+    @staticmethod
+    def pipeline(**kwargs):
+        return simple_pipeline(**kwargs)
 
     def update_spectral_calculation_parameters(self, radtrans: Radtrans, **parameters):
         pressures = radtrans.press * 1e-6  # cgs to bar

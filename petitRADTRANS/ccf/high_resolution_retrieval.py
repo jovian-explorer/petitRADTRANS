@@ -283,10 +283,10 @@ def _get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=
 
     if apply_pipeline:
         spectrum_model = simple_pipeline(
-            spectral_data=spectrum_model0,
+            spectrum=spectrum_model0,
             wavelengths=parameters['wavelengths_instrument'].value,
             airmass=parameters['airmass'].value,
-            data_uncertainties=parameters['data_uncertainties'].value,
+            uncertainties=parameters['data_uncertainties'].value,
             apply_throughput_removal=True,
             apply_telluric_lines_removal=True
         )
@@ -340,10 +340,10 @@ def _get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=
 
     if apply_pipeline:
         spectrum_model = simple_pipeline(
-            spectral_data=spectrum_model0,
+            spectrum=spectrum_model0,
             wavelengths=parameters['wavelengths_instrument'].value,
             airmass=parameters['airmass'].value,
-            data_uncertainties=parameters['data_uncertainties'].value,
+            uncertainties=parameters['data_uncertainties'].value,
             apply_throughput_removal=False
         )
     else:
@@ -814,8 +814,8 @@ def init_mock_observations(planet, line_species_str, mode,
 
     print('Data reduction...')
     reduced_mock_observations, reduction_matrix, reduced_uncertainties = simple_pipeline(
-        spectral_data=mock_observations,
-        data_uncertainties=uncertainties,
+        spectrum=mock_observations,
+        uncertainties=uncertainties,
         wavelengths=wavelengths_instrument,
         airmass=airmass,
         full=True,
@@ -850,7 +850,7 @@ def init_mock_observations(planet, line_species_str, mode,
     ts = np.ma.masked_where(mock_observations.mask, ts)
     fmt, mr0t, _ = simple_pipeline(
         ts, airmass=airmass, wavelengths=wavelengths_instrument,
-        data_uncertainties=true_parameters['data_uncertainties'].value, full=True,
+        uncertainties=true_parameters['data_uncertainties'].value, full=True,
         apply_throughput_removal=apply_throughput_removal,
         apply_telluric_lines_removal=apply_telluric_lines_removal
     )
@@ -858,13 +858,13 @@ def init_mock_observations(planet, line_species_str, mode,
 
     fmtd, mr0td, _ = simple_pipeline(ts * true_parameters['deformation_matrix'].value, airmass=airmass,
                                      wavelengths=wavelengths_instrument,
-                                     data_uncertainties=true_parameters['data_uncertainties'].value,
+                                     uncertainties=true_parameters['data_uncertainties'].value,
                                      apply_throughput_removal=apply_throughput_removal,
                                      apply_telluric_lines_removal=apply_telluric_lines_removal,
                                      full=True)
     fs, mr, _ = simple_pipeline(ts * true_parameters['deformation_matrix'].value + noise, airmass=airmass,
                                 wavelengths=wavelengths_instrument,
-                                data_uncertainties=true_parameters['data_uncertainties'].value, full=True,
+                                uncertainties=true_parameters['data_uncertainties'].value, full=True,
                                 apply_throughput_removal=apply_throughput_removal,
                                 apply_telluric_lines_removal=apply_telluric_lines_removal,
                                 )

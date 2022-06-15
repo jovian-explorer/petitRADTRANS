@@ -29,7 +29,7 @@ all_species = [
     'H2S_main_iso',
     'K',
     'NH3_main_iso',
-    'Na_allard_new',
+    'Na_allard',
     'PH3_main_iso',
     'H2O_main_iso'
 ]
@@ -73,8 +73,32 @@ def _init_model(planet, w_bords, line_species_str, p0=1e-2):
         carbon_pressure_quench=None,
         use_equilibrium_chemistry=True
     )
+    # print('1', np.sum(list(mass_fractions.values()), axis=0))
+    # print(list(mass_fractions.keys()))
+    #
+    # if 'CO_all_iso' not in line_species:
+    #     co_mass_mixing_ratio = copy.copy(mass_fractions['CO'])
+    #
+    #     if 'CO_main_iso' in line_species:
+    #         print('main1', np.mean(co_mass_mixing_ratio), co_mass_mixing_ratio - mass_fractions['CO'])
+    #         print('main11', np.sum(list(mass_fractions.values()), axis=0))
+    #         mass_fractions['CO'] = co_mass_mixing_ratio / (1 + c13c12_ratio)
+    #         print('main12', np.sum(list(mass_fractions.values()), axis=0))
+    #         mass_fractions['CO_36'] = co_mass_mixing_ratio - mass_fractions['CO']
+    #         print('main2',np.mean(co_mass_mixing_ratio), co_mass_mixing_ratio - (mass_fractions['CO_36'] + mass_fractions['CO']))
+    #         print('main21',np.sum(list(mass_fractions.values()), axis=0))
+    #         print('main22',mass_fractions['CO_36'])
+    #     elif 'CO_36' in line_species:
+    #         print('36')
+    #         mass_fractions['CO_36'] = co_mass_mixing_ratio / (1 + 1 / c13c12_ratio)
+    #         mass_fractions['CO'] = \
+    #             co_mass_mixing_ratio - mass_fractions['CO_36']
+    # print('2', np.sum(list(mass_fractions.values()), axis=0))
 
     for species in line_species:
+        if species == 'CO_36':
+            pass
+
         spec = species.split('_', 1)[0]
 
         if spec in mass_fractions:
@@ -83,15 +107,6 @@ def _init_model(planet, w_bords, line_species_str, p0=1e-2):
 
             if species != 'K':
                 del mass_fractions[spec]
-
-    if 'CO_36' in line_species_str:
-        if 'CO_main_iso' in mass_fractions:
-            mass_fractions['CO_36'] = mass_fractions['CO_main_iso'] * 0.01
-            mass_fractions['CO_main_iso'] = mass_fractions['CO_main_iso'] - mass_fractions['CO_36']
-        else:
-            co = copy.copy(mass_fractions['CO_36'])
-            mass_fractions['CO_36'] = co * 0.01
-            mass_fractions['CO'] = co - mass_fractions['CO_36']
 
     mean_molar_mass = calc_MMW(mass_fractions)
 
@@ -281,9 +296,9 @@ def _get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=
 
     if apply_pipeline:
         spectrum_model = simple_pipeline(
-            spectral_data=spectrum_model0,
+            spectrum=spectrum_model0,
             airmass=parameters['airmass'].value,
-            data_uncertainties=parameters['data_uncertainties'].value,
+            uncertainties=parameters['data_uncertainties'].value,
             apply_throughput_removal=True,
             apply_telluric_lines_removal=True
         )
@@ -399,6 +414,29 @@ def get_retrieval_name(planet, mode, wavelength_min, wavelength_max, retrieval_s
     return f"{planet.name.lower().replace(' ', '_')}_" \
            f"{mode}_{exposure_time:.3e}s_{wavelength_min:.3f}-{wavelength_max:.3f}um_" \
            f"{'_'.join(retrieval_species_names)}_{n_live_points}lp"
+
+def load_airmassorg_data(file):
+    with open(file, 'r') as f:
+        jd_times = []
+        altitudes = []
+
+        for line in f:
+            line = line.strip()
+            cols = line.split('\t')
+
+            jd_times.append(float(cols[3]))
+
+            altitude = cols[4]
+            altitude = altitude[:4]
+            altitudes.append(float(altitude))
+
+    jd_times = np.array(jd_times)
+    times = (jd_times - jd_times[0]) * nc.snc.day
+
+    altitudes = np.array(altitudes)
+    airmasses = 1 / np.cos(np.deg2rad(90 - altitudes))
+
+    return times, airmasses
 
 
 # Useful functions
@@ -786,9 +824,11 @@ def init_mock_observations(planet, line_species_str, mode,
 
     print('Data reduction...')
     reduced_mock_observations, reduction_matrix, reduced_uncertainties = simple_pipeline(
-        spectral_data=mock_observations,
-        data_uncertainties=uncertainties,
+        spectrum=mock_observations,
+        uncertainties=uncertainties,
+        wavelengths=wavelengths_instrument,
         airmass=airmass,
+        polynomial_fit_degree=2,
         apply_throughput_removal=True,
         apply_telluric_lines_removal=True,
         full=True
@@ -832,7 +872,7 @@ def init_mock_observations(planet, line_species_str, mode,
         ts = np.ma.masked_where(mock_observations.mask, ts)
 
     fmt, mr0t, _ = simple_pipeline(
-        ts, airmass=airmass, data_uncertainties=true_parameters['data_uncertainties'].value, full=True,
+        ts, airmass=airmass, uncertainties=true_parameters['data_uncertainties'].value, full=True,
         apply_throughput_removal=True, apply_telluric_lines_removal=True
     )
     w, r = retrieval_model(model, true_parameters)
@@ -841,14 +881,14 @@ def init_mock_observations(planet, line_species_str, mode,
         print("Skipping pipeline validity checks")
     else:
         fmtd, mr0td, _ = simple_pipeline(ts * true_parameters['deformation_matrix'].value, airmass=airmass,
-                                         data_uncertainties=true_parameters['data_uncertainties'].value,
+                                         uncertainties=true_parameters['data_uncertainties'].value,
                                          apply_throughput_removal=True,
                                          apply_telluric_lines_removal=True,
                                          full=True)
         fs, mr, _ = simple_pipeline(ts * true_parameters['deformation_matrix'].value + noise, airmass=airmass,
                                     apply_throughput_removal=True,
                                     apply_telluric_lines_removal=True,
-                                    data_uncertainties=true_parameters['data_uncertainties'].value, full=True)
+                                    uncertainties=true_parameters['data_uncertainties'].value, full=True)
 
         # Check pipeline validity
         assert np.allclose(r, ts * mr0t, atol=1e-12, rtol=1e-12)
@@ -1211,30 +1251,6 @@ def init_run(retrieval_name, prt_object, pressures, parameters, retrieved_specie
     )
 
     return run_definition_simple
-
-
-def load_airmassorg_data(file):
-    with open(file, 'r') as f:
-        jd_times = []
-        altitudes = []
-
-        for line in f:
-            line = line.strip()
-            cols = line.split('\t')
-
-            jd_times.append(float(cols[3]))
-
-            altitude = cols[4]
-            altitude = altitude[:4]
-            altitudes.append(float(altitude))
-
-    jd_times = np.array(jd_times)
-    times = (jd_times - jd_times[0]) * nc.snc.day
-
-    altitudes = np.array(altitudes)
-    airmasses = 1 / np.cos(np.deg2rad(90 - altitudes))
-
-    return times, airmasses
 
 
 def load_all(directory):

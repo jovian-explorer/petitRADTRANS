@@ -204,7 +204,7 @@ def get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=F
 
             spectrum_model, rm, _ = simple_pipeline(
                 spectrum_model0, mean=True, airmass=parameters['airmass'].value,
-                data_uncertainties=parameters['data_noise'].value
+                uncertainties=parameters['data_noise'].value
             )  # p
 
             # spectrum_model = spectrum_model0 * parameters['true_correction'].value  # pt
@@ -216,7 +216,7 @@ def get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=F
 
             spectrum_model, _, _ = simple_pipeline(
                 spectrum_model0 * parameters['data'].value, mean=True, airmass=parameters['airmass'].value,
-                data_uncertainties=parameters['data_noise'].value
+                uncertainties=parameters['data_noise'].value
             )  # mbrogi
             # spectrum_model = spectrum_model / parameters['reduced_data'].value  # mbrogid
             spectrum_model = spectrum_model - parameters['reduced_data'].value  # mbrogid
@@ -608,8 +608,8 @@ def init_parameters(planet, line_species_str, mode,
     if apply_pipeline:
         print('Data reduction...')
         reduced_mock_observations, reduction_matrix, pipeline_noise = simple_pipeline(
-            spectral_data=mock_observations,
-            data_uncertainties=error,
+            spectrum=mock_observations,
+            uncertainties=error,
             airmass=airmass,
             times=times,
             mean_subtract=False,
@@ -731,15 +731,15 @@ def init_parameters(planet, line_species_str, mode,
 
     ts = copy.copy(true_spectra)
     ts = np.ma.masked_where(mock_observations.mask, ts)
-    fmt, mr0t, _ = simple_pipeline(ts, airmass=airmass, mean=median, data_uncertainties=true_parameters['data_noise'].value)
+    fmt, mr0t, _ = simple_pipeline(ts, airmass=airmass, mean=median, uncertainties=true_parameters['data_noise'].value)
 
     true_parameters['true_correction'] = Param(mr0t)
     w, r = retrieval_model(model, true_parameters)
 
     fmtd, mr0td, _ = simple_pipeline(ts * true_parameters['deformation_matrix'].value, airmass=airmass, mean=median,
-                                     data_uncertainties=true_parameters['data_noise'].value)
+                                     uncertainties=true_parameters['data_noise'].value)
     fs, mr, _ = simple_pipeline(ts * true_parameters['deformation_matrix'].value + noise, airmass=airmass, mean=median,
-                                data_uncertainties=true_parameters['data_noise'].value)
+                                uncertainties=true_parameters['data_noise'].value)
 
     # print('!!! noiseless Mr !!!')
     # reduction_matrix = np.ones(mock_observations.shape)
@@ -860,7 +860,7 @@ def init_parameters(planet, line_species_str, mode,
     print(f'Log L reduction matrix = {log_l_reduction_matrix}')
 
     noiseless_reduced_spectra, _, _ = simple_pipeline(ts * deformation_matrix, airmass=airmass, mean=median,
-                                                      data_uncertainties=true_parameters['data_noise'].value)
+                                                      uncertainties=true_parameters['data_noise'].value)
 
     pipeline_test_noiseless = pipeline_validity_test(
         reduced_true_model=r,

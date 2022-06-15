@@ -309,9 +309,9 @@ def _get_secondary_eclipse_retrieval_model(prt_object, parameters, pt_plot_mode=
 
     if apply_pipeline:
         spectrum_model = simple_pipeline(
-            spectral_data=spectrum_model0,
+            spectrum=spectrum_model0,
             airmass=parameters['airmass'].value,
-            data_uncertainties=parameters['data_uncertainties'].value
+            uncertainties=parameters['data_uncertainties'].value
         )
     else:
         spectrum_model = spectrum_model0
@@ -363,9 +363,9 @@ def _get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=
 
     if apply_pipeline:
         spectrum_model = simple_pipeline(
-            spectral_data=spectrum_model0,
+            spectrum=spectrum_model0,
             airmass=parameters['airmass'].value,
-            data_uncertainties=parameters['data_uncertainties'].value,
+            uncertainties=parameters['data_uncertainties'].value,
             apply_throughput_removal=False
         )
     else:
@@ -857,8 +857,8 @@ def init_mock_observations(planet, line_species_str, mode,
 
     print('Data reduction...')
     reduced_mock_observations, reduction_matrix, reduced_uncertainties = simple_pipeline(
-        spectral_data=mock_observations,
-        data_uncertainties=uncertainties,
+        spectrum=mock_observations,
+        uncertainties=uncertainties,
         airmass=airmass,
         apply_throughput_removal=False,
         full=True

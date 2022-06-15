@@ -8,43 +8,43 @@ import numpy as np
 from petitRADTRANS.ccf.utils import median_uncertainties, calculate_uncertainty
 
 
-def __init_pipeline_outputs(spectral_data, reduction_matrix, data_uncertainties):
+def __init_pipeline_outputs(spectrum, reduction_matrix, uncertainties):
     if reduction_matrix is None:
-        reduction_matrix = np.ma.ones(spectral_data.shape)
-        reduction_matrix.mask = np.zeros(spectral_data.shape, dtype=bool)
+        reduction_matrix = np.ma.ones(spectrum.shape)
+        reduction_matrix.mask = np.zeros(spectrum.shape, dtype=bool)
 
-    if isinstance(spectral_data, np.ma.core.MaskedArray):
-        spectral_data_corrected = np.ma.zeros(spectral_data.shape)
-        spectral_data_corrected.mask = copy.copy(spectral_data.mask)
+    if isinstance(spectrum, np.ma.core.MaskedArray):
+        spectral_data_corrected = np.ma.zeros(spectrum.shape)
+        spectral_data_corrected.mask = copy.copy(spectrum.mask)
 
-        if data_uncertainties is not None:
-            pipeline_uncertainties = np.ma.masked_array(copy.copy(data_uncertainties))
-            pipeline_uncertainties.mask = copy.copy(spectral_data.mask)
+        if uncertainties is not None:
+            pipeline_uncertainties = np.ma.masked_array(copy.copy(uncertainties))
+            pipeline_uncertainties.mask = copy.copy(spectrum.mask)
         else:
             pipeline_uncertainties = None
     else:
-        spectral_data_corrected = np.zeros(spectral_data.shape)
+        spectral_data_corrected = np.zeros(spectrum.shape)
 
-        if data_uncertainties is not None:
-            pipeline_uncertainties = copy.copy(data_uncertainties)
+        if uncertainties is not None:
+            pipeline_uncertainties = copy.copy(uncertainties)
         else:
             pipeline_uncertainties = None
 
     return spectral_data_corrected, reduction_matrix, pipeline_uncertainties
 
 
-def __remove_throughput(spectral_data, reduction_matrix, noise=None,
+def __remove_throughput(spectrum, reduction_matrix, noise=None,
                         throughput_correction_lower_bound=0.70, throughput_correction_upper_bound=None):
     if throughput_correction_upper_bound is None:
         # Ensure that at least the brightest pixel is removed, and that the upper bound is greater than the lower bound
         throughput_correction_upper_bound = np.max(
-            (throughput_correction_lower_bound, np.min((0.99, 1 - 1 / np.size(spectral_data))))
+            (throughput_correction_lower_bound, np.min((0.99, 1 - 1 / np.size(spectrum))))
         )
     elif throughput_correction_upper_bound >= throughput_correction_lower_bound:
-        if np.size(spectral_data) * (1 - throughput_correction_upper_bound) < 1:
+        if np.size(spectrum) * (1 - throughput_correction_upper_bound) < 1:
             warn(
-                f"data size ({np.size(spectral_data)}) is low compared to the throughput correction upper bound "
-                f"({throughput_correction_upper_bound}), recommended value is {1 - 1 / np.size(spectral_data)}",
+                f"data size ({np.size(spectrum)}) is low compared to the throughput correction upper bound "
+                f"({throughput_correction_upper_bound}), recommended value is {1 - 1 / np.size(spectrum)}",
                 UserWarning
              )
     else:
@@ -52,7 +52,7 @@ def __remove_throughput(spectral_data, reduction_matrix, noise=None,
                          f"greater or equal to throughput correction lower bound ({throughput_correction_lower_bound})")
 
     # Look at where the brightest pixels are, in order to avoid telluric lines
-    time_averaged_data = np.median(spectral_data, axis=0)  # median of the data over time/integrations
+    time_averaged_data = np.median(spectrum, axis=0)  # median of the data over time/integrations
 
     time_averaged_data_lower_bound = np.percentile(
         time_averaged_data,
@@ -69,13 +69,13 @@ def __remove_throughput(spectral_data, reduction_matrix, noise=None,
         time_averaged_data <= time_averaged_data_upper_bound
     ))
 
-    brightest_data_wavelength = spectral_data[:, brightest_pixels[0]]
+    brightest_data_wavelength = spectrum[:, brightest_pixels[0]]
     brightest_data_wavelength = np.median(brightest_data_wavelength, axis=1)
 
-    spectral_data_corrected = np.zeros(spectral_data.shape)
+    spectral_data_corrected = np.zeros(spectrum.shape)
 
     for i, correction_coefficient in enumerate(brightest_data_wavelength):
-        spectral_data_corrected[i, :] = spectral_data[i, :] / correction_coefficient
+        spectral_data_corrected[i, :] = spectrum[i, :] / correction_coefficient
         reduction_matrix[i, :] /= correction_coefficient
 
     pipeline_noise = np.zeros(spectral_data_corrected.shape)
@@ -87,7 +87,7 @@ def __remove_throughput(spectral_data, reduction_matrix, noise=None,
             )
 
             partial_derivatives = np.array([
-                spectral_data_corrected[i, :] / spectral_data[i, :],  # dS'/dS
+                spectral_data_corrected[i, :] / spectrum[i, :],  # dS'/dS
                 - spectral_data_corrected[i, :] / correction_coefficient  # dS'/dC
             ])
 
@@ -102,11 +102,11 @@ def __remove_throughput(spectral_data, reduction_matrix, noise=None,
     return spectral_data_corrected, reduction_matrix, pipeline_noise
 
 
-def _remove_telluric_lines_old(spectral_data, airmass=None, remove_outliers=True, remove_standard_deviation=False):
+def _remove_telluric_lines_old(spectrum, airmass=None, remove_outliers=True, remove_standard_deviation=False):
     """Correct for Earth's atmospheric absorptions.
 
     Args:
-        spectral_data: spectral data to correct
+        spectrum: spectral data to correct
         airmass: airmass of the data
         remove_outliers: if True, remove the pixels that are 3 times away from the median of the standard deviation of
             the data over time.
@@ -115,7 +115,7 @@ def _remove_telluric_lines_old(spectral_data, airmass=None, remove_outliers=True
     Returns:
         Spectral data corrected from the telluric transmittance
     """
-    for j, data in enumerate(spectral_data):
+    for j, data in enumerate(spectrum):
         # Remove the mean of the telluric lines
         if airmass is not None:
             exp_airmass = np.exp(-airmass[j])
@@ -149,23 +149,23 @@ def _remove_telluric_lines_old(spectral_data, airmass=None, remove_outliers=True
                 np.abs(data) > 3 * np.ma.median(standard_deviation_integration), data
             )
 
-        spectral_data[j, :, :] = data
+        spectrum[j, :, :] = data
 
-    return spectral_data
+    return spectrum
 
 
-def __remove_throughput_masked(spectral_data, reduction_matrix, noise=None,
+def __remove_throughput_masked(spectrum, reduction_matrix, noise=None,
                                throughput_correction_lower_bound=0.70, throughput_correction_upper_bound=None):
     if throughput_correction_upper_bound is None:
         # Ensure that at least the brightest pixel is removed, and that the upper bound is greater than the lower bound
         throughput_correction_upper_bound = np.ma.max(
-            (throughput_correction_lower_bound, np.ma.min((0.99, 1 - 1 / np.size(spectral_data))))
+            (throughput_correction_lower_bound, np.ma.min((0.99, 1 - 1 / np.size(spectrum))))
         )
     elif throughput_correction_upper_bound >= throughput_correction_lower_bound:
-        if spectral_data.size * (1 - throughput_correction_upper_bound) < 1:
+        if spectrum.size * (1 - throughput_correction_upper_bound) < 1:
             warn(
-                f"data size ({spectral_data.size}) is low compared to the throughput correction upper bound "
-                f"({throughput_correction_upper_bound}), recommended value is {1 - 1 / spectral_data.size}",
+                f"data size ({spectrum.size}) is low compared to the throughput correction upper bound "
+                f"({throughput_correction_upper_bound}), recommended value is {1 - 1 / spectrum.size}",
                 UserWarning
              )
     else:
@@ -173,7 +173,7 @@ def __remove_throughput_masked(spectral_data, reduction_matrix, noise=None,
                          f"greater or equal to throughput correction lower bound ({throughput_correction_lower_bound})")
 
     # Look at where the brightest pixels are, in order to avoid telluric lines
-    time_averaged_data = np.ma.median(spectral_data, axis=0)  # median of the data over time/integrations
+    time_averaged_data = np.ma.median(spectrum, axis=0)  # median of the data over time/integrations
     time_averaged_data = np.ma.array(time_averaged_data)  # ensure array is masked
 
     time_averaged_data_lower_bound = np.percentile(
@@ -192,26 +192,26 @@ def __remove_throughput_masked(spectral_data, reduction_matrix, noise=None,
     ))
 
     # Time-dependent median of the brightest wavelengths
-    brightest_data_wavelength = np.ma.median(spectral_data[:, brightest_pixels[0]], axis=1)
+    brightest_data_wavelength = np.ma.median(spectrum[:, brightest_pixels[0]], axis=1)
 
-    spectral_data_corrected = np.ma.zeros(spectral_data.shape)
-    spectral_data_corrected.mask = copy.copy(spectral_data.mask)
+    spectral_data_corrected = np.ma.zeros(spectrum.shape)
+    spectral_data_corrected.mask = copy.copy(spectrum.mask)
 
     for i, correction_coefficient in enumerate(brightest_data_wavelength):
-        spectral_data_corrected[i, :] = spectral_data[i, :] / correction_coefficient
+        spectral_data_corrected[i, :] = spectrum[i, :] / correction_coefficient
         reduction_matrix[i, :] /= correction_coefficient
 
     pipeline_noise = np.ma.zeros(spectral_data_corrected.shape)
-    pipeline_noise.mask = copy.copy(spectral_data.mask)
+    pipeline_noise.mask = copy.copy(spectrum.mask)
 
     if noise is not None:
         for i, correction_coefficient in enumerate(brightest_data_wavelength):
             brightest_data_wavelength_noise = median_uncertainties(
-                noise[i, brightest_pixels[0]][~spectral_data[i, brightest_pixels[0]].mask]
+                noise[i, brightest_pixels[0]][~spectrum[i, brightest_pixels[0]].mask]
             )
 
             partial_derivatives = np.array([
-                spectral_data_corrected[i, :] / spectral_data[i, :],  # dS'/dS
+                spectral_data_corrected[i, :] / spectrum[i, :],  # dS'/dS
                 - spectral_data_corrected[i, :] / correction_coefficient  # dS'/dC
             ])
 
@@ -222,17 +222,17 @@ def __remove_throughput_masked(spectral_data, reduction_matrix, noise=None,
 
             for j in range(uncertainties.shape[1]):
                 pipeline_noise[i, j] = calculate_uncertainty(partial_derivatives[:, j], uncertainties[:, j])
-                pipeline_noise.mask[i, j] = spectral_data.mask[i, j]
+                pipeline_noise.mask[i, j] = spectrum.mask[i, j]
 
     return spectral_data_corrected, reduction_matrix, pipeline_noise
 
 
-def _remove_throughput_test(spectral_data, reduction_matrix, data_noise=None,
+def _remove_throughput_test(spectrum, reduction_matrix, data_noise=None,
                             throughput_correction_lower_bound=0.70, throughput_correction_upper_bound=None, mean=False):
     """Correct for the variable throughput.
 
     Args:
-        spectral_data: spectral data to correct
+        spectrum: spectral data to correct
         reduction_matrix: matrix storing all the operations made to reduce the data
         data_noise: noise of the data
         throughput_correction_lower_bound: [0-1] quantile lower bound on throughput correction
@@ -242,17 +242,17 @@ def _remove_throughput_test(spectral_data, reduction_matrix, data_noise=None,
     Returns:
         Spectral data corrected from throughput
     """
-    if isinstance(spectral_data, np.ma.core.MaskedArray):
-        spectral_data_corrected = np.ma.zeros(spectral_data.shape)
-        spectral_data_corrected.mask = copy.copy(spectral_data.mask)
+    if isinstance(spectrum, np.ma.core.MaskedArray):
+        spectral_data_corrected = np.ma.zeros(spectrum.shape)
+        spectral_data_corrected.mask = copy.copy(spectrum.mask)
 
         if data_noise is not None:
             pipeline_noise = np.ma.masked_array(copy.copy(data_noise))
-            pipeline_noise.mask = copy.copy(spectral_data.mask)
+            pipeline_noise.mask = copy.copy(spectrum.mask)
         else:
             pipeline_noise = None
     else:
-        spectral_data_corrected = np.zeros(spectral_data.shape)
+        spectral_data_corrected = np.zeros(spectrum.shape)
 
         if data_noise is not None:
             pipeline_noise = copy.copy(data_noise)
@@ -262,21 +262,21 @@ def _remove_throughput_test(spectral_data, reduction_matrix, data_noise=None,
     if data_noise is not None:
         weights = 1 / data_noise
     else:
-        weights = np.ones(spectral_data.shape)
+        weights = np.ones(spectrum.shape)
 
     if mean:
-        for i, data in enumerate(spectral_data):
-            if isinstance(spectral_data, np.ma.core.MaskedArray):
+        for i, data in enumerate(spectrum):
+            if isinstance(spectrum, np.ma.core.MaskedArray):
                 # correction_coefficient = np.ma.mean(data, axis=1)
                 # print('Mean!!')
                 correction_coefficient = np.ma.average(data, axis=1, weights=weights[i])
-            elif isinstance(spectral_data, np.ndarray):
+            elif isinstance(spectrum, np.ndarray):
                 # correction_coefficient = np.mean(data, axis=1)
                 # print('Mean!!')
                 correction_coefficient = np.average(data, axis=1, weights=weights[i])
             else:
                 raise ValueError(f"spectral_data must be a numpy.ndarray or a numpy.ma.core.MaskedArray, "
-                                 f"but is of type '{type(spectral_data)}'")
+                                 f"but is of type '{type(spectrum)}'")
 
             spectral_data_corrected[i, :, :] = np.transpose(
                 np.transpose(data) / correction_coefficient
@@ -311,14 +311,14 @@ def _remove_throughput_test(spectral_data, reduction_matrix, data_noise=None,
                 #         pipeline_noise.mask[i, j, k] = data.mask[j, k]
     else:
         print('Not mean!!')
-        for i, data in enumerate(spectral_data):
-            if isinstance(spectral_data, np.ma.core.MaskedArray):
+        for i, data in enumerate(spectrum):
+            if isinstance(spectrum, np.ma.core.MaskedArray):
                 spectral_data_corrected[i, :, :], reduction_matrix[i, :, :], pipeline_noise[i, :, :] = \
                     __remove_throughput_masked(
                         data, reduction_matrix[i, :, :], data_noise[i],
                         throughput_correction_lower_bound, throughput_correction_upper_bound
                     )
-            elif isinstance(spectral_data, np.ndarray):
+            elif isinstance(spectrum, np.ndarray):
                 spectral_data_corrected[i, :, :], reduction_matrix[i, :, :], pipeline_noise[i, :, :] = \
                     __remove_throughput(
                         data, reduction_matrix[i, :, :], data_noise[i],
@@ -326,7 +326,7 @@ def _remove_throughput_test(spectral_data, reduction_matrix, data_noise=None,
                     )
             else:
                 raise ValueError(f"spectral_data must be a numpy.ndarray or a numpy.ma.core.MaskedArray, "
-                                 f"but is of type '{type(spectral_data)}'")
+                                 f"but is of type '{type(spectrum)}'")
 
             # spectral_data_corrected[i, :, :] = np.transpose(
             #     np.transpose(spectral_data_corrected[i, :, :])
@@ -336,13 +336,13 @@ def _remove_throughput_test(spectral_data, reduction_matrix, data_noise=None,
     return spectral_data_corrected, reduction_matrix, pipeline_noise
 
 
-def _simple_pipeline_test(spectral_data, airmass=None, times=None, data_noise=None,
+def _simple_pipeline_test(spectrum, airmass=None, times=None, data_noise=None,
                           throughput_correction_lower_bound=0.70, throughput_correction_upper_bound=None,
                           mean_subtract=False, mean=False):
     """Removes the telluric lines and variable throughput of some data.
 
     Args:
-        spectral_data: spectral data to correct
+        spectrum: spectral data to correct
         airmass: airmass of the data
         times: (s) time after first observation: t(i) = dit * (ndit(i) - 1)
         data_noise: noise of the data
@@ -353,16 +353,16 @@ def _simple_pipeline_test(spectral_data, airmass=None, times=None, data_noise=No
     Returns:
         Spectral data corrected from variable throughput
     """
-    reduction_matrix = np.ma.ones(spectral_data.shape)
-    reduction_matrix.mask = np.zeros(spectral_data.shape, dtype=bool)
-    spectral_data_corrected = copy.copy(spectral_data)
+    reduction_matrix = np.ma.ones(spectrum.shape)
+    reduction_matrix.mask = np.zeros(spectrum.shape, dtype=bool)
+    spectral_data_corrected = copy.copy(spectrum)
 
-    if isinstance(spectral_data, np.ma.core.MaskedArray):
-        spectral_data_corrected.mask = copy.copy(spectral_data.mask)
+    if isinstance(spectrum, np.ma.core.MaskedArray):
+        spectral_data_corrected.mask = copy.copy(spectrum.mask)
 
         if data_noise is not None:
             pipeline_noise = np.ma.masked_array(copy.copy(data_noise))
-            pipeline_noise.mask = copy.copy(spectral_data.mask)
+            pipeline_noise.mask = copy.copy(spectrum.mask)
         else:
             pipeline_noise = None
     else:
@@ -376,7 +376,7 @@ def _simple_pipeline_test(spectral_data, airmass=None, times=None, data_noise=No
     # print('rm th')
     if True:
         spectral_data_corrected, reduction_matrix, pipeline_noise = _remove_throughput_test(
-            spectral_data=spectral_data,
+            spectrum=spectrum,
             reduction_matrix=reduction_matrix,
             data_noise=pipeline_noise,
             throughput_correction_lower_bound=throughput_correction_lower_bound,
@@ -389,17 +389,17 @@ def _simple_pipeline_test(spectral_data, airmass=None, times=None, data_noise=No
     # print('rm tl')
     if airmass is None:
         spectral_data_corrected, reduction_matrix, pipeline_noise = remove_telluric_lines_mean(
-            spectral_data=spectral_data_corrected,
+            spectrum=spectral_data_corrected,
             reduction_matrix=reduction_matrix,  # TODO separate the 2 reduction matrices?
-            data_uncertainties=pipeline_noise,
+            uncertainties=pipeline_noise,
             mask_threshold=0.2
         )
     else:
         spectral_data_corrected, reduction_matrix, pipeline_noise = remove_telluric_lines_fit(
-            spectral_data=spectral_data_corrected,
+            spectrum=spectral_data_corrected,
             reduction_matrix=reduction_matrix,
             airmass=airmass,
-            data_uncertainties=pipeline_noise,
+            uncertainties=pipeline_noise,
             mask_threshold=0.2,
             polynomial_fit_degree=2
         )
@@ -426,8 +426,8 @@ def pipeline_validity_test(reduced_true_model, reduced_mock_observations,
     return 1 - (reduced_true_model - mock_noise * mock_observations_reduction_matrix) / reduced_mock_observations
 
 
-def remove_noisy_wavelength_channels(spectral_data, reduction_matrix, mean_subtract=False):
-    for i, data in enumerate(spectral_data):
+def remove_noisy_wavelength_channels(spectrum, reduction_matrix, mean_subtract=False):
+    for i, data in enumerate(spectrum):
         # Get standard deviation over time, for each wavelength channel
         time_standard_deviation = np.asarray([np.ma.std(data, axis=0)] * np.size(data, axis=0))
 
@@ -436,17 +436,17 @@ def remove_noisy_wavelength_channels(spectral_data, reduction_matrix, mean_subtr
             time_standard_deviation > 3 * np.ma.std(data), data
         )
 
-        spectral_data[i, :, :] = data
+        spectrum[i, :, :] = data
 
     if mean_subtract:
-        mean_spectra = np.mean(spectral_data, axis=2)  # mean over wavelengths of each individual spectrum
-        spectral_data -= mean_spectra
+        mean_spectra = np.mean(spectrum, axis=2)  # mean over wavelengths of each individual spectrum
+        spectrum -= mean_spectra
         reduction_matrix -= mean_spectra
 
-    return spectral_data, reduction_matrix
+    return spectrum, reduction_matrix
 
 
-def remove_telluric_lines_fit(spectral_data, reduction_matrix, airmass, data_uncertainties=None, mask_threshold=1e-16,
+def remove_telluric_lines_fit(spectrum, reduction_matrix, airmass, uncertainties=None, mask_threshold=1e-16,
                               polynomial_fit_degree=2):
     """Remove telluric lines with a polynomial function.
     The telluric transmittance can be written as:
@@ -459,10 +459,10 @@ def remove_telluric_lines_fit(spectral_data, reduction_matrix, airmass, data_unc
     might be safer.
 
     Args:
-        spectral_data: spectral data to correct
+        spectrum: spectral data to correct
         reduction_matrix: matrix storing all the operations made to reduce the data
         airmass: airmass of the data
-        data_uncertainties: uncertainties on the data
+        uncertainties: uncertainties on the data
         mask_threshold: mask wavelengths where the Earth atmospheric transmittance estimate is below this value
         polynomial_fit_degree: degree of the polynomial fit of the Earth atmospheric transmittance
 
@@ -471,18 +471,18 @@ def remove_telluric_lines_fit(spectral_data, reduction_matrix, airmass, data_unc
     """
     # Initialization
     spectral_data_corrected, reduction_matrix, pipeline_uncertainties = __init_pipeline_outputs(
-        spectral_data, reduction_matrix, data_uncertainties
+        spectrum, reduction_matrix, uncertainties
     )
 
-    if data_uncertainties is not None:
-        weights = 1 / data_uncertainties
+    if uncertainties is not None:
+        weights = 1 / uncertainties
     else:
-        weights = np.ones(spectral_data.shape)
+        weights = np.ones(spectrum.shape)
 
     telluric_lines_fits = np.ma.zeros(spectral_data_corrected.shape)
 
     # Correction
-    for i, det in enumerate(spectral_data):
+    for i, det in enumerate(spectrum):
         # Mask wavelength columns where at least one value is lower or equal to 0, to avoid invalid log values
         masked_det = np.ma.masked_where(np.ones(det.shape) * np.min(det, axis=0) <= 0, det)
         log_det_t = np.ma.log(np.transpose(masked_det))
@@ -512,19 +512,19 @@ def remove_telluric_lines_fit(spectral_data, reduction_matrix, airmass, data_unc
         reduction_matrix[i, :, :] /= telluric_lines_fits[i, :, :]
 
     # Propagation of uncertainties
-    if data_uncertainties is not None:
+    if uncertainties is not None:
         pipeline_uncertainties /= np.abs(telluric_lines_fits)
 
     return spectral_data_corrected, reduction_matrix, pipeline_uncertainties
 
 
-def remove_telluric_lines_mean(spectral_data, reduction_matrix, data_uncertainties=None, mask_threshold=1e-16):
+def remove_telluric_lines_mean(spectrum, reduction_matrix, uncertainties=None, mask_threshold=1e-16):
     """Remove the telluric lines using the weighted arithmetic mean over time.
 
     Args:
-        spectral_data: spectral data to correct
+        spectrum: spectral data to correct
         reduction_matrix: matrix storing all the operations made to reduce the data
-        data_uncertainties: uncertainties on the data
+        uncertainties: uncertainties on the data
         mask_threshold: mask wavelengths where the Earth atmospheric transmittance estimate is below this value
 
     Returns:
@@ -532,20 +532,20 @@ def remove_telluric_lines_mean(spectral_data, reduction_matrix, data_uncertainti
     """
     # Initialization
     spectral_data_corrected, reduction_matrix, pipeline_uncertainties = __init_pipeline_outputs(
-        spectral_data, reduction_matrix, data_uncertainties
+        spectrum, reduction_matrix, uncertainties
     )
 
-    if data_uncertainties is not None:
-        weights = 1 / data_uncertainties
+    if uncertainties is not None:
+        weights = 1 / uncertainties
     else:
-        weights = np.ones(spectral_data.shape)
+        weights = np.ones(spectrum.shape)
 
-    mean_spectrum_time = np.ma.average(spectral_data, axis=1, weights=weights)
+    mean_spectrum_time = np.ma.average(spectrum, axis=1, weights=weights)
     mean_spectrum_time = np.ma.masked_array(mean_spectrum_time)  # ensure that it is a masked array
 
     # Correction
     if isinstance(spectral_data_corrected, np.ma.core.MaskedArray):
-        for i, data in enumerate(spectral_data):
+        for i, data in enumerate(spectrum):
             mean_spectrum_time[i] = np.ma.masked_where(
                 mean_spectrum_time[i] < mask_threshold, mean_spectrum_time[i]
             )
@@ -554,26 +554,26 @@ def remove_telluric_lines_mean(spectral_data, reduction_matrix, data_uncertainti
             spectral_data_corrected[i, :, :] = data / mean_spectrum_time[i]
             reduction_matrix[i, :, :] /= mean_spectrum_time[i]
     else:
-        for i, data in enumerate(spectral_data):
+        for i, data in enumerate(spectrum):
             spectral_data_corrected[i, :, :] = data / mean_spectrum_time[i]
             reduction_matrix[i, :, :] /= mean_spectrum_time[i]
 
-    if data_uncertainties is not None:
-        for i, data in enumerate(spectral_data):
+    if uncertainties is not None:
+        for i, data in enumerate(spectrum):
             pipeline_uncertainties[i, :, :] /= np.abs(mean_spectrum_time[i])
 
     return spectral_data_corrected, reduction_matrix, pipeline_uncertainties
 
 
-def remove_throughput_fit(spectral_data, reduction_matrix, wavelengths, data_uncertainties=None, mask_threshold=1e-16,
+def remove_throughput_fit(spectrum, reduction_matrix, wavelengths, uncertainties=None, mask_threshold=1e-16,
                           polynomial_fit_degree=2):
     """Remove variable throughput with a polynomial function.
 
     Args:
-        spectral_data: spectral data to correct
+        spectrum: spectral data to correct
         reduction_matrix: matrix storing all the operations made to reduce the data
         wavelengths: wavelengths of the data
-        data_uncertainties: uncertainties on the data
+        uncertainties: uncertainties on the data
         mask_threshold: mask wavelengths where the Earth atmospheric transmittance estimate is below this value
         polynomial_fit_degree: degree of the polynomial fit of the Earth atmospheric transmittance
 
@@ -582,18 +582,18 @@ def remove_throughput_fit(spectral_data, reduction_matrix, wavelengths, data_unc
     """
     # Initialization
     spectral_data_corrected, reduction_matrix, pipeline_uncertainties = __init_pipeline_outputs(
-        spectral_data, reduction_matrix, data_uncertainties
+        spectrum, reduction_matrix, uncertainties
     )
 
-    if data_uncertainties is not None:
-        weights = 1 / data_uncertainties
+    if uncertainties is not None:
+        weights = 1 / uncertainties
     else:
-        weights = np.ones(spectral_data.shape)
+        weights = np.ones(spectrum.shape)
 
     throughput_fits = np.ma.zeros(spectral_data_corrected.shape)
 
     # Correction
-    for i, det in enumerate(spectral_data):
+    for i, det in enumerate(spectrum):
         if np.ndim(wavelengths) == 2:
             wvl = wavelengths[i, :]
         else:
@@ -621,47 +621,47 @@ def remove_throughput_fit(spectral_data, reduction_matrix, wavelengths, data_unc
         reduction_matrix[i, :, :] /= throughput_fits[i, :, :]
 
     # Propagation of uncertainties
-    if data_uncertainties is not None:
+    if uncertainties is not None:
         pipeline_uncertainties /= np.abs(throughput_fits)
 
     return spectral_data_corrected, reduction_matrix, pipeline_uncertainties
 
 
-def remove_throughput_mean(spectral_data, reduction_matrix=None, data_uncertainties=None):
+def remove_throughput_mean(spectrum, reduction_matrix=None, uncertainties=None):
     """Correct for the variable throughput using the weighted arithmetic mean over wavelength.
 
     Args:
-        spectral_data: spectral data to correct
+        spectrum: spectral data to correct
         reduction_matrix: matrix storing all the operations made to reduce the data
-        data_uncertainties: uncertainties on the data
+        uncertainties: uncertainties on the data
 
     Returns:
         Corrected spectral data, reduction matrix and uncertainties after correction
     """
     # Initialization
     spectral_data_corrected, reduction_matrix, pipeline_uncertainties = __init_pipeline_outputs(
-        spectral_data, reduction_matrix, data_uncertainties
+        spectrum, reduction_matrix, uncertainties
     )
 
-    if data_uncertainties is not None:
-        weights = 1 / data_uncertainties
+    if uncertainties is not None:
+        weights = 1 / uncertainties
     else:
-        weights = np.ones(spectral_data.shape)
+        weights = np.ones(spectrum.shape)
 
     # Correction
-    for i, data in enumerate(spectral_data):
-        if isinstance(spectral_data, np.ma.core.MaskedArray):
+    for i, data in enumerate(spectrum):
+        if isinstance(spectrum, np.ma.core.MaskedArray):
             correction_coefficient = np.ma.average(data, axis=1, weights=weights[i])
-        elif isinstance(spectral_data, np.ndarray):
+        elif isinstance(spectrum, np.ndarray):
             correction_coefficient = np.average(data, axis=1, weights=weights[i])
         else:
             raise ValueError(f"spectral_data must be a numpy.ndarray or a numpy.ma.core.MaskedArray, "
-                             f"but is of type '{type(spectral_data)}'")
+                             f"but is of type '{type(spectrum)}'")
 
         spectral_data_corrected[i, :, :] = np.transpose(np.transpose(data) / correction_coefficient)
         reduction_matrix[i, :, :] = np.transpose(np.transpose(reduction_matrix[i, :, :]) / correction_coefficient)
 
-        if data_uncertainties is not None:
+        if uncertainties is not None:
             pipeline_uncertainties[i, :, :] = np.transpose(
                 np.transpose(pipeline_uncertainties[i, :, :]) / np.abs(correction_coefficient)
             )
@@ -669,7 +669,7 @@ def remove_throughput_mean(spectral_data, reduction_matrix=None, data_uncertaint
     return spectral_data_corrected, reduction_matrix, pipeline_uncertainties
 
 
-def simple_pipeline(spectral_data, data_uncertainties=None,
+def simple_pipeline(spectrum, uncertainties=None,
                     wavelengths=None, airmass=None, tellurics_mask_threshold=0.1, polynomial_fit_degree=1,
                     apply_throughput_removal=True, apply_telluric_lines_removal=True, full=False, **kwargs):
     """Removes the telluric lines and variable throughput of some data.
@@ -677,8 +677,8 @@ def simple_pipeline(spectral_data, data_uncertainties=None,
     will be fitted using the weighted arithmetic mean. Otherwise, telluric transmittance are fitted with a polynomial.
 
     Args:
-        spectral_data: spectral data to correct
-        data_uncertainties: uncertainties on the data
+        spectrum: spectral data to correct
+        uncertainties: uncertainties on the data
         wavelengths: wavelengths of the data
         airmass: airmass of the data
         tellurics_mask_threshold: mask wavelengths where the Earth atmospheric transmittance estimate is below this value
@@ -690,23 +690,23 @@ def simple_pipeline(spectral_data, data_uncertainties=None,
         Reduced spectral data, reduction matrix and uncertainties after reduction
     """
     # Initialize reduction matrix
-    reduction_matrix = np.ma.ones(spectral_data.shape)
-    reduction_matrix.mask = np.zeros(spectral_data.shape, dtype=bool)
+    reduction_matrix = np.ma.ones(spectrum.shape)
+    reduction_matrix.mask = np.zeros(spectrum.shape, dtype=bool)
 
     # Initialize reduced data and pipeline noise
-    reduced_data = copy.copy(spectral_data)
+    reduced_data = copy.copy(spectrum)
 
-    if isinstance(spectral_data, np.ma.core.MaskedArray):
-        reduced_data.mask = copy.copy(spectral_data.mask)
+    if isinstance(spectrum, np.ma.core.MaskedArray):
+        reduced_data.mask = copy.copy(spectrum.mask)
 
-        if data_uncertainties is not None:
-            reduced_data_uncertainties = np.ma.masked_array(copy.copy(data_uncertainties))
-            reduced_data_uncertainties.mask = copy.copy(spectral_data.mask)
+        if uncertainties is not None:
+            reduced_data_uncertainties = np.ma.masked_array(copy.copy(uncertainties))
+            reduced_data_uncertainties.mask = copy.copy(spectrum.mask)
         else:
             reduced_data_uncertainties = None
     else:
-        if data_uncertainties is not None:
-            reduced_data_uncertainties = copy.copy(data_uncertainties)
+        if uncertainties is not None:
+            reduced_data_uncertainties = copy.copy(uncertainties)
         else:
             reduced_data_uncertainties = None
 
@@ -714,16 +714,16 @@ def simple_pipeline(spectral_data, data_uncertainties=None,
     if apply_throughput_removal:
         if wavelengths is None:
             reduced_data, reduction_matrix, reduced_data_uncertainties = remove_throughput_mean(
-                spectral_data=spectral_data,
+                spectrum=spectrum,
                 reduction_matrix=reduction_matrix,
-                data_uncertainties=reduced_data_uncertainties
+                uncertainties=reduced_data_uncertainties
             )
         else:
             reduced_data, reduction_matrix, reduced_data_uncertainties = remove_throughput_fit(
-                spectral_data=spectral_data,
+                spectrum=spectrum,
                 reduction_matrix=reduction_matrix,
                 wavelengths=wavelengths,
-                data_uncertainties=reduced_data_uncertainties,
+                uncertainties=reduced_data_uncertainties,
                 mask_threshold=1e-16,
                 polynomial_fit_degree=2
             )
@@ -731,17 +731,17 @@ def simple_pipeline(spectral_data, data_uncertainties=None,
     if apply_telluric_lines_removal:
         if airmass is None:
             reduced_data, reduction_matrix, reduced_data_uncertainties = remove_telluric_lines_mean(
-                spectral_data=reduced_data,
+                spectrum=reduced_data,
                 reduction_matrix=reduction_matrix,
-                data_uncertainties=reduced_data_uncertainties,
+                uncertainties=reduced_data_uncertainties,
                 mask_threshold=tellurics_mask_threshold
             )
         else:
             reduced_data, reduction_matrix, reduced_data_uncertainties = remove_telluric_lines_fit(
-                spectral_data=reduced_data,
+                spectrum=reduced_data,
                 reduction_matrix=reduction_matrix,
                 airmass=airmass,
-                data_uncertainties=reduced_data_uncertainties,
+                uncertainties=reduced_data_uncertainties,
                 mask_threshold=tellurics_mask_threshold,
                 polynomial_fit_degree=polynomial_fit_degree
             )
