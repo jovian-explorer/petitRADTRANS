@@ -346,8 +346,10 @@ class Data:
         logL=0.0
         if self.covariance is not None:
             logL += -1*np.dot(diff, np.dot(self.inv_cov, diff))/2.
+            logL += -0.5 * np.log(np.linalg.det(2 * np.pi * self.covariance))
         else:
             logL += -1*np.sum( (diff / f_err)**2. ) / 2.
+            logL += -0.5*np.sum(np.log(2*np.pi*f_err**2.))
         if plotting:
             if not self.photometry:
                 plt.plot(self.wlen, flux_rebinned)
