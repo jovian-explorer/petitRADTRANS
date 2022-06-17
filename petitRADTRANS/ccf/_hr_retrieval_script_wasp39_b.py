@@ -7,6 +7,7 @@ Try:
 If for some reason the script crashes.
 """
 import argparse
+import copy
 import os.path
 import sys
 import time
@@ -15,7 +16,8 @@ import numpy as np
 
 # from petitRADTRANS.ccf.high_resolution_retrieval_wasp39_b import *
 # from petitRADTRANS.ccf.high_resolution_retrieval_toi270_c import *
-from petitRADTRANS.ccf.high_resolution_retrieval_HD_189733_b import *
+#from petitRADTRANS.ccf.high_resolution_retrieval_HD_189733_b import *
+from petitRADTRANS.ccf.high_resolution_retrieval_HD_189733_b2 import *
 # from petitRADTRANS.ccf._high_resolution_retrieval2 import *
 from petitRADTRANS.ccf.model_containers import RetrievalSpectralModel
 from petitRADTRANS.ccf.spectra_utils import load_snr_file
@@ -1076,6 +1078,235 @@ def main_hd(sim_id=0):
 
 
 def main_hd2(sim_id=0):
+    from mpi4py import MPI
+
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+
+    module_dir = os.path.abspath(os.path.dirname(__file__))
+
+    star_name = 'WASP-82'
+    planet_name = star_name + ' b'
+    planet = Planet.get(planet_name)
+
+    # Paul's setup for HD 189733 b
+    # planet.equilibrium_temperature = 1209
+
+    # line_species_str = ['CO_main_iso', 'CO_36', 'CH4_main_iso', 'H2O_main_iso']
+    line_species_str = ['CO_main_iso', 'CH4_main_iso', 'H2O_main_iso']
+    # line_species_str = ['CO_36', 'CH4_main_iso', 'H2O_main_iso']
+    # line_species_str = ['CO_main_iso', 'CO_36', 'H2O_main_iso']
+    # line_species_str = ['CO_main_iso', 'CO_36', 'CH4_main_iso']
+
+    retrieval_name = f't{planet_name}{sim_id}_12CO_13CO_CH4_H2O_t_18-28_noCO_36'
+
+    if not os.path.isdir(
+            os.path.join(module_dir, '..', '__tmp', 'test_retrieval', 'bins_' + planet_name.lower().replace(' ', '_'))
+    ):
+        os.mkdir(
+            os.path.join(module_dir, '..', '__tmp', 'test_retrieval', 'bins_' + planet_name.lower().replace(' ', '_'))
+        )
+
+    retrieval_directory = os.path.abspath(
+        os.path.join(module_dir, '..', '__tmp', 'test_retrieval', 'bins_' + planet_name.lower().replace(' ', '_'),
+                     retrieval_name)
+    )
+
+    mode = 'transit'
+    n_live_points = 100
+    add_noise = False
+
+    retrieval_directories = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval'))
+
+    load_from = None
+    # load_from = os.path.join(retrieval_directories, f't0_kp_vr_CO_H2O_79-80_{mode}_200lp_np')
+    # load_from = os.path.join(retrieval_directories, f't{sim_id}_vttt_p_kp_vr_CO_H2O_79-80_{mode}_30lp')
+    # load_from = os.path.join(retrieval_directories, f't1_tt2_p_mr_kp_vr_CO_H2O_79-80_{mode}_100lp')
+
+    band = 'K'
+
+    wavelengths_borders = {
+        'K': [1.8, 2.8],
+        # 'K': [2.28, 2.42],
+        # 'K': [2.15, 2.4],
+        # 'M': [4.79, 4.80]  # [4.5, 5.5],
+    }
+
+    wrange_0 = wavelengths_borders[band] * np.array([1.001, 0.999])
+    n_wranges = 100
+    wranges = np.linspace(wrange_0[0], wrange_0[1], int(n_wranges + 1))
+    wavelengths_borders[band] = np.array([wranges[sim_id], wranges[sim_id + 1]])
+
+    if wavelengths_borders[band][-1] > 2.5:
+        print("End of transmission file")
+        return 0
+
+    integration_times_ref = {
+        'K': 60,
+        # 'M': 76.89
+    }
+
+    wavelengths_borders = wavelengths_borders[band]
+    integration_times_ref = integration_times_ref[band]
+
+    snr_file = os.path.join(module_dir, 'andes', star_name.replace(' ', '_'), f"ANDES_snrs.npz")
+    telluric_transmittance = os.path.join(module_dir, 'andes', 'sky', 'transmission',
+                                          f"transmission_1500_2500.dat")
+    airmass = os.path.join(module_dir, 'andes', star_name.replace(' ', '_'), 'airmass_optimal.txt')
+    variable_throughput = os.path.join(module_dir, 'metis', 'brogi_crires_test', 'algn.npy')
+
+    wavelengths_instrument = None
+    instrument_snr = None
+    plot = True
+    instrument_resolving_power = 1e5
+
+    if rank == 0:
+        # Initialize parameters
+        retrieval_name, retrieval_directory, \
+            model, prt_object, reduced_mock_observations, \
+            retrieval_model \
+            = init_mock_observations(
+                planet, line_species_str, mode,
+                retrieval_directory, retrieval_name,
+                add_noise, wavelengths_borders, integration_times_ref,
+                wavelengths_instrument=wavelengths_instrument, instrument_snr=instrument_snr, snr_file=snr_file,
+                telluric_transmittance=telluric_transmittance, airmass=airmass,
+                variable_throughput=variable_throughput,
+                instrument_resolving_power=instrument_resolving_power,
+                load_from=load_from, plot=plot
+            )
+
+        retrieval_parameters = {
+            'retrieval_name': retrieval_name,
+            'pressures': model.pressures,
+            'retrieved_species': model.line_species,
+            'rayleigh_species': model.rayleigh_species,
+            'continuum_species': model.continuum_species,
+            'retrieval_model': retrieval_model,
+            'wavelengths_instrument': model.model_parameters['output_wavelengths'],
+            'observed_spectra': reduced_mock_observations,
+            'observations_uncertainties': model.model_parameters['uncertainties'],
+            'prt_object': prt_object,
+            'parameters': copy.deepcopy(model.model_parameters)
+        }
+
+        retrieval_directory = retrieval_directory
+    else:
+        print(f"Rank {rank} waiting for main process to finish...")
+        retrieval_parameters = {  # needed for broadcasting
+            'retrieval_name': None,
+            'pressures': None,
+            'retrieved_species': None,
+            'rayleigh_species': None,
+            'continuum_species': None,
+            'retrieval_model': None,
+            'wavelengths_instrument': None,
+            'observed_spectra': None,
+            'observations_uncertainties': None,
+            'prt_object': Radtrans(
+                line_species=['H2O_main_iso'], mode='lbl', pressures=np.array([1e2]), wlen_bords_micron=[1.0, 1.00001]
+            ),  # initializing here because Radtrans cannot be an empty instance
+            'parameters': {}
+        }
+        retrieval_directory = ''
+
+    return 0
+
+    for key in retrieval_parameters:
+        if key == 'prt_object':
+            init_dict = {
+                'line_species': None,
+                'rayleigh_species': None,
+                'continuum_opacities': None,
+                'wlen_bords_micron': None,
+                'mode': None,
+                'do_scat_emis': None,
+                'lbl_opacity_sampling': None,
+                'press': None
+            }
+            # prt_keys = comm.bcast(list(retrieval_parameters[key].__dict__.keys()), root=0)
+
+            for pkey in init_dict:
+                if rank == 0:
+                    print(f'Broadcasting Radtrans init key {pkey}...')
+
+                if pkey == 'continuum_opacities':
+                    init_dict[pkey] = ['H2-H2', 'H2-He']
+                else:
+                    init_dict[pkey] = comm.bcast(retrieval_parameters[key].__dict__[pkey], root=0)
+
+            if rank != 0:
+                retrieval_parameters[key] = Radtrans(
+                    line_species=init_dict['line_species'],
+                    rayleigh_species=init_dict['rayleigh_species'],
+                    continuum_opacities=init_dict['continuum_opacities'],
+                    wlen_bords_micron=init_dict['wlen_bords_micron'],
+                    mode=init_dict['mode'],
+                    do_scat_emis=init_dict['do_scat_emis'],
+                    lbl_opacity_sampling=init_dict['lbl_opacity_sampling']
+                )
+                retrieval_parameters[key].setup_opa_structure(init_dict['press'] * 1e-6)
+
+            print(f'rank {rank} waiting...')
+            comm.barrier()
+        else:
+            retrieval_parameters[key] = comm.bcast(retrieval_parameters[key], root=0)
+
+    retrieval_directory = comm.bcast(retrieval_directory, root=0)
+
+    if rank == 0:
+        print("Bcasting done !!!")
+
+    # # Check if all observations are the same
+    # obs_tmp = comm.allgather(retrieval_parameters['observed_spectra'])
+    #
+    # for obs_tmp_proc in obs_tmp[1:]:
+    #     assert np.allclose(obs_tmp_proc, obs_tmp[0], atol=0, rtol=1e-15)
+
+    # print(f"Shared observations consistency check OK")
+
+    # Initialize retrieval
+    run_definitions = init_run(**retrieval_parameters)
+
+    retrieval = Retrieval(
+        run_definitions,
+        output_dir=retrieval_directory,
+        sample_spec=False,
+        ultranest=False,
+        pRT_plot_style=False
+    )
+
+    retrieval.run(
+        sampling_efficiency=0.8,
+        n_live_points=n_live_points,
+        const_efficiency_mode=False,
+        resume=False
+    )
+
+    if rank == 0:
+        sample_dict, parameter_dict = retrieval.get_samples(
+            output_dir=retrieval_directory + os.path.sep,
+            ret_names=[retrieval_name]
+        )
+
+        n_param = len(parameter_dict[retrieval_name])
+        parameter_plot_indices = {retrieval_name: np.arange(0, n_param)}
+
+        true_values = {retrieval_name: []}
+
+        for p in parameter_dict[retrieval_name]:
+            true_values[retrieval_name].append(np.mean(retrieval_parameters['parameters'][p].value))
+
+        fig = contour_corner(
+            sample_dict, parameter_dict, os.path.join(retrieval_directory, f'corner_{retrieval_name}.png'),
+            parameter_plot_indices=parameter_plot_indices,
+            true_values=true_values, prt_plot_style=False
+        )
+
+        fig.show()
+
+
+def _main_hd2(sim_id=0):
     from mpi4py import MPI
 
     comm = MPI.COMM_WORLD

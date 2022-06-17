@@ -12,7 +12,7 @@ from scipy.ndimage import gaussian_filter1d
 
 from petitRADTRANS import nat_cst as nc
 from petitRADTRANS.ccf.pipeline import simple_pipeline
-from petitRADTRANS.ccf.utils import calculate_uncertainty, module_dir
+from petitRADTRANS.ccf.utils import calculate_uncertainty, module_dir, dict2hdf5, hdf52dict
 from petitRADTRANS.fort_rebin import fort_rebin as fr
 from petitRADTRANS.phoenix import get_PHOENIX_spec
 from petitRADTRANS.physics import doppler_shift, guillot_global, guillot_metallic_temperature_profile
@@ -700,7 +700,6 @@ class BaseSpectralModel:
 
             spectrum = self.scale_spectrum(
                 spectrum=spectrum,
-                mode=mode,
                 **self.model_parameters
             )
 
@@ -763,6 +762,15 @@ class BaseSpectralModel:
         )
 
         return radtrans
+
+    @classmethod
+    def load(cls, filename):
+        new_spectrum_model = cls(pressures=None, wavelengths_boundaries=[0.0, 0.0])
+
+        with h5py.File(filename, 'r') as f:
+            new_spectrum_model.__dict__ = hdf52dict(f)
+
+        return new_spectrum_model
 
     @staticmethod
     def pipeline(spectrum):
@@ -843,15 +851,16 @@ class BaseSpectralModel:
                              f"but has {np.ndim(output_wavelengths)}")
 
     def save(self, file):
-        pass
-        # TODO save and load functions
-        # with h5py.File(file, 'w') as f:
-        #
-        #     dataset = f.create_dataset(
-        #         name='wavelengths',
-        #         data=wavelengths
-        #     )
-        #     dataset.attrs['units'] = f'{wavelengths_units}'
+        with h5py.File(file, 'w') as f:
+            dict2hdf5(
+                dictionary=self.__dict__,
+                hdf5_file=f
+            )
+            f.create_dataset(
+                name='units',
+                data='pressures are in bar, radiosities are in erg.s-1.cm-2.sr-1/cm, wavelengths are in um, '
+                     'otherwise all other units are in CGS'
+            )
 
     @staticmethod
     def scale_spectrum(spectrum, star_radius, planet_radius=None, star_observed_spectral_radiosities=None,
@@ -3858,7 +3867,7 @@ class SpectralModel2(BaseSpectralModel):
             log10_metallicity = None
 
         for argument, value in locals().items():
-            if argument not in kwargs and argument != 'self':
+            if argument not in kwargs and argument != 'self' and argument != 'kwargs':
                 kwargs[argument] = value
 
         return self.calculate_spectral_parameters(

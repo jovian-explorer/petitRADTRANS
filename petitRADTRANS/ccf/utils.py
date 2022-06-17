@@ -1,5 +1,8 @@
+import copy
 import os
 
+import h5py
+import warnings
 import numpy as np
 
 module_dir = os.path.dirname(__file__)  # TODO find a cleaner way to do this?
@@ -27,6 +30,49 @@ def class_init_args2dict(string):
     out_string += '}'
 
     return out_string
+
+
+def dict2hdf5(dictionary, hdf5_file, group='/'):
+    for key in dictionary:
+        if isinstance(dictionary[key], dict):  # create a new group for the dictionary
+            new_group = group + key + '/'
+            dict2hdf5(dictionary[key], hdf5_file, new_group)
+        else:
+            if dictionary[key] is None:
+                data = 'None'
+            else:
+                data = dictionary[key]
+
+            hdf5_file.create_dataset(
+                name=group + key,
+                data=data
+            )
+
+
+def hdf52dict(hdf5_file):
+    dictionary = {}
+
+    for key in hdf5_file:
+        if isinstance(hdf5_file[key], h5py.Dataset):
+            if isinstance(hdf5_file[key][()], bytes):
+                dictionary[key] = str(hdf5_file[key][()], 'utf-8')
+            else:
+                dictionary[key] = hdf5_file[key][()]
+        elif isinstance(hdf5_file[key], h5py.Group):
+            dictionary[key] = hdf52dict(hdf5_file[key])
+        else:
+            warnings.warn(f"Ignoring '{key}' of type '{type(hdf5_file[key])} in HDF5 file: "
+                          f"hdf52dict() can only handle types 'Dataset' and 'Group'")
+
+    return dictionary
+
+
+def class2hdf5(obj, filename=None):
+    with h5py.File(filename, 'w') as f:
+        dict2hdf5(
+            dictionary=obj.__dict__,
+            hdf5_file=f
+        )
 
 
 def calculate_uncertainty(derivatives, uncertainties, covariance_matrix=None):
