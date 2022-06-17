@@ -521,7 +521,7 @@ class BaseSpectralModel:
             rebin_required_interval: (um) the optimal wavelengths boundaries for the spectrum
         """
         # Re-bin requirement is an interval half a bin larger then re-binning interval
-        wavelengths_flat = self.model_parameters['output_wavelengths'].flatten()
+        wavelengths_flat = np.array(self.model_parameters['output_wavelengths']).flatten()
         rebin_required_interval = [
             wavelengths_flat[0]
             - (wavelengths_flat[1] - wavelengths_flat[0]) / 2,
@@ -634,25 +634,27 @@ class BaseSpectralModel:
                 **parameters
             )
 
-        self.model_parameters['mode'] = mode
-        self.model_parameters['deformation_matrix'] = deformation_matrix
-        self.model_parameters['noise_matrix'] = noise_matrix
-        self.model_parameters['scale'] = scale
-        self.model_parameters['shift'] = shift
-        self.model_parameters['convolve'] = convolve
-        self.model_parameters['rebin'] = rebin
-        self.model_parameters['reduce'] = reduce
+            self.model_parameters['mode'] = mode
+            self.model_parameters['deformation_matrix'] = deformation_matrix
+            self.model_parameters['noise_matrix'] = noise_matrix
+            self.model_parameters['scale'] = scale
+            self.model_parameters['shift'] = shift
+            self.model_parameters['convolve'] = convolve
+            self.model_parameters['rebin'] = rebin
+            self.model_parameters['reduce'] = reduce
+
+            parameters = copy.deepcopy(self.model_parameters)
 
         if mode == 'emission':
             self.wavelengths, self.spectral_radiosities = self.get_spectral_radiosity_spectrum_model(
                 radtrans=radtrans,
-                parameters=self.model_parameters
+                parameters=parameters
             )
             spectrum = copy.copy(self.spectral_radiosities)
         elif mode == 'transmission':
             self.wavelengths, self.transit_radii = self.get_transit_spectrum_model(
                 radtrans=radtrans,
-                parameters=self.model_parameters
+                parameters=parameters
             )
             spectrum = copy.copy(self.transit_radii)
         else:
@@ -670,17 +672,17 @@ class BaseSpectralModel:
 
         if scale:
             if mode == 'emission':  # shift the star spectrum as well for scaling
-                if 'star_observed_spectral_radiosities' not in self.model_parameters:
+                if 'star_observed_spectral_radiosities' not in parameters:
                     missing = []
 
-                    if 'star_spectral_radiosities' not in self.model_parameters:
+                    if 'star_spectral_radiosities' not in parameters:
                         missing.append('star_spectral_radiosities')
 
                     if shift:
-                        if 'system_observer_radial_velocities' not in self.model_parameters:
-                            if 'relative_velocities' in self.model_parameters:
-                                self.model_parameters['system_observer_radial_velocities'] = \
-                                    np.zeros(self.model_parameters['relative_velocities'].shape)
+                        if 'system_observer_radial_velocities' not in parameters:
+                            if 'relative_velocities' in parameters:
+                                parameters['system_observer_radial_velocities'] = \
+                                    np.zeros(parameters['relative_velocities'].shape)
                             else:
                                 missing.append('system_observer_radial_velocities')
 
@@ -689,18 +691,22 @@ class BaseSpectralModel:
 
                         raise TypeError(f"missing {len(missing)} parameters for scaling: '{joint}'")
 
-                    _, self.model_parameters['star_observed_spectral_radiosities'] = self.get_instrument_model(
+                    _, parameters['star_observed_spectral_radiosities'] = self.get_instrument_model(
                         wavelengths=copy.copy(self.wavelengths),
-                        spectrum=self.model_parameters['star_spectral_radiosities'],
-                        relative_velocities=self.model_parameters['system_observer_radial_velocities'],
+                        spectrum=parameters['star_spectral_radiosities'],
+                        relative_velocities=parameters['system_observer_radial_velocities'],
                         shift=shift,
                         convolve=convolve,
                         rebin=rebin
                     )
 
+                    if update_parameters:
+                        self.model_parameters['star_observed_spectral_radiosities'] = \
+                            copy.deepcopy(parameters['star_observed_spectral_radiosities'])
+
             spectrum = self.scale_spectrum(
                 spectrum=spectrum,
-                **self.model_parameters
+                **parameters
             )
 
         if deformation_matrix is not None:
@@ -710,21 +716,25 @@ class BaseSpectralModel:
             spectrum += noise_matrix
 
         if reduce:
-            spectrum, self.model_parameters['reduction_matrix'], self.model_parameters['reduced_uncertainties'] = \
+            spectrum, parameters['reduction_matrix'], parameters['reduced_uncertainties'] = \
                 self.get_reduced_spectrum(
                     spectrum=spectrum,
                     pipeline=self.pipeline,
                     wavelengths=wavelengths,
-                    **self.model_parameters
+                    **parameters
                 )
         else:
-            self.model_parameters['reduction_matrix'] = np.ones(spectrum.shape)
+            parameters['reduction_matrix'] = np.ones(spectrum.shape)
 
-            if 'data_uncertainties' in self.model_parameters:
-                self.model_parameters['reduced_uncertainties'] = \
-                    copy.deepcopy(self.model_parameters['data_uncertainties'])
+            if 'data_uncertainties' in parameters:
+                parameters['reduced_uncertainties'] = \
+                    copy.deepcopy(parameters['data_uncertainties'])
             else:
-                self.model_parameters['reduced_uncertainties'] = None
+                parameters['reduced_uncertainties'] = None
+
+        if update_parameters:
+            self.model_parameters['reduction_matrix'] = parameters['reduction_matrix']
+            self.model_parameters['reduced_uncertainties'] = parameters['reduced_uncertainties']
 
         return wavelengths, spectrum
 

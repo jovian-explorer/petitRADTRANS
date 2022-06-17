@@ -1181,7 +1181,7 @@ def main_hd2(sim_id=0):
             'pressures': model.pressures,
             'retrieved_species': model.line_species,
             'rayleigh_species': model.rayleigh_species,
-            'continuum_species': model.continuum_species,
+            'continuum_species': model.continuum_opacities,
             'retrieval_model': retrieval_model,
             'wavelengths_instrument': model.model_parameters['output_wavelengths'],
             'observed_spectra': reduced_mock_observations,
@@ -1210,7 +1210,7 @@ def main_hd2(sim_id=0):
         }
         retrieval_directory = ''
 
-    return 0
+    #return 0
 
     for key in retrieval_parameters:
         if key == 'prt_object':
@@ -1295,7 +1295,7 @@ def main_hd2(sim_id=0):
         true_values = {retrieval_name: []}
 
         for p in parameter_dict[retrieval_name]:
-            true_values[retrieval_name].append(np.mean(retrieval_parameters['parameters'][p].value))
+            true_values[retrieval_name].append(np.mean(retrieval_parameters['parameters'][p]))
 
         fig = contour_corner(
             sample_dict, parameter_dict, os.path.join(retrieval_directory, f'corner_{retrieval_name}.png'),
@@ -1554,9 +1554,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    for i in range(100):
+    for i in range(1):
         print(f'====\n sim {i + 1}')
-        main_hd3(planet=args.planet, sim_id=i + 1)
+        #main_hd3(planet=args.planet, sim_id=i + 1)
+        main_hd2(sim_id=i + 1)
         print(f'====\n')
         plt.close('all')
     # main(sim_id=16)
