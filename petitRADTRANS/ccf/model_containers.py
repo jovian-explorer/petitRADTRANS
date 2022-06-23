@@ -122,6 +122,8 @@ class BaseSpectralModel:
                 **kwargs
             )
 
+        kwargs['planet_max_radial_orbital_velocity'] = planet_max_radial_orbital_velocity
+
         if 'orbital_phases' in kwargs and 'orbital_longitudes' not in kwargs:
             if kwargs['orbital_phases'] is not None:
                 orbital_longitudes = np.rad2deg(2 * np.pi * kwargs['orbital_phases'])
@@ -130,19 +132,17 @@ class BaseSpectralModel:
         else:
             orbital_longitudes = np.zeros(1)
 
+        kwargs['orbital_longitudes'] = orbital_longitudes
+
         if 'relative_velocities' in kwargs:
             if kwargs['relative_velocities'] is None:
                 relative_velocities = calculate_relative_velocities_function(
-                    orbital_longitudes=orbital_longitudes,
-                    planet_max_radial_orbital_velocity=planet_max_radial_orbital_velocity,
                     **kwargs
                 )
             else:
                 relative_velocities = kwargs['relative_velocities']
         else:
             relative_velocities = calculate_relative_velocities_function(
-                orbital_longitudes=orbital_longitudes,
-                planet_max_radial_orbital_velocity=planet_max_radial_orbital_velocity,
                 **kwargs
             )
 
@@ -505,7 +505,7 @@ class BaseSpectralModel:
 
         return wavelengths, spectrum
 
-    def get_optimal_wavelength_boundaries(self):
+    def get_optimal_wavelength_boundaries(self, output_wavelengths=None, relative_velocities=None):
         """Return the optimal wavelength boundaries for rebin on output wavelengths.
         This minimises the number of wavelengths to load and over which to calculate the spectra.
         Doppler shifting is also taken into account.
@@ -520,8 +520,14 @@ class BaseSpectralModel:
         Returns:
             rebin_required_interval: (um) the optimal wavelengths boundaries for the spectrum
         """
+        if output_wavelengths is None:
+            output_wavelengths = self.model_parameters['output_wavelengths']
+
+        if relative_velocities is None and 'relative_velocities' in self.model_parameters:
+            relative_velocities = self.model_parameters['relative_velocities']
+
         # Re-bin requirement is an interval half a bin larger then re-binning interval
-        wavelengths_flat = np.array(self.model_parameters['output_wavelengths']).flatten()
+        wavelengths_flat = np.array(output_wavelengths).flatten()
         rebin_required_interval = [
             wavelengths_flat[0]
             - (wavelengths_flat[1] - wavelengths_flat[0]) / 2,
@@ -532,14 +538,17 @@ class BaseSpectralModel:
         # Take Doppler shifting into account
         rebin_required_interval_shifted = copy.copy(rebin_required_interval)
 
-        if 'relative_velocities' in self.model_parameters:
-            relative_velocities_tmp = copy.deepcopy(self.model_parameters['relative_velocities'])
-            del self.model_parameters['relative_velocities']  # tmp remove parameters to prevent multiple argument def
+        if relative_velocities is not None:
+            if 'relative_velocities' in self.model_parameters:
+                relative_velocities_tmp = copy.deepcopy(self.model_parameters['relative_velocities'])
+                del self.model_parameters['relative_velocities']  # tmp rm parameters to prevent multiple argument def
+            else:
+                relative_velocities_tmp = None
 
             rebin_required_interval_shifted[0] = self.shift_wavelengths(
                 wavelengths_rest=np.array([rebin_required_interval[0]]),
                 relative_velocities=np.array([
-                    -np.max(relative_velocities_tmp)
+                    -np.max(relative_velocities)
                 ]),
                 **self.model_parameters
             )[0][0]
@@ -547,12 +556,13 @@ class BaseSpectralModel:
             rebin_required_interval_shifted[1] = self.shift_wavelengths(
                 wavelengths_rest=np.array([rebin_required_interval[1]]),
                 relative_velocities=np.array([
-                    -np.min(relative_velocities_tmp)
+                    -np.min(relative_velocities)
                 ]),
                 **self.model_parameters
             )[0][0]
 
-            self.model_parameters['relative_velocities'] = relative_velocities_tmp
+            if relative_velocities_tmp is not None:
+                self.model_parameters['relative_velocities'] = relative_velocities_tmp
 
         # Ensure that non-shifted spectrum can still be re-binned
         rebin_required_interval[0] = np.min((rebin_required_interval_shifted[0], rebin_required_interval[0]))

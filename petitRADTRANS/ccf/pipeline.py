@@ -592,6 +592,9 @@ def remove_throughput_fit(spectrum, reduction_matrix, wavelengths, uncertainties
 
     throughput_fits = np.ma.zeros(spectral_data_corrected.shape)
 
+    if np.ndim(wavelengths) == 3:
+        print('Assuming same wavelength solution for each observations, taking wavelengths of observation 0')
+
     # Correction
     for i, det in enumerate(spectrum):
         if np.ndim(wavelengths) == 1:
@@ -599,7 +602,6 @@ def remove_throughput_fit(spectrum, reduction_matrix, wavelengths, uncertainties
         elif np.ndim(wavelengths) == 2:
             wvl = wavelengths[i, :]
         elif np.ndim(wavelengths) == 3:
-            print('Assuming same wavelength solution for each observations, taking wavelengths of observation 0')
             wvl = wavelengths[i, 0, :]
         else:
             raise ValueError(f"wavelengths must have at most 3 dimensions, but has {np.ndim(wavelengths)}")

@@ -4,7 +4,7 @@ All notable changes to the CCF module will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com)
 and this project adheres to [Semantic Versioning](http://semver.org).
 
-## [2.5.0-a17] - 2021-04-19
+## [2.5.0-a20] - 2021-06-23
 ### Added
 - High-resolution retrievals.
 - Possibility to initialize a `retrieval.Data` class without needing a file.
@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 - Possibility to initialize a `retrieval.Retrieval` class with a stellar spectrum, without the need to recalculate it.
 - Possibility to give scattering.
 - Support for 2D and 3D spectral array in retrievals.
+- Support for SLURM.
 - Static function `retrieval.Retrieval._get_samples`, to get retrieval outputs without the need to initialize a `Retrieval`.
 - Gibson et al. 2021 log-likelihood calculation.
 - Better high-resolution mock observation function.
@@ -32,6 +33,7 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 - Function to calculate the radius of a planet from its surface gravity and mass.
 - Option to use the NASA Exoplanet Archive "best mass" when generating a `Planet`.
 - Test suite.
+- Functions in `Radtrans` to calculate radius and pressure at hydrostatic equilibrium.
 - Na2S and KCl clouds compatibility with free chemistry.
 - Module `configuration` to manage paths.
 - Module `version` to store petitRADTRANS version number.
@@ -49,6 +51,7 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 - Stricter scattering convergence criterion.
 - Switched to corr-k combination method without Monte Carlo noise (relevant for scattering mode).
 - CIAs are no more hard-coded.
+- Make `poor_mans_nonequ_chem` compatible with `Angles`.
 - Code clean-up.
 
 ### Removed
@@ -60,8 +63,12 @@ and this project adheres to [Semantic Versioning](http://semver.org).
 - Function `contour_corner` not working when not giving optional arguments `parameter_ranges` and `parameter_plot_indices`.
 - True values not plotted in function `contour_corner`.
 - Function `get_MM` not working with e- and H-.
-- H- implementation.
+- e- and H- implementation.
 - Hack cloud photospheric tau behaviour.
+- Potential reference before assignment in module `retrieval`.
+- Potential `TypeError` in `model_generating_function`.
+- Module `setup` not working with PyPI.
+- Wavelength range in module `retrieval` not working in "photometry" mode.
 - Wrong docstrings in function `Radtrans.get_star_spectrum`.
 
 
