@@ -16,7 +16,7 @@ Thus, to get started download the `opacity and input data
 your computer (it does not matter where).
 
 Next, please add the following environment variable to your
-“.bash_profile” or “.bashrc” file (depending on your operating system)
+“.bash_profile”, “.bashrc”, or ".zshrc" file (depending on your operating system and shell type)
 by typing 
 
 .. code-block:: bash
