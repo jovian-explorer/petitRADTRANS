@@ -149,6 +149,7 @@ def emission_model_diseq(pRT_object,
     else:
         print("Pick two of log_g, R_pl and mass priors!")
         sys.exit(5)
+
     sigma_lnorm = None
     b_hans = None
     distribution = "lognormal"
@@ -158,12 +159,21 @@ def emission_model_diseq(pRT_object,
         b_hans = parameters['b_hans'].value
         distribution = "hansen"
 
+    # per-cloud species fseds
+    fseds = {}
+    for cloud in pRT_object.cloud_species:
+        cname = cloud.split('_')[0]
+        try:
+            fseds[cloud] = parameters['fsed_'+cname].value
+        except:
+            fseds[cloud] = parameters['fsed'].value
+    # calculate the spectrum
     pRT_object.calc_flux(temperatures,
                         abundances,
                         gravity,
                         MMW,
                         contribution = False,
-                        fsed = parameters['fsed'].value,
+                        fsed = fseds,
                         Kzz = Kzz_use,
                         sigma_lnorm = sigma_lnorm,
                         b_hans = b_hans,
@@ -1253,64 +1263,96 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
     except ImportError:
         print("Could not import poor_mans_nonequ_chemistry. Exiting.")
         sys.exit(2)
+
     # Make the abundance profile
     COs = parameters['C/O'].value * np.ones_like(pressures)
     FeHs = parameters['Fe/H'].value * np.ones_like(pressures)
 
     # Prior check all input params
     clouds = {}
-    for cloud in cloud_species:
-        # equilibrium cloud abundance
-        Xcloud= fc.return_cloud_mass_fraction(cloud,parameters['Fe/H'].value, parameters['C/O'].value)
 
-        # Scaled by a constant factor
-        clouds[cloud.split("_")[0]] = 10**parameters['log_X_cb_'+cloud.split("_")[0]].value*Xcloud
-    pquench_C = None
-    if 'log_pquench' in parameters.keys():
-        pquench_C = 10**parameters['log_pquench'].value
-    abundances_interp = pm.interpol_abundances(COs, \
-                                               FeHs, \
-                                               temperatures, \
-                                               pressures,
-                                               Pquench_carbon = pquench_C)
+    for cloud in cloud_species:
+        cname = cloud.split("_")[0]
+        if "eq_scaling_"+cname in parameters.keys():
+            # equilibrium cloud abundance
+            Xcloud= fc.return_cloud_mass_fraction(cloud,parameters['Fe/H'].value, parameters['C/O'].value)
+            # Scaled by a constant factor
+            clouds[cname] = 10**parameters['eq_scaling_'+cname].value*Xcloud
+        else:
+            # Free cloud abundance
+            clouds[cname] = 10**parameters['log_X_cb_'+cloud.split("_")[0]].value
+
+    # Free Chemistry
+    if line_species[0].split("_R_")[0] in parameters.keys():
+        # Cannot mix free and equilibrium chemistry. Maybe something to add?
+        msum = 0.0
+        for species in line_species:
+            abund = 10**parameters[species.split("_R_")[0]].value
+            abundances_interp[species] = abund * np.ones_like(pressures)
+            msum += abund
+        # Whatever's left is H2 and
+        abundances_interp['H2'] = 0.766 * (1.0-msum) * np.ones_like(pressures)
+        abundances_interp['He'] = 0.234 * (1.0-msum) * np.ones_like(pressures)
+        if msum > 1.0:
+            #print(f"Abundance sum > 1.0, msum={msum}")
+            return None,None
+        MMW = calc_MMW(abundances)
+    else:
+        # Equilibrium chemistry
+        pquench_C = None
+        if 'log_pquench' in parameters.keys():
+            pquench_C = 10**parameters['log_pquench'].value
+        abundances_interp = pm.interpol_abundances(COs, \
+                                                FeHs, \
+                                                temperatures, \
+                                                pressures,
+                                                Pquench_carbon = pquench_C)
+        # Magic factor for FeH abundances
+        if 'FeH' in abundances_interp.keys():
+            abundances_interp['FeH'] = abundances_interp['FeH']/2.
     MMW = abundances_interp['MMW']
 
+    # Get the cloud locations
     Pbases = {}
     for cloud in cloud_species:
         cname = cloud.split('_')[0]
-        Pbases[cname] = fc.simple_cdf(cname,pressures, temperatures,
-                                     parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
-    fseds = {}
-    abundances = {}
-    # Clouds
-    p_clouds = []
-    for key, val in Pbases.items():
-        p_clouds.append(val)
-    p_clouds = np.array(p_clouds)
-    #print(len(p_clouds),pressures.shape,parameters['pressure_scaling'].value,parameters['pressure_width'].value)
+        # Free cloud bases
+        if 'Pbase_'+cname in parameters.keys():
+            Pbases[cname] = parameters['Pbase_'+cname].value
+        # Equilibrium locations
+        else:
+            Pbases[cname] = fc.simple_cdf(cname,pressures, temperatures,
+                                            parameters['Fe/H'].value, parameters['C/O'].value, np.mean(MMW))
+
+    # Find high resolution pressure grid and indices
     if AMR:
-        press_use, small_index = fixed_length_amr(p_clouds,
+        press_use, small_index = fixed_length_amr(np.array(list(Pbases.values())),
                                                   pressures,
                                                   parameters['pressure_scaling'].value,
                                                   parameters['pressure_width'].value)
-        #press_use, small_index = _make_half_pressure_better(p_clouds, pressures)
     else :
         #TODO: Test
         press_use = pressures
         small_index = np.linspace(press_use[0],press_use[-1],press_use.shape[0],dtype = int)
 
+    fseds = {}
+    abundances = {}
     for cloud in cp.copy(cloud_species):
         cname = cloud.split('_')[0]
-        if 'log_X_cb_'+cname not in parameters.keys():
-            continue
+        # Set up fseds per-cloud
+        try:
+            fseds[cname] = parameters['fsed_'+cname].value
+        except:
+            fseds[cname] = parameters['fsed'].value
         abundances[cname] = np.zeros_like(temperatures)
         abundances[cname][pressures < Pbases[cname]] = \
                         clouds[cname] *\
                         (pressures[pressures <= Pbases[cname]]/\
-                        Pbases[cname])**parameters['fsed'].value
-        fseds[cname] = parameters['fsed'].value
+                        Pbases[cname])**fseds[cname]
+        # Use correct array length if using AMR
         if AMR:
             abundances[cname] = abundances[cname][small_index]
+
     if AMR:
         for species in line_species:
             abundances[species] = abundances_interp[species.split('_')[0]][small_index]
@@ -1323,10 +1365,6 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
         abundances['H2'] = abundances_interp['H2']
         abundances['He'] = abundances_interp['He']
 
-    # Magic factor for FeH abundances
-    # Ask Paul to explain this
-    if 'FeH' in abundances.keys():
-        abundances['FeH'] = abundances['FeH']/2.
     return abundances,MMW,small_index
 
 def pglobal_check(press,shape,scaling):
