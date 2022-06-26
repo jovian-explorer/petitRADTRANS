@@ -126,10 +126,10 @@ class Data:
             logging.error("Please provide a model generating function or external reference for " + name + "!")
             sys.exit(8)
         if model_resolution is not None:
-            if opacity_mode is 'c_k' and model_resolution > 1000:
+            if opacity_mode == 'c_k' and model_resolution > 1000:
                 logging.warning("The maximum opacity for c-k mode is 1000!")
                 self.model_resolution = None
-            if opacity_mode is 'lbl' and model_resolution < 1000:
+            if opacity_mode == 'lbl' and model_resolution < 1000:
                 logging.warning("Your resolution is lower than R=1000, it's recommended to use 'c-k' mode.")
 
         # Optional, covariance and scaling
@@ -341,6 +341,7 @@ class Data:
             f_err = self.flux_error*self.scale_factor
         logL=0.0
         if self.covariance is not None:
+            #logL += -1*np.sum((diff/np.sqrt(self.covariance.diagonal()))**2)/2.
             logL += -1*np.dot(diff, np.dot(self.inv_cov, diff))/2.
         else:
             logL += -1*np.sum( (diff / f_err)**2. ) / 2.
