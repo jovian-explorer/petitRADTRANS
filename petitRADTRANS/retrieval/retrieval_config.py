@@ -316,7 +316,7 @@ class RetrievalConfig:
         if free:
             self.parameters.pop(species,None)
 
-    def add_cloud_species(self,species, eq = True, abund_lim = (-3.5,4.5), PBase_lim = (-5.0,7.0), fixed_abund = None,fixed_base=None):
+    def add_cloud_species(self,species, eq = True, abund_lim = (-3.5,4.5), PBase_lim = None, fixed_abund = None,fixed_base=None):
         """
         This function adds a single cloud species to the list of species. Optionally,
         it will add parameters to allow for a retrieval using an ackermann-marley model.
@@ -353,18 +353,24 @@ class RetrievalConfig:
 
         self.cloud_species.append(species)
         cname = species.split('_')[0]
-        if fixed_abund is None:
-            self.parameters['log_X_cb_'+cname] = Parameter('log_X_cb_'+cname,True,\
-                                        transform_prior_cube_coordinate = \
-                                        lambda x : abund_lim[0] + abund_lim[1]*x)
+        if eq:
+            self.parameters['eq_scaling_'+cname] = Parameter('eq_scaling_'+cname,True,\
+                                                transform_prior_cube_coordinate = \
+                                                lambda x : abund_lim[0] + abund_lim[1]*x)
         else:
-            self.parameters['log_X_cb_'+cname] = Parameter('log_X_cb_'+cname,False,\
-                            value = fixed_abund)
-        if not eq:
+            if fixed_abund is None:
+                self.parameters['log_X_cb_'+cname] = Parameter('log_X_cb_'+cname,True,\
+                                            transform_prior_cube_coordinate = \
+                                            lambda x : abund_lim[0] + abund_lim[1]*x)
+            else:
+                self.parameters['log_X_cb_'+cname] = Parameter('log_X_cb_'+cname,False,\
+                                value = fixed_abund)
+
+        if PBase_lim is not None or fixed_base is not None:
             if fixed_base is None:
                 self.parameters['Pbase_'+cname] =Parameter('Pbase_'+cname,True,\
-                                                               transform_prior_cube_coordinate = \
-                                                               lambda x : PBase_lim[0] + PBase_lim[1]*x)
+                                                            transform_prior_cube_coordinate = \
+                                                            lambda x : PBase_lim[0] + PBase_lim[1]*x)
             else:
                 self.parameters['Pbase_'+cname] =Parameter('Pbase_'+cname,False,\
                                                                value = fixed_base)
@@ -499,7 +505,7 @@ class RetrievalConfig:
                 wbins = [0.95*wlow,1.05*whigh]
             else:
                 wbins = wlen_range_micron
-            if opacity_mode is 'lbl':
+            if opacity_mode == 'lbl':
                 logging.warning("Are you sure you want a high resolution model for photometry?")
             self.data[name] = Data(name,
                                     path,

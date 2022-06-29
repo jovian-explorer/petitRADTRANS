@@ -6,7 +6,6 @@ os.environ["OMP_NUM_THREADS"] = "1"
 # Read external packages
 import numpy as np
 import copy as cp
-import pymultinest
 
 import json
 import logging
@@ -200,6 +199,9 @@ class Retrieval:
                                 frac_remain = frac_remain,
                                 Lepsilon =Lepsilon)
             return
+
+
+        import pymultinest
         if const_efficiency_mode and sampling_efficiency > 0.1:
             logging.warning("Sampling efficiency should be ~ 0.05 if you're using constant efficiency mode!")
         prefix = self.output_dir + 'out_PMN/'+self.retrieval_name+'_'
@@ -571,9 +573,9 @@ class Retrieval:
                     # Sanity checks on outputs
                     #print(spectrum_model)
                     if spectrum_model is None:
-                        return -1e99
+                        return -1e98
                     if np.isnan(spectrum_model).any():
-                        return -1e99
+                        return -1e98
                     log_likelihood += dd.get_chisq(wlen_model,
                                             spectrum_model,
                                             self.plotting)
@@ -612,12 +614,12 @@ class Retrieval:
                                         spectrum_model, \
                                         self.plotting)
         #print(f"LL: {log_likelihood+log_prior}")
-        if log_likelihood + log_prior < -9e99:
-            return -1e99
-        if np.abs(log_likelihood + log_prior) < 1e-99:
-            return -1e-99
+        if log_likelihood + log_prior < -9e98:
+            return -1e98
+        if np.abs(log_likelihood + log_prior) < 1e-98:
+            return -1e-98
         if self.ultranest and np.isinf(log_likelihood+log_prior):
-            return -1e99
+            return -1e98
         return log_likelihood + log_prior
 
     def get_samples(self, output_dir = None, ret_names = []):
@@ -1124,7 +1126,9 @@ class Retrieval:
 
             # If the data has an arbitrary retrieved scaling factor
             scale = dd.scale_factor
-
+            errscale = 1.0
+            if dd.scale_err:
+                errscale = dd.scale_factor
             if not dd.photometry:
                 if dd.external_pRT_reference is None:
                     best_fit_binned = rgw(self.best_fit_specs[name][0], \
@@ -1162,14 +1166,14 @@ class Retrieval:
                 label = dd.name
                 ax.errorbar(wlen, \
                             flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
-                            yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
+                            yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *errscale, \
                             marker=marker, markeredgecolor='k', linewidth = 0, elinewidth = 2, \
                             label = label, zorder =10, alpha = 0.9)
             else:
                 # Don't label photometry?
                 ax.errorbar(wlen, \
                             flux * self.rd.plot_kwargs["y_axis_scaling"] * scale, \
-                            yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *scale, \
+                            yerr = error * self.rd.plot_kwargs["y_axis_scaling"] *errscale, \
                             xerr = dd.wlen_bins/2., linewidth = 0, elinewidth = 2, \
                             marker=marker, markeredgecolor='k', color = 'grey', zorder = 10, \
                             label = None, alpha = 0.6)
@@ -1178,7 +1182,7 @@ class Retrieval:
             if dd.external_pRT_reference is None:
 
                 ax_r.errorbar(wlen, \
-                            ((flux*scale) - best_fit_binned )/error ,
+                            ((flux*scale) - best_fit_binned )/(error*errscale) ,
                             yerr = error/error,
                             color = col,
                             linewidth = 0, elinewidth = 2, \
@@ -1186,7 +1190,7 @@ class Retrieval:
                             alpha = 0.9)
             else:
                 ax_r.errorbar(wlen, \
-                        ((flux*scale) - best_fit_binned )/error,
+                        ((flux*scale) - best_fit_binned )/(error*errscale),
                         yerr = error/error,
                         color = col,
                         linewidth = 0, elinewidth = 2, \
