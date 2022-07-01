@@ -476,6 +476,7 @@ def remove_telluric_lines_fit(spectrum, reduction_matrix, airmass, uncertainties
 
     if uncertainties is not None:
         weights = 1 / uncertainties
+        weights[weights.mask] = 0
     else:
         weights = np.ones(spectrum.shape)
 
@@ -537,6 +538,7 @@ def remove_telluric_lines_mean(spectrum, reduction_matrix, uncertainties=None, m
 
     if uncertainties is not None:
         weights = 1 / uncertainties
+        weights[weights.mask] = 0
     else:
         weights = np.ones(spectrum.shape)
 
@@ -587,6 +589,7 @@ def remove_throughput_fit(spectrum, reduction_matrix, wavelengths, uncertainties
 
     if uncertainties is not None:
         weights = 1 / uncertainties
+        weights[weights.mask] = 0
     else:
         weights = np.ones(spectrum.shape)
 
@@ -652,6 +655,7 @@ def remove_throughput_mean(spectrum, reduction_matrix=None, uncertainties=None):
 
     if uncertainties is not None:
         weights = 1 / uncertainties
+        weights[weights.mask] = 0
     else:
         weights = np.ones(spectrum.shape)
 

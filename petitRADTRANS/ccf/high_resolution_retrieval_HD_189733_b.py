@@ -29,7 +29,7 @@ all_species = [
     'H2S_main_iso',
     'K',
     'NH3_main_iso',
-    'Na_allard',
+    'Na_allard_new',
     'PH3_main_iso',
     'H2O_main_iso'
 ]
@@ -447,6 +447,7 @@ def init_mock_observations(planet, line_species_str, mode,
                            telluric_transmittance=None, airmass=None, variable_throughput=None,
                            instrument_resolving_power=1e5,
                            load_from=None, plot=False):
+    print('1')
     # Load SNR file
     if snr_file is not None:
         print("Loading SNR...")

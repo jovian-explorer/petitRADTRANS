@@ -130,7 +130,7 @@ class BaseSpectralModel:
             else:
                 orbital_longitudes = np.zeros(1)
         else:
-            orbital_longitudes = np.zeros(1)
+            orbital_longitudes = kwargs['orbital_longitudes']
 
         kwargs['orbital_longitudes'] = orbital_longitudes
 
@@ -3450,9 +3450,16 @@ class SpectralModel2(BaseSpectralModel):
             found = False
 
             # Set line species mass mixing ratios into to their imposed one
-            for line_species_name in line_species:
+            for line_species_name_ in line_species:
+                if line_species_name_ == 'CO_36':  # CO_36 special case
+                    if line_species_name_ in imposed_mass_mixing_ratios:
+                        # Use imposed mass mixing ratio
+                        mass_mixing_ratios[line_species_name_] = imposed_mass_mixing_ratios[line_species_name_]
+
+                    continue
+
                 # Correct for line species name to match pRT chemistry name
-                line_species_name = line_species_name.split('_', 1)[0]
+                line_species_name = line_species_name_.split('_', 1)[0]
 
                 if line_species_name == 'C2H2':  # C2H2 special case
                     line_species_name += ',acetylene'
@@ -3461,9 +3468,9 @@ class SpectralModel2(BaseSpectralModel):
                     if key not in included_line_species:
                         # Species not included, set mass mixing ratio to 0
                         mass_mixing_ratios[line_species_name] = np.zeros(np.shape(temperatures))
-                    elif line_species_name in imposed_mass_mixing_ratios:
+                    elif line_species_name_ in imposed_mass_mixing_ratios:
                         # Use imposed mass mixing ratio
-                        mass_mixing_ratios[line_species_name] = 10 ** imposed_mass_mixing_ratios[line_species_name]
+                        mass_mixing_ratios[line_species_name_] = imposed_mass_mixing_ratios[line_species_name_]
                     else:
                         # Use calculated mass mixing ratio
                         mass_mixing_ratios[line_species_name] = equilibrium_mass_mixing_ratios[line_species_name]
@@ -3555,7 +3562,7 @@ class SpectralModel2(BaseSpectralModel):
             # Nothing is imposed
             imposed_mass_mixing_ratios = {}
 
-        # Chemical equilibrium
+        # Chemical equilibrium mass mixing ratios
         if use_equilibrium_chemistry:
             # Calculate metallicity
             if log10_metallicity is None:
@@ -3593,32 +3600,29 @@ class SpectralModel2(BaseSpectralModel):
             if 'CO_main_iso' in line_species and 'CO_all_iso' in line_species:
                 raise ValueError(f"cannot add main isotopologue and all isotopologues of CO at the same time")
 
-            if 'CO_all_iso' not in line_species:
-                co_mass_mixing_ratio = copy.copy(mass_mixing_ratios_equilibrium['CO'])
+            if 'CO_main_iso' not in imposed_mass_mixing_ratios and 'CO_36' not in imposed_mass_mixing_ratios:
+                if 'CO_all_iso' not in line_species:
+                    if 'CO_main_iso' in mass_mixing_ratios_equilibrium:
+                        co_mass_mixing_ratio = copy.copy(mass_mixing_ratios_equilibrium['CO_main_iso'])
+                    else:
+                        co_mass_mixing_ratio = copy.copy(mass_mixing_ratios_equilibrium['CO'])
 
-                if 'CO_main_iso' in line_species:
-                    mass_mixing_ratios_equilibrium['CO'] = co_mass_mixing_ratio / (1 + c13c12_ratio)
-                    mass_mixing_ratios_equilibrium['CO_36'] = \
-                        co_mass_mixing_ratio - mass_mixing_ratios_equilibrium['CO']
-                elif 'CO_36' in line_species:
-                    mass_mixing_ratios_equilibrium['CO_36'] = co_mass_mixing_ratio / (1 + 1 / c13c12_ratio)
-                    mass_mixing_ratios_equilibrium['CO'] = \
-                        co_mass_mixing_ratio - mass_mixing_ratios_equilibrium['CO_36']
-
-            if imposed_mass_mixing_ratios == {}:
-                imposed_mass_mixing_ratios = copy.copy(mass_mixing_ratios_equilibrium)
+                    if 'CO_main_iso' in line_species:
+                        mass_mixing_ratios_equilibrium['CO'] = co_mass_mixing_ratio / (1 + c13c12_ratio)
+                        mass_mixing_ratios_equilibrium['CO_36'] = \
+                            co_mass_mixing_ratio - mass_mixing_ratios_equilibrium['CO']
+                    elif 'CO_36' in line_species:
+                        mass_mixing_ratios_equilibrium['CO_36'] = co_mass_mixing_ratio / (1 + 1 / c13c12_ratio)
+                        mass_mixing_ratios_equilibrium['CO'] = \
+                            co_mass_mixing_ratio - mass_mixing_ratios_equilibrium['CO_36']
         else:
             mass_mixing_ratios_equilibrium = None
 
+        # Imposed mass mixing ratios
         # Ensure that the sum of mass mixing ratios of imposed species is <= 1
         for species in imposed_mass_mixing_ratios:
-            # Ignore the non-abundances coming from the chemistry module
-            if species == 'nabla_ad' or species == 'MMW':
-                continue
-
-            spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities
-            mass_mixing_ratios[species] = imposed_mass_mixing_ratios[spec]
-            m_sum_imposed_species += imposed_mass_mixing_ratios[spec]
+            mass_mixing_ratios[species] = imposed_mass_mixing_ratios[species]
+            m_sum_imposed_species += imposed_mass_mixing_ratios[species]
 
         for i in range(np.size(m_sum_imposed_species)):
             if m_sum_imposed_species[i] > 1:
@@ -3640,7 +3644,7 @@ class SpectralModel2(BaseSpectralModel):
             species_list = list(mass_mixing_ratios_equilibrium.keys())
 
         for species in species_list:
-            # Ignore the non-abundances coming from the chemistry module
+            # Ignore the non-MMR keys coming from the chemistry module
             if species == 'nabla_ad' or species == 'MMW':
                 continue
 
@@ -3819,17 +3823,24 @@ class SpectralModel2(BaseSpectralModel):
         return temperatures
 
     def calculate_orbital_phases(self, phase_start, orbital_period):
-        self.orbital_phases = Planet.get_orbital_phases(
+        orbital_phases = Planet.get_orbital_phases(
             phase_start=phase_start,
             orbital_period=orbital_period,
             times=self.times
         )
+
+        return orbital_phases
 
     @staticmethod
     def get_reduced_spectrum(spectrum, pipeline, **kwargs):
         # simple_pipeline interface
         if not hasattr(spectrum, 'mask'):
             spectrum = np.ma.masked_array(spectrum)
+
+        if 'uncertainties' in kwargs:  # ensure that spectrum and uncertainties share the same mask
+            if hasattr(kwargs['uncertainties'], 'mask'):
+                spectrum.mask = np.zeros(spectrum.shape, dtype=bool)
+                spectrum.mask[:] = copy.deepcopy(kwargs['uncertainties'].mask)
 
         reduced_data, reduction_matrix, reduced_data_uncertainties = \
             pipeline(spectrum=spectrum, full=True, **kwargs)
@@ -3904,7 +3915,8 @@ class SpectralModel2(BaseSpectralModel):
 
     def update_spectral_calculation_parameters(self, radtrans: Radtrans, **parameters):
         pressures = radtrans.press * 1e-6  # cgs to bar
-        imposed_mass_mixing_ratios = {}
+        # imposed_mass_mixing_ratios = {}
+        kwargs = {'imposed_mass_mixing_ratios': {}}
 
         for species in radtrans.line_species:
             # TODO mass mixing ratio dict initialization more general
@@ -3912,20 +3924,21 @@ class SpectralModel2(BaseSpectralModel):
 
             if spec in parameters:
                 # TODO move that to RetrievalSpectralModel
-                imposed_mass_mixing_ratios[species] = 10 ** parameters[spec] * np.ones_like(pressures)
-
-        kwargs = {}
+                kwargs['imposed_mass_mixing_ratios'][species] = 10 ** parameters[spec] * np.ones_like(pressures)
 
         for parameter, value in parameters.items():
             # TODO move that to RetrievalSpectralModel
             if 'log10_' in parameter and value is not None:
                 kwargs[parameter.split('log10_', 1)[-1]] = 10 ** value
             else:
-                kwargs[parameter] = copy.copy(value)
-
                 if parameter == 'imposed_mass_mixing_ratios':
-                    for spec, mass_mixing_ratio in imposed_mass_mixing_ratios.items():
-                        kwargs[parameter][spec] = mass_mixing_ratio
+                    if 'imposed_mass_mixing_ratios' in kwargs:
+                        if kwargs[parameter] is None:
+                            kwargs[parameter] = copy.copy(value)
+                    else:
+                        kwargs[parameter] = copy.copy(value)
+                else:
+                    kwargs[parameter] = copy.copy(value)
 
         self.temperatures, self.mass_mixing_ratios, self.mean_molar_masses, self.model_parameters = \
             self.get_spectral_calculation_parameters(

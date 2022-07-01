@@ -884,7 +884,7 @@ def main_hd(sim_id=0):
 
     mode = 'transit'
     n_live_points = 100
-    add_noise = False
+    add_noise = True
 
     retrieval_directories = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval'))
 
@@ -939,7 +939,7 @@ def main_hd(sim_id=0):
             = init_mock_observations(
                 planet, line_species_str, mode,
                 retrieval_directory, retrieval_name,
-                add_noise, wavelengths_borders[band], integration_times_ref[band],
+                add_noise, wavelengths_borders, integration_times_ref,
                 wavelengths_instrument=wavelengths_instrument, instrument_snr=instrument_snr, snr_file=snr_file,
                 telluric_transmittance=telluric_transmittance, airmass=airmass,
                 variable_throughput=variable_throughput,
@@ -981,7 +981,7 @@ def main_hd(sim_id=0):
         }
         retrieval_directory = ''
 
-    # return 0
+    return 0
 
     for key in retrieval_parameters:
         if key == 'prt_object':
@@ -1093,7 +1093,7 @@ def main_hd2(sim_id=0):
     # planet.equilibrium_temperature = 1209
 
     # line_species_str = ['CO_main_iso', 'CO_36', 'CH4_main_iso', 'H2O_main_iso']
-    line_species_str = ['CO_main_iso', 'CH4_main_iso', 'H2O_main_iso']
+    line_species_str = all_species#['CO_main_iso', 'CH4_main_iso', 'H2O_main_iso']
     # line_species_str = ['CO_36', 'CH4_main_iso', 'H2O_main_iso']
     # line_species_str = ['CO_main_iso', 'CO_36', 'H2O_main_iso']
     # line_species_str = ['CO_main_iso', 'CO_36', 'CH4_main_iso']
@@ -1114,7 +1114,7 @@ def main_hd2(sim_id=0):
 
     mode = 'transit'
     n_live_points = 100
-    add_noise = False
+    add_noise = True
 
     retrieval_directories = os.path.abspath(os.path.join(module_dir, '..', '__tmp', 'test_retrieval'))
 
@@ -1210,7 +1210,7 @@ def main_hd2(sim_id=0):
         }
         retrieval_directory = ''
 
-    #return 0
+    return 0
 
     for key in retrieval_parameters:
         if key == 'prt_object':
@@ -1558,6 +1558,7 @@ if __name__ == '__main__':
         print(f'====\n sim {i + 1}')
         #main_hd3(planet=args.planet, sim_id=i + 1)
         main_hd2(sim_id=i + 1)
+        #main_hd(sim_id=i + 1)
         print(f'====\n')
         plt.close('all')
     # main(sim_id=16)
