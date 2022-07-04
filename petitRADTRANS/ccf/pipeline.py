@@ -2,6 +2,7 @@
 Useful functions for data reduction.
 """
 import copy
+import sys
 from warnings import warn
 
 import numpy as np
@@ -475,7 +476,10 @@ def remove_telluric_lines_fit(spectrum, reduction_matrix, airmass, uncertainties
     )
 
     if uncertainties is not None:
-        weights = 1 / uncertainties
+        # The log of the spectrum is fitted, so the weights must be the weights of the log
+        spectrum = np.ma.masked_equal(spectrum, 0)
+        uncertainties = np.ma.masked_equal(uncertainties, 0)
+        weights = 1 / np.abs(uncertainties / spectrum)  # 1 / uncertainties of the log
         weights[weights.mask] = 0
     else:
         weights = np.ones(spectrum.shape)
@@ -487,9 +491,15 @@ def remove_telluric_lines_fit(spectrum, reduction_matrix, airmass, uncertainties
         # Mask wavelength columns where at least one value is lower or equal to 0, to avoid invalid log values
         masked_det = np.ma.masked_where(np.ones(det.shape) * np.min(det, axis=0) <= 0, det)
         log_det_t = np.ma.log(np.transpose(masked_det))
+        weights[i][masked_det.mask] = 0  # polyfit doesn't take masks into account, so set weight of masked values to 0
 
         # Fit each wavelength column
         for k, log_wavelength_column in enumerate(log_det_t):
+            if np.allclose(weights[i, :, k], 0, atol=sys.float_info.min):  # skip fully masked columns
+                telluric_lines_fits[i, :, k] = 0
+
+                continue
+
             fit_parameters = np.polynomial.Polynomial.fit(
                 x=airmass, y=log_wavelength_column, deg=polynomial_fit_degree, w=weights[i, :, k]
             )
@@ -589,7 +599,7 @@ def remove_throughput_fit(spectrum, reduction_matrix, wavelengths, uncertainties
 
     if uncertainties is not None:
         weights = 1 / uncertainties
-        weights[weights.mask] = 0
+        weights[weights.mask] = 0  # polyfit doesn't take masks into account, so set weight of masked values to 0
     else:
         weights = np.ones(spectrum.shape)
 
