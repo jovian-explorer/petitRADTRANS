@@ -499,8 +499,8 @@ class Radtrans(_read_opacities.ReadOpacities):
         self.mmw = np.zeros(p_len)
 
         if len(self.cloud_species) > 0:
-            self.cloud_mass_fracs = np.zeros((p_len,len(self.cloud_species)),dtype='d',order='F')
-            self.r_g = np.zeros((p_len,len(self.cloud_species)),dtype='d',order='F')
+            self.cloud_mass_fracs = np.zeros((p_len,len(self.cloud_species)), dtype='d', order='F')
+            self.r_g = np.zeros((p_len,len(self.cloud_species)), dtype='d', order='F')
 
     def interpolate_species_opa(self, temp):
         # Interpolate line opacities to given temperature structure.
@@ -691,9 +691,11 @@ class Radtrans(_read_opacities.ReadOpacities):
                 print("You must provide a value for the Hansen distribution width, b_hans!")
                 b_hans = None
                 sys.exit(15)
-        for i_spec in range(int(len(self.cloud_species))):
+
+        # Set cloud particle radii if already known
+        for i_spec,cloud in enumerate(self.cloud_species):
             self.cloud_mass_fracs[:,i_spec] = \
-              abundances[self.cloud_species[i_spec]]
+                abundances[cloud]
             if radius != None:
                 self.r_g[:,i_spec] = radius[self.cloud_species[i_spec]]
             elif a_hans != None:
@@ -711,12 +713,15 @@ class Radtrans(_read_opacities.ReadOpacities):
                                     self.cloud_aniso)
             else:
                 cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
-                fs.calc_hansen_opas(rho,self.rho_cloud_particles, \
-                                    self.cloud_mass_fracs,self.r_g,b_hans, \
-                                    self.cloud_rad_bins,self.cloud_radii, \
-                                    self.cloud_lambdas, \
-                                    self.cloud_specs_abs_opa, \
-                                    self.cloud_specs_scat_opa, \
+                fs.calc_hansen_opas(rho,
+                                    self.rho_cloud_particles,
+                                    self.cloud_mass_fracs,
+                                    self.r_g,
+                                    b_hans,
+                                    self.cloud_rad_bins,
+                                    self.cloud_radii,
+                                    self.cloud_specs_abs_opa,
+                                    self.cloud_specs_scat_opa,
                                     self.cloud_aniso)
         else:
             fseds = np.zeros(len(self.cloud_species))
@@ -733,29 +738,35 @@ class Radtrans(_read_opacities.ReadOpacities):
                                         sigma_lnorm,Kzz)
 
                 cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
-                py_calc_cloud_opas(rho,self.rho_cloud_particles, \
-                                        self.cloud_mass_fracs, \
-                                        self.r_g,sigma_lnorm, \
-                                        self.cloud_rad_bins,self.cloud_radii, \
-                                        self.cloud_lambdas, \
-                                        self.cloud_specs_abs_opa, \
-                                        self.cloud_specs_scat_opa, \
-                                        self.cloud_aniso)
+                py_calc_cloud_opas(rho,
+                                   self.rho_cloud_particles, \
+                                   self.cloud_mass_fracs, \
+                                   self.r_g,sigma_lnorm, \
+                                   self.cloud_rad_bins,self.cloud_radii, \
+                                   self.cloud_lambdas, \
+                                   self.cloud_specs_abs_opa, \
+                                   self.cloud_specs_scat_opa, \
+                                   self.cloud_aniso)
 
             else:
-                self.r_g = fs.get_rg_n_hansen(gravity,rho,self.rho_cloud_particles, \
-                        self.temp,mmw,fseds, \
-                        self.cloud_mass_fracs, \
-                        b_hans,Kzz)
+                self.r_g = fs.get_rg_n_hansen(gravity,rho,
+                                              self.rho_cloud_particles,
+                                              self.temp,
+                                              mmw,
+                                              fseds,
+                                              b_hans,
+                                              Kzz)
                 cloud_abs_opa_TOT,cloud_scat_opa_TOT,cloud_red_fac_aniso_TOT = \
-                fs.calc_hansen_opas(rho,self.rho_cloud_particles, \
-                                        self.cloud_mass_fracs, \
-                                        self.r_g,b_hans, \
-                                        self.cloud_rad_bins,self.cloud_radii, \
-                                        self.cloud_lambdas, \
-                                        self.cloud_specs_abs_opa, \
-                                        self.cloud_specs_scat_opa, \
-                                        self.cloud_aniso)
+                fs.calc_hansen_opas(rho,
+                                    self.rho_cloud_particles,
+                                    self.cloud_mass_fracs,
+                                    self.r_g,
+                                    b_hans,
+                                    self.cloud_rad_bins,
+                                    self.cloud_radii,
+                                    self.cloud_specs_abs_opa,
+                                    self.cloud_specs_scat_opa,
+                                    self.cloud_aniso)
 
         # aniso = (1-g)
         cloud_abs, cloud_abs_plus_scat_aniso, aniso, cloud_abs_plus_scat_no_aniso = \
@@ -1792,6 +1803,8 @@ class Radtrans(_read_opacities.ReadOpacities):
                 tab.write_hdf5(path + '/' + spec + '_R_' + str(int(resolution)) + '/' + spec + '_R_' + str(
                     int(resolution)) + '.h5')
                 os.system('rm temp.h5')
+
+
 def py_calc_cloud_opas(
     rho, # (M,)
     rho_p,  # (N,)
@@ -1859,7 +1872,6 @@ def py_calc_cloud_opas(
     cloud_scat_opa = cloud_scat_opa / rho
 
     return cloud_abs_opa, cloud_scat_opa, cloud_red_fac_aniso
-
 
 def py_calc_cloud_opas_old(rho,
                     rho_p,
