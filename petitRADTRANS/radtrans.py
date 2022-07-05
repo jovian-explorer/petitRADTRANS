@@ -691,13 +691,12 @@ class Radtrans(_read_opacities.ReadOpacities):
                 print("You must provide a value for the Hansen distribution width, b_hans!")
                 b_hans = None
                 sys.exit(15)
-        for i_spec in range(int(len(self.cloud_species))):
-            self.cloud_mass_fracs[:,i_spec] = \
-              abundances[self.cloud_species[i_spec]]
+        for i_spec,cloud in enumerate(self.cloud_species):
+            self.cloud_mass_fracs[:,i_spec] = abundances[cloud]
             if radius != None:
-                self.r_g[:,i_spec] = radius[self.cloud_species[i_spec]]
+                self.r_g[:,i_spec] = radius[cloud]
             elif a_hans != None:
-                self.r_g[:,i_spec] = a_hans[self.cloud_species[i_spec]]
+                self.r_g[:,i_spec] = a_hans[cloud]
 
         if radius is not None or a_hans is not None:
             if dist is "lognormal":
@@ -756,8 +755,6 @@ class Radtrans(_read_opacities.ReadOpacities):
                                         self.cloud_specs_abs_opa, \
                                         self.cloud_specs_scat_opa, \
                                         self.cloud_aniso)
-
-        # aniso = (1-g)
         cloud_abs, cloud_abs_plus_scat_aniso, aniso, cloud_abs_plus_scat_no_aniso = \
            fs.interp_integ_cloud_opas(cloud_abs_opa_TOT,cloud_scat_opa_TOT, \
             cloud_red_fac_aniso_TOT,self.cloud_lambdas,self.border_freqs)
