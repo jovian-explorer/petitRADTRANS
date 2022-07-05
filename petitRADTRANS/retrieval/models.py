@@ -1308,7 +1308,7 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
                                                 pressures,
                                                 Pquench_carbon = pquench_C)
         # Magic factor for FeH abundances
-        if 'FeH' in abundances_interp.keys():
+        if 'FeH' in '\t'.join(list(abundances_interp.keys())):
             abundances_interp['FeH'] = abundances_interp['FeH']/2.
     MMW = abundances_interp['MMW']
 
