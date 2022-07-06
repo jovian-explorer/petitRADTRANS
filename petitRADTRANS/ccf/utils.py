@@ -1,4 +1,3 @@
-import copy
 import os
 
 import h5py
@@ -6,6 +5,20 @@ import warnings
 import numpy as np
 
 module_dir = os.path.dirname(__file__)  # TODO find a cleaner way to do this?
+
+
+def bytes2str(obj):
+    if hasattr(obj, '__iter__') and not isinstance(obj, bytes):
+        new_obj = []
+
+        for o in obj:
+            new_obj.append(bytes2str(o))
+
+        return np.array(new_obj)
+    elif isinstance(obj, bytes):
+        return str(obj, 'utf-8')
+    else:
+        return obj
 
 
 def class_init_args2class_args(string):
@@ -54,10 +67,7 @@ def hdf52dict(hdf5_file):
 
     for key in hdf5_file:
         if isinstance(hdf5_file[key], h5py.Dataset):
-            if isinstance(hdf5_file[key][()], bytes):
-                dictionary[key] = str(hdf5_file[key][()], 'utf-8')
-            else:
-                dictionary[key] = hdf5_file[key][()]
+            dictionary[key] = bytes2str(hdf5_file[key][()])
         elif isinstance(hdf5_file[key], h5py.Group):
             dictionary[key] = hdf52dict(hdf5_file[key])
         else:

@@ -11,7 +11,7 @@ import petitRADTRANS.nat_cst as nc
 from petitRADTRANS.ccf.ccf_utils import radiosity_erg_hz2radiosity_erg_cm
 from petitRADTRANS.ccf.mock_observation import add_telluric_lines, add_variable_throughput, \
     generate_mock_observations, get_mock_secondary_eclipse_spectra, get_mock_transit_spectra, get_orbital_phases
-from petitRADTRANS.ccf.model_containers import Planet, SpectralModel
+from petitRADTRANS.ccf.model_containers import Planet
 from petitRADTRANS.ccf.pipeline import simple_pipeline, pipeline_validity_test
 from petitRADTRANS.ccf.utils import calculate_reduced_chi2
 from petitRADTRANS.fort_rebin import fort_rebin as fr
@@ -54,7 +54,7 @@ def _init_model(planet, w_bords, line_species_str, p0=1e-2):
     mass_fractions = {
         'H2': 0.74,
         'He': 0.24,
-       # line_species_str: 1e-3
+        # line_species_str: 1e-3
     }
     for species in line_species_str:
         mass_fractions[species] = 1e-3
@@ -115,7 +115,7 @@ def _init_model_old(planet, w_bords, line_species_str, p0=1e-2):
     mass_fractions = {
         'H2': 0.74,
         'He': 0.24,
-       # line_species_str: 1e-3
+        # line_species_str: 1e-3
     }
     for species in line_species_str:
         mass_fractions[species] = 1e-3
@@ -344,7 +344,10 @@ def _get_transit_retrieval_model(prt_object, parameters, pt_plot_mode=None, AMR=
             wavelengths=parameters['wavelengths_instrument'].value,
             airmass=parameters['airmass'].value,
             uncertainties=parameters['data_uncertainties'].value,
-            apply_throughput_removal=False
+            polynomial_fit_degree=1,
+            tellurics_mask_threshold=0.2,
+            apply_throughput_removal=True,
+            apply_telluric_lines_removal=True
         )
     else:
         spectrum_model = spectrum_model0
@@ -502,7 +505,8 @@ def init_mock_observations(planet, line_species_str, mode,
     ))[0]
 
     if snr_file_data is not None and instrument_snr is None:
-        instrument_snr = np.ma.masked_invalid(snr_file_data[wh, 1] / snr_file_data[wh, 2])
+        n = np.ma.masked_less_equal(snr_file_data[wh, 2], 0)
+        instrument_snr = np.ma.masked_invalid(snr_file_data[wh, 1] / n)
     else:
         instrument_snr = instrument_snr[wh]
 
@@ -550,7 +554,7 @@ def init_mock_observations(planet, line_species_str, mode,
         airmass = np.interp(x, xp, airmass)
         telluric_transmittance = np.exp(
             np.transpose(np.transpose(
-                np.ones((np.size(orbital_phases), np.size(wavelengths_instrument)))
+                np.ones((np.size(orbital_phases), np.size(wavelengths_instrument[0])))
                 * np.log(telluric_transmittance)
             ) * airmass)
         )
@@ -693,11 +697,13 @@ def init_mock_observations(planet, line_species_str, mode,
             number=1
         )
 
-        true_parameters['data'] = Param(mock_observations)
         true_parameters['true_noise'] = Param(noise)
 
         uncertainties = np.ones(mock_observations.shape) / instrument_snr
         true_parameters['data_uncertainties'] = Param(copy.copy(uncertainties))
+
+        mock_observations = np.ma.masked_where(uncertainties.mask, mock_observations)
+        true_parameters['data'] = Param(mock_observations)
 
         # Generate deformation matrix
         deformation_matrix = _get_deformation_matrix(
@@ -821,6 +827,8 @@ def init_mock_observations(planet, line_species_str, mode,
         full=True,
         apply_throughput_removal=apply_throughput_removal,
         apply_telluric_lines_removal=apply_telluric_lines_removal,
+        polynomial_fit_degree=1,
+        tellurics_mask_threshold=0.2
     )
 
     uncertainties *= np.abs(reduction_matrix)
@@ -849,7 +857,8 @@ def init_mock_observations(planet, line_species_str, mode,
     ts = copy.copy(true_spectra)
     ts = np.ma.masked_where(mock_observations.mask, ts)
     fmt, mr0t, _ = simple_pipeline(
-        ts, airmass=airmass, wavelengths=wavelengths_instrument,
+        ts, airmass=airmass,
+        wavelengths=wavelengths_instrument,
         uncertainties=true_parameters['data_uncertainties'].value, full=True,
         apply_throughput_removal=apply_throughput_removal,
         apply_telluric_lines_removal=apply_telluric_lines_removal
@@ -862,17 +871,24 @@ def init_mock_observations(planet, line_species_str, mode,
                                      apply_throughput_removal=apply_throughput_removal,
                                      apply_telluric_lines_removal=apply_telluric_lines_removal,
                                      full=True)
-    fs, mr, _ = simple_pipeline(ts * true_parameters['deformation_matrix'].value + noise, airmass=airmass,
-                                wavelengths=wavelengths_instrument,
-                                uncertainties=true_parameters['data_uncertainties'].value, full=True,
-                                apply_throughput_removal=apply_throughput_removal,
-                                apply_telluric_lines_removal=apply_telluric_lines_removal,
-                                )
+    fs, mr, _ = simple_pipeline(
+        spectrum=ts * true_parameters['deformation_matrix'].value + noise,
+        uncertainties=true_parameters['data_uncertainties'].value,
+        wavelengths=wavelengths_instrument,
+        airmass=airmass,
+        full=True,
+        apply_throughput_removal=apply_throughput_removal,
+        apply_telluric_lines_removal=apply_telluric_lines_removal,
+        polynomial_fit_degree=1,
+        tellurics_mask_threshold=0.2
+    )
 
     # Check pipeline validity
+    print(np.max(np.abs(r - ts * mr0t)))
+    print(np.max(np.abs(reduced_mock_observations - (ts * true_parameters['deformation_matrix'].value + noise) * mr)))
     assert np.allclose(r, ts * mr0t, atol=1e-14, rtol=1e-14)
     assert np.allclose(reduced_mock_observations, (ts * true_parameters['deformation_matrix'].value + noise) * mr,
-                       atol=1e-14, rtol=1e-14)
+                       atol=1e-9, rtol=1e-9)
 
     print('Pipeline validity check OK')
 
@@ -1066,7 +1082,6 @@ def init_mock_observations(planet, line_species_str, mode,
             ),
             file_name=os.path.join(retrieval_directory, 'pipeline_validity.png')
         )
-
 
     save_all(
         directory=retrieval_directory,

@@ -3711,8 +3711,11 @@ class SpectralModel2(BaseSpectralModel):
 
                     for species in mass_mixing_ratios:
                         if species not in imposed_mass_mixing_ratios:
-                            mass_mixing_ratios[species][i] = \
-                                mass_mixing_ratios[species][i] * (1 - m_sum_imposed_species[i]) / m_sum_species[i]
+                            if m_sum_species[i] > 0:
+                                mass_mixing_ratios[species][i] = \
+                                    mass_mixing_ratios[species][i] * (1 - m_sum_imposed_species[i]) / m_sum_species[i]
+                            else:
+                                mass_mixing_ratios[species][i] = mass_mixing_ratios[species][i] / m_sum_total[i]
                 elif m_sum_total[i] == 0:
                     if verbose:
                         print(f"sum of species mass fraction ({m_sum_species[i]} + {m_sum_imposed_species[i]}) "
@@ -3744,6 +3747,12 @@ class SpectralModel2(BaseSpectralModel):
                         # Use He/H2 ratio in argument
                         mass_mixing_ratios['H2'][i] = (1 - m_sum_total[i]) / (1 + heh2_ratio)
                         mass_mixing_ratios['He'][i] = mass_mixing_ratios['H2'][i] * heh2_ratio
+                else:
+                    mass_mixing_ratios['H2'] = np.zeros(np.shape(pressures))
+                    mass_mixing_ratios['He'] = np.zeros(np.shape(pressures))
+        else:
+            mass_mixing_ratios['H2'] = np.zeros(np.shape(pressures))
+            mass_mixing_ratios['He'] = np.zeros(np.shape(pressures))
 
         return mass_mixing_ratios
 
@@ -3918,13 +3927,13 @@ class SpectralModel2(BaseSpectralModel):
         # imposed_mass_mixing_ratios = {}
         kwargs = {'imposed_mass_mixing_ratios': {}}
 
-        for species in radtrans.line_species:
-            # TODO mass mixing ratio dict initialization more general
-            spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities
-
-            if spec in parameters:
-                # TODO move that to RetrievalSpectralModel
-                kwargs['imposed_mass_mixing_ratios'][species] = 10 ** parameters[spec] * np.ones_like(pressures)
+        # for species in radtrans.line_species:
+        #     # TODO mass mixing ratio dict initialization more general
+        #     spec = species.split('_R_')[0]  # deal with the naming scheme for binned down opacities
+        #
+        #     if spec in parameters:
+        #         # TODO move that to RetrievalSpectralModel
+        #         kwargs['imposed_mass_mixing_ratios'][species] = 10 ** parameters[spec] * np.ones_like(pressures)
 
         for parameter, value in parameters.items():
             # TODO move that to RetrievalSpectralModel
@@ -3932,11 +3941,9 @@ class SpectralModel2(BaseSpectralModel):
                 kwargs[parameter.split('log10_', 1)[-1]] = 10 ** value
             else:
                 if parameter == 'imposed_mass_mixing_ratios':
-                    if 'imposed_mass_mixing_ratios' in kwargs:
-                        if kwargs[parameter] is None:
-                            kwargs[parameter] = copy.copy(value)
-                    else:
-                        kwargs[parameter] = copy.copy(value)
+                    for species, mass_mixing_ratios in parameters[parameter].items():
+                        if species not in kwargs[parameter]:
+                            kwargs[parameter][species] = copy.copy(mass_mixing_ratios)
                 else:
                     kwargs[parameter] = copy.copy(value)
 

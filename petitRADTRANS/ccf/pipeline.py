@@ -706,9 +706,10 @@ def simple_pipeline(spectrum, uncertainties=None,
         polynomial_fit_degree: degree of the polynomial fit of the Earth atmospheric transmittance
         apply_throughput_removal: if True, apply the throughput removal correction
         apply_telluric_lines_removal: if True, apply the telluric lines removal correction
+        full: if True, return the reduced matrix and reduced uncertainties in addition to the reduced spectrum
 
     Returns:
-        Reduced spectral data, reduction matrix and uncertainties after reduction
+        Reduced spectral data (and reduction matrix and uncertainties after reduction if full is True)
     """
     # Initialize reduction matrix
     reduction_matrix = np.ma.ones(spectrum.shape)

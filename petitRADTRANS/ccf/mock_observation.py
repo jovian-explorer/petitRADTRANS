@@ -388,9 +388,10 @@ def generate_mock_observations(wavelength_model, planet_spectrum_model,
     if np.ndim(telluric_transmittance) == 1:
         telluric_transmittance = np.ones(data_shape) * telluric_transmittance
     elif np.ndim(telluric_transmittance) == 2:
-        telluric_transmittance = \
-            np.ones(np.append(planet_velocities.size, telluric_transmittance.shape)) * telluric_transmittance
-        telluric_transmittance = np.moveaxis(telluric_transmittance, 0, 1)
+        pass
+        # telluric_transmittance = \
+        #     np.ones(np.append(planet_velocities.size, telluric_transmittance.shape)) * telluric_transmittance
+        # telluric_transmittance = np.moveaxis(telluric_transmittance, 0, 1)
 
     if np.shape(telluric_transmittance)[-1] != np.shape(wavelength_instrument)[-1]:
         raise ValueError(f"Telluric transmittance (shape {np.shape(telluric_transmittance)}) "
