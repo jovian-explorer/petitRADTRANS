@@ -261,8 +261,7 @@ def guillot_global_ret(P,delta,gamma,T_int,T_equ):
 def guillot_modif(P,delta,gamma,T_int,T_equ,ptrans,alpha):
     return guillot_global_ret(P,np.abs(delta),np.abs(gamma), \
                                   np.abs(T_int),np.abs(T_equ))* \
-                                  (1.-alpha*(1./(1.+ \
-                                                np.exp((np.log(P/ptrans))))))
+                                  (1.-alpha*(1./(1.+ P/ptrans)))
 
 ### Function to make temp
 def make_press_temp(rad_trans_params):

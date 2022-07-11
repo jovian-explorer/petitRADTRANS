@@ -218,14 +218,17 @@ class Data:
             obs= np.genfromtxt(path)
 
         # Warnings and errors
-        if obs.shape[1] != 3:
+        if obs.shape[1] < 3:
             logging.error("Failed to properly load data in " + path + "!!!")
             sys.exit(6)
+        elif obs.shape[1] > 3:
+            logging.warning(" File " + path + " has more than three columns. Retrieval package assumes that"+ \
+                          " the first three have this meaning: wavelength, flux, flux error")
         if np.isnan(obs).any():
             logging.warning("nans present in " + path + ", please verify your data before running the retrieval!")
         self.wlen = obs[:,0]
         self.flux = obs[:,1]
-        self.flux_error = obs[:,-1]
+        self.flux_error = obs[:,2]
 
     def loadfits(self,path):
         """
