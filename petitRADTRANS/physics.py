@@ -247,7 +247,7 @@ def guillot_modif(pressure, delta, gamma, t_int, t_equ, ptrans, alpha):
         np.abs(delta),
         np.abs(gamma),
         np.abs(t_int), np.abs(t_equ)
-    ) * (1. - alpha * (1. / (1. + np.exp((np.log(pressure / ptrans))))))
+    ) * (1. - alpha * (1. / (1. + pressure / ptrans)))
 
 
 def make_press_temp(rad_trans_params):  # TODO pressure grid in input?
