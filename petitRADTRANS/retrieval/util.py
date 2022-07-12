@@ -126,7 +126,7 @@ def get_MMW_from_mfrac(m_frac):
     wraps calc_MMW
     """
 
-    calc_MMW(m_frac)
+    return calc_MMW(m_frac)
 
 def get_MMW_from_nfrac(n_frac):
     """
