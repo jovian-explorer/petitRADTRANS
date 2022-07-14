@@ -375,7 +375,7 @@ class Radtrans(_read_opacities.ReadOpacities):
             print('  Read CIA opacities for H2-H2...')
             self.cia_h2h2_lambda, self.cia_h2h2_temp, \
               self.cia_h2h2_alpha_grid,self.H2H2temp,self.H2H2wlen = \
-              fi.cia_read('H2H2',self.path)
+              fi.cia_read('H2-H2',self.path)
             self.cia_h2h2_alpha_grid = np.array(self.cia_h2h2_alpha_grid, \
                                                   dtype='d',order='F')
             self.cia_h2h2_temp = self.cia_h2h2_temp[:self.H2H2temp]
@@ -386,7 +386,7 @@ class Radtrans(_read_opacities.ReadOpacities):
         if self.H2HeCIA:
             print('  Read CIA opacities for H2-He...')
             self.cia_h2he_lambda, self.cia_h2he_temp, self.cia_h2he_alpha_grid,\
-              self.H2Hetemp,self.H2Hewlen = fi.cia_read('H2He',self.path)
+              self.H2Hetemp,self.H2Hewlen = fi.cia_read('H2-He',self.path)
             self.cia_h2he_alpha_grid = np.array(self.cia_h2he_alpha_grid, \
                                                   dtype='d',order='F')
             self.cia_h2he_temp = self.cia_h2he_temp[:self.H2Hetemp]
@@ -722,7 +722,7 @@ class Radtrans(_read_opacities.ReadOpacities):
                                     self.cloud_aniso)
         else:
             fseds = np.zeros(len(self.cloud_species))
-            for i,cloud in renumerate(self.cloud_species):
+            for i,cloud in enumerate(self.cloud_species):
                 try:
                     #print('fsed '+self.cloud_species[i_spec], fsed[self.cloud_species[i_spec]])
                     fseds[i_spec] = fsed[cloud.split('_')[0]]

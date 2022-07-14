@@ -590,16 +590,12 @@ def guillot_eqchem_transmission(pRT_object, \
                                     10**parameters['log_kappa_IR'].value, \
                                     parameters['gamma'].value, \
                                     gravity, \
-                                    parameters['Tint'].value, \
-                                    parameters['Tequ'].value)
+                                    parameters['T_int'].value, \
+                                    parameters['T_equ'].value)
 
     # If in evaluation mode, and PTs are supposed to be plotted
     if PT_plot_mode:
         return p_use, temperatures
-
-    # Make the abundance profile
-    COs = parameters['C/O'].value * np.ones_like(pressures)
-    FeHs = parameters['Fe/H'].value * np.ones_like(pressures)
 
     abundances, MMW, small_index, Pbases = get_abundances(p_use,
                                                   temperatures,
@@ -618,7 +614,7 @@ def guillot_eqchem_transmission(pRT_object, \
 
     radii = {}
     for cloud in pRT_object.cloud_species:
-        radii[cloud] = 10**parameter['log_cloud_radius_' + cloud.split('_')[0]].value * np.ones_like(p_use)
+        radii[cloud] = 10**parameters['log_cloud_radius_' + cloud.split('_')[0]].value * np.ones_like(p_use)
     # Calculate the spectrum
     if 'sigma_lnorm' in parameters.keys():
         pRT_object.calc_transm(temperatures, \
@@ -627,7 +623,7 @@ def guillot_eqchem_transmission(pRT_object, \
                                 MMW, \
                                 R_pl=R_pl, \
                                 P0_bar=0.01,
-                                sigma_lnorm = parameter['sigma_lnorm'].value,
+                                sigma_lnorm = parameters['sigma_lnorm'].value,
                                 radius = radii)
     else:
         pRT_object.calc_transm(temperatures, \
@@ -710,16 +706,12 @@ def guillot_patchy_eqchem_transmission(pRT_object, \
                                     10**parameters['log_kappa_IR'].value, \
                                     parameters['gamma'].value, \
                                     gravity, \
-                                    parameters['Tint'].value, \
-                                    parameters['Tequ'].value)
+                                    parameters['T_int'].value, \
+                                    parameters['T_equ'].value)
 
     # If in evaluation mode, and PTs are supposed to be plotted
     if PT_plot_mode:
         return p_use, temperatures
-
-    # Make the abundance profile
-    COs = parameters['C/O'].value * np.ones_like(pressures)
-    FeHs = parameters['Fe/H'].value * np.ones_like(pressures)
 
     abundances, MMW, small_index, Pbases = get_abundances(p_use,
                                                   temperatures,
@@ -738,7 +730,7 @@ def guillot_patchy_eqchem_transmission(pRT_object, \
 
     radii = {}
     for cloud in pRT_object.cloud_species:
-        radii[cloud] = 10**parameter['log_cloud_radius_' + cloud.split('_')[0]].value * np.ones_like(p_use)
+        radii[cloud] = 10**parameters['log_cloud_radius_' + cloud.split('_')[0]].value * np.ones_like(p_use)
     # Calculate the spectrum
     pRT_object.calc_transm(temperatures, \
                             abundances, \
@@ -746,7 +738,7 @@ def guillot_patchy_eqchem_transmission(pRT_object, \
                             MMW, \
                             R_pl=R_pl, \
                             P0_bar=0.01,
-                            sigma_lnorm = parameter['sigma_lnorm'].value,
+                            sigma_lnorm = parameters['sigma_lnorm'].value,
                             radius = radii)
     wlen_model = nc.c/pRT_object.freq/1e-4
     spectrum_model_cloudy = (pRT_object.transm_rad/parameters['Rstar'].value)**2.
@@ -758,14 +750,16 @@ def guillot_patchy_eqchem_transmission(pRT_object, \
                             gravity, \
                             MMW, \
                             R_pl=R_pl, \
-                            P0_bar=0.01)
+                            P0_bar=0.01,
+                            sigma_lnorm = parameters['sigma_lnorm'].value,
+                            radius = radii)
 
     wlen_model = nc.c/pRT_object.freq/1e-4
     spectrum_model_clear = (pRT_object.transm_rad/parameters['Rstar'].value)**2.
     patchiness = parameters["patchiness"].value
     spectrum_model = (patchiness * spectrum_model_cloudy) +\
                      ((1-patchiness)*spectrum_model_clear)
-    return wlen_model, spectrum_model
+    return wlen_model, spectrum_model*1e6
 
 def guillot_eqchem_emission(pRT_object, \
                             parameters, \
@@ -1029,6 +1023,21 @@ def isothermal_free_transmission(pRT_object, \
 
     # Make the P-T profile
     pressures = pRT_object.press/1e6
+    gravity = -np.inf
+    R_pl = -np.inf
+    if 'log_g' in parameters.keys() and 'mass' in parameters.keys():
+        gravity = 10**parameters['log_g'].value
+        R_pl = np.sqrt(nc.G*parameters['mass'].value/gravity)
+    elif 'log_g' in parameters.keys():
+        gravity= 10**parameters['log_g'].value
+        R_pl = parameters['R_pl'].value
+    elif 'mass' in parameters.keys():
+        R_pl = parameters['R_pl'].value
+        gravity = nc.G * parameters['mass'].value/R_pl**2
+    else:
+        print("Pick two of log_g, R_pl and mass priors!")
+        sys.exit(5)
+
     temperatures = parameters['Temp'].value * np.ones_like(pressures)
     #for key,value in parameters.items():
     #    print(key,value.value)
@@ -1041,7 +1050,7 @@ def isothermal_free_transmission(pRT_object, \
         spec = species.split('_R_')[0]
         abundances[species] = 10**parameters[spec].value * np.ones_like(pressures)
         msum += 10**parameters[spec].value
-    if msum > 1.0:
+    if msum > 0.1:
         return None, None
     abundances['H2'] = 0.766 * (1.0-msum) * np.ones_like(pressures)
     abundances['He'] = 0.234 * (1.0-msum) * np.ones_like(pressures)
@@ -1063,22 +1072,22 @@ def isothermal_free_transmission(pRT_object, \
         # low gravity objects
         pRT_object.calc_transm(temperatures, \
                                abundances, \
-                               10**parameters['log_g'].value, \
+                               gravity, \
                                MMW, \
-                               R_pl=parameters['R_pl'].value, \
+                               R_pl=R_pl, \
                                P0_bar=0.01,
                                Pcloud = pcloud)
     else:
         pRT_object.calc_transm(temperatures, \
                                abundances, \
-                               10**parameters['log_g'].value, \
+                               gravity, \
                                MMW, \
-                               R_pl=parameters['R_pl'].value, \
+                               R_pl=R_pl, \
                                P0_bar=0.01)
 
     wlen_model = nc.c/pRT_object.freq/1e-4
     spectrum_model = (pRT_object.transm_rad/parameters['Rstar'].value)**2.
-    return wlen_model, spectrum_model
+    return wlen_model, spectrum_model*1e6
 
 def guillot_free_transmission(pRT_object, \
                                 parameters, \
@@ -1613,11 +1622,12 @@ def get_abundances(pressures, temperatures, line_species, cloud_species, paramet
     else:
         for species in line_species:
             if 'FeH' in species:
-                abundances[species] = abundances_interp[species] / 2.
-                abunds_change_rainout = cp.copy(abundances[species])
-                index_ro = pressures < Pbases['Fe(c)']
-                abunds_change_rainout[index_ro] = 0.
-                abundances[species] = abunds_change_rainout
+                abundances[species] = abundances_interp[species.split('_')[0]] / 2.
+                if "Fe(c)_cd" in cloud_species:
+                    abunds_change_rainout = cp.copy(abundances[species])
+                    index_ro = pressures < Pbases['Fe(c)']
+                    abunds_change_rainout[index_ro] = 0.
+                    abundances[species] = abunds_change_rainout[small_index]
             abundances[species] = abundances_interp[species.split('_')[0]]
         abundances['H2'] = abundances_interp['H2']
         abundances['He'] = abundances_interp['He']
