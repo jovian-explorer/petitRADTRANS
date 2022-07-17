@@ -8,7 +8,7 @@ petitRADTRANS allows the calculation of emission or transmission spectra, at low
 and includes a retrieval module to fit a petitRADTRANS model to your spectral data.
 
 
-Documentation
+Documentation                   
 -------------
 
 The code documentation, installation guide, and tutorial can be found at `https://petitradtrans.readthedocs.io <https://petitradtrans.readthedocs.io>`_.
