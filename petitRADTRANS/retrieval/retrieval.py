@@ -246,7 +246,7 @@ class Retrieval:
             else:
                 i = max(0, int(-np.floor(np.log10(sigma))) + 1)
             fmt = '%%.%df' % i
-            fmts = '\t'.join(['    %-15s' + fmt + " +- " + fmt])
+            fmts = '\t'.join(['    %-15s' + fmt + " +- " + fmt]) 
             print(fmts % (p, med, sigma))
 
     def _run_ultranest(self,
