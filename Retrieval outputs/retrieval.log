@@ -1,0 +1,762 @@
+This folder contains the files you should get as outputs if your retrieval works perfectly.
+
+This is how it should look like if your code is running perfectly - 
+
+(petitradtrans) keshav@dev:~/petitRADTRANS$ python3 retran.py
+
+correlated-k opacities
+
+Na_burrows
+NaH
+HCN
+Al+
+SH
+CO2
+O2
+C2H2
+CH4
+Mg+
+Si+
+K_lor_cut
+Na_allard
+Ca+
+Li
+AlH
+VO
+C2H4
+CO_13_HITEMP
+TiO_all_Exomol
+V+
+K_allard
+Ti+
+CO_13_Chubb
+K_burrows
+Si
+Na_lor_cut
+OH
+SiO2
+PH3
+VO_Plez
+H2S
+Al
+FeH
+CO_all_iso_Chubb
+H2O_Exomol
+Fe
+Ti
+CrH
+O+
+analytics
+MgO
+TiO_48_Exomol
+TiO_all_Plez
+NH3
+V
+O
+MgH
+SiO
+CO_all_iso_HITEMP
+TiO_48_Plez
+Ca
+Fe+
+H2O_HITEMP
+CO_12_HITEMP
+AlO
+Mg
+CaH
+O3
+
+line-by-line opacities
+
+Starting retrieval hst_example_clear_spec
+Using pRT Plotting style!
+Setting up PRT Objects
+/home/keshav/petitRADTRANS/petitRADTRANS/radtrans.py:100: FutureWarning: pRT_input_data_path was set by an environment variable. In a future update, the path to the petitRADTRANS input_data will be set within a .ini file that will be automatically generated into the user home directory (OS agnostic), inside a .petitradtrans directory
+  warnings.warn(f"pRT_input_data_path was set by an environment variable. In a future update, the path to "
+  Read line opacities of CH4_R_120...
+ Done.
+  Read line opacities of H2O_Exomol_R_120...
+ Done.
+  Read line opacities of CO2_R_120...
+ Done.
+  Read line opacities of CO_all_iso_HITEMP_R_120...
+ Done.
+
+  Read CIA opacities for H2-H2...
+  Read CIA opacities for H2-He...
+Done.
+
+Starting retrieval: hst_example_clear_spec
+
+ MultiNest Warning: no resume file found, starting from scratch
+ *****************************************************
+ MultiNest v3.10
+ Copyright Farhan Feroz & Mike Hobson
+ Release Jul 2015
+
+ no. of live points =  400
+ dimensionality =    8
+ *****************************************************
+ Starting MultiNest
+ generating live points
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ live points generated, starting sampling
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.984683
+Replacements:                                450
+Total Samples:                               457
+Nested Sampling ln(Z):            -144781.440148
+Importance Nested Sampling ln(Z):     155.656542 +/-  0.998895
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.965251
+Replacements:                                500
+Total Samples:                               518
+Nested Sampling ln(Z):             -10521.552156
+Importance Nested Sampling ln(Z):     155.676343 +/-  0.874310
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.943396
+Replacements:                                550
+Total Samples:                               583
+Nested Sampling ln(Z):              -7038.276169
+Importance Nested Sampling ln(Z):     155.558131 +/-  0.874433
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.902256
+Replacements:                                600
+Total Samples:                               665
+Nested Sampling ln(Z):              -4938.889805
+Importance Nested Sampling ln(Z):     155.426546 +/-  0.874542
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.873656
+Replacements:                                650
+Total Samples:                               744
+Nested Sampling ln(Z):              -3100.174174
+Importance Nested Sampling ln(Z):     154.723105 +/-  0.874633
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.858896
+Replacements:                                700
+Total Samples:                               815
+Nested Sampling ln(Z):              -1954.875220
+Importance Nested Sampling ln(Z):     154.244762 +/-  0.874662
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.844595
+Replacements:                                750
+Total Samples:                               888
+Nested Sampling ln(Z):              -1197.839376
+Importance Nested Sampling ln(Z):     153.880722 +/-  0.874720
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.828157
+Replacements:                                800
+Total Samples:                               966
+Nested Sampling ln(Z):               -763.228637
+Importance Nested Sampling ln(Z):     153.652736 +/-  0.874772
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.818094
+Replacements:                                850
+Total Samples:                              1039
+Nested Sampling ln(Z):               -467.750076
+Importance Nested Sampling ln(Z):     153.455858 +/-  0.874809
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.805730
+Replacements:                                900
+Total Samples:                              1117
+Nested Sampling ln(Z):               -276.665121
+Importance Nested Sampling ln(Z):     153.264352 +/-  0.874393
+Acceptance Rate:                        0.792327
+Replacements:                                950
+Total Samples:                              1199
+Nested Sampling ln(Z):               -139.776897
+Importance Nested Sampling ln(Z):     153.061663 +/-  0.874427
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.781250
+Replacements:                               1000
+Total Samples:                              1280
+Nested Sampling ln(Z):                -59.420973
+Importance Nested Sampling ln(Z):     152.906664 +/-  0.874456
+Acceptance Rate:                        0.761974
+Replacements:                               1050
+Total Samples:                              1378
+Nested Sampling ln(Z):                -15.879503
+Importance Nested Sampling ln(Z):     152.736369 +/-  0.874486
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.752394
+Replacements:                               1100
+Total Samples:                              1462
+Nested Sampling ln(Z):                 22.185840
+Importance Nested Sampling ln(Z):     152.582253 +/-  0.873581
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.740979
+Replacements:                               1150
+Total Samples:                              1552
+Nested Sampling ln(Z):                 49.858207
+Importance Nested Sampling ln(Z):     152.409228 +/-  0.872925
+Acceptance Rate:                        0.729927
+Replacements:                               1200
+Total Samples:                              1644
+Nested Sampling ln(Z):                 69.204545
+Importance Nested Sampling ln(Z):     152.996194 +/-  0.667667
+Acceptance Rate:                        0.717978
+Replacements:                               1250
+Total Samples:                              1741
+Nested Sampling ln(Z):                 82.502357
+Importance Nested Sampling ln(Z):     152.838439 +/-  0.667683
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.712329
+Replacements:                               1300
+Total Samples:                              1825
+Nested Sampling ln(Z):                 95.599398
+Importance Nested Sampling ln(Z):     156.843792 +/-  0.983601
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.697674
+Replacements:                               1350
+Total Samples:                              1935
+Nested Sampling ln(Z):                103.232451
+Importance Nested Sampling ln(Z):     156.705119 +/-  0.983616
+Acceptance Rate:                        0.692384
+Replacements:                               1400
+Total Samples:                              2022
+Nested Sampling ln(Z):                109.024181
+Importance Nested Sampling ln(Z):     156.615460 +/-  0.984050
+Acceptance Rate:                        0.685904
+Replacements:                               1450
+Total Samples:                              2114
+Nested Sampling ln(Z):                114.446131
+Importance Nested Sampling ln(Z):     156.613111 +/-  0.986361
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.676285
+Replacements:                               1500
+Total Samples:                              2218
+Nested Sampling ln(Z):                118.433194
+Importance Nested Sampling ln(Z):     156.619417 +/-  0.980192
+Acceptance Rate:                        0.668103
+Replacements:                               1550
+Total Samples:                              2320
+Nested Sampling ln(Z):                121.322091
+Importance Nested Sampling ln(Z):     156.617313 +/-  0.982253
+Acceptance Rate:                        0.659522
+Replacements:                               1600
+Total Samples:                              2426
+Nested Sampling ln(Z):                123.290980
+Importance Nested Sampling ln(Z):     156.615188 +/-  0.984342
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.652432
+Replacements:                               1650
+Total Samples:                              2529
+Nested Sampling ln(Z):                124.929705
+Importance Nested Sampling ln(Z):     156.613418 +/-  0.986087
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.638858
+Replacements:                               1700
+Total Samples:                              2661
+Nested Sampling ln(Z):                126.280932
+Importance Nested Sampling ln(Z):     156.614846 +/-  0.984685
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.629270
+Replacements:                               1750
+Total Samples:                              2781
+Nested Sampling ln(Z):                127.292451
+Importance Nested Sampling ln(Z):     156.670313 +/-  0.933200
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.612662
+Replacements:                               1800
+Total Samples:                              2938
+Nested Sampling ln(Z):                128.007600
+Importance Nested Sampling ln(Z):     156.658008 +/-  0.944214
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.601235
+Replacements:                               1850
+Total Samples:                              3077
+Nested Sampling ln(Z):                128.540098
+Importance Nested Sampling ln(Z):     156.650185 +/-  0.951343
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.589879
+Replacements:                               1900
+Total Samples:                              3221
+Nested Sampling ln(Z):                128.956604
+Importance Nested Sampling ln(Z):     156.643671 +/-  0.957351
+Acceptance Rate:                        0.573867
+Replacements:                               1950
+Total Samples:                              3398
+Nested Sampling ln(Z):                129.270892
+Importance Nested Sampling ln(Z):     158.459694 +/-  0.602899
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.563222
+Replacements:                               2000
+Total Samples:                              3551
+Nested Sampling ln(Z):                129.525962
+Importance Nested Sampling ln(Z):     158.348917 +/-  0.594937
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.551372
+Replacements:                               2050
+Total Samples:                              3718
+Nested Sampling ln(Z):                129.763499
+Importance Nested Sampling ln(Z):     158.281639 +/-  0.569159
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.544323
+Replacements:                               2100
+Total Samples:                              3858
+Nested Sampling ln(Z):                130.008113
+Importance Nested Sampling ln(Z):     158.255904 +/-  0.557990
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.531126
+Replacements:                               2150
+Total Samples:                              4048
+Nested Sampling ln(Z):                130.315091
+Importance Nested Sampling ln(Z):     158.210594 +/-  0.562391
+Acceptance Rate:                        0.525310
+Replacements:                               2200
+Total Samples:                              4188
+Nested Sampling ln(Z):                130.733955
+Importance Nested Sampling ln(Z):     158.383896 +/-  0.496716
+Acceptance Rate:                        0.516055
+Replacements:                               2250
+Total Samples:                              4360
+Nested Sampling ln(Z):                131.246971
+Importance Nested Sampling ln(Z):     158.413325 +/-  0.470899
+Acceptance Rate:                        0.512135
+Replacements:                               2300
+Total Samples:                              4491
+Nested Sampling ln(Z):                131.857972
+Importance Nested Sampling ln(Z):     158.381653 +/-  0.477977
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.506138
+Replacements:                               2350
+Total Samples:                              4643
+Nested Sampling ln(Z):                132.730028
+Importance Nested Sampling ln(Z):     158.353435 +/-  0.484723
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.501148
+Replacements:                               2400
+Total Samples:                              4789
+Nested Sampling ln(Z):                133.619140
+Importance Nested Sampling ln(Z):     158.339114 +/-  0.486428
+Acceptance Rate:                        0.494450
+Replacements:                               2450
+Total Samples:                              4955
+Nested Sampling ln(Z):                134.542717
+Importance Nested Sampling ln(Z):     158.317596 +/-  0.492170
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.490677
+Replacements:                               2500
+Total Samples:                              5095
+Nested Sampling ln(Z):                135.483784
+Importance Nested Sampling ln(Z):     158.349027 +/-  0.475979
+Acceptance Rate:                        0.485899
+Replacements:                               2550
+Total Samples:                              5248
+Nested Sampling ln(Z):                136.424426
+Importance Nested Sampling ln(Z):     158.380821 +/-  0.460221
+Acceptance Rate:                        0.481392
+Replacements:                               2600
+Total Samples:                              5401
+Nested Sampling ln(Z):                137.458523
+Importance Nested Sampling ln(Z):     158.408241 +/-  0.447059
+Acceptance Rate:                        0.474825
+Replacements:                               2650
+Total Samples:                              5581
+Nested Sampling ln(Z):                138.568901
+Importance Nested Sampling ln(Z):     158.440017 +/-  0.433308
+Acceptance Rate:                        0.470793
+Replacements:                               2700
+Total Samples:                              5735
+Nested Sampling ln(Z):                139.548357
+Importance Nested Sampling ln(Z):     158.412198 +/-  0.442458
+Acceptance Rate:                        0.463275
+Replacements:                               2750
+Total Samples:                              5936
+Nested Sampling ln(Z):                140.515364
+Importance Nested Sampling ln(Z):     158.422713 +/-  0.436112
+Acceptance Rate:                        0.461589
+Replacements:                               2800
+Total Samples:                              6066
+Nested Sampling ln(Z):                141.423756
+Importance Nested Sampling ln(Z):     158.610267 +/-  0.384075
+Acceptance Rate:                        0.457978
+Replacements:                               2850
+Total Samples:                              6223
+Nested Sampling ln(Z):                142.347175
+Importance Nested Sampling ln(Z):     158.626851 +/-  0.372930
+Acceptance Rate:                        0.452701
+Replacements:                               2900
+Total Samples:                              6406
+Nested Sampling ln(Z):                143.257965
+Importance Nested Sampling ln(Z):     158.797313 +/-  0.324310
+Acceptance Rate:                        0.449969
+Replacements:                               2950
+Total Samples:                              6556
+Nested Sampling ln(Z):                144.218146
+Importance Nested Sampling ln(Z):     158.913489 +/-  0.305556
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.447161
+Replacements:                               3000
+Total Samples:                              6709
+Nested Sampling ln(Z):                145.150869
+Importance Nested Sampling ln(Z):     159.027061 +/-  0.273343
+Acceptance Rate:                        0.443185
+Replacements:                               3050
+Total Samples:                              6882
+Nested Sampling ln(Z):                146.114013
+Importance Nested Sampling ln(Z):     159.070293 +/-  0.263403
+Acceptance Rate:                        0.438845
+Replacements:                               3100
+Total Samples:                              7064
+Nested Sampling ln(Z):                147.022756
+Importance Nested Sampling ln(Z):     159.189493 +/-  0.260510
+Acceptance Rate:                        0.434423
+Replacements:                               3150
+Total Samples:                              7251
+Nested Sampling ln(Z):                147.965484
+Importance Nested Sampling ln(Z):     159.146772 +/-  0.260039
+Acceptance Rate:                        0.427408
+Replacements:                               3200
+Total Samples:                              7487
+Nested Sampling ln(Z):                148.782103
+Importance Nested Sampling ln(Z):     159.124112 +/-  0.255660
+Acceptance Rate:                        0.424948
+Replacements:                               3250
+Total Samples:                              7648
+Nested Sampling ln(Z):                149.600726
+Importance Nested Sampling ln(Z):     159.089152 +/-  0.257230
+ pRT: negative radius corretion applied!
+Acceptance Rate:                        0.422752
+Replacements:                               3300
+Total Samples:                              7806
+Nested Sampling ln(Z):                150.380498
+Importance Nested Sampling ln(Z):     159.078367 +/-  0.253935
+Acceptance Rate:                        0.420221
+Replacements:                               3350
+Total Samples:                              7972
+Nested Sampling ln(Z):                151.095781
+Importance Nested Sampling ln(Z):     159.066631 +/-  0.251478
+Acceptance Rate:                        0.417537
+Replacements:                               3400
+Total Samples:                              8143
+Nested Sampling ln(Z):                151.787573
+Importance Nested Sampling ln(Z):     159.185880 +/-  0.244970
+Acceptance Rate:                        0.413570
+Replacements:                               3450
+Total Samples:                              8342
+Nested Sampling ln(Z):                152.414050
+Importance Nested Sampling ln(Z):     159.224892 +/-  0.235170
+Acceptance Rate:                        0.411088
+Replacements:                               3500
+Total Samples:                              8514
+Nested Sampling ln(Z):                152.981270
+Importance Nested Sampling ln(Z):     159.366006 +/-  0.220634
+Acceptance Rate:                        0.409836
+Replacements:                               3550
+Total Samples:                              8662
+Nested Sampling ln(Z):                153.505718
+Importance Nested Sampling ln(Z):     159.430885 +/-  0.203016
+Acceptance Rate:                        0.405588
+Replacements:                               3600
+Total Samples:                              8876
+Nested Sampling ln(Z):                154.054599
+Importance Nested Sampling ln(Z):     159.391916 +/-  0.201062
+Acceptance Rate:                        0.402027
+Replacements:                               3650
+Total Samples:                              9079
+Nested Sampling ln(Z):                154.560616
+Importance Nested Sampling ln(Z):     159.465396 +/-  0.184820
+Acceptance Rate:                        0.397764
+Replacements:                               3700
+Total Samples:                              9302
+Nested Sampling ln(Z):                155.012325
+Importance Nested Sampling ln(Z):     159.449383 +/-  0.181714
+Acceptance Rate:                        0.393577
+Replacements:                               3750
+Total Samples:                              9528
+Nested Sampling ln(Z):                155.452388
+Importance Nested Sampling ln(Z):     159.480015 +/-  0.174138
+Acceptance Rate:                        0.390184
+Replacements:                               3800
+Total Samples:                              9739
+Nested Sampling ln(Z):                155.853025
+Importance Nested Sampling ln(Z):     159.541154 +/-  0.163841
+Acceptance Rate:                        0.387090
+Replacements:                               3850
+Total Samples:                              9946
+Nested Sampling ln(Z):                156.231860
+Importance Nested Sampling ln(Z):     159.541535 +/-  0.161378
+Acceptance Rate:                        0.384388
+Replacements:                               3900
+Total Samples:                             10146
+Nested Sampling ln(Z):                156.589948
+Importance Nested Sampling ln(Z):     159.522916 +/-  0.161294
+Acceptance Rate:                        0.380686
+Replacements:                               3950
+Total Samples:                             10376
+Nested Sampling ln(Z):                156.916126
+Importance Nested Sampling ln(Z):     159.515300 +/-  0.160062
+Acceptance Rate:                        0.377358
+Replacements:                               4000
+Total Samples:                             10600
+Nested Sampling ln(Z):                157.210231
+Importance Nested Sampling ln(Z):     159.543953 +/-  0.154509
+Acceptance Rate:                        0.375487
+Replacements:                               4050
+Total Samples:                             10786
+Nested Sampling ln(Z):                157.468076
+Importance Nested Sampling ln(Z):     159.539272 +/-  0.153170
+Acceptance Rate:                        0.373236
+Replacements:                               4100
+Total Samples:                             10985
+Nested Sampling ln(Z):                157.723632
+Importance Nested Sampling ln(Z):     159.544026 +/-  0.151203
+Acceptance Rate:                        0.370569
+Replacements:                               4150
+Total Samples:                             11199
+Nested Sampling ln(Z):                157.961961
+Importance Nested Sampling ln(Z):     159.553418 +/-  0.148719
+Acceptance Rate:                        0.368292
+Replacements:                               4200
+Total Samples:                             11404
+Nested Sampling ln(Z):                158.175143
+Importance Nested Sampling ln(Z):     159.544151 +/-  0.148353
+Acceptance Rate:                        0.366474
+Replacements:                               4250
+Total Samples:                             11597
+Nested Sampling ln(Z):                158.363637
+Importance Nested Sampling ln(Z):     159.553753 +/-  0.146094
+Acceptance Rate:                        0.364098
+Replacements:                               4300
+Total Samples:                             11810
+Nested Sampling ln(Z):                158.537022
+Importance Nested Sampling ln(Z):     159.537262 +/-  0.146989
+Acceptance Rate:                        0.360517
+Replacements:                               4350
+Total Samples:                             12066
+Nested Sampling ln(Z):                158.696147
+Importance Nested Sampling ln(Z):     159.528856 +/-  0.147091
+Acceptance Rate:                        0.358335
+Replacements:                               4400
+Total Samples:                             12279
+Nested Sampling ln(Z):                158.842428
+Importance Nested Sampling ln(Z):     159.542803 +/-  0.144435
+Acceptance Rate:                        0.356542
+Replacements:                               4450
+Total Samples:                             12481
+Nested Sampling ln(Z):                158.978553
+Importance Nested Sampling ln(Z):     159.560694 +/-  0.141655
+Acceptance Rate:                        0.355338
+Replacements:                               4500
+Total Samples:                             12664
+Nested Sampling ln(Z):                159.106094
+Importance Nested Sampling ln(Z):     159.583769 +/-  0.138190
+Acceptance Rate:                        0.353480
+Replacements:                               4550
+Total Samples:                             12872
+Nested Sampling ln(Z):                159.226323
+Importance Nested Sampling ln(Z):     159.596817 +/-  0.136086
+Acceptance Rate:                        0.352301
+Replacements:                               4600
+Total Samples:                             13057
+Nested Sampling ln(Z):                159.339232
+Importance Nested Sampling ln(Z):     159.609805 +/-  0.134082
+Acceptance Rate:                        0.350811
+Replacements:                               4650
+Total Samples:                             13255
+Nested Sampling ln(Z):                159.445857
+Importance Nested Sampling ln(Z):     159.614812 +/-  0.133048
+Acceptance Rate:                        0.348561
+Replacements:                               4700
+Total Samples:                             13484
+Nested Sampling ln(Z):                159.545212
+Importance Nested Sampling ln(Z):     159.614090 +/-  0.132772
+Acceptance Rate:                        0.345857
+Replacements:                               4750
+Total Samples:                             13734
+Nested Sampling ln(Z):                159.641605
+Importance Nested Sampling ln(Z):     159.614135 +/-  0.132434
+Acceptance Rate:                        0.343421
+Replacements:                               4800
+Total Samples:                             13977
+Nested Sampling ln(Z):                159.734600
+Importance Nested Sampling ln(Z):     159.620279 +/-  0.131390
+Acceptance Rate:                        0.342079
+Replacements:                               4850
+Total Samples:                             14178
+Nested Sampling ln(Z):                159.819657
+Importance Nested Sampling ln(Z):     159.631988 +/-  0.129726
+Acceptance Rate:                        0.341131
+Replacements:                               4900
+Total Samples:                             14364
+Nested Sampling ln(Z):                159.897214
+Importance Nested Sampling ln(Z):     159.644408 +/-  0.128034
+Acceptance Rate:                        0.339506
+Replacements:                               4950
+Total Samples:                             14580
+Nested Sampling ln(Z):                159.969418
+Importance Nested Sampling ln(Z):     159.651433 +/-  0.126987
+Acceptance Rate:                        0.337245
+Replacements:                               5000
+Total Samples:                             14826
+Nested Sampling ln(Z):                160.038306
+Importance Nested Sampling ln(Z):     159.652372 +/-  0.126731
+Acceptance Rate:                        0.335459
+Replacements:                               5050
+Total Samples:                             15054
+Nested Sampling ln(Z):                160.102742
+Importance Nested Sampling ln(Z):     159.653372 +/-  0.126482
+Acceptance Rate:                        0.333660
+Replacements:                               5100
+Total Samples:                             15285
+Nested Sampling ln(Z):                160.161559
+Importance Nested Sampling ln(Z):     159.654558 +/-  0.126231
+Acceptance Rate:                        0.332473
+Replacements:                               5150
+Total Samples:                             15490
+Nested Sampling ln(Z):                160.214617
+Importance Nested Sampling ln(Z):     159.662112 +/-  0.125217
+Acceptance Rate:                        0.331020
+Replacements:                               5200
+Total Samples:                             15709
+Nested Sampling ln(Z):                160.263149
+Importance Nested Sampling ln(Z):     159.662888 +/-  0.125051
+Acceptance Rate:                        0.328865
+Replacements:                               5250
+Total Samples:                             15964
+Nested Sampling ln(Z):                160.308173
+Importance Nested Sampling ln(Z):     159.660800 +/-  0.125249
+Acceptance Rate:                        0.326938
+Replacements:                               5300
+Total Samples:                             16211
+Nested Sampling ln(Z):                160.349307
+Importance Nested Sampling ln(Z):     159.663909 +/-  0.124813
+Acceptance Rate:                        0.324932
+Replacements:                               5350
+Total Samples:                             16465
+Nested Sampling ln(Z):                160.387019
+Importance Nested Sampling ln(Z):     159.671223 +/-  0.123871
+Acceptance Rate:                        0.322427
+Replacements:                               5400
+Total Samples:                             16748
+Nested Sampling ln(Z):                160.421715
+Importance Nested Sampling ln(Z):     159.675294 +/-  0.123333
+Acceptance Rate:                        0.320005
+Replacements:                               5450
+Total Samples:                             17031
+Nested Sampling ln(Z):                160.454408
+Importance Nested Sampling ln(Z):     159.676211 +/-  0.123192
+Acceptance Rate:                        0.317039
+Replacements:                               5500
+Total Samples:                             17348
+Nested Sampling ln(Z):                160.484174
+Importance Nested Sampling ln(Z):     159.675747 +/-  0.123222
+Acceptance Rate:                        0.314984
+Replacements:                               5539
+Total Samples:                             17585
+Nested Sampling ln(Z):                160.505286
+Importance Nested Sampling ln(Z):     159.676981 +/-  0.123057
+ ln(ev)=   160.75776878642449      +/-  0.15659668943836730     
+ Total Likelihood Evaluations:        17585
+ Sampling finished. Exiting MultiNest
+  analysing data from out_PMN/hst_example_clear_spec_.txt
+  marginal likelihood:
+    ln Z = 159.7 +- 0.1
+  parameters:
+    log_g          2.689 +- 0.097
+    R_pl           1602518295 +- 76785525
+    Temperature    702 +- 158
+    log_Pcloud     0.3 +- 1.2
+    CH4            -2.25 +- 0.69
+    H2O_Exomol     -2.02 +- 0.81
+    CO2            -3.6 +- 1.5
+    CO_all_iso_HITEMP-3.4 +- 1.7
+Plotting Best-fit spectrum
+Computing Best Fit Model, this may take a minute...
+  Read line opacities of CH4...
+ Done.
+  Read line opacities of H2O_Exomol...
+ Done.
+  Read line opacities of CO2...
+ Done.
+  Read line opacities of CO_all_iso_HITEMP...
+ Done.
+
+      Read CIA opacities for H2-H2...
+      Read CIA opacities for H2-He...
+    Done.
+
+    /home/keshav/petitRADTRANS/petitRADTRANS/retrieval/retrieval.py:1277: UserWarning: This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.
+      plt.tight_layout()
+    /home/keshav/petitRADTRANS/petitRADTRANS/retrieval/retrieval.py:1278: UserWarning: This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.
+      plt.savefig(self.output_dir + 'evaluate_'+self.rd.retrieval_name +'/best_fit_spec.pdf')
+    /home/keshav/anaconda3/envs/petitradtrans/lib/python3.9/tkinter/__init__.py:814: UserWarning: This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.
+      func(*args)
+    Plotting PT profiles
+    (2002, 9)
+    Making corner plot
+    8
+
+
