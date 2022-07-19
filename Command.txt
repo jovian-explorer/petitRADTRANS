@@ -1,4 +1,6 @@
-This is the only set of commands you need to run if you installed everything correctly. I would suggest making a new environment before the installation and running the piepline, so as to not make it clash with other installations you may have on your system.
+This is the only set of commands you need to run if you installed everything correctly. 
+I would suggest making a new environment before the installation and running the piepline,
+so as to not make it clash with other installations you may have on your system.
 
 conda activate petitradtrans
 python3 retran.py
